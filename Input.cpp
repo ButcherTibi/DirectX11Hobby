@@ -164,13 +164,15 @@ void InputState::addShortcut(Shortcut* shortcut, InputKey* key_0, InputKey* key_
 
 void InputState::removeShortcut(Shortcut* shortcut)
 {
+	shortcut->duration = -1.0f;
+
 	switch (shortcut->size) {
 	case 1:
 		unlistenForKey(shortcut->keys[0]);
 
 		for (uint32_t i = 0; i < shortcuts_1key.size(); i++) {
 
-			Shortcut* existing = shortcuts_3keys[i];
+			Shortcut* existing = shortcuts_1key[i];
 
 			if (existing == shortcut) {
 				shortcut->size = 0;

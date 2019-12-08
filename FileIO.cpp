@@ -146,6 +146,14 @@ bool Path::isAccesible()
 	return true;
 }
 
+bool Path::hasExtension(std::string ext)
+{
+	std::string& last_entry = this->entries.back();
+	uint64_t offset = last_entry.find_last_of('.');
+
+	return last_entry.substr(offset + 1) == ext ? true : false;
+}
+
 void Path::push_back(std::string path)
 {
 	push_path_to_vector(this->entries, path);
@@ -230,6 +238,27 @@ std::vector<char> Path::toWin32Path()
 	return path;
 }
 
+std::string Path::toString()
+{
+	std::string path;
+
+	if (this->entries.size()) {
+
+		size_t last = entries.size() - 1;
+		for (size_t i = 0; i < entries.size(); i++) {
+
+			for (char letter : entries[i]) {
+				path.push_back(letter);
+			}
+
+			if (i != last) {
+				path.push_back('\\');
+			}
+		}
+	}
+	return path;
+}
+
 ErrorStack getExePath(Path& exe_path)
 {
 	std::vector<char> exe_filename(max_path);
@@ -258,7 +287,8 @@ ErrorStack Path::read(std::vector<char> &content)
 		NULL);
 
 	if (file_handle == INVALID_HANDLE_VALUE) {
-		return ErrorStack(code_location, getLastError());
+		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location, 
+			"failed to create file handle for path = " + this->toString(), getLastError());
 	}
 
 	// find file size
@@ -266,7 +296,8 @@ ErrorStack Path::read(std::vector<char> &content)
 	if (!GetFileSizeEx(file_handle, &file_size)) {
 
 		CloseHandle(file_handle);
-		return ErrorStack(code_location, getLastError());
+		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
+			"failed to find file size for path = " + this->toString(), getLastError());
 	}
 	content.resize(file_size.QuadPart);
 
@@ -276,7 +307,8 @@ ErrorStack Path::read(std::vector<char> &content)
 	if (!ReadFile(file_handle, content.data(), (DWORD) file_size.QuadPart, &bytes_read, NULL)) {
 
 		CloseHandle(file_handle);
-		return ErrorStack(code_location, getLastError());
+		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
+			"failed to read path = " + this->toString(), getLastError());
 	}
 
 	CloseHandle(file_handle);

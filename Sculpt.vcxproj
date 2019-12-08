@@ -171,7 +171,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
-    <ClCompile Include="Importer.cpp" />
+    <ClCompile Include="BinaryParser.cpp" />
+    <ClCompile Include="GLTFParser.cpp" />
+    <ClCompile Include="JSONParser.cpp" />
     <ClCompile Include="LinkageMesh.cpp" />
     <ClCompile Include="FileIO.cpp" />
     <ClCompile Include="Input.cpp" />

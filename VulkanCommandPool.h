@@ -5,6 +5,8 @@
 #include <atomic>
 
 
+// This thing is never used, should delete ?
+
 struct ComandPoolResource
 {
 	std::atomic_bool in_use;

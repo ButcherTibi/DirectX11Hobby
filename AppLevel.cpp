@@ -110,14 +110,14 @@ ErrorStack AppLevel::response()
 		float delta_pitch = (float)input.mouse_delta_y * rotation_sensitivity * delta_time;
 		float delta_yaw = (float)input.mouse_delta_x * rotation_sensitivity * delta_time;
 
-		renderer.orbitCameraArcball(renderer.mesh.position, delta_pitch, delta_yaw);
+		renderer.orbitCameraArcball(renderer.meshes[0]->position, delta_pitch, delta_yaw);
 	}
 	else if (zoom_shortcut) {
 
 		float zoom_sensitivity = 0.5f;
 		float zoom_amount = (float)input.mouse_delta_y * zoom_sensitivity * delta_time;
 
-		renderer.zoomCamera(renderer.mesh.position, zoom_amount);
+		renderer.zoomCamera(renderer.meshes[0]->position, zoom_amount);
 	}
 	else if (pan_shortcut) {
 
@@ -135,7 +135,7 @@ ErrorStack AppLevel::response()
 	}
 
 	// Render settings
-	renderer.loadMeshToBuffs();
+	renderer.loadMeshesToBuffs();
 
 	err = renderer.vk_man.rebuild();
 	if (err.isBad()) {
@@ -197,7 +197,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}
 	}
 
-	// Mouse Input
+	// Mouse Position Input
 	{
 		RAWINPUTDEVICE raw_input_dev;
 		raw_input_dev.usUsagePage = 0x01;
@@ -212,7 +212,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}
 	}
 
-	// Keyboard Input
+	// Button Input
 	{
 		input.addShortcut(&input.rotate_camera, &input.key_mouse_right);
 		input.addShortcut(&input.zoom_camera, &input.key_mouse_middle);
@@ -222,21 +222,16 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	ErrorStack err;
 
 	// Scene setup
+	std::vector<LinkageMesh> meshes;  // keep alive
 	{
-		LinkageMesh mesh;
-		err = importGLTFMesh(Path("E:/my_work/Vulkan/Sculpt/Sculpt/meshes/minimal_mesh.json"), mesh);
+		err = gltf::importMeshes(Path("E:/my_work/Vulkan/Sculpt/Sculpt/meshes/damaged_helmet/damaged_helmet.gltf"), meshes);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
+		setMeshVertexColor(meshes[0], { 1, 1, 1, 1 });
 
-		return 0;
-
-		CreateCoordinateCubeInfo info = {};
-		info.pos.z = -1.5f;
-
-		createCoordinateCubeMesh(info, app_level.renderer.mesh);
-
+		app_level.renderer.meshes.push_back(&meshes[0]);
 		app_level.renderer.camera.position.z = 1.5;
 	}
 
@@ -268,9 +263,9 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}
 
 		// Get Input
-		err = input.update(std::chrono::steady_clock::now());
+		err = input.update(frame_start);
 		if (err.isBad()) {
-			err.report(code_location, "failed to update input");
+			err.pushError(code_location, "failed to update input");
 			break;
 		}
 

@@ -19,6 +19,8 @@ public:
 	Path(std::string path);
 
 public:
+	/* Queries */
+
 	/* does the path starts from drive letter */
 	bool isAbsolute();
 
@@ -27,6 +29,11 @@ public:
 
 	/* try to access directory or file pointed by path */
 	bool isAccesible();
+
+	bool hasExtension(std::string ext);
+
+
+	/* Modify */
 
 	void push_back(Path path);
 	void push_back(std::string path);
@@ -38,8 +45,16 @@ public:
 
 	bool erase(size_t start, size_t end);
 
+
+	/* Conversions */
+
 	/* Win32 requires this path format = "\\?\C:\Directory\file.txt" (aparently) */
 	std::vector<char> toWin32Path();
+
+	/*  */
+	std::string toString();
+
+	/* Reads */
 
 	/* reads the file pointed by this path
 	 * intended for reading shader code and JSON */

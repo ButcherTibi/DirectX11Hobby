@@ -52,9 +52,9 @@ public:
 };
 
 
-// Vertex Buffer
-class GPUVertex 
-{
+/* Vertex Buffer Types */
+
+class GPUVertex {
 public:
 	uint32_t mesh_id;
 	glm::vec3 pos;
@@ -65,23 +65,24 @@ public:
 };
 
 
-// Storage
-struct GPUStorage
-{
-	alignas(16) glm::vec3 mesh_pos;
-	alignas(16) glm::vec4 mesh_rot;
+/* Storage Buffer Types */
+
+struct GPUMeshProperties {
+	alignas(16) glm::vec3 pos;
+	alignas(16) glm::vec4 rot;
 };
 
 
-// Uniform
-struct GPUUniform 
-{
+/* Uniform Buffer Types */
+
+struct GPUUniform  {
 	alignas(16) glm::vec3 camera_pos;
 	alignas(16) glm::vec4 camera_rot;
 	alignas(16) glm::mat4 camera_perspective;
 };
 
 
+// Descriptor stuff can be put in another file
 class DescriptorSets
 {
 public:

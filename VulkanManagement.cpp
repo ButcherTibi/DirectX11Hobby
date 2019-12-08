@@ -44,9 +44,9 @@ ErrorStack VulkanManagement::init(HINSTANCE hinstance, HWND hwnd)
 	dev_mem_node.initDeviceMemory(&dev_mem, &dev_node);
 	level_nodes[3].push_back(&dev_mem_node);
 
-	cmd_pools.init(&dev);
-	cmd_pools_node.initCmdPools(&cmd_pools, &dev_node);
-	level_nodes[3].push_back(&cmd_pools_node);
+	//cmd_pools.init(&dev);
+	//cmd_pools_node.initCmdPools(&cmd_pools, &dev_node);
+	//level_nodes[3].push_back(&cmd_pools_node);
 
 	load_cmd_buff.init(&dev);
 	load_cmd_buff_node.initLoadCmdBuff(&load_cmd_buff, &dev_node);
@@ -70,7 +70,7 @@ ErrorStack VulkanManagement::init(HINSTANCE hinstance, HWND hwnd)
 		std::vector<char> vertex_shader_code;
 		res = vert_code_path.read(vertex_shader_code);
 		if (res.isBad()) {
-			res.report(code_location, "failed to read vertex shader code file");
+			res.pushError(code_location, "failed to read vertex shader code file");
 			return res;
 		}
 		vert_module.init(&dev, vertex_shader_code, VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT);
@@ -82,7 +82,7 @@ ErrorStack VulkanManagement::init(HINSTANCE hinstance, HWND hwnd)
 		std::vector<char> frag_shader_code;
 		res = frag_code_path.read(frag_shader_code);
 		if (res.isBad()) {
-			res.report(code_location, "failed to read fragment shader code file");
+			res.pushError(code_location, "failed to read fragment shader code file");
 			return res;
 		}
 		frag_module.init(&dev, frag_shader_code, VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -302,7 +302,7 @@ ErrorStack VulkanManagement::rebuild()
 		for (auto& task : level_nodes[i]) {
 			
 			if (task.err.isBad()) {
-				task.err.report(code_location, "failed to rebuild node " + task.node->name);
+				task.err.pushError(code_location, "failed to rebuild node " + task.node->name);
 				return task.err;
 			}
 		}	

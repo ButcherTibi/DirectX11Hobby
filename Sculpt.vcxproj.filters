@@ -28,6 +28,9 @@
     <Filter Include="Source Files\AppLevel">
       <UniqueIdentifier>{6cac705a-a616-4a81-bd62-ed76c9977ca6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Importer">
+      <UniqueIdentifier>{73c0de51-568c-486b-b747-400f71b18cd9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -105,8 +108,14 @@
     <ClCompile Include="MathTypes.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
-    <ClCompile Include="Importer.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="JSONParser.cpp">
+      <Filter>Source Files\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="GLTFParser.cpp">
+      <Filter>Source Files\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryParser.cpp">
+      <Filter>Source Files\Importer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -171,7 +180,7 @@
       <Filter>Source Files\AppLevel</Filter>
     </ClInclude>
     <ClInclude Include="Importer.h">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Importer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

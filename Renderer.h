@@ -45,8 +45,8 @@ public:
 	DeviceMemory dev_mem;
 	VulkanNode dev_mem_node;
 
-	ComandPools cmd_pools;
-	VulkanNode cmd_pools_node;
+	//ComandPools cmd_pools;
+	//VulkanNode cmd_pools_node;
 
 	LoadComandBuffer load_cmd_buff;
 	VulkanNode load_cmd_buff_node;
@@ -195,11 +195,13 @@ public:
 	VulkanManagement vk_man;
 
 	Camera camera;
-	LinkageMesh mesh;
+	std::vector<LinkageMesh*> meshes;
 
 	std::vector<GPUVertex> gpu_verts;
 	std::vector<uint32_t> gpu_indexs;
-	GPUStorage gpu_storage;
+
+	std::vector<GPUMeshProperties> gpu_meshes;
+
 	GPUUniform gpu_uniform;
 
 public:
@@ -219,5 +221,5 @@ public:
 	/* moves the camera up,down, left, right relative to camera rotation */
 	void panCamera(float delta_vertical, float delta_horizontal);
 
-	void loadMeshToBuffs();
+	void loadMeshesToBuffs();
 };

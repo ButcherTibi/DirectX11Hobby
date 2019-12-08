@@ -2,15 +2,9 @@
 // Standard
 #include <array>
 
-// GLM
-#include <glm/gtc/matrix_transform.hpp>
-
 // Other
 #include "ErrorStuff.h"
 #include "VulkanContext.h"
-#include "VulkanMemory.h"
-#include "VulkanCommandPool.h"
-#include "Meshes.h"
 
 #include "VulkanBuffers.h"
 

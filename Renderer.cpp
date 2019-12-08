@@ -1,6 +1,5 @@
 
 // Standard
-#include <execution>
 
 // Math
 #include "MathTypes.h"
@@ -86,54 +85,63 @@ void Renderer::panCamera(float delta_vertical, float delta_horizontal)
 	camera.position += camera.right() * -delta_horizontal;
 }
 
-void Renderer::loadMeshToBuffs()
+void Renderer::loadMeshesToBuffs()
 {
-	// Vertex buffers
+	// calculate sizes
 	{
-		gpu_verts.resize(mesh.verts_size);
+		uint64_t total_verts_size = 0;
+		uint64_t total_idxs_size = 0;
 
-		std::atomic_uint32_t atomic_i = 0;
+		for (LinkageMesh* mesh : meshes) {
 
-		std::for_each(std::execution::par_unseq, mesh.verts.begin(), mesh.verts.end(), [this, &atomic_i](Vertex& v) {
+			total_verts_size += mesh->verts_size;
+			total_idxs_size += mesh->ttris_count * 3;
+		}
 
-			uint32_t i = atomic_i.fetch_add(1, std::memory_order_relaxed);
-
-			gpu_verts[i].color.r = v.color.r;
-			gpu_verts[i].color.g = v.color.g;
-			gpu_verts[i].color.b = v.color.b;
-			gpu_verts[i].pos = v.pos;
-
-			v.gpu_idx = i;  // for index buffer
-		});
+		this->gpu_verts.resize(total_verts_size);
+		this->gpu_indexs.resize(total_idxs_size);
+		this->gpu_meshes.resize(meshes.size());
 	}
+	
 
-	// Index buffer
-	{
-		gpu_indexs.resize(mesh.ttris_count.load() * 3);
+	uint32_t total_verts_idx = 0;
+	uint32_t total_idxs_idx = 0;
+	for (uint64_t mesh_idx = 0; mesh_idx < meshes.size(); mesh_idx++) {
 
-		std::atomic_uint32_t atomic_i = 0;
+		LinkageMesh* mesh = meshes[mesh_idx];
 
-		std::for_each(std::execution::par_unseq, mesh.polys.begin(), mesh.polys.end(), [this, &atomic_i](Poly& p) {
+		// Vertices
+		for (Vertex& v : mesh->verts) {
 
-			uint32_t i = atomic_i.fetch_add((uint32_t)p.tess_tris.size() * 3, std::memory_order_relaxed);
+			GPUVertex& gpu_v = gpu_verts[total_verts_idx];
+			gpu_v.mesh_id = (uint32_t)mesh_idx;		
+			gpu_v.pos = v.pos;
+			gpu_v.color = v.color;
+
+			v.gpu_idx = total_verts_idx;  // for index buffer
+
+			total_verts_idx++;
+		}
+
+		// Indexes
+		for (Poly& p : mesh->polys) {
+
+			uint32_t& i = total_idxs_idx;
 
 			for (TriangulationTris& tris : p.tess_tris) {
 
-				gpu_indexs[i++] = tris.vs[0]->gpu_idx;
-				gpu_indexs[i++] = tris.vs[1]->gpu_idx;
-				gpu_indexs[i++] = tris.vs[2]->gpu_idx;
+				gpu_indexs[i + 0] = tris.vs[0]->gpu_idx;
+				gpu_indexs[i + 1] = tris.vs[1]->gpu_idx;
+				gpu_indexs[i + 2] = tris.vs[2]->gpu_idx;
+
+				total_idxs_idx += 3;
 			}
-		});
-	}
+		}
 
-	// Storage buffer
-	{
-		gpu_storage.mesh_pos = mesh.position;
-
-		gpu_storage.mesh_rot.x = mesh.rotation.x;
-		gpu_storage.mesh_rot.y = mesh.rotation.y;
-		gpu_storage.mesh_rot.z = mesh.rotation.z;
-		gpu_storage.mesh_rot.w = mesh.rotation.w;
+		// Mesh Data
+		GPUMeshProperties& gpu_mesh = gpu_meshes[mesh_idx];
+		gpu_mesh.pos = mesh->position;
+		gpu_mesh.rot.data = mesh->rotation.data;  // same order x,y,z,w
 	}
 
 	// Uniform buffer
@@ -154,6 +162,6 @@ void Renderer::loadMeshToBuffs()
 
 	vk_man.loadVertexData(&gpu_verts);
 	vk_man.loadIndexData(&gpu_indexs);
-	vk_man.loadStorageData(&gpu_storage, sizeof(GPUStorage));
+	vk_man.loadStorageData(gpu_meshes.data(), sizeof(GPUMeshProperties) * gpu_meshes.size());
 	vk_man.loadUniformData(&gpu_uniform, sizeof(GPUUniform));
 }

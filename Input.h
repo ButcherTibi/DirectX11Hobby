@@ -85,7 +85,8 @@ public:
 	void submit(bool state, steady_time time);
 };
 
-
+/* Reminder for why I made this:
+ * - 2 shortcuts using overlapping but different key combinations will not trigger simultaneously */
 struct Shortcut
 {
 	std::array<InputKey*, 3> keys;
@@ -123,6 +124,7 @@ public:
 	InputKey key_mouse_right;
 	InputKey key_mouse_middle;
 
+	// TODO: move these out
 	// Shortcuts
 	Shortcut rotate_camera;
 	Shortcut zoom_camera;

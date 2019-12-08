@@ -16,8 +16,16 @@ struct CreateTriangleInfo
 	bool clockwise = true;
 };
 // create a mesh consisting of a single triangle
-void createTriangleMesh(CreateTriangleInfo info, LinkageMesh& me);
+void createTriangleMesh(CreateTriangleInfo info, LinkageMesh& tris);
 
+struct CreateQuadInfo {
+	glm::vec3 pos = { 0, 0, 0 };
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1 };
+
+	glm::vec4 color = { 1, 1, 1, 1 };
+};
+void createQuadMesh(CreateQuadInfo info, LinkageMesh& quad);
 
 struct CreateCubeInfo
 {
@@ -31,7 +39,7 @@ struct CreateCubeInfo
 
 	bool clockwise = true;
 };
-void createCubeMesh(CreateCubeInfo info, LinkageMesh& me);
+void createCubeMesh(CreateCubeInfo info, LinkageMesh& cube);
 
 
 struct CreateCoordinateCubeInfo
@@ -45,4 +53,4 @@ struct CreateCoordinateCubeInfo
 
 	bool clockwise = true;
 };
-void createCoordinateCubeMesh(CreateCoordinateCubeInfo info, LinkageMesh& me);
+void createCoordinateCubeMesh(CreateCoordinateCubeInfo info, LinkageMesh& coordinate_cube);

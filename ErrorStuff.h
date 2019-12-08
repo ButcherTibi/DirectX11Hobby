@@ -28,8 +28,10 @@ enum class ExtraError {
 
 	// Aplication
 	FAILED_TO_GET_WINDOW_SIZE,
+	FAILED_TO_READ_FILE,
 
 	// Importer
+	FAILED_TO_PARSE_JSON,
 	FAILED_TO_PARSE_GLTF,
 
 	// Instance
@@ -108,15 +110,10 @@ struct ErrorStack
 	/* with Windows message */
 	ErrorStack(ExtraError res, std::string location, std::string msg, std::string win_msg);
 
-	/* i = index of character in text, 
-	 * i gets converted to line and colum and appended to message */
-	ErrorStack(ExtraError err, std::string location, std::string msg, uint64_t i, std::vector<char>& text);
-
 	ErrorStack(VkResult res, std::string location, std::string msg);
 	ErrorStack(VkResult res, ExtraError err, std::string location, std::string msg);
 
-	void report(std::string location, std::string msg);
-	void report(std::string location, std::string msg, uint64_t line, uint64_t col);
+	void pushError(std::string location, std::string msg);
 
 	Error lastError();
 
@@ -132,9 +129,20 @@ std::string getLastError();
 std::string asIs(char c);
 
 
+/* Debug variable */
+
+#if (_DEBUG)
+	extern uint64_t debug_trigger_0;
+#endif
+
+
 /* Assertions */
 
-constexpr bool enable_runtime_assertions = true;
+#if (_DEBUG)
+	constexpr bool enable_runtime_assertions = true;
+#else
+	constexpr bool enable_runtime_assertions = false;
+#endif
 
 // prints a message, if condition is false
 #define assert_cond(param, msg) \

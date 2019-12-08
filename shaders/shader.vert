@@ -13,11 +13,18 @@ layout(std140, set = 0, binding = 0) readonly uniform UniformBuffer {
     mat4 camera_perspective;
 } ubuf;
 
-// Storage Buffer
+
+/* Storage Buffer Types */
+
+struct MeshProps {
+    vec3 pos;
+    vec4 rot;
+};
+
 layout(std140, set = 0, binding = 1) readonly buffer StorageBuffer {
-    vec3 mesh_pos;
-    vec4 mesh_rot;
-} buf;
+    MeshProps meshes_props[];
+} sbuf;
+
 
 // Outputs
 layout(location = 0) out vec3 out_color;
@@ -42,7 +49,7 @@ void main()
 
     // Object
     pos = in_pos; 
-    pos += buf.mesh_pos;  // local to global position
+    pos += sbuf.meshes_props[in_mesh_id].pos;  // local to global position
 
     // Camera
     pos -= ubuf.camera_pos;

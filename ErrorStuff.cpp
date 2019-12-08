@@ -65,28 +65,6 @@ ErrorStack::ErrorStack(ExtraError res, std::string location, std::string msg, st
 	this->error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
 }
 
-ErrorStack::ErrorStack(ExtraError err, std::string location, std::string msg, uint64_t i, std::vector<char>& text)
-{
-	uint64_t line = 1;
-	uint64_t col = 1;
-
-	for (uint64_t idx = 0; idx <= i; idx++) {
-
-		char& c = text[idx];
-
-		if (c == '\n') {
-			line++;
-			col = 1;
-			continue;
-		}
-		printf("%I64u %c \n", col, c);
-		col++;
-	}
-
-	this->error_stack.push_back(Error(err, location, msg + 
-		" at ln= " + std::to_string(line) + " col= " + std::to_string(col - 1) ));
-}
-
 ErrorStack::ErrorStack(VkResult res, std::string location, std::string msg)
 {
 	this->error_stack.push_back(Error(res, location, msg));
@@ -97,15 +75,9 @@ ErrorStack::ErrorStack(VkResult res, ExtraError err, std::string location, std::
 	this->error_stack.push_back(Error(res, location, msg));
 }
 
-void ErrorStack::report(std::string location, std::string msg)
+void ErrorStack::pushError(std::string location, std::string msg)
 {
 	this->error_stack.push_back(Error(location, msg));
-}
-
-void ErrorStack::report(std::string location, std::string msg, uint64_t line, uint64_t col)
-{
-	this->error_stack.push_back(Error(location, msg +
-		" at ln= " + std::to_string(line) + " col= " + std::to_string(col)));
 }
 
 Error ErrorStack::lastError()
@@ -168,10 +140,14 @@ std::string asIs(char c)
 	switch (c)
 	{
 	case '\n':
-		return std::string("\\n");
+		return std::string("'\\n'");
 	case '\r':
-		return std::string("\\r");
+		return std::string("'\\r'");
 	}
 
-	return std::string(1, c);
+	return "'" + std::string(1, c) + "'";
 }
+
+#if (_DEBUG)
+	uint64_t debug_trigger_0 = 0;
+#endif

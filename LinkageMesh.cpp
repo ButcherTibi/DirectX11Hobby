@@ -6,6 +6,11 @@
 #include "Meshes.h"
 
 
+Vertex::Vertex()
+{
+	// do nothing
+}
+
 Vertex::Vertex(float x, float y, float z)
 {
 	this->pos.x = x;
@@ -24,13 +29,25 @@ Vertex::Vertex(glm::vec3 const& pos, glm::vec4 const& color)
 	this->color = color;
 }
 
+void Vertex::registerEdge(Edge* e)
+{
+	this->link_edges_count += 1;
+	this->link_edges.push_front(e);
+}
+
+void Edge::registerPoly(Poly* p)
+{
+	this->link_polys_count += 1;
+	this->link_polys.push_front(p);
+}
+
 Side::Side(Vertex* v, Edge* e)
 {
 	this->v = v;
 	this->e = e;
 }
 
-bool Poly::getWinding()
+bool Poly::getFirstWinding()
 {
 	for (Side& ps : poly_sides) {
 		Edge* e = ps.e;
@@ -41,12 +58,18 @@ bool Poly::getWinding()
 
 				for (Side& other_ps : other_p->poly_sides) {
 
-					// Counter Clock Wise
-					if (ps.e == other_ps.e &&
-						ps.v == other_ps.v)
-					{
-						return false;
+					// on the shared edge between the this and neighbouring
+					if (ps.e == other_ps.e) {
+
+						// Counter Clock Wise
+						if (ps.v == other_ps.v) {
+							return false;
+						}
+						// Clock Wise
+						return true;
 					}
+
+					// imagine gears rotating to understand the above if
 				}
 			}				
 		}
@@ -77,7 +100,7 @@ void Poly::tesselate(LinkageMesh* me)
 
 		tess_tris.resize(1);
 
-		if (getWinding()) {	
+		if (getFirstWinding()) {	
 			tess_tris[0].vs[0] = v0;
 			tess_tris[0].vs[1] = v1;
 			tess_tris[0].vs[2] = v2;
@@ -88,7 +111,7 @@ void Poly::tesselate(LinkageMesh* me)
 			tess_tris[0].vs[2] = v0;
 		}
 
-		me->ttris_count.fetch_add(1);
+		me->ttris_count += 1;
 	}
 	else if (poly_sides_count == 4) {
 
@@ -97,7 +120,8 @@ void Poly::tesselate(LinkageMesh* me)
 		Vertex* aux_v0;
 		Vertex* aux_v1;
 
-		if (!getWinding()) {
+		// ensure v0, v1, v2, v3 are clockwise
+		if (!getFirstWinding()) {
 
 			aux_v0 = v0;
 			aux_v1 = v1;
@@ -107,6 +131,7 @@ void Poly::tesselate(LinkageMesh* me)
 			v3 = aux_v0;
 		}
 
+		// shortest path tesselation
 		if (distBetweenPos(v0->pos, v2->pos) <
 			distBetweenPos(v1->pos, v3->pos))
 		{
@@ -128,10 +153,20 @@ void Poly::tesselate(LinkageMesh* me)
 			tess_tris[1].vs[2] = v3;
 		}
 
-		me->ttris_count.fetch_add(2);
+		me->ttris_count += 2;
 	}
 	else {
 		std::cout << "Error tesselation of NPolygon not supported" << std::endl;
 		return;
 	}
 }
+
+//LinkageMesh::LinkageMesh()
+//{
+//	// 
+//}
+//
+//LinkageMesh::LinkageMesh(const LinkageMesh&)
+//{
+//	//
+//}

@@ -24,7 +24,7 @@ ErrorStack Buffer::build()
 
 	ErrorStack err = dev_mem->allocateBuffer(buff_size, mem_usage, { buff_usage }, buff, alloc);
 	if (err.isBad()) {
-		err.report(code_location, "failed to allocate buffer");
+		err.pushError(code_location, "failed to allocate buffer");
 	}
 
 	// staging buffer required
@@ -39,14 +39,14 @@ ErrorStack Buffer::build()
 			err = dev_mem->allocateBuffer(buff_size, MemoryUsage::GPU_DOWNLOAD, { BufferUsage::STAGING }, staging_buff,
 				staging_alloc);
 			if (err.isBad()) {
-				err.report(code_location, "failed to create new staging buffer");
+				err.pushError(code_location, "failed to create new staging buffer");
 				return err;
 			}
 			staging_buff_size = buff_size;
 
 			err = staging_alloc->map_whole();
 			if (err.isBad()) {
-				err.report(code_location, "failed to map new staging buffer");
+				err.pushError(code_location, "failed to map new staging buffer");
 				return err;
 			}
 		}
@@ -58,14 +58,14 @@ ErrorStack Buffer::build()
 			err = dev_mem->allocateBuffer(buff_size, MemoryUsage::GPU_UPLOAD, { BufferUsage::STAGING }, staging_buff,
 				staging_alloc);
 			if (err.isBad()) {
-				err.report(code_location, "failed to recreate staging buffer");
+				err.pushError(code_location, "failed to recreate staging buffer");
 				return err;
 			}
 			staging_buff_size = buff_size;
 
 			err = staging_alloc->map_whole();
 			if (err.isBad()) {
-				err.report(code_location, "failed to map new staging buffer");
+				err.pushError(code_location, "failed to map new staging buffer");
 				return err;
 			}
 		}
