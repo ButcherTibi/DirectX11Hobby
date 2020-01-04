@@ -57,6 +57,12 @@ void createQuadMesh(CreateQuadInfo info, LinkageMesh& me)
 	Vertex* v2 = initVertex(me, +0.5f, +0.5f, 0.0f);
 	Vertex* v3 = initVertex(me, +0.5f, -0.5f, 0.0f);
 
+	// UV
+	v0->uv = { 0, 1 };
+	v1->uv = { 0, 0 };
+	v2->uv = { 1, 0 };
+	v3->uv = { 1, 1 };
+
 	// Edge
 	Edge* e0 = initEdge(me, v0, v1);
 	Edge* e1 = initEdge(me, v1, v2);
@@ -172,35 +178,14 @@ void createCoordinateCubeMesh(CreateCoordinateCubeInfo info, LinkageMesh& me)
 	v[7] = glm::vec3(-x_dim, -y_dim, -z_dim);
 
 	// Z Axis
-	Poly* front_p = fabricateQuad(me, v[0], v[1], v[2], v[3], blue_lite);
-	Poly* back_p = fabricateQuad(me, v[7], v[6], v[5], v[4], blue);
+	Poly* front_p = fabricateQuad(me, v[0], v[1], v[2], v[3], glm::vec3{0, 0, -1}, blue_lite);
+	Poly* back_p = fabricateQuad(me, v[7], v[6], v[5], v[4], glm::vec3{ 0, 0, 1 }, blue);
 
 	// X Axis
-	Poly* right_p = fabricateQuad(me, v[1], v[5], v[6], v[2], red);
-	Poly* left_p = fabricateQuad(me, v[0], v[3], v[7], v[4], red_lite);
+	Poly* right_p = fabricateQuad(me, v[1], v[5], v[6], v[2], glm::vec3{ 0, 1, 0 }, red);
+	Poly* left_p = fabricateQuad(me, v[0], v[3], v[7], v[4], glm::vec3{ 0, -1, 0 }, red_lite);
 
 	// Y Axis
-	Poly* top_p = fabricateQuad(me, v[4], v[5], v[1], v[0], green);
-	Poly* bot_p = fabricateQuad(me, v[7], v[3], v[2], v[6], green_lite);
-
-	// Inside cube (for checking culling)
-	{
-		for (glm::vec3& v_pos : v) {
-			v_pos /= 2.0f;
-		}
-
-		auto pink = glm::vec4(1.0f, 0.5f, 1.0f, 1.0f);
-
-		// Z Axis
-		Poly* front_p = fabricateQuad(me, v[3], v[2], v[1], v[0], pink);
-		Poly* back_p = fabricateQuad(me, v[4], v[5], v[6], v[7], pink);
-
-		// X Axis
-		Poly* right_p = fabricateQuad(me, v[2], v[6], v[5], v[1], pink);
-		Poly* left_p = fabricateQuad(me, v[4], v[7], v[3], v[0], pink);
-
-		// Y Axis
-		Poly* top_p = fabricateQuad(me, v[0], v[1], v[5], v[4], pink);
-		Poly* bot_p = fabricateQuad(me, v[6], v[2], v[3], v[7], pink);
-	}
+	Poly* top_p = fabricateQuad(me, v[4], v[5], v[1], v[0], glm::vec3{ 1, 0, 0 }, green);
+	Poly* bot_p = fabricateQuad(me, v[7], v[3], v[2], v[6], glm::vec3{ -1, 0, 0 }, green_lite);
 }

@@ -1,3 +1,15 @@
 # stuff to ignore
+
+# folders
 x64
 meshes
+textures
+ThirdParty
+
+# stb_image
+stb_image.cpp
+stb_image.h
+
+# VMA
+vk_mem_alloc.h
+vma_implementation.cpp

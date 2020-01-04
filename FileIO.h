@@ -45,6 +45,7 @@ public:
 
 	bool erase(size_t start, size_t end);
 
+	void removeExtension();
 
 	/* Conversions */
 
@@ -52,7 +53,7 @@ public:
 	std::vector<char> toWin32Path();
 
 	/*  */
-	std::string toString();
+	std::string toWindowsPath();
 
 	/* Reads */
 
@@ -60,11 +61,15 @@ public:
 	 * intended for reading shader code and JSON */
 	ErrorStack read(std::vector<char>& content);
 
+	
+	/*  */
+
+	static ErrorStack getExePath(Path& exe_path);
+	static ErrorStack getLocalFolder(Path& local_path);
+
+
+	/*  */
 
 	// debug
 	void check();
 };
-
-
-// retrieves executable path
-ErrorStack getExePath(Path& exe_path);

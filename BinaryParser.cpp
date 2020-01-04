@@ -67,7 +67,7 @@ ErrorStack bin::loadFromURI(std::vector<char>& uri, Path& this_file, Vector& r_b
 	// Data URI
 	if (checkForKeyword(uri_i, uri, "data:application/octet-stream;base64,")) {
 
-		r_bin.bytes.reserve(size_t(uri.size() * 0.76f));
+		r_bin.bytes.reserve(uri.size());
 
 		// decode rest of URI as Base64 binary
 		for (; uri_i < uri.size(); uri_i++) {
@@ -100,88 +100,24 @@ ErrorStack bin::loadFromURI(std::vector<char>& uri, Path& this_file, Vector& r_b
 	return ErrorStack();
 }
 
-template<typename T>
-std::string bitsToString(T bits)
-{
-	std::string b = "";
-
-	for (int8_t i = sizeof(T) * 8; i >= 0; i--) {
-
-		if (bits & (1 << i)) {
-			b.push_back('1');
-		}
-		else {
-			b.push_back('0');
-		}
-
-		if (i % 8 == 0 && (sizeof(T) * 8 > i) && (i > 0)) {
-			b.push_back(' ');
-		}
-	}
-
-	return b;
-}
-
-ErrorStack loadIndexesFromBuffer(uint64_t offset, uint64_t component_type, uint64_t count,
-	bin::Vector binary, std::vector<uint32_t>& indexes)
-{
-	indexes.resize(count);
-
-	switch (component_type) {
-	// fast path
-	case gltf::UNSIGNED_INT: {
-		std::memcpy(indexes.data(), binary.bytes.data() + offset, sizeof(uint32_t) * indexes.size());
-		break;
-	}		
-
-	case gltf::BYTE: {
-		std::vector<uint8_t> uint8_idxs;
-		uint8_idxs.resize(count);
-
-		std::memcpy(uint8_idxs.data(), binary.bytes.data() + offset, sizeof(uint8_t) * uint8_idxs.size());
-
-		for (uint64_t i = 0; i < count; i++) {
-			indexes[i] = uint8_idxs[i];
-		}
-		break;
-	}
-
-	case gltf::UNSIGNED_SHORT: {
-		std::vector<uint16_t> uint16_idxs;
-		uint16_idxs.resize(count);
-
-		std::memcpy(uint16_idxs.data(), binary.bytes.data() + offset, sizeof(uint16_t) * uint16_idxs.size());
-
-		for (uint64_t i = 0; i < count; i++) {
-			indexes[i] = uint16_idxs[i];
-		}
-		break;
-	}
-	default:
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
-			"invalid component_type for index buffer allowed types are BYTE, UNSIGNED_SHORT, UNSIGNED_INT");
-	}
-
-	return ErrorStack();
-}
-
-ErrorStack loadVec3FromBuffer(uint64_t offset, uint64_t component_type, uint64_t count,
-	bin::Vector binary, std::vector<glm::vec3>& vecs)
-{
-	vecs.resize(count);
-
-	switch (component_type) {
-	// fast path
-	case gltf::FLOAT: {
-		// PARANOIA: maybe sizeof(glm::vec3) != sizeof(float) * 3
-		std::memcpy(vecs.data(), binary.bytes.data() + offset, sizeof(glm::vec3) * count);
-		break;
-	}
-
-	default:
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
-			"invalid component_type for position, can only be VEC3");
-	}
-
-	return ErrorStack();
-}
+//template<typename T>
+//std::string bitsToString(T bits)
+//{
+//	std::string b = "";
+//
+//	for (int8_t i = sizeof(T) * 8; i >= 0; i--) {
+//
+//		if (bits & (1 << i)) {
+//			b.push_back('1');
+//		}
+//		else {
+//			b.push_back('0');
+//		}
+//
+//		if (i % 8 == 0 && (sizeof(T) * 8 > i) && (i > 0)) {
+//			b.push_back(' ');
+//		}
+//	}
+//
+//	return b;
+//}

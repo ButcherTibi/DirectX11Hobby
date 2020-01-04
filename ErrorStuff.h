@@ -2,11 +2,6 @@
 
 // Standard
 #include <vector>
-#include <iostream>
-
-// Vulkan
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.h>
 
 
 #define code_location \
@@ -49,6 +44,7 @@ enum class ExtraError {
 	FAILED_TO_ENUMERATE_PHYSICAL_DEVICES,
 	NO_GPU_WITH_VULKAN_SUPPORT_FOUND,
 	NO_SUITABLE_GPU_FOUND,
+	FAILED_TO_GET_SURFACE_FORMATS_COUNT,
 	FAILED_TO_GET_SURFACE_FORMATS,
 	NO_SUITABLE_SURFACE_FORMAT_FOUND,
 	FAILED_TO_GET_SURFACE_CAPABILITIES,
@@ -117,7 +113,6 @@ struct ErrorStack
 
 	Error lastError();
 
-	bool isOk();
 	bool isBad();
 
 	void debugPrint();
@@ -128,6 +123,17 @@ std::string getLastError();
 
 std::string asIs(char c);
 
+
+#define checkErrStack(err_stack, msg) \
+	if (err_stack.isBad()) { \
+		err_stack.pushError(code_location, msg); \
+		return err_stack; \
+	}
+
+#define checkVkRes(vk_res, msg) \
+	if (vk_res != VK_SUCCESS) { \
+		return ErrorStack(vk_res, code_location, msg); \
+	}
 
 /* Debug variable */
 

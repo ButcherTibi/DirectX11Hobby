@@ -2,19 +2,13 @@
 // Standard
 #include <chrono>
 
-// Windows
-#include <Windows.h>
-
-// Vulkan
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.h>
-
-// GLM
-
-// Other
+// Mine
 #include "Input.h"
 #include "Primitives.h"
 #include "Importer.h"
+
+// new
+#include "VulkanSystems.h"
 
 // Header
 #include "AppLevel.h"
@@ -22,28 +16,6 @@
 
 AppLevel app_level;
 
-
-void errorMessageBox(const WindowHandle& win_handle, const std::string& msg, const std::string& win_error = "")
-{
-	if (win_error == "") {
-		MessageBoxA(win_handle.hwnd, msg.c_str(), "Error",
-			MB_ICONERROR);
-	}
-	else {
-		std::string txt = msg + "\n" +
-			"Windows Error: " + win_error + "\n";
-
-		MessageBoxA(win_handle.hwnd, txt.c_str(), "Error",
-			MB_ICONERROR);
-	}
-}
-
-WindowHandle::~WindowHandle()
-{
-	if (this->hwnd != NULL) {
-		DestroyWindow(hwnd);
-	}
-}
 
 // handles Windows's window messages
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -84,25 +56,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 ErrorStack AppLevel::response()
 {
-	ErrorStack err;
-
-	// Handle window resize
-	{
-		RECT rect;
-
-		if (!GetWindowRect(app_level.win_handle.hwnd, &rect)) {
-			return ErrorStack(ExtraError::FAILED_TO_GET_WINDOW_SIZE, code_location, "failed to get window size", getLastError());
-		}
-		uint32_t new_width = rect.right - rect.left;
-		uint32_t new_height = rect.bottom - rect.top;
-
-		renderer.resizeScreenResolution(new_width, new_height);
-	}
-
 	// Controls
 	float rotate_shortcut = input.rotate_camera.duration;
 	float zoom_shortcut = input.zoom_camera.duration;
 	float pan_shortcut = input.pan_camera.duration;
+	float focus_shortcut = input.focus_camera.duration;
 
 	if (rotate_shortcut) {
 		
@@ -110,14 +68,14 @@ ErrorStack AppLevel::response()
 		float delta_pitch = (float)input.mouse_delta_y * rotation_sensitivity * delta_time;
 		float delta_yaw = (float)input.mouse_delta_x * rotation_sensitivity * delta_time;
 
-		renderer.orbitCameraArcball(renderer.meshes[0]->position, delta_pitch, delta_yaw);
+		renderer.orbitCameraArcball(renderer.meshes[0].position, delta_pitch, delta_yaw);
 	}
 	else if (zoom_shortcut) {
 
 		float zoom_sensitivity = 0.5f;
 		float zoom_amount = (float)input.mouse_delta_y * zoom_sensitivity * delta_time;
 
-		renderer.zoomCamera(renderer.meshes[0]->position, zoom_amount);
+		renderer.zoomCamera(renderer.meshes[0].position, zoom_amount);
 	}
 	else if (pan_shortcut) {
 
@@ -127,27 +85,18 @@ ErrorStack AppLevel::response()
 
 		renderer.panCamera(delta_vertical, delta_horizontal);
 	}
+	else if (focus_shortcut) {
+		renderer.camera.position = { 0, 0, 5 };
+		renderer.camera.rotation = { 1, 0, 0, 0 };
+	}
 
 	// Begin render comands
-	err = renderer.vk_man.waitForRendering();
-	if (err.isBad()) {
-		return err;
-	}
+	checkErrStack(renderer.waitForRendering(), "");
+	renderer.generateGPUData();
+	checkErrStack(renderer.loadGPUData(), "");
+	checkErrStack(renderer.draw(), "");
 
-	// Render settings
-	renderer.loadMeshesToBuffs();
-
-	err = renderer.vk_man.rebuild();
-	if (err.isBad()) {
-		return err;
-	}
-
-	err = renderer.vk_man.draw();
-	if (err.isBad()) {
-		return err;
-	}
-
-	return err;
+	return ErrorStack();
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
@@ -159,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	{
 		const char win_class_name[] = "Window Class";
 
-		// Register the window class.	
+		// Register the window class.
 		window_class.cbSize = sizeof(window_class);
 		window_class.style = CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS;
 		window_class.lpfnWndProc = &WindowProc;
@@ -174,7 +123,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}	
 
 		// Create the window.
-		app_level.win_handle.hwnd = CreateWindowExA(
+		app_level.hwnd = CreateWindowExA(
 			WS_EX_LEFT,
 			win_class_name,
 			"Vulkan aplication",
@@ -189,7 +138,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			NULL        // Additional application data
 		);
 
-		if (app_level.win_handle.hwnd == NULL) {
+		if (app_level.hwnd == NULL) {
 			printf("Error: \n"
 				"failed to create window \n"
 				"Windows error: %s \n", getLastError().c_str());
@@ -197,52 +146,92 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}
 	}
 
-	// Mouse Position Input
+	// Input Setup
 	{
 		RAWINPUTDEVICE raw_input_dev;
 		raw_input_dev.usUsagePage = 0x01;
 		raw_input_dev.usUsage = 0x02;
 		raw_input_dev.dwFlags = 0;
-		raw_input_dev.hwndTarget = app_level.win_handle.hwnd;
+		raw_input_dev.hwndTarget = app_level.hwnd;
 
-		if (RegisterRawInputDevices(&raw_input_dev, 1, sizeof(RAWINPUTDEVICE)) == FALSE) {
-			errorMessageBox(app_level.win_handle, "failed to register raw mouse input device",
-				getLastError());
+		if (!RegisterRawInputDevices(&raw_input_dev, 1, sizeof(RAWINPUTDEVICE))) {
+
+			printf("Error: \n"
+				"failed to register raw mouse input device \n"
+				"Windows error: %s \n", getLastError().c_str());
 			return 1;
 		}
-	}
 
-	// Button Input
-	{
 		input.addShortcut(&input.rotate_camera, &input.key_mouse_right);
 		input.addShortcut(&input.zoom_camera, &input.key_mouse_middle);
 		input.addShortcut(&input.pan_camera, &input.key_mouse_left, &input.key_mouse_right);
+		input.addShortcut(&input.focus_camera, &input.key_f);
 	}
 
 	ErrorStack err;
 
-	// Scene setup
-	std::vector<LinkageMesh> meshes;  // keep alive
+	// Load Shader Code
+	std::vector<char> vert_shader_code;
+	std::vector<char> frag_shader_code;
 	{
-		err = gltf::importMeshes(Path("E:/my_work/Vulkan/Sculpt/Sculpt/meshes/damaged_helmet/damaged_helmet.gltf"), meshes);
+		Path shader_path;
+		err = Path::getExePath(shader_path);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
-		setMeshVertexColor(meshes[0], { 1, 1, 1, 1 });
 
-		app_level.renderer.meshes.push_back(&meshes[0]);
-		app_level.renderer.camera.position.z = 1.5;
+		shader_path.pop_back(3);
+		shader_path.push_back("Sculpt/shaders");
+
+		Path vert_shader_path = shader_path;
+		vert_shader_path.push_back("vert.spv");
+		
+		err = vert_shader_path.read(vert_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
+
+		Path frag_shader_path = shader_path;
+		frag_shader_path.push_back("frag.spv");
+
+		err = frag_shader_path.read(frag_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 	}
 
-	// Render	
-	err = app_level.renderer.vk_man.init(hinstance, app_level.win_handle.hwnd);
+	// 
+	{
+
+	}
+
+	// Scene setup
+	{
+		/*err = gltf::importMeshes(Path("E:/my_work/Vulkan/Sculpt/Sculpt/meshes/damaged_helmet/damaged_helmet.gltf"),
+			renderer.meshes);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}*/
+
+		CreateQuadInfo info = {};
+		createQuadMesh(info, renderer.meshes.emplace_back());
+
+		renderer.camera.position.z = 1.5;
+	}
+
+	// Render
+	renderer.generateGPUData();
+
+	err = renderer.create(hinstance, app_level.hwnd, 1024, 720,
+		vert_shader_code, frag_shader_code);
 	if (err.isBad()) {
 		err.debugPrint();
 		return 1;
 	}
-
-	app_level.renderer.vk_man.changeRequestedRenderResolution(720, 1024);
 
 	steady_time frame_start;
 	
@@ -257,7 +246,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
 		// Get Window Messages
 		MSG msg = { };
-		while (PeekMessageA(&msg, app_level.win_handle.hwnd, 0, 0, PM_REMOVE)) {
+		while (PeekMessageA(&msg, app_level.hwnd, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageA(&msg);
 		}
@@ -279,10 +268,14 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		app_level.delta_time = fsec_cast(std::chrono::steady_clock::now() - frame_start);
 	}
 
+	DestroyWindow(app_level.hwnd);
+
 	if (err.isBad()) {
 		err.debugPrint();
 		return 1;
 	}
+
+	vkDeviceWaitIdle(renderer.logical_dev.logical_device);
 
 	return 0;
 }

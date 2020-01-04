@@ -34,6 +34,7 @@
 			"expected JSON field " + std::string(#obj) + " to be of OBJECT type"); \
 	}
 
+ /* only checks for complaiance with required fields of the GLTF Standard */
 ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 {
 	JSONValue& root = *json_graph.root;
@@ -379,6 +380,97 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 	return ErrorStack();
 }
 
+ErrorStack gltf::loadIndexesFromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx, 
+	std::vector<bin::Vector>& bin_buffs, std::vector<uint32_t>& indexes)
+{
+	gltf::Accessor& acc = gltf_struct.accessors[acc_idx];
+	gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
+
+	if (acc.type != "SCALAR") {
+		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+			"expected indices accessor type to be SCALAR but instead got " + acc.type);
+	}
+
+	uint64_t count = acc.count;
+
+	indexes.resize(count);
+	bin::Vector& buffer = bin_buffs[buff_view.buffer];
+	uint64_t offset = buff_view.byte_offset + acc.byte_offset;
+
+	switch (acc.component_type) {
+		// fast path
+	case gltf::UNSIGNED_INT: {
+
+		std::memcpy(indexes.data(), buffer.bytes.data() + offset, sizeof(uint32_t) * indexes.size());
+		break;
+	}
+
+	case gltf::UNSIGNED_BYTE: {
+
+		std::vector<uint8_t> uint8_idxs;
+		uint8_idxs.resize(count);
+
+		std::memcpy(uint8_idxs.data(), buffer.bytes.data() + offset, sizeof(uint8_t) * uint8_idxs.size());
+
+		for (uint64_t i = 0; i < count; i++) {
+			indexes[i] = uint8_idxs[i];
+		}
+		break;
+	}
+
+	case gltf::UNSIGNED_SHORT: {
+
+		std::vector<uint16_t> uint16_idxs;
+		uint16_idxs.resize(count);
+
+		std::memcpy(uint16_idxs.data(), buffer.bytes.data() + offset, sizeof(uint16_t) * uint16_idxs.size());
+
+		for (uint64_t i = 0; i < count; i++) {
+			indexes[i] = uint16_idxs[i];
+		}
+		break;
+	}
+	default:
+		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+			"invalid component_type for index buffer allowed types are BYTE, UNSIGNED_SHORT, UNSIGNED_INT");
+	}
+
+	return ErrorStack();
+}
+
+ErrorStack gltf::loadVec3FromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx, 
+	std::vector<bin::Vector>& bin_buffs, std::vector<glm::vec3>& vecs)
+{
+	gltf::Accessor& acc = gltf_struct.accessors[acc_idx];
+	gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
+
+	if (acc.type != "VEC3") {
+		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+			"expected position atribute accessor type to be VEC3 but instead got " + acc.type);
+	}
+
+	uint64_t count = acc.count;
+
+	vecs.resize(count);
+	bin::Vector& buffer = bin_buffs[buff_view.buffer];
+	uint64_t offset = buff_view.byte_offset + acc.byte_offset;
+
+	switch (acc.component_type) {
+		// fast path
+	case gltf::FLOAT: {
+		// PARANOIA: maybe sizeof(glm::vec3) != sizeof(float) * 3
+		std::memcpy(vecs.data(), buffer.bytes.data() + offset, sizeof(glm::vec3) * count);
+		break;
+	}
+
+	default:
+		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+			"invalid component_type for position, can only be VEC3");
+	}
+
+	return ErrorStack();
+}
+
 ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 {
 	ErrorStack err;
@@ -409,7 +501,7 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 		return err;
 	}
 
-	// Convert URI to binary data
+	// Convert URI to buffer data
 	std::vector<bin::Vector> bin_buffs;
 	{
 		bin_buffs.resize(gltf_struct.buffers.size());
@@ -452,20 +544,7 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 
 				// Indexes
 				{
-					gltf::Accessor& acc = gltf_struct.accessors[prim.indices.value()];
-					gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
-
-					uint64_t offset = buff_view.byte_offset + acc.byte_offset;
-
-					if (acc.type != "SCALAR") {
-						return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, 
-							"expected indices accessor type to be SCALAR but instead got " + acc.type);
-					}
-
-					bin::Vector& bin_buff = bin_buffs[buff_view.buffer];
-
-					err = loadIndexesFromBuffer(offset, acc.component_type, acc.count, bin_buff,
-						indexes);
+					err = loadIndexesFromBuffer(gltf_struct, prim.indices.value(), bin_buffs, indexes);
 					if (err.isBad()) {
 						err.pushError(code_location, "failed to load indexes from buffer");
 						return err;
@@ -476,21 +555,9 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 				{
 					uint64_t acc_idx = prim.atributes.at(atribute_name_position);
 
-					gltf::Accessor& acc = gltf_struct.accessors[acc_idx];
-					gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
-
-					uint64_t offset = buff_view.byte_offset + acc.byte_offset;
-
-					if (acc.type != "VEC3") {
-						return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
-							"expected position atribute accessor type to be VEC3 but instead got " + acc.type);
-					}
-
-					bin::Vector& bin_buff = bin_buffs[buff_view.buffer];
-
-					err = loadVec3FromBuffer(offset, acc.component_type, acc.count, bin_buff, attrs.positions);
+					err = loadVec3FromBuffer(gltf_struct, acc_idx, bin_buffs, attrs.positions);
 					if (err.isBad()) {
-						err.pushError(code_location, "failed to load positions from binary buffer");
+						err.pushError(code_location, "failed to load positions from buffer");
 						return err;
 					}
 				}
@@ -499,13 +566,14 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 				auto normal_it = prim.atributes.find(atribute_name_normal);
 				if (normal_it != prim.atributes.end()) {
 
-					gltf::Accessor& acc = gltf_struct.accessors[normal_it->second];
-					gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
-
-
+					err = loadVec3FromBuffer(gltf_struct, normal_it->second, bin_buffs, attrs.normals);
+					if (err.isBad()) {
+						err.pushError(code_location, "failed to load normals from buffer");
+						return err;
+					}
 				}
 				else {
-					prim.atributes.clear();
+					attrs.normals.clear();
 				}
 
 				// Create Linkage Mesh

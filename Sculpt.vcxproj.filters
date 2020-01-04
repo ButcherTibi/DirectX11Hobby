@@ -19,67 +19,37 @@
     <Filter Include="Source Files\Renderer">
       <UniqueIdentifier>{49af7614-544f-4745-8cc2-ec256a2a0c2a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Buffers">
-      <UniqueIdentifier>{66d24e75-1c67-444b-8bc4-0ba9741b5c68}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Mesh">
       <UniqueIdentifier>{db273801-5239-4134-9a5f-eb598bc972e4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\AppLevel">
-      <UniqueIdentifier>{6cac705a-a616-4a81-bd62-ed76c9977ca6}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Importer">
       <UniqueIdentifier>{73c0de51-568c-486b-b747-400f71b18cd9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Mine">
+      <UniqueIdentifier>{10803e6a-b26c-41e4-8b3f-218047b714b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ThirdParty">
+      <UniqueIdentifier>{a262b940-e443-4e56-b65a-7e9d9126f61f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\EntryPoint">
+      <UniqueIdentifier>{6cac705a-a616-4a81-bd62-ed76c9977ca6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\VulkanSystems">
+      <UniqueIdentifier>{16514fe7-3e9a-409f-8c56-f6c5a9302513}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ThirdParty\VulkanMemoryAllocator">
+      <UniqueIdentifier>{f30f959c-297e-4e22-8e3a-dd03df043b23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ThirdParty\stb_image">
+      <UniqueIdentifier>{10891787-7a85-4b6e-8a75-da84801afa37}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileIO.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanContext.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanMemory.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanFrames.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanCommandPool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanPipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanCommandBuffers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MathUtils.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
     <ClCompile Include="MathDefinitions.cpp">
       <Filter>Source Files\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ErrorStuff.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Buffer.cpp">
-      <Filter>Source Files\Buffers</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanNodeDependency.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Descriptors.cpp">
-      <Filter>Source Files\Buffers</Filter>
     </ClCompile>
     <ClCompile Include="Primitives.cpp">
       <Filter>Source Files\Mesh</Filter>
@@ -87,23 +57,14 @@
     <ClCompile Include="MeshOps.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanSync.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Renderer.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="LinkageMesh.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanManagement.cpp">
-      <Filter>Source Files\Renderer</Filter>
-    </ClCompile>
     <ClCompile Include="AppLevel.cpp">
-      <Filter>Source Files\AppLevel</Filter>
-    </ClCompile>
-    <ClCompile Include="Controls.cpp">
-      <Filter>Source Files\AppLevel</Filter>
+      <Filter>Source Files\EntryPoint</Filter>
     </ClCompile>
     <ClCompile Include="MathTypes.cpp">
       <Filter>Source Files\Math</Filter>
@@ -117,52 +78,49 @@
     <ClCompile Include="BinaryParser.cpp">
       <Filter>Source Files\Importer</Filter>
     </ClCompile>
+    <ClCompile Include="vma_implementation.cpp">
+      <Filter>Source Files\ThirdParty\VulkanMemoryAllocator</Filter>
+    </ClCompile>
+    <ClCompile Include="ErrorStuff.cpp">
+      <Filter>Source Files\Mine</Filter>
+    </ClCompile>
+    <ClCompile Include="FileIO.cpp">
+      <Filter>Source Files\Mine</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Source Files\Mine</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files\Mine</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files\EntryPoint</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanSystems.cpp">
+      <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="Pipeline.cpp">
+      <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandBuffers.cpp">
+      <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="stb_image.cpp">
+      <Filter>Source Files\ThirdParty\stb_image</Filter>
+    </ClCompile>
+    <ClCompile Include="Resources.cpp">
+      <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FileIO.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanMemory.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanContext.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanFrames.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanCommandPool.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanPipeline.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanCommandBuffers.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="stdafx.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="MathDefinitions.h">
       <Filter>Source Files\Math</Filter>
     </ClInclude>
     <ClInclude Include="MathUtils.h">
       <Filter>Source Files\Math</Filter>
     </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ErrorStuff.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Renderer.h">
       <Filter>Source Files\Renderer</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanBuffers.h">
-      <Filter>Source Files\Buffers</Filter>
-    </ClInclude>
-    <ClInclude Include="VulkanNodeDependency.h">
-      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Primitives.h">
       <Filter>Source Files\Mesh</Filter>
@@ -170,17 +128,110 @@
     <ClInclude Include="Meshes.h">
       <Filter>Source Files\Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="VulkanSyncronization.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="MathTypes.h">
       <Filter>Source Files\Math</Filter>
     </ClInclude>
     <ClInclude Include="AppLevel.h">
-      <Filter>Source Files\AppLevel</Filter>
+      <Filter>Source Files\EntryPoint</Filter>
     </ClInclude>
     <ClInclude Include="Importer.h">
       <Filter>Source Files\Importer</Filter>
+    </ClInclude>
+    <ClInclude Include="vk_mem_alloc.h">
+      <Filter>Source Files\ThirdParty\VulkanMemoryAllocator</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedFontProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedTextureProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedXamlProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\FileTextureProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalFontProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalTextureProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalXamlProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\ProvidersApi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Src\stb_image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Application.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncherApi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\DelegateCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\NotifyPropertyChangedBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Window.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ErrorStuff.h">
+      <Filter>Source Files\Mine</Filter>
+    </ClInclude>
+    <ClInclude Include="FileIO.h">
+      <Filter>Source Files\Mine</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
+      <Filter>Source Files\Mine</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>Source Files\Mine</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imgui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\misc\cpp\imgui_stdlib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\misc\freetype\imgui_freetype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imconfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imgui_internal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imstb_rectpack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imstb_textedit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\imgui-master\imstb_truetype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3native.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanSystems.h">
+      <Filter>Source Files\VulkanSystems</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

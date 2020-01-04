@@ -217,8 +217,7 @@ bool doSafePow(double a, double b, double& val)
 	return true;
 }
 
-ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, bool use_64int, bool use_double,
-	JSONValue& number)
+ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValue& number)
 {
 	NumberParseMode mode = NumberParseMode::INTEGER;
 
@@ -263,13 +262,8 @@ ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, bool use
 					continue;
 				}
 
-				// write value
-				if (use_64int) {
-					number.value = (int64_t)int_num;
-				}
-				else {
-					number.value = (int32_t)(int_num);
-				}
+				number.value = (int64_t)int_num;
+
 				return ErrorStack();
 			}
 			break;
@@ -298,13 +292,8 @@ ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, bool use
 					continue;
 				}
 
-				// write value
-				if (use_double) {
-					number.value = (double)frac_num;
-				}
-				else {
-					number.value = (float)frac_num;
-				}
+				number.value = (double)frac_num;
+
 				return ErrorStack();
 			}
 			break;
@@ -333,12 +322,7 @@ ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, bool use
 				if (doSafePow(10, (double)exp_int * exp_sign, exp_dbl) && 
 					isSafeMul(frac_num, exp_dbl)) 
 				{
-					if (use_double) {
-						number.value = double(frac_num * exp_dbl);
-					}
-					else {
-						number.value = (float)(frac_num * exp_dbl);
-					}
+					number.value = double(frac_num * exp_dbl);
 				}
 				else {
 					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
@@ -385,7 +369,7 @@ ErrorStack JSONGraph::parseArray(uint64_t& i, std::vector<char>& text, JSONValue
 		// number
 		if (isUTF8Number(c) || c == '+' || c == '-') {
 
-			err = parseNumber(i, text, this->use_64int, this->use_double, *val);
+			err = parseNumber(i, text, *val);
 		}
 		else {
 			i++;
@@ -520,7 +504,7 @@ ErrorStack JSONGraph::parseObject(uint64_t& i, std::vector<char>& text, JSONValu
 				// Number
 				if (isUTF8Number(c) || c == '+' || c == '-') {
 
-					err = parseNumber(i, text, this->use_64int, this->use_double, field_value);
+					err = parseNumber(i, text, field_value);
 				}
 				else {
 					i++;
@@ -599,11 +583,7 @@ ErrorStack parseJSON(std::vector<char>& text, uint64_t offset, bool use_64int, b
 			i, text));
 	}
 
-	json.use_64int = use_64int;
-	json.use_double = use_double;
-	JSONValue& root = json.values.emplace_front();
-
-	ErrorStack err = json.parseObject(i, text, root);
+	ErrorStack err = json.parseObject(i, text, json.values.emplace_front());
 	if (err.isBad()) {
 		return err;
 	}

@@ -68,15 +68,10 @@ InputKey getTimeIntersection(const InputKey& t0, const InputKey& t1)
 
 InputState::InputState()
 {
-	// Pointer
-	{
-		raw_inputs.reserve(raw_inputs_size);
-		pos_states.reserve(raw_inputs_size);
-	}
-
 	// Letter Keys
 	this->key_a.vk_key = WindowsVirtualKeys::VK_A;
 	this->key_d.vk_key = WindowsVirtualKeys::VK_D;
+	this->key_f.vk_key = WindowsVirtualKeys::VK_F;
 	this->key_s.vk_key = WindowsVirtualKeys::VK_S;
 	this->key_w.vk_key = WindowsVirtualKeys::VK_W;
 
@@ -285,39 +280,6 @@ ErrorStack InputState::update(const steady_time& time)
 			}
 			else {
 				shortcut->duration = 0.0f;
-			}
-		}
-	}
-
-	// Buffered Raw Mouse
-	{	
-		pos_states.clear();
-
-		while (true) {
-			// don't know why they are required
-			raw_inputs.clear();
-			raw_inputs.resize(raw_inputs_size);
-			uint32_t raw_input_size = (uint32_t)(sizeof(RAWINPUT) * raw_inputs.size());
-
-			UINT input_count = GetRawInputBuffer(raw_inputs.data(), &raw_input_size, sizeof(RAWINPUTHEADER));
-
-			if (input_count == (UINT)-1) {
-				return ErrorStack(ExtraError::FAILED_TO_GET_RAW_INPUT_BUFFER, code_location, "failed to get raw input buffer", getLastError());
-			}
-			else if (input_count) {
-
-				for (uint32_t i = 0; i < input_count; i++) {
-
-					RAWINPUT& raw_input = raw_inputs[i];
-
-					if (raw_input.header.dwType == RIM_TYPEMOUSE) {
-						pos_states.push_back({raw_input.data.mouse.lLastX, 
-							raw_input.data.mouse.lLastY});
-					}
-				}
-			}
-			else {
-				break;
 			}
 		}
 	}

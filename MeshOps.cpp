@@ -81,8 +81,8 @@ Poly* initTris(LinkageMesh& me, Vertex* v0, Vertex* v1, Vertex* v2,
 	p.poly_sides.emplace_front(v0, e0);
 	p.poly_sides.emplace_front(v1, e1);
 	p.poly_sides.emplace_front(v2, e2);
-	p.tesselate(&me);
-
+	p.build(&me);
+	
 	p.self_it = me.polys.before_begin();
 
 	return &me.polys.front();
@@ -118,7 +118,6 @@ Poly* fabricateTris(LinkageMesh& me, Vertex* v0, Vertex* v1, Vertex* v2)
 //	p.poly_sides.emplace_front(e->verts[0], e0);
 //	p.poly_sides.emplace_front(v, e1);
 //	p.poly_sides.emplace_front(e->verts[1], e);
-//	p.tesselate(&me);
 //
 //	me.polys_size += 1;
 //	me.polys.push_front(p);
@@ -138,7 +137,7 @@ Poly* initQuad(LinkageMesh& me, Vertex* v0, Vertex* v1, Vertex* v2, Vertex* v3,
 	p.poly_sides.emplace_front(v1, e1);
 	p.poly_sides.emplace_front(v2, e2);
 	p.poly_sides.emplace_front(v3, e3);
-	p.tesselate(&me);
+	p.build(&me);
 
 	p.self_it = me.polys.before_begin();
 
@@ -152,12 +151,18 @@ Poly* initQuad(LinkageMesh& me, Vertex* v0, Vertex* v1, Vertex* v2, Vertex* v3,
 }
 
 Poly* fabricateQuad(LinkageMesh& me, glm::vec3 const& vp0, glm::vec3 const& vp1,
-	glm::vec3 const& vp2, glm::vec3 const& vp3, glm::vec4 const& color)
+	glm::vec3 const& vp2, glm::vec3 const& vp3,
+	glm::vec3 normal, glm::vec4 const& color)
 {
 	Vertex* v0 = initVertex(me, vp0, color);
 	Vertex* v1 = initVertex(me, vp1, color);
 	Vertex* v2 = initVertex(me, vp2, color);
 	Vertex* v3 = initVertex(me, vp3, color);
+
+	v0->normal = normal;
+	v1->normal = normal;
+	v2->normal = normal;
+	v3->normal = normal;
 
 	Edge* e0 = initEdge(me, v0, v1);
 	Edge* e1 = initEdge(me, v1, v2);
@@ -172,15 +177,19 @@ void addTriangleListToMesh(LinkageMesh& me, std::vector<uint32_t>& indexes, Vert
 {
 	std::vector<Vertex*> verts{ attrs.positions.size() };
 
+	// Create Vertices with positions
 	for (uint64_t i = 0; i < verts.size(); i++) {
 
-		Vertex* v = initBlankVertex(me);
-		v->pos = attrs.positions[i];
+		verts[i] = initBlankVertex(me);
+		verts[i]->pos = attrs.positions[i];
+	}
 
-		if (attrs.normals.size()) {
+	// Normals
+	if (attrs.normals.size()) {
+		for (uint64_t i = 0; i < verts.size(); i++) {
+			Vertex* v = verts[i];
 			v->normal = attrs.normals[i];
-		}		
-		// v->color = colors[i];
+		}
 	}
 
 	for (uint64_t i = 0; i + 2 < indexes.size(); i += 3) {

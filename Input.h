@@ -5,9 +5,6 @@
 #include <queue>
 #include <chrono>
 
-// Windows
-#include <Windows.h>
-
 // mine
 #include "ErrorStuff.h"
 
@@ -100,10 +97,6 @@ class InputState {
 	// Keyboard
 	std::vector<InputKey*> key_logs;
 
-	// Pointer
-	size_t raw_inputs_size = 256;
-	std::vector<RAWINPUT> raw_inputs;
-
 	// Shortcuts
 	std::vector<Shortcut*> shortcuts_3keys;
 	std::vector<Shortcut*> shortcuts_2keys;
@@ -113,6 +106,7 @@ public:
 	// Letter keys
 	InputKey key_a;
 	InputKey key_d;
+	InputKey key_f;
 	InputKey key_s;
 	InputKey key_w;
 
@@ -124,15 +118,6 @@ public:
 	InputKey key_mouse_right;
 	InputKey key_mouse_middle;
 
-	// TODO: move these out
-	// Shortcuts
-	Shortcut rotate_camera;
-	Shortcut zoom_camera;
-	Shortcut pan_camera;
-
-	// Mouse delta positions within a frame
-	std::vector<std::array<int32_t, 2>> pos_states;
-
 	// The cursors's screen position
 	int32_t screen_pos_x;
 	int32_t screen_pos_y;
@@ -141,6 +126,13 @@ public:
 	 * Initilized from WinProc */
 	int32_t mouse_delta_x;
 	int32_t mouse_delta_y;
+
+	// Shortcuts
+	Shortcut rotate_camera;
+	Shortcut zoom_camera;
+	Shortcut pan_camera;
+
+	Shortcut focus_camera;
 
 public:
 	InputState();

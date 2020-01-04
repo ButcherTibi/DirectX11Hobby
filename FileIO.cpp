@@ -2,16 +2,13 @@
 #include <fstream>
 #include <vector>
 
-// Windows
-#include <Windows.h>
-
 // Other
 #include "ErrorStuff.h"
 
 #include "FileIO.h"
 
 
-size_t max_path = 1000;
+size_t max_path = 1024;
 
 uint32_t findEntryCount(std::string path)
 {
@@ -207,6 +204,16 @@ bool Path::erase(size_t start, size_t end)
 	return true;
 }
 
+void Path::removeExtension()
+{
+	std::string& last = entries.back();
+	size_t last_dot = last.find_last_of('.');
+
+	if (last_dot != std::string::npos) {
+		last = last.substr(0, last_dot);
+	}
+}
+
 std::vector<char> Path::toWin32Path()
 {
 	std::vector<char> path;
@@ -238,7 +245,7 @@ std::vector<char> Path::toWin32Path()
 	return path;
 }
 
-std::string Path::toString()
+std::string Path::toWindowsPath()
 {
 	std::string path;
 
@@ -259,19 +266,6 @@ std::string Path::toString()
 	return path;
 }
 
-ErrorStack getExePath(Path& exe_path)
-{
-	std::vector<char> exe_filename(max_path);
-
-	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-
-		return ErrorStack(code_location, getLastError());
-	}
-	exe_path.push_back(std::string(exe_filename.begin(), exe_filename.end()));
-
-	return ErrorStack();
-}
-
 ErrorStack Path::read(std::vector<char> &content)
 {
 	// create file handle
@@ -288,7 +282,7 @@ ErrorStack Path::read(std::vector<char> &content)
 
 	if (file_handle == INVALID_HANDLE_VALUE) {
 		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location, 
-			"failed to create file handle for path = " + this->toString(), getLastError());
+			"failed to create file handle for path = " + this->toWindowsPath(), getLastError());
 	}
 
 	// find file size
@@ -297,7 +291,7 @@ ErrorStack Path::read(std::vector<char> &content)
 
 		CloseHandle(file_handle);
 		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
-			"failed to find file size for path = " + this->toString(), getLastError());
+			"failed to find file size for path = " + this->toWindowsPath(), getLastError());
 	}
 	content.resize(file_size.QuadPart);
 
@@ -308,7 +302,7 @@ ErrorStack Path::read(std::vector<char> &content)
 
 		CloseHandle(file_handle);
 		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
-			"failed to read path = " + this->toString(), getLastError());
+			"failed to read path = " + this->toWindowsPath(), getLastError());
 	}
 
 	CloseHandle(file_handle);
@@ -318,4 +312,31 @@ ErrorStack Path::read(std::vector<char> &content)
 void Path::check()
 {
 	// 
+}
+
+ErrorStack Path::getExePath(Path& exe_path)
+{
+	assert_cond(exe_path.entries.size() == 0, "");
+
+	std::vector<char> exe_filename(max_path);
+
+	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
+
+		return ErrorStack(code_location, getLastError());
+	}
+	exe_path.push_back(std::string(exe_filename.begin(), exe_filename.end()));
+
+	return ErrorStack();
+}
+
+ErrorStack Path::getLocalFolder(Path& local_path)
+{
+	checkErrStack(getExePath(local_path), "");
+	local_path.removeExtension();
+	std::string solution_name = local_path.entries.back();
+
+	local_path.pop_back(3);
+	local_path.push_back(solution_name);
+
+	return ErrorStack();
 }

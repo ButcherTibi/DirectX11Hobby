@@ -1,6 +1,7 @@
 
-#include <iostream>
 
+
+// Header
 #include "ErrorStuff.h"
 
 
@@ -42,60 +43,52 @@ Error::Error(VkResult res, ExtraError err, std::string location, std::string msg
 
 ErrorStack::ErrorStack()
 {
-	//
+	
 }
 
 ErrorStack::ErrorStack(Error err)
 {
-	this->error_stack.push_back(err);
+	error_stack.push_back(err);
 }
 
 ErrorStack::ErrorStack(std::string location, std::string msg)
 {
-	this->error_stack.push_back(Error(location, msg));
+	error_stack.push_back(Error(location, msg));
 }
 
 ErrorStack::ErrorStack(ExtraError res, std::string location, std::string msg)
 {
-	this->error_stack.push_back(Error(res, location, msg));
+	error_stack.push_back(Error(res, location, msg));
 }
 
 ErrorStack::ErrorStack(ExtraError res, std::string location, std::string msg, std::string win_msg)
 {
-	this->error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
+	error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
 }
 
 ErrorStack::ErrorStack(VkResult res, std::string location, std::string msg)
 {
-	this->error_stack.push_back(Error(res, location, msg));
+	error_stack.push_back(Error(res, location, msg));
 }
 
 ErrorStack::ErrorStack(VkResult res, ExtraError err, std::string location, std::string msg)
 {
-	this->error_stack.push_back(Error(res, location, msg));
+	error_stack.push_back(Error(res, location, msg));
 }
 
 void ErrorStack::pushError(std::string location, std::string msg)
 {
-	this->error_stack.push_back(Error(location, msg));
+	error_stack.push_back(Error(location, msg));
 }
 
 Error ErrorStack::lastError()
 {
-	return this->error_stack.back();
-}
-
-bool ErrorStack::isOk()
-{
-	if (this->error_stack.size() > 0) {
-		return false;
-	}
-	return true;
+	return error_stack.back();
 }
 
 bool ErrorStack::isBad()
 {
-	if (this->error_stack.size() > 0) {
+	if (error_stack.size()) {
 		return true;
 	}
 	return false;

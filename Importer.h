@@ -47,12 +47,12 @@ struct JSONField {
 
 struct JSONValue {
 	std::variant<bool,
-		int32_t, int64_t,
-		float, double,
+		int64_t,
+		double,
 		std::string,
 		std::vector<JSONValue*>,  // array
 		std::vector<JSONField>,  // object
-		nullptr_t>   
+		nullptr_t>
 		value;
 };
 
@@ -80,8 +80,7 @@ private:
 public:
 	/* @param i assumes i is at first digit of number,
 	 * @param is_large ? int64_t and double : int32_t and float */
-	ErrorStack parseNumber(uint64_t& i, std::vector<char>& text, bool use_64int, bool use_double,
-		JSONValue& number);
+	ErrorStack parseNumber(uint64_t& i, std::vector<char>& text, JSONValue& json_value);
 
 	/* assumes i after '[' */
 	ErrorStack parseArray(uint64_t& i, std::vector<char>& text, JSONValue& json_value);
@@ -117,13 +116,6 @@ namespace bin {
 
 	ErrorStack loadFromURI(std::vector<char>& uri, Path& this_file, Vector& r_bin);
 }
-
-
-ErrorStack loadIndexesFromBuffer(uint64_t offset, uint64_t component_type, uint64_t count,
-	bin::Vector binary, std::vector<uint32_t>& indexes);
-
-ErrorStack loadVec3FromBuffer(uint64_t offset, uint64_t component_type, uint64_t count,
-	bin::Vector binary, std::vector<glm::vec3>& vecs);
 
 
 namespace gltf {
@@ -192,6 +184,18 @@ namespace gltf {
 	/* Atributes */
 	#define atribute_name_position "POSITION"
 	#define atribute_name_normal "NORMAL"
+
+
+	/* Helper functions */
+
+	ErrorStack loadIndexesFromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx,
+		std::vector<bin::Vector>& bin_buffs, std::vector<uint32_t>& indexes);
+
+	ErrorStack loadVec3FromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx, 
+		std::vector<bin::Vector>& bin_buffs, std::vector<glm::vec3>& vecs);
+
+
+	/* Functions */
 
 	ErrorStack importMeshes(Path path, std::vector<LinkageMesh>& meshes);
 };

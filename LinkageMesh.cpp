@@ -47,7 +47,28 @@ Side::Side(Vertex* v, Edge* e)
 	this->e = e;
 }
 
-bool Poly::getFirstWinding()
+void TesselationTris::calcNormal()
+{
+	glm::vec3 n0 = vs[0]->pos - vs[1]->pos;
+	glm::vec3 n1 = vs[0]->pos - vs[2]->pos;
+
+	this->normal = glm::cross(n0, n1);
+	this->normal = glm::normalize(normal);
+}
+
+void Poly::calcNormal()
+{
+	this->normal = glm::vec3{0, 0, 0};
+
+	for (TesselationTris& tris : this->tess_tris) {
+		this->normal += tris.normal;
+	}
+
+	this->normal /= tess_tris.size();
+	this->normal = glm::normalize(this->normal);
+}
+
+bool Poly::isNeighboringWindingDifferent()
 {
 	for (Side& ps : poly_sides) {
 		Edge* e = ps.e;
@@ -61,11 +82,11 @@ bool Poly::getFirstWinding()
 					// on the shared edge between the this and neighbouring
 					if (ps.e == other_ps.e) {
 
-						// Counter Clock Wise
+						// Different
 						if (ps.v == other_ps.v) {
 							return false;
 						}
-						// Clock Wise
+						// Same
 						return true;
 					}
 
@@ -86,7 +107,7 @@ float distBetweenPos(glm::vec3 pos1, glm::vec3 pos2)
 	return std::sqrtf(x_diff * x_diff - y_diff * y_diff - z_diff * z_diff);
 }
 
-void Poly::tesselate(LinkageMesh* me)
+void Poly::tesselateFirstWinding(LinkageMesh* me)
 {
 	auto ps0 = poly_sides.begin();
 	auto ps1 = std::next(ps0);
@@ -100,7 +121,7 @@ void Poly::tesselate(LinkageMesh* me)
 
 		tess_tris.resize(1);
 
-		if (getFirstWinding()) {	
+		if (isNeighboringWindingDifferent()) {	
 			tess_tris[0].vs[0] = v0;
 			tess_tris[0].vs[1] = v1;
 			tess_tris[0].vs[2] = v2;
@@ -121,7 +142,7 @@ void Poly::tesselate(LinkageMesh* me)
 		Vertex* aux_v1;
 
 		// ensure v0, v1, v2, v3 are clockwise
-		if (!getFirstWinding()) {
+		if (!isNeighboringWindingDifferent()) {
 
 			aux_v0 = v0;
 			aux_v1 = v1;
@@ -159,6 +180,74 @@ void Poly::tesselate(LinkageMesh* me)
 		std::cout << "Error tesselation of NPolygon not supported" << std::endl;
 		return;
 	}
+}
+
+void Poly::tesselateAnyWinding(LinkageMesh* me)
+{
+	auto ps0 = poly_sides.begin();
+	auto ps1 = std::next(ps0);
+	auto ps2 = std::next(ps1);
+
+	Vertex* v0 = ps0->v;
+	Vertex* v1 = ps1->v;
+	Vertex* v2 = ps2->v;
+
+	if (poly_sides_count == 3) {
+
+		tess_tris.resize(1);
+		me->ttris_count += 1;
+
+		tess_tris[0].vs[0] = v0;
+		tess_tris[0].vs[1] = v1;
+		tess_tris[0].vs[2] = v2;		
+	}
+	else if (poly_sides_count == 4) {
+
+		tess_tris.resize(2);
+		me->ttris_count += 2;
+
+		Vertex* v3 = std::next(ps2)->v;
+
+		// shortest path tesselation
+		if (distBetweenPos(v0->pos, v2->pos) <
+			distBetweenPos(v1->pos, v3->pos))
+		{
+			tess_tris[0].vs[0] = v0;
+			tess_tris[0].vs[1] = v2;
+			tess_tris[0].vs[2] = v3;
+
+			tess_tris[1].vs[0] = v0;
+			tess_tris[1].vs[1] = v1;
+			tess_tris[1].vs[2] = v2;
+		}
+		else {
+			tess_tris[0].vs[0] = v0;
+			tess_tris[0].vs[1] = v1;
+			tess_tris[0].vs[2] = v3;
+
+			tess_tris[1].vs[0] = v1;
+			tess_tris[1].vs[1] = v2;
+			tess_tris[1].vs[2] = v3;
+		}		
+	}
+	else {
+		std::cout << "Error tesselation of NPolygon not supported" << std::endl;
+		return;
+	}
+}
+
+void Poly::build(LinkageMesh* me)
+{
+	// Tesselation
+	this->tesselateFirstWinding(me);
+
+	// Triangle Normals
+	for (TesselationTris& tris : this->tess_tris) {
+		tris.calcNormal();
+	}
+
+	// Face Normal
+	this->calcNormal();
 }
 
 //LinkageMesh::LinkageMesh()

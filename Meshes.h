@@ -26,6 +26,7 @@ public:
 	// Data
 	glm::vec3 pos;
 	glm::vec3 normal;
+	glm::vec2 uv;
 	glm::vec4 color;
 
 	// Linkage
@@ -70,9 +71,16 @@ public:
 	Side(Vertex* v, Edge* e);
 };
 
-struct TriangulationTris
+/* Because calc normals requires cross product consitent winding 
+ * must be maintained to ensure all Tesselation Triangle normals point 
+ * in the same relative direction */
+struct TesselationTris
 {
 	std::array<Vertex*, 3> vs;
+	glm::vec3 normal;
+
+	// NOTE: check if needs flip
+	void calcNormal();
 };
 
 class Poly
@@ -81,33 +89,40 @@ public:
 	std::forward_list<Poly>::iterator self_it;
 
 	// Data
+	glm::vec3 normal;
+
 	uint32_t poly_sides_count;
 	std::forward_list<Side> poly_sides;
 
-	// bool clock_wise;
-	std::vector<TriangulationTris> tess_tris;
+	// Generated when rendering
+	std::vector<TesselationTris> tess_tris;
 
 public:
-	/* finds what winding has the first neighbouring polygon
-	 * return true for clockwise */
-	bool getFirstWinding();
+	/* calculates the normal that is the average of tesselated tris normals */
+	void calcNormal();
 
-	void tesselate(LinkageMesh* me);
+	/* finds what winding has the first neighboring polygon
+	 * return true for Same Winding Direction */
+	bool isNeighboringWindingDifferent();
+
+	/* tesselateAnyWinding with the winding of the first neighbouring polygon */
+	void tesselateFirstWinding(LinkageMesh* me);
+
+	/* tesselation with no defined winding */
+	void tesselateAnyWinding(LinkageMesh* me);
+
+	void build(LinkageMesh* me);
 };
 
 
 /* Mutable Linkage Mesh
  *  */
-class LinkageMesh
-{
+class LinkageMesh {
 public:
-	//uint32_t id;
-
 	glm::vec3 position = {0, 0, 0};
 	glm::quat rotation = { 1, 0, 0, 0 };
 	glm::vec3 scale = {1, 1, 1};
 
-public:
 	uint32_t verts_size = 0;
 	uint32_t edges_size = 0;
 	uint32_t polys_size = 0;
@@ -159,7 +174,8 @@ Poly* initQuad(LinkageMesh& me, Vertex* v0, Vertex* v1, Vertex* v2, Vertex* v3,
 
 // Creates a Quad as well as it's verts and edges
 Poly* fabricateQuad(LinkageMesh& me, glm::vec3 const& v0, glm::vec3 const& v1, 
-	glm::vec3 const& v2, glm::vec3 const& v3, glm::vec4 const& color);
+	glm::vec3 const& v2, glm::vec3 const& v3,
+	glm::vec3 normal, glm::vec4 const& color);
 
 
 /* Linkage Mesh */
