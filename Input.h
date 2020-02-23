@@ -147,7 +147,7 @@ public:
 	void removeShortcut(Shortcut* shortcut);
 
 	/* updates the keys and mouse state */
-	ErrorStack update(const steady_time& time);
+	ErrStack update(const steady_time& time);
 };
 
 extern InputState input;

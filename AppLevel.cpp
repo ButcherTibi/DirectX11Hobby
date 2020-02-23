@@ -6,9 +6,11 @@
 #include "Input.h"
 #include "Primitives.h"
 #include "Importer.h"
-
-// new
 #include "VulkanSystems.h"
+#include "UserInterface.h"
+
+// Image Loading
+#include "stb_image.h"
 
 // Header
 #include "AppLevel.h"
@@ -33,7 +35,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			sizeof(RAWINPUTHEADER));
 
 		if (input_size == (UINT)-1) {
-			// ErrorStack(ExtraError::FAILED_TO_GET_RAW_INPUT_DATA, code_location, "failed to get raw input", getLastError());
+			// ErrStack(ExtraError::FAILED_TO_GET_RAW_INPUT_DATA, code_location, "failed to get raw input", getLastError());
 		}
 		else if (input_size) {
 			input.mouse_delta_x = raw_input.data.mouse.lLastX;
@@ -54,7 +56,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
 }
 
-ErrorStack AppLevel::response()
+ErrStack AppLevel::response()
 {
 	// Controls
 	float rotate_shortcut = input.rotate_camera.duration;
@@ -96,12 +98,15 @@ ErrorStack AppLevel::response()
 	checkErrStack(renderer.loadGPUData(), "");
 	checkErrStack(renderer.draw(), "");
 
-	return ErrorStack();
+	return ErrStack();
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
 {
 	printf("WinMain \n");
+
+	app_level.window_width = 1024;
+	app_level.window_height = 720;
 
 	// Window
 	WNDCLASSEXA window_class = {};
@@ -130,7 +135,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 
 			// Size and position
-			CW_USEDEFAULT, CW_USEDEFAULT, 1024, 720,
+			CW_USEDEFAULT, CW_USEDEFAULT, app_level.window_width, app_level.window_height,
 
 			NULL,       // Parent window    
 			NULL,       // Menu
@@ -168,70 +173,156 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		input.addShortcut(&input.focus_camera, &input.key_f);
 	}
 
-	ErrorStack err;
+	ErrStack err;
+	Path local_path;
+	Path::getExePath(local_path);
+	local_path.pop_back(3);
+	local_path.push_back("Sculpt");
 
 	// Load Shader Code
 	std::vector<char> vert_shader_code;
 	std::vector<char> frag_shader_code;
+	std::vector<char> ui_vertex_shader_code;
+	std::vector<char> ui_frag_shader_code;
 	{
-		Path shader_path;
-		err = Path::getExePath(shader_path);
-		if (err.isBad()) {
-			err.debugPrint();
-			return 1;
+		Path shader_path = local_path;
+		shader_path.push_back("shaders");
+
+		// 3D
+		{
+			Path path = shader_path;
+			path.push_back("3D/vert.spv");
+
+			err = path.read(vert_shader_code);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
+
+			path = shader_path;
+			path.push_back("3D/frag.spv");
+
+			err = path.read(frag_shader_code);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
 		}
-
-		shader_path.pop_back(3);
-		shader_path.push_back("Sculpt/shaders");
-
-		Path vert_shader_path = shader_path;
-		vert_shader_path.push_back("vert.spv");
 		
-		err = vert_shader_path.read(vert_shader_code);
-		if (err.isBad()) {
-			err.debugPrint();
-			return 1;
+		// UI
+		{
+			Path path = shader_path;
+			path.push_back("UI/vert.spv");
+
+			err = path.read(ui_vertex_shader_code);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
+
+			path = shader_path;
+			path.push_back("UI/frag.spv");
+
+			err = path.read(ui_frag_shader_code);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
 		}
+	}
 
-		Path frag_shader_path = shader_path;
-		frag_shader_path.push_back("frag.spv");
+	// Mesh
+	{
+		Path mesh_path = local_path;
+		mesh_path.push_back("meshes/DamagedHelmet/DamagedHelmet.gltf");
 
-		err = frag_shader_path.read(frag_shader_code);
+		// Mesh
+		err = importGLTFMeshes(mesh_path, renderer.meshes);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
 	}
 
-	// 
-	{
+	renderer.camera.position.z = 1.5;
 
+	// Mesh Diffuse Texture
+	{
+		Path tex_path = local_path;
+		local_path.push_back("meshes/DamagedHelmet/Default_albedo.jpg");
+
+		int32_t width, height, channels;
+
+		uint8_t* tex_pixels = stbi_load(local_path.toWindowsPath().c_str(),
+			&width, &height, &channels, STBI_rgb_alpha);
+
+		BasicBitmap& img = renderer.mesh_difuse;
+		img.width = width;
+		img.height = height;
+		img.channels = 4;
+		img.mem_size = width * height * 4;
+		img.colors.resize(img.mem_size);
+
+		memcpy(img.colors.data(), tex_pixels, img.mem_size);
+
+		stbi_image_free(tex_pixels);
 	}
 
-	// Scene setup
+	// UI Symbol Atlas Texture
 	{
-		/*err = gltf::importMeshes(Path("E:/my_work/Vulkan/Sculpt/Sculpt/meshes/damaged_helmet/damaged_helmet.gltf"),
-			renderer.meshes);
+		Path font_path;
+		err = Path::getLocalFolder(font_path);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
-		}*/
+		}
+		font_path.push_back("/UI/Fonts/Roboto/Roboto-Regular.ttf");
 
-		CreateQuadInfo info = {};
-		createQuadMesh(info, renderer.meshes.emplace_back());
+		std::vector<uint8_t> roboto_font_raw;
+		err = font_path.read(roboto_font_raw);
+		if (err.isBad()) {
+			err.isBad();
+			return 1;
+		}
 
-		renderer.camera.position.z = 1.5;
+		std::vector<GlyphBitmap> char_bitmaps;
+		err = createFontBitmaps(roboto_font_raw, 12, char_bitmaps);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
+
+		char_bitmaps[0].debugPrint();
+
+		BasicBitmap& img = renderer.symbol_atlas;
+		img.colors = char_bitmaps[0].pixels;
+		img.width = char_bitmaps[0].width;
+		img.height = char_bitmaps[0].height;
+		img.channels = 1;
+		img.calcMemSize();
 	}
 
 	// Render
-	renderer.generateGPUData();
+	{
+		renderer.generateGPUData();
 
-	err = renderer.create(hinstance, app_level.hwnd, 1024, 720,
-		vert_shader_code, frag_shader_code);
-	if (err.isBad()) {
-		err.debugPrint();
-		return 1;
+		RendererCreateInfo info;
+		info.hinstance = hinstance;
+		info.hwnd = app_level.hwnd;
+		info.width = app_level.window_width;
+		info.height = app_level.window_height;
+		info.g3d_vert_shader_code = &vert_shader_code;
+		info.g3d_frag_shader_code = &frag_shader_code;
+		info.ui_vert_shader_code = &ui_vertex_shader_code;
+		info.ui_frag_shader_code = &ui_frag_shader_code;
+
+		err = renderer.create(info);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 	}
+	
 
 	steady_time frame_start;
 	

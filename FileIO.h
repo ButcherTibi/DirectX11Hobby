@@ -25,7 +25,7 @@ public:
 	bool isAbsolute();
 
 	/* does path point to a directory */
-	ErrorStack isDirectory(bool &is_dir);
+	ErrStack isDirectory(bool &is_dir);
 
 	/* try to access directory or file pointed by path */
 	bool isAccesible();
@@ -59,13 +59,13 @@ public:
 
 	/* reads the file pointed by this path
 	 * intended for reading shader code and JSON */
-	ErrorStack read(std::vector<char>& content);
-
+	template<typename T = char>
+	ErrStack read(std::vector<T>& content);
 	
 	/*  */
 
-	static ErrorStack getExePath(Path& exe_path);
-	static ErrorStack getLocalFolder(Path& local_path);
+	static ErrStack getExePath(Path& exe_path);
+	static ErrStack getLocalFolder(Path& local_path);
 
 
 	/*  */

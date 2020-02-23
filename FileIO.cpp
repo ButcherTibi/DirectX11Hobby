@@ -104,11 +104,11 @@ bool Path::isAbsolute()
 	return isPathAbsolute(entries[0]);
 }
 
-ErrorStack Path::isDirectory(bool &is_dir)
+ErrStack Path::isDirectory(bool &is_dir)
 {
 	if (!this->entries.size()) {
 		is_dir = false;
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	std::vector<char> path = this->toWin32Path();
@@ -116,7 +116,7 @@ ErrorStack Path::isDirectory(bool &is_dir)
 
 	DWORD file_atrib = GetFileAttributesA(path_lpcstr);
 	if (file_atrib & INVALID_FILE_ATTRIBUTES) {
-		return ErrorStack(code_location, getLastError());
+		return ErrStack(code_location, getLastError());
 	}
 	
 	if (file_atrib & FILE_ATTRIBUTE_DIRECTORY) {
@@ -125,7 +125,7 @@ ErrorStack Path::isDirectory(bool &is_dir)
 	else {
 		is_dir = false;
 	}
-	return ErrorStack();
+	return ErrStack();
 }
 
 bool Path::isAccesible()
@@ -266,13 +266,14 @@ std::string Path::toWindowsPath()
 	return path;
 }
 
-ErrorStack Path::read(std::vector<char> &content)
+template<typename T>
+ErrStack Path::read(std::vector<T>& content)
 {
 	// create file handle
 	std::vector<char> filename_vec = toWin32Path();
 	LPCSTR filename_win = filename_vec.data();
 
-	HANDLE file_handle = CreateFileA(filename_win, 
+	HANDLE file_handle = CreateFileA(filename_win,
 		GENERIC_READ, // desired acces
 		0,  // share mode
 		NULL,  // security atributes
@@ -281,7 +282,7 @@ ErrorStack Path::read(std::vector<char> &content)
 		NULL);
 
 	if (file_handle == INVALID_HANDLE_VALUE) {
-		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location, 
+		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
 			"failed to create file handle for path = " + this->toWindowsPath(), getLastError());
 	}
 
@@ -290,7 +291,7 @@ ErrorStack Path::read(std::vector<char> &content)
 	if (!GetFileSizeEx(file_handle, &file_size)) {
 
 		CloseHandle(file_handle);
-		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
+		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
 			"failed to find file size for path = " + this->toWindowsPath(), getLastError());
 	}
 	content.resize(file_size.QuadPart);
@@ -298,23 +299,25 @@ ErrorStack Path::read(std::vector<char> &content)
 	// read file
 	DWORD bytes_read;
 
-	if (!ReadFile(file_handle, content.data(), (DWORD) file_size.QuadPart, &bytes_read, NULL)) {
+	if (!ReadFile(file_handle, content.data(), (DWORD)file_size.QuadPart, &bytes_read, NULL)) {
 
 		CloseHandle(file_handle);
-		return ErrorStack(ExtraError::FAILED_TO_READ_FILE, code_location,
+		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
 			"failed to read path = " + this->toWindowsPath(), getLastError());
 	}
 
 	CloseHandle(file_handle);
-	return ErrorStack();
+	return ErrStack();
 }
+template ErrStack Path::read(std::vector<char>& content);
+template ErrStack Path::read(std::vector<uint8_t>& content);
 
 void Path::check()
 {
 	// 
 }
 
-ErrorStack Path::getExePath(Path& exe_path)
+ErrStack Path::getExePath(Path& exe_path)
 {
 	assert_cond(exe_path.entries.size() == 0, "");
 
@@ -322,14 +325,14 @@ ErrorStack Path::getExePath(Path& exe_path)
 
 	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
 
-		return ErrorStack(code_location, getLastError());
+		return ErrStack(code_location, getLastError());
 	}
 	exe_path.push_back(std::string(exe_filename.begin(), exe_filename.end()));
 
-	return ErrorStack();
+	return ErrStack();
 }
 
-ErrorStack Path::getLocalFolder(Path& local_path)
+ErrStack Path::getLocalFolder(Path& local_path)
 {
 	checkErrStack(getExePath(local_path), "");
 	local_path.removeExtension();
@@ -338,5 +341,5 @@ ErrorStack Path::getLocalFolder(Path& local_path)
 	local_path.pop_back(3);
 	local_path.push_back(solution_name);
 
-	return ErrorStack();
+	return ErrStack();
 }

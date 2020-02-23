@@ -177,11 +177,23 @@ void addTriangleListToMesh(LinkageMesh& me, std::vector<uint32_t>& indexes, Vert
 {
 	std::vector<Vertex*> verts{ attrs.positions.size() };
 
-	// Create Vertices with positions
+	// Create Vertices
 	for (uint64_t i = 0; i < verts.size(); i++) {
-
 		verts[i] = initBlankVertex(me);
-		verts[i]->pos = attrs.positions[i];
+	}
+
+	// Position
+	for (uint64_t i = 0; i < verts.size(); i++) {
+		Vertex* v = verts[i];
+		v->pos = attrs.positions[i];
+	}
+
+	// UVs
+	if (attrs.uvs.size()) {
+		for (uint64_t i = 0; i < verts.size(); i++) {
+			Vertex* v = verts[i];
+			v->uv = attrs.uvs[i];
+		}
 	}
 
 	// Normals
@@ -207,9 +219,3 @@ void addTriangleListToMesh(LinkageMesh& me, std::vector<uint32_t>& indexes, Vert
 	}
 }
 
-void setMeshVertexColor(LinkageMesh& mesh, glm::vec4 new_color)
-{
-	for (Vertex& v : mesh.verts) {
-		v.color = new_color;
-	}
-}

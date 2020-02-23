@@ -8,7 +8,7 @@
 
 namespace vks {
 
-	ErrorStack find_layers(const std::vector<VkLayerProperties>& layer_props, const std::vector<const char*>& layers)
+	ErrStack find_layers(const std::vector<VkLayerProperties>& layer_props, const std::vector<const char*>& layers)
 	{
 		for (const char* layer : layers) {
 
@@ -21,13 +21,13 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrorStack(ExtraError::VALIDATION_LAYER_NOT_FOUND, code_location, "validation layer = " + std::string(layer) + " not found");
+				return ErrStack(ExtraError::VALIDATION_LAYER_NOT_FOUND, code_location, "validation layer = " + std::string(layer) + " not found");
 			}
 		}
-		return ErrorStack();
+		return ErrStack();
 	}
 
-	ErrorStack find_extensions(const std::vector<VkExtensionProperties>& ext_props, const std::vector<const char*>& extensions)
+	ErrStack find_extensions(const std::vector<VkExtensionProperties>& ext_props, const std::vector<const char*>& extensions)
 	{
 		for (const char* extension : extensions) {
 
@@ -40,24 +40,24 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrorStack(ExtraError::EXTENSION_NOT_FOUND, code_location, "instance extension = " + std::string(extension) + " not found");
+				return ErrStack(ExtraError::EXTENSION_NOT_FOUND, code_location, "instance extension = " + std::string(extension) + " not found");
 			}
 		}
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 	{
-		std::cerr << "Vulkan Debug: " << pCallbackData->pMessage << std::endl;
+		std::cerr << "Vulkan Debug: " << pCallbackData->pMessage << std::endl << std::endl;
 
 		return VK_FALSE;
 	}
 
-	ErrorStack Instance::create()
+	ErrStack Instance::create()
 	{
 		VkResult vk_res;
-		ErrorStack err;
+		ErrStack err;
 
 		// Find Layers
 		{
@@ -65,14 +65,14 @@ namespace vks {
 
 			vk_res = vkEnumerateInstanceLayerProperties(&layer_props_count, NULL);
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, code_location, "could not retrieve validation layer props count");
+				return ErrStack(vk_res, code_location, "could not retrieve validation layer props count");
 			}
 
 			std::vector<VkLayerProperties> layer_props(layer_props_count);
 
 			vk_res = vkEnumerateInstanceLayerProperties(&layer_props_count, layer_props.data());
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, code_location, "could not retrieve validation layer props");
+				return ErrStack(vk_res, code_location, "could not retrieve validation layer props");
 			}
 
 			validation_layers = { "VK_LAYER_LUNARG_standard_validation" };
@@ -89,14 +89,14 @@ namespace vks {
 
 			vk_res = vkEnumerateInstanceExtensionProperties(NULL, &ext_props_count, NULL);
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props count");
+				return ErrStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props count");
 			}
 
 			std::vector<VkExtensionProperties> ext_props(ext_props_count);
 
 			vk_res = vkEnumerateInstanceExtensionProperties(NULL, &ext_props_count, ext_props.data());
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props");
+				return ErrStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props");
 			}
 
 			err = find_extensions(ext_props, instance_extensions);
@@ -130,7 +130,7 @@ namespace vks {
 
 			vk_res = vkCreateInstance(&inst_info, NULL, &instance);
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, ExtraError::INSTANCE_CREATION_FAILURE, code_location, "could not create a Vulkan instance");
+				return ErrStack(vk_res, ExtraError::INSTANCE_CREATION_FAILURE, code_location, "could not create a Vulkan instance");
 			}
 		}
 
@@ -150,11 +150,11 @@ namespace vks {
 
 				vk_res = func(instance, &createInfo, NULL, &callback);
 				if (vk_res != VK_SUCCESS) {
-					return ErrorStack(vk_res, code_location, "debug callback creation failed");
+					return ErrStack(vk_res, code_location, "debug callback creation failed");
 				}
 			}
 			else {
-				return ErrorStack(ExtraError::DEBUG_EXTENSION_NOT_FOUND, code_location, "debug extension not present");
+				return ErrStack(ExtraError::DEBUG_EXTENSION_NOT_FOUND, code_location, "debug extension not present");
 			}
 		}
 
@@ -164,12 +164,12 @@ namespace vks {
 				vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2KHR");
 
 			if (getMemProps2 == NULL) {
-				return ErrorStack(ExtraError::FAILED_TO_GET_EXTERNAL_FUNCTION, code_location, "failed to retrieve function pointer for "
+				return ErrStack(ExtraError::FAILED_TO_GET_EXTERNAL_FUNCTION, code_location, "failed to retrieve function pointer for "
 					"vkGetPhysicalDeviceMemoryProperties2KHR");
 			}
 		}
 
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Instance::destroy()
@@ -198,7 +198,7 @@ namespace vks {
 	}
 
 
-	ErrorStack Surface::create(Instance* instance, HINSTANCE hinstance, HWND hwnd)
+	ErrStack Surface::create(Instance* instance, HINSTANCE hinstance, HWND hwnd)
 	{
 		this->instance = instance;
 
@@ -209,10 +209,10 @@ namespace vks {
 
 		VkResult vk_res = vkCreateWin32SurfaceKHR(instance->instance, &info, NULL, &this->surface);
 		if (vk_res != VK_SUCCESS) {
-			return ErrorStack(vk_res, code_location, "failed to create vulkan surface");
+			return ErrStack(vk_res, code_location, "failed to create vulkan surface");
 		}
 
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Surface::destroy()
@@ -232,29 +232,30 @@ namespace vks {
 	PhysicalDevice::PhysicalDevice()
 	{
 		phys_dev_features.samplerAnisotropy = VK_TRUE;
+		phys_dev_features.sampleRateShading = VK_TRUE;
 	}
 
-	ErrorStack PhysicalDevice::create(Instance* instance, Surface* surface)
+	ErrStack PhysicalDevice::create(Instance* instance, Surface* surface)
 	{
 		VkResult vk_res;
-		ErrorStack err;
+		ErrStack err;
 
 		uint32_t deviceCount = 0;
 
 		vk_res = vkEnumeratePhysicalDevices(instance->instance, &deviceCount, NULL);
 		if (vk_res != VK_SUCCESS) {
-			return ErrorStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
+			return ErrStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
 		}
 
 		if (deviceCount == 0) {
-			return ErrorStack(ExtraError::NO_GPU_WITH_VULKAN_SUPPORT_FOUND, code_location, "failed to find GPUs with Vulkan support");
+			return ErrStack(ExtraError::NO_GPU_WITH_VULKAN_SUPPORT_FOUND, code_location, "failed to find GPUs with Vulkan support");
 		}
 
 		std::vector<VkPhysicalDevice> phys_devices(deviceCount);
 
 		vk_res = vkEnumeratePhysicalDevices(instance->instance, &deviceCount, phys_devices.data());
 		if (vk_res != VK_SUCCESS) {
-			return ErrorStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
+			return ErrStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
 		}
 
 		for (VkPhysicalDevice phys_dev : phys_devices) {
@@ -276,7 +277,7 @@ namespace vks {
 					VkBool32 supported;
 					vk_res = vkGetPhysicalDeviceSurfaceSupportKHR(phys_dev, i, surface->surface, &supported);
 					if (vk_res != VK_SUCCESS) {
-						return ErrorStack(vk_res, code_location, "failed to check if pshysical device can present");
+						return ErrStack(vk_res, code_location, "failed to check if pshysical device can present");
 					}
 
 					if (family_prop.queueCount > 0 && family_prop.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
@@ -297,12 +298,12 @@ namespace vks {
 			{
 				uint32_t extension_count;
 				if (vkEnumerateDeviceExtensionProperties(phys_dev, NULL, &extension_count, NULL) != VK_SUCCESS) {
-					return ErrorStack(code_location, "failed to retrieve enumerate device extension properties count");
+					return ErrStack(code_location, "failed to retrieve enumerate device extension properties count");
 				}
 
 				std::vector<VkExtensionProperties> available_extensions(extension_count);
 				if (vkEnumerateDeviceExtensionProperties(phys_dev, NULL, &extension_count, available_extensions.data()) != VK_SUCCESS) {
-					return ErrorStack(code_location, "failed to retrieve enumerate device extension properties");
+					return ErrStack(code_location, "failed to retrieve enumerate device extension properties");
 				}
 
 				uint32_t count = 0;
@@ -338,17 +339,40 @@ namespace vks {
 		}
 
 		if (physical_device == VK_NULL_HANDLE) {
-			return ErrorStack(ExtraError::NO_SUITABLE_GPU_FOUND, code_location, "failed to find a suitable GPU");
+			return ErrStack(ExtraError::NO_SUITABLE_GPU_FOUND, code_location, "failed to find a suitable GPU");
 		}
 
 		vkGetPhysicalDeviceProperties(physical_device, &this->phys_dev_props);
 		vkGetPhysicalDeviceMemoryProperties(physical_device, &this->mem_props);
 
-		return ErrorStack();
+
+		{
+			VkSampleCountFlags counts = phys_dev_props.limits.framebufferColorSampleCounts & phys_dev_props.limits.framebufferDepthSampleCounts;
+			if (counts & VK_SAMPLE_COUNT_64_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_64_BIT;
+			}
+			else if (counts & VK_SAMPLE_COUNT_32_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_32_BIT;
+			}
+			else if (counts & VK_SAMPLE_COUNT_16_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_16_BIT;
+			}
+			else if (counts & VK_SAMPLE_COUNT_8_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_8_BIT;
+			}
+			else if (counts & VK_SAMPLE_COUNT_4_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_4_BIT;
+			}
+			else if (counts & VK_SAMPLE_COUNT_2_BIT) {
+				this->max_MSAA = VK_SAMPLE_COUNT_2_BIT;
+			}
+		}
+
+		return ErrStack();
 	}
 
 
-	ErrorStack LogicalDevice::create(Instance* instance, PhysicalDevice* phys_dev)
+	ErrStack LogicalDevice::create(Instance* instance, PhysicalDevice* phys_dev)
 	{
 		// Graphics queue
 		VkDeviceQueueCreateInfo graphics_queue_info = {};
@@ -377,7 +401,7 @@ namespace vks {
 
 		VkResult vk_res = vkCreateDevice(phys_dev->physical_device, &device_info, NULL, &logical_device);
 		if (vk_res != VK_SUCCESS) {
-			return ErrorStack(vk_res, ExtraError::FAILED_CREATE_LOGICAL_DEVICE, code_location, "failed to create logical device");
+			return ErrStack(vk_res, ExtraError::FAILED_CREATE_LOGICAL_DEVICE, code_location, "failed to create logical device");
 		}
 
 		// Queue creation
@@ -393,11 +417,11 @@ namespace vks {
 
 			VkResult vk_res = vmaCreateAllocator(&alloc_info, &this->allocator);
 			if (vk_res != VK_SUCCESS) {
-				return ErrorStack(vk_res, code_location, "failed to create allocator");
+				return ErrStack(vk_res, code_location, "failed to create allocator");
 			}
 		}
 
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void LogicalDevice::destroy()
@@ -416,7 +440,7 @@ namespace vks {
 	}
 
 
-	ErrorStack Swapchain::create(Surface* surface, PhysicalDevice* phys_dev, LogicalDevice* logical_dev, 
+	ErrStack Swapchain::create(Surface* surface, PhysicalDevice* phys_dev, LogicalDevice* logical_dev, 
 		uint32_t width, uint32_t height)
 	{
 		this->logical_device = logical_dev;
@@ -449,7 +473,7 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrorStack(ExtraError::NO_SUITABLE_SURFACE_FORMAT_FOUND, code_location, "failed to find suitable surface format");
+				return ErrStack(ExtraError::NO_SUITABLE_SURFACE_FORMAT_FOUND, code_location, "failed to find suitable surface format");
 			}
 		}
 
@@ -503,7 +527,7 @@ namespace vks {
 		checkVkRes(vkGetSwapchainImagesKHR(logical_device->logical_device, swapchain, &image_count, images.data()),
 			"failed to retrieve swap chain images");
 
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Swapchain::destroy()
@@ -520,32 +544,7 @@ namespace vks {
 	}
 
 
-	static ErrorStack findSupportedImageFormat(vks::PhysicalDevice* phys_dev, std::vector<DesiredImageProps> desires,
-		DesiredImageProps& result)
-	{
-		VkResult vk_res;
-
-		for (DesiredImageProps desire : desires) {
-
-			vk_res = vkGetPhysicalDeviceImageFormatProperties(phys_dev->physical_device, desire.format, desire.type,
-				desire.tiling, desire.usage, desire.flags, &desire.props_found);
-			if (vk_res == VK_SUCCESS) {
-				result = desire;
-				return ErrorStack();
-			}
-			else if (vk_res == VK_ERROR_FORMAT_NOT_SUPPORTED) {
-				continue;
-			}
-			else {
-				return ErrorStack(vk_res, code_location, "failed to check for desired image properties");
-			}
-		}
-
-		return ErrorStack(code_location, "desired image properties not supported");
-	}
-
-
-	ErrorStack ImageView::create(LogicalDevice* logical_dev, VkImage img, VkFormat format, 
+	ErrStack ImageView::createPresentView(LogicalDevice* logical_dev, VkImage img, VkFormat format, 
 		VkImageAspectFlags aspect)
 	{
 		this->logical_dev = logical_dev;
@@ -574,12 +573,38 @@ namespace vks {
 		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
 			"failed to create image view");
 
-		return ErrorStack();
+		return ErrStack();
 	}
 
-	ErrorStack ImageView::create(LogicalDevice* logical_dev, Image* img, VkImageAspectFlags aspect)
+	ErrStack ImageView::create(LogicalDevice* logical_dev, Image* img, VkImageAspectFlags aspect)
 	{
-		return create(logical_dev, img->img, img->format, aspect);
+		this->logical_dev = logical_dev;
+
+		VkComponentMapping component_mapping = {};
+		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		VkImageSubresourceRange sub_resource = {};
+		sub_resource.aspectMask = aspect;
+		sub_resource.baseMipLevel = 0;
+		sub_resource.levelCount = img->mip_lvl;
+		sub_resource.baseArrayLayer = 0;
+		sub_resource.layerCount = 1;
+
+		VkImageViewCreateInfo imageview_info = {};
+		imageview_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageview_info.image = img->img;
+		imageview_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		imageview_info.format = img->format;
+		imageview_info.components = component_mapping;
+		imageview_info.subresourceRange = sub_resource;
+
+		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
+			"failed to create image view");
+
+		return ErrStack();
 	}
 
 	void ImageView::destroy()
@@ -596,29 +621,13 @@ namespace vks {
 	}
 
 
-	ErrorStack Sampler::create(LogicalDevice* logical_dev)
+	ErrStack Sampler::create(LogicalDevice* logical_dev, VkSamplerCreateInfo& info)
 	{
-		this->logical_dev = logical_dev;
-
-		VkSamplerCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		info.magFilter = VK_FILTER_LINEAR;
-		info.minFilter = VK_FILTER_LINEAR;
-		info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		info.anisotropyEnable = VK_TRUE;
-		info.maxAnisotropy = 16;
-		info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		info.mipLodBias = 0.0f;
-		info.minLod = 0.0f;
-		info.maxLod = 0.0f;
+		this->logical_dev = logical_dev;	
 
 		checkVkRes(vkCreateSampler(logical_dev->logical_device, &info, NULL, &sampler),
 			"failed to create sampler");
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Sampler::destroy()
@@ -635,73 +644,128 @@ namespace vks {
 	}
 
 
-	ErrorStack Renderpass::create(LogicalDevice* logical_dev, VkFormat present_format, 
+	ErrStack Renderpass::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, VkFormat present_format, 
 		VkFormat depth_format)
 	{
 		this->logical_dev = logical_dev;
 
-		// Description
+		// Descriptions
 		VkAttachmentDescription color_atach = {};
 		color_atach.format = present_format;
-		color_atach.samples = VK_SAMPLE_COUNT_1_BIT;  // for MSAA ?
+		color_atach.samples = phys_dev->max_MSAA;
 		color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		color_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		color_atach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentDescription depth_atach = {};
 		depth_atach.format = depth_format;
-		depth_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		depth_atach.samples = phys_dev->max_MSAA;
 		depth_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		depth_atach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		depth_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		depth_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		depth_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		depth_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		depth_atach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+		VkAttachmentDescription msaa_resolve_atach = {};
+		msaa_resolve_atach.format = present_format;
+		msaa_resolve_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		msaa_resolve_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		msaa_resolve_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		msaa_resolve_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		msaa_resolve_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		msaa_resolve_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		msaa_resolve_atach.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkAttachmentDescription ui_color_atach = {};
+		ui_color_atach.format = present_format;
+		ui_color_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		ui_color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		ui_color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		ui_color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		ui_color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		ui_color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		ui_color_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
 		// Reference
-		VkAttachmentReference color_attach_ref = {};
-		color_attach_ref.attachment = 0;
-		color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkAttachmentReference g3d_color_attach_ref = {};
+		g3d_color_attach_ref.attachment = 0;
+		g3d_color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference depth_attach_ref = {};
 		depth_attach_ref.attachment = 1;
 		depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+		VkAttachmentReference msaa_resolve_attach_ref = {};
+		msaa_resolve_attach_ref.attachment = 2;
+		msaa_resolve_attach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkAttachmentReference ui_color_attach_ref = {};
+		ui_color_attach_ref.attachment = 3;
+		ui_color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		// Attachments
+		std::array<VkAttachmentDescription, 4> attachments = {
+			color_atach, depth_atach, msaa_resolve_atach,
+			ui_color_atach
+		};
+
 		// Subpass Description
-		VkSubpassDescription subpass_description = {};
-		subpass_description.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass_description.colorAttachmentCount = 1;
-		subpass_description.pColorAttachments = &color_attach_ref;
-		subpass_description.pDepthStencilAttachment = &depth_attach_ref;
+		VkSubpassDescription subpass_descp = {};
+		subpass_descp.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass_descp.colorAttachmentCount = 1;
+		subpass_descp.pColorAttachments = &g3d_color_attach_ref;
+		subpass_descp.pResolveAttachments = &msaa_resolve_attach_ref;
+		subpass_descp.pDepthStencilAttachment = &depth_attach_ref;
+
+		VkSubpassDescription ui_subpass_descp = {};
+		ui_subpass_descp.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		ui_subpass_descp.inputAttachmentCount = 1;
+		ui_subpass_descp.pInputAttachments = &msaa_resolve_attach_ref;
+		ui_subpass_descp.colorAttachmentCount = 1;
+		ui_subpass_descp.pColorAttachments = &ui_color_attach_ref;
+
+		std::array<VkSubpassDescription, 2> subpass_descps = {
+			subpass_descp, ui_subpass_descp,
+		};
 
 		// Subpass Dependency
-		VkSubpassDependency dependency = {};
-		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependency.dstSubpass = 0;
-		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.srcAccessMask = 0;
-		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;  // depth ?
+		VkSubpassDependency g3d_depend = {};
+		g3d_depend.srcSubpass = VK_SUBPASS_EXTERNAL;
+		g3d_depend.dstSubpass = 1;
+		g3d_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		g3d_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		g3d_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		g3d_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-		std::array<VkAttachmentDescription, 2> attachments;
-		attachments[0] = color_atach;
-		attachments[1] = depth_atach;
+		VkSubpassDependency ui_depend = {};
+		ui_depend.srcSubpass = 0;
+		ui_depend.dstSubpass = VK_SUBPASS_EXTERNAL;
+		ui_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		ui_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ui_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		ui_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		
+
+		std::array<VkSubpassDependency, 2> depends{
+			g3d_depend, ui_depend
+		};
 
 		VkRenderPassCreateInfo renderpass_info = {};
 		renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 		renderpass_info.attachmentCount = (uint32_t)attachments.size();
 		renderpass_info.pAttachments = attachments.data();
-		renderpass_info.subpassCount = 1;
-		renderpass_info.pSubpasses = &subpass_description;
-		renderpass_info.dependencyCount = 1;
-		renderpass_info.pDependencies = &dependency;
+		renderpass_info.subpassCount = (uint32_t)subpass_descps.size();
+		renderpass_info.pSubpasses = subpass_descps.data();
+		renderpass_info.dependencyCount = (uint32_t)depends.size();
+		renderpass_info.pDependencies = depends.data();
 
 		checkVkRes(vkCreateRenderPass(logical_dev->logical_device, &renderpass_info, NULL, &renderpass),
 			"failed to create renderpass");
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Renderpass::destroy()
@@ -718,19 +782,21 @@ namespace vks {
 	}
 
 
-	ErrorStack Framebuffers::create(LogicalDevice* logical_dev, std::vector<ImageView>& present_views,
-		ImageView* depth_view, Renderpass* renderpass, uint32_t width, uint32_t height)
+	ErrStack Framebuffers::create(LogicalDevice* logical_dev, FrameBufferCreateInfo& info,
+		Renderpass* renderpass, uint32_t width, uint32_t height)
 	{
 		this->logical_dev = logical_dev;
 
-		size_t img_count = present_views.size();
+		size_t img_count = info.swapchain_views->size();
 		frame_buffs.resize(img_count);
 
 		for (size_t i = 0; i < img_count; i++) {
 
-			std::array<VkImageView, 2> attachments = {
-				present_views[i].img_view,
-				depth_view->img_view
+			std::array<VkImageView, 4> attachments = {
+				info.g3d_color_MSAA_view->img_view,
+				info.g3d_depth_view->img_view,
+				info.g3d_color_resolve_view->img_view,
+				info.swapchain_views[0][i].img_view
 			};
 
 			VkFramebufferCreateInfo framebuff_info = {};
@@ -745,7 +811,7 @@ namespace vks {
 			checkVkRes(vkCreateFramebuffer(logical_dev->logical_device, &framebuff_info, NULL,
 				&frame_buffs[i]), "failed to create framebuffer");
 		}
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void Framebuffers::destroy()
@@ -764,7 +830,7 @@ namespace vks {
 	}
 
 
-	ErrorStack CommandPool::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev)
+	ErrStack CommandPool::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev)
 	{
 		this->logical_dev = logical_dev;
 
@@ -774,7 +840,7 @@ namespace vks {
 
 		checkVkRes(vkCreateCommandPool(logical_dev->logical_device, &info, NULL, &cmd_pool),
 			"failed to create command pool");
-		return ErrorStack();
+		return ErrStack();
 	}
 
 	void CommandPool::destroy()
@@ -791,7 +857,7 @@ namespace vks {
 	}
 
 
-	SingleCommandBuffer::SingleCommandBuffer(LogicalDevice* logical_dev, CommandPool* cmd_pool, ErrorStack* r_err)
+	SingleCommandBuffer::SingleCommandBuffer(LogicalDevice* logical_dev, CommandPool* cmd_pool, ErrStack* r_err)
 	{
 		this->logical_dev = logical_dev;
 		this->cmd_pool = cmd_pool;
@@ -805,7 +871,7 @@ namespace vks {
 
 		VkResult vk_res = vkAllocateCommandBuffers(logical_dev->logical_device, &allocInfo, &cmd_buff);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrorStack(vk_res, code_location, "failed to create single use command buffer");
+			*err = ErrStack(vk_res, code_location, "failed to create single use command buffer");
 			return;
 		}
 
@@ -815,7 +881,7 @@ namespace vks {
 
 		vk_res = vkBeginCommandBuffer(cmd_buff, &beginInfo);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrorStack(vk_res, code_location, "failed to begin single use command buffer");
+			*err = ErrStack(vk_res, code_location, "failed to begin single use command buffer");
 			return;
 		}
 	}
@@ -824,7 +890,7 @@ namespace vks {
 	{
 		VkResult vk_res = vkEndCommandBuffer(cmd_buff);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrorStack(vk_res, code_location, "failed to end single use command buffer");
+			*err = ErrStack(vk_res, code_location, "failed to end single use command buffer");
 			return;
 		}
 
@@ -835,13 +901,13 @@ namespace vks {
 
 		vk_res = vkQueueSubmit(logical_dev->queue, 1, &submitInfo, VK_NULL_HANDLE);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrorStack(vk_res, code_location, "failed to submit single use command buffer");
+			*err = ErrStack(vk_res, code_location, "failed to submit single use command buffer");
 			return;
 		}
 
 		vk_res = vkQueueWaitIdle(logical_dev->queue);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrorStack(vk_res, code_location, "");
+			*err = ErrStack(vk_res, code_location, "");
 			return;
 		}
 
@@ -849,247 +915,179 @@ namespace vks {
 	}
 
 
-	VkVertexInputBindingDescription GPUVertex::getBindingDescription()
+	VkVertexInputBindingDescription GPU_3D_Vertex::getBindingDescription()
 	{
 		VkVertexInputBindingDescription bindingDescription;
 		bindingDescription.binding = 0;
-		bindingDescription.stride = sizeof(GPUVertex);
+		bindingDescription.stride = sizeof(GPU_3D_Vertex);
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		return bindingDescription;
 	}
 
-	std::array<VkVertexInputAttributeDescription, 7> GPUVertex::getAttributeDescriptions()
+	std::array<VkVertexInputAttributeDescription, 7> GPU_3D_Vertex::getAttributeDescriptions()
 	{
 		std::array<VkVertexInputAttributeDescription, 7> attrs_descp = {};
 
 		attrs_descp[0].binding = 0;
 		attrs_descp[0].location = 0;
 		attrs_descp[0].format = VK_FORMAT_R32_UINT;
-		attrs_descp[0].offset = offsetof(GPUVertex, mesh_id);
+		attrs_descp[0].offset = offsetof(GPU_3D_Vertex, mesh_id);
 
 		attrs_descp[1].binding = 0;
 		attrs_descp[1].location = 1;
 		attrs_descp[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[1].offset = offsetof(GPUVertex, pos);
+		attrs_descp[1].offset = offsetof(GPU_3D_Vertex, pos);
 
 		attrs_descp[2].binding = 0;
 		attrs_descp[2].location = 2;
 		attrs_descp[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[2].offset = offsetof(GPUVertex, vertex_normal);
+		attrs_descp[2].offset = offsetof(GPU_3D_Vertex, vertex_normal);
 
 		attrs_descp[3].binding = 0;
 		attrs_descp[3].location = 3;
 		attrs_descp[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[3].offset = offsetof(GPUVertex, tess_normal);
+		attrs_descp[3].offset = offsetof(GPU_3D_Vertex, tess_normal);
 
 		attrs_descp[4].binding = 0;
 		attrs_descp[4].location = 4;
 		attrs_descp[4].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[4].offset = offsetof(GPUVertex, poly_normal);
+		attrs_descp[4].offset = offsetof(GPU_3D_Vertex, poly_normal);
 
 		attrs_descp[5].binding = 0;
 		attrs_descp[5].location = 5;
 		attrs_descp[5].format = VK_FORMAT_R32G32_SFLOAT;
-		attrs_descp[5].offset = offsetof(GPUVertex, uv);
+		attrs_descp[5].offset = offsetof(GPU_3D_Vertex, uv);
 
 		attrs_descp[6].binding = 0;
 		attrs_descp[6].location = 6;
 		attrs_descp[6].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[6].offset = offsetof(GPUVertex, color);
+		attrs_descp[6].offset = offsetof(GPU_3D_Vertex, color);
 
 		return attrs_descp;
 	}
 
 
-	ErrorStack DescriptorSetLayout::create(LogicalDevice* logical_dev)
+	VkVertexInputBindingDescription GPU_UI_Vertex::getBindingDescription()
+	{
+		VkVertexInputBindingDescription bindingDescription;
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(GPU_UI_Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return bindingDescription;
+	}
+
+	std::array<VkVertexInputAttributeDescription, 2> GPU_UI_Vertex::getAttributeDescriptions()
+	{
+		std::array<VkVertexInputAttributeDescription, 2> attrs_descp = {};
+
+		attrs_descp[0].binding = 0;
+		attrs_descp[0].location = 0;
+		attrs_descp[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attrs_descp[0].offset = offsetof(GPU_UI_Vertex, pos);
+
+		attrs_descp[1].binding = 0;
+		attrs_descp[1].location = 1;
+		attrs_descp[1].format = VK_FORMAT_R32G32_SFLOAT;
+		attrs_descp[1].offset = offsetof(GPU_UI_Vertex, uv);
+
+		return attrs_descp;
+	}
+	
+	ErrStack Descriptor::create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings,
+		std::vector<VkDescriptorPoolSize>& pool_sizes)
 	{
 		this->logical_dev = logical_dev;
 
-		VkResult res;
+		// Descriptor Layout
+		{
+			VkDescriptorSetLayoutCreateInfo descp_layout_info = {};
+			descp_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descp_layout_info.bindingCount = (uint32_t)(bindings.size());
+			descp_layout_info.pBindings = bindings.data();
 
-		bindings.resize(3);
-
-		VkDescriptorSetLayoutBinding uniform_bind = {};
-		uniform_bind.binding = 0;
-		uniform_bind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uniform_bind.descriptorCount = 1;
-		uniform_bind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-		bindings[0] = uniform_bind;
-
-		VkDescriptorSetLayoutBinding storage_bind = {};
-		storage_bind.binding = 1;
-		storage_bind.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		storage_bind.descriptorCount = 1;
-		storage_bind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		bindings[1] = storage_bind;
-
-		VkDescriptorSetLayoutBinding sampler_bind = {};
-		sampler_bind.binding = 2;
-		sampler_bind.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		sampler_bind.descriptorCount = 1;
-		sampler_bind.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		bindings[2] = sampler_bind;
-
-		VkDescriptorSetLayoutCreateInfo descp_layout_info = {};
-		descp_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		descp_layout_info.bindingCount = (uint32_t)(bindings.size());
-		descp_layout_info.pBindings = bindings.data();
-
-		res = vkCreateDescriptorSetLayout(logical_dev->logical_device, &descp_layout_info, NULL, &descp_layout);
-		if (res != VK_SUCCESS) {
-			return ErrorStack(res, code_location, "failed to create descriptor set layout");
+			VkResult res = vkCreateDescriptorSetLayout(logical_dev->logical_device, &descp_layout_info, NULL, &descp_layout);
+			if (res != VK_SUCCESS) {
+				return ErrStack(res, code_location, "failed to create descriptor set layout");
+			}
 		}
 
-		return ErrorStack();
+		// Descriptor Pool
+		{
+			VkDescriptorPoolCreateInfo descp_pool_info = {};
+			descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			descp_pool_info.maxSets = 1;
+			descp_pool_info.poolSizeCount = (uint32_t)(pool_sizes.size());
+			descp_pool_info.pPoolSizes = pool_sizes.data();
+
+			VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
+			if (vk_res != VK_SUCCESS) {
+				return ErrStack(vk_res, code_location, "failed to create descriptor pool");
+			}
+		}
+
+		// Descriptor Sets
+		{
+			VkDescriptorSetAllocateInfo descp_sets_info = {};
+			descp_sets_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			descp_sets_info.descriptorPool = descp_pool;
+			descp_sets_info.descriptorSetCount = 1;
+			descp_sets_info.pSetLayouts = &descp_layout;
+
+			VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
+			if (res != VK_SUCCESS) {
+				return ErrStack(res, code_location, "failed to allocate descriptor sets");
+			}
+		}
+
+		return ErrStack();
 	}
 
-	void DescriptorSetLayout::destroy()
+	void Descriptor::update(std::vector<DescriptorWrite>& descp_writes)
+	{
+		this->writes.resize(descp_writes.size());
+
+		for (size_t i = 0; i < descp_writes.size(); i++) {
+
+			VkWriteDescriptorSet& vk_write = this->writes[i];
+			DescriptorWrite& write = descp_writes[i];
+
+			vk_write = {};
+			vk_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			vk_write.dstSet = descp_set;
+			vk_write.dstBinding = write.dstBinding;
+			vk_write.dstArrayElement = write.dstArrayElement;
+			vk_write.descriptorCount = write.descriptorCount;
+			vk_write.descriptorType = write.descriptorType;
+			vk_write.pImageInfo = write.img_info;
+			vk_write.pBufferInfo = write.buff_info;
+		}
+
+		vkUpdateDescriptorSets(logical_dev->logical_device,
+			(uint32_t)writes.size(), writes.data(), 0, NULL);
+	}
+
+	void Descriptor::destroyLayout()
 	{
 		vkDestroyDescriptorSetLayout(logical_dev->logical_device, this->descp_layout, NULL);
 		descp_layout = VK_NULL_HANDLE;
 	}
 
-	DescriptorSetLayout::~DescriptorSetLayout()
+	void Descriptor::destroyPool()
 	{
-		if (descp_layout != VK_NULL_HANDLE) {
-			destroy();
-		}
-	}
-
-
-	ErrorStack DescriptorPool::create(LogicalDevice* logical_dev)
-	{
-		this->logical_dev = logical_dev;
-
-		std::array<VkDescriptorPoolSize, 3> pool_sizes;
-
-		size_t i = 0;
-
-		pool_sizes[i].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		pool_sizes[i].descriptorCount = 1;  // swapchain image count ???
-
-		i++;
-		pool_sizes[i].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		pool_sizes[i].descriptorCount = 1;
-
-		i++;
-		pool_sizes[i].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[i].descriptorCount = 1;
-
-		VkDescriptorPoolCreateInfo descp_pool_info = {};
-		descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		descp_pool_info.maxSets = 1;
-		descp_pool_info.poolSizeCount = (uint32_t)(pool_sizes.size());
-		descp_pool_info.pPoolSizes = pool_sizes.data();
-
-		VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
-		if (vk_res != VK_SUCCESS) {
-			return ErrorStack(vk_res, code_location, "failed to create descriptor pool");
-		}
-
-		return ErrorStack();
-	}
-
-	void DescriptorPool::destroy()
-	{
-		vkDestroyDescriptorPool(logical_dev->logical_device, descp_pool, NULL);
+		vkDestroyDescriptorPool(logical_dev->logical_device, this->descp_pool, NULL);
 		descp_pool = VK_NULL_HANDLE;
 	}
 
-	DescriptorPool::~DescriptorPool()
+	Descriptor::~Descriptor()
 	{
+		if (descp_layout != VK_NULL_HANDLE) {
+			destroyLayout();
+		}
+
 		if (descp_pool != VK_NULL_HANDLE) {
-			destroy();
+			destroyPool();
 		}
 	}
-
-
-	ErrorStack DescriptorSet::create(LogicalDevice* logical_dev, DescriptorSetLayout* descp_layout, 
-		DescriptorPool* descp_pool)
-	{
-		this->logical_dev = logical_dev;
-
-		VkDescriptorSetAllocateInfo descp_sets_info = {};
-		descp_sets_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		descp_sets_info.descriptorPool = descp_pool->descp_pool;
-		descp_sets_info.descriptorSetCount = 1;
-		descp_sets_info.pSetLayouts = &descp_layout->descp_layout;
-
-		VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
-		if (res != VK_SUCCESS) {
-			return ErrorStack(res, code_location, "failed to allocate descriptor sets");
-		}
-		return ErrorStack();
-	}
-
-	void DescriptorSet::update(Buffer* uniform_buff, Buffer* storage_buff, Sampler* sampler, 
-		ImageView* img_view, VkImageLayout img_layout)
-	{
-		descp_writes.clear();
-
-		// Uniform
-		{
-			VkDescriptorBufferInfo uniform_buff_info = {};
-			uniform_buff_info.buffer = uniform_buff->buff;
-			uniform_buff_info.offset = 0;
-			uniform_buff_info.range = uniform_buff->buff_alloc_info.size;
-
-			VkWriteDescriptorSet uniform_write = {};
-			uniform_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			uniform_write.dstSet = descp_set;
-			uniform_write.dstBinding = 0;
-			uniform_write.dstArrayElement = 0;
-			uniform_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			uniform_write.descriptorCount = 1;
-			uniform_write.pBufferInfo = &uniform_buff_info;
-
-			descp_writes.push_back(uniform_write);
-		}
-
-		// Storage
-		{
-			VkDescriptorBufferInfo storage_buff_info = {};
-			storage_buff_info.buffer = storage_buff->buff;
-			storage_buff_info.offset = 0;
-			storage_buff_info.range = storage_buff->buff_alloc_info.size;
-
-			VkWriteDescriptorSet storage_write = {};
-			storage_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			storage_write.dstSet = descp_set;
-			storage_write.dstBinding = 1;
-			storage_write.dstArrayElement = 0;
-			storage_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			storage_write.descriptorCount = 1;
-			storage_write.pBufferInfo = &storage_buff_info;
-
-			descp_writes.push_back(storage_write);
-		}
-
-		// Sampler
-		{
-			VkDescriptorImageInfo image_info = {};
-			image_info.sampler = sampler->sampler;
-			image_info.imageView = img_view->img_view;
-			image_info.imageLayout = img_layout;
-
-			VkWriteDescriptorSet write = {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = descp_set;
-			write.dstBinding = 2;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.descriptorCount = 1;
-			write.pImageInfo = &image_info;
-
-			descp_writes.push_back(write);
-		}
-
-		if (descp_writes.size()) {
-			vkUpdateDescriptorSets(logical_dev->logical_device,
-				(uint32_t)descp_writes.size(), descp_writes.data(), 0, NULL);
-		}
-	}
-	
-
 }

@@ -41,52 +41,52 @@ Error::Error(VkResult res, ExtraError err, std::string location, std::string msg
 	this->msg = msg;
 }
 
-ErrorStack::ErrorStack()
+ErrStack::ErrStack()
 {
 	
 }
 
-ErrorStack::ErrorStack(Error err)
+ErrStack::ErrStack(Error err)
 {
 	error_stack.push_back(err);
 }
 
-ErrorStack::ErrorStack(std::string location, std::string msg)
+ErrStack::ErrStack(std::string location, std::string msg)
 {
 	error_stack.push_back(Error(location, msg));
 }
 
-ErrorStack::ErrorStack(ExtraError res, std::string location, std::string msg)
+ErrStack::ErrStack(ExtraError res, std::string location, std::string msg)
 {
 	error_stack.push_back(Error(res, location, msg));
 }
 
-ErrorStack::ErrorStack(ExtraError res, std::string location, std::string msg, std::string win_msg)
+ErrStack::ErrStack(ExtraError res, std::string location, std::string msg, std::string win_msg)
 {
 	error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
 }
 
-ErrorStack::ErrorStack(VkResult res, std::string location, std::string msg)
+ErrStack::ErrStack(VkResult res, std::string location, std::string msg)
 {
 	error_stack.push_back(Error(res, location, msg));
 }
 
-ErrorStack::ErrorStack(VkResult res, ExtraError err, std::string location, std::string msg)
+ErrStack::ErrStack(VkResult res, ExtraError err, std::string location, std::string msg)
 {
 	error_stack.push_back(Error(res, location, msg));
 }
 
-void ErrorStack::pushError(std::string location, std::string msg)
+void ErrStack::pushError(std::string location, std::string msg)
 {
 	error_stack.push_back(Error(location, msg));
 }
 
-Error ErrorStack::lastError()
+Error ErrStack::lastError()
 {
 	return error_stack.back();
 }
 
-bool ErrorStack::isBad()
+bool ErrStack::isBad()
 {
 	if (error_stack.size()) {
 		return true;
@@ -94,9 +94,9 @@ bool ErrorStack::isBad()
 	return false;
 }
 
-void ErrorStack::debugPrint()
+void ErrStack::debugPrint()
 {
-	std::cout << "ErrorStack :" << std::endl;
+	std::cout << "ErrStack :" << std::endl;
 	for (size_t i = 0; i < error_stack.size(); i++) {
 
 		Error& error = error_stack[i];

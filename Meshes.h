@@ -80,7 +80,7 @@ struct TesselationTris
 	glm::vec3 normal;
 
 	// NOTE: check if needs flip
-	void calcNormal();
+	void deriveNormal();
 };
 
 class Poly
@@ -182,12 +182,10 @@ Poly* fabricateQuad(LinkageMesh& me, glm::vec3 const& v0, glm::vec3 const& v1,
 
 struct VertexAtributes {
 	std::vector<glm::vec3> positions;
+	std::vector<glm::vec2> uvs;
 	std::vector<glm::vec3> normals;
 	// colors
 };
 
 // add Tris Polys to mesh, new tris polys are linked together but not linked to existing polys
 void addTriangleListToMesh(LinkageMesh& mesh, std::vector<uint32_t>& indexes, VertexAtributes& attrs, bool flip_winding);
-
-// iterates over all vertices and sets their color
-void setMeshVertexColor(LinkageMesh& mesh, glm::vec4 new_color);

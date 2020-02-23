@@ -84,7 +84,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\ImGui;$(SolutionDir)Sculpt\ThirdParty\ImGui\examples;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -110,7 +110,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\ImGui;$(SolutionDir)Sculpt\ThirdParty\ImGui\examples;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -141,7 +141,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\ImGui;$(SolutionDir)Sculpt\ThirdParty\ImGui\examples;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -171,7 +171,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\ImGui;$(SolutionDir)Sculpt\ThirdParty\ImGui\examples;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -200,7 +200,9 @@
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
     <ClCompile Include="BinaryParser.cpp" />
+    <ClCompile Include="CharacterAtlas.cpp" />
     <ClCompile Include="GLTFParser.cpp" />
+    <ClCompile Include="ImportOBJ.cpp" />
     <ClCompile Include="JSONParser.cpp" />
     <ClCompile Include="LinkageMesh.cpp" />
     <ClCompile Include="FileIO.cpp" />
@@ -213,6 +215,8 @@
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="Resources.cpp" />
     <ClCompile Include="stb_image.cpp" />
+    <ClCompile Include="tiny_obj_loader.cpp" />
+    <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="vma_implementation.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -263,6 +267,8 @@
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalXamlProvider.h" />
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\ProvidersApi.h" />
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Src\stb_image.h" />
+    <ClInclude Include="tiny_obj_loader.h" />
+    <ClInclude Include="UserInterface.h" />
     <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />
     <ClInclude Include="Renderer.h" />

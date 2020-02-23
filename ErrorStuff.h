@@ -94,20 +94,20 @@ struct Error
 
 // change this to return an idx to a global vector of error
 // add time maybe ?
-struct ErrorStack
+struct ErrStack
 {
 	std::vector<Error> error_stack;
 
-	ErrorStack();
-	ErrorStack(Error err);
-	ErrorStack(std::string location, std::string msg);
-	ErrorStack(ExtraError res, std::string location, std::string msg);
+	ErrStack();
+	ErrStack(Error err);
+	ErrStack(std::string location, std::string msg);
+	ErrStack(ExtraError res, std::string location, std::string msg);
 
 	/* with Windows message */
-	ErrorStack(ExtraError res, std::string location, std::string msg, std::string win_msg);
+	ErrStack(ExtraError res, std::string location, std::string msg, std::string win_msg);
 
-	ErrorStack(VkResult res, std::string location, std::string msg);
-	ErrorStack(VkResult res, ExtraError err, std::string location, std::string msg);
+	ErrStack(VkResult res, std::string location, std::string msg);
+	ErrStack(VkResult res, ExtraError err, std::string location, std::string msg);
 
 	void pushError(std::string location, std::string msg);
 
@@ -132,7 +132,7 @@ std::string asIs(char c);
 
 #define checkVkRes(vk_res, msg) \
 	if (vk_res != VK_SUCCESS) { \
-		return ErrorStack(vk_res, code_location, msg); \
+		return ErrStack(vk_res, code_location, msg); \
 	}
 
 /* Debug variable */

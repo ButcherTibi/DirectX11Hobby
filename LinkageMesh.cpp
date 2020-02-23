@@ -47,7 +47,7 @@ Side::Side(Vertex* v, Edge* e)
 	this->e = e;
 }
 
-void TesselationTris::calcNormal()
+void TesselationTris::deriveNormal()
 {
 	glm::vec3 n0 = vs[0]->pos - vs[1]->pos;
 	glm::vec3 n1 = vs[0]->pos - vs[2]->pos;
@@ -243,7 +243,7 @@ void Poly::build(LinkageMesh* me)
 
 	// Triangle Normals
 	for (TesselationTris& tris : this->tess_tris) {
-		tris.calcNormal();
+		tris.deriveNormal();
 	}
 
 	// Face Normal

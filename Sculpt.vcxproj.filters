@@ -43,6 +43,12 @@
     <Filter Include="Source Files\ThirdParty\stb_image">
       <UniqueIdentifier>{10891787-7a85-4b6e-8a75-da84801afa37}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\ThirdParty\tiny_obj_loader">
+      <UniqueIdentifier>{afcfe2bc-21d5-4c6d-bdc8-e24f12f86d78}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\UserInterface">
+      <UniqueIdentifier>{c66b86a8-8f33-4af0-8aae-a8e67523627d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MathUtils.cpp">
@@ -110,6 +116,18 @@
     </ClCompile>
     <ClCompile Include="Resources.cpp">
       <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="tiny_obj_loader.cpp">
+      <Filter>Source Files\ThirdParty\tiny_obj_loader</Filter>
+    </ClCompile>
+    <ClCompile Include="ImportOBJ.cpp">
+      <Filter>Source Files\Importer</Filter>
+    </ClCompile>
+    <ClCompile Include="FontRasterization.cpp">
+      <Filter>Source Files\UserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterAtlas.cpp">
+      <Filter>Source Files\UserInterface</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -232,6 +250,12 @@
     </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
+    </ClInclude>
+    <ClInclude Include="tiny_obj_loader.h">
+      <Filter>Source Files\ThirdParty\tiny_obj_loader</Filter>
+    </ClInclude>
+    <ClInclude Include="UserInterface.h">
+      <Filter>Source Files\UserInterface</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

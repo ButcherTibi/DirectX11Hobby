@@ -9,7 +9,7 @@
 InputState input;
 
 
-// Most Significant Bit (most left) of Windows's SHORT
+// Most Significant Bit (most left) of Windows's GLTF_SHORT
 bool msbWinShort(SHORT val)
 {
 	size_t short_size = sizeof(SHORT);
@@ -212,7 +212,7 @@ void InputState::removeShortcut(Shortcut* shortcut)
 	}
 }
 
-ErrorStack InputState::update(const steady_time& time)
+ErrStack InputState::update(const steady_time& time)
 {
 	// Keys
 	std::for_each(std::execution::par_unseq, key_logs.begin(), key_logs.end(), [time](InputKey* key) {
@@ -288,11 +288,11 @@ ErrorStack InputState::update(const steady_time& time)
 	{
 		POINT point;
 		if (!GetCursorPos(&point)) {
-			return ErrorStack(ExtraError::FAILED_TO_GET_CURSOR_SCREEN_POSITION, code_location, "failed to get mouse screen pos", getLastError());
+			return ErrStack(ExtraError::FAILED_TO_GET_CURSOR_SCREEN_POSITION, code_location, "failed to get mouse screen pos", getLastError());
 		}
 		this->screen_pos_x = point.x;
 		this->screen_pos_y = point.y;
 	}
 
-	return ErrorStack();
+	return ErrStack();
 }

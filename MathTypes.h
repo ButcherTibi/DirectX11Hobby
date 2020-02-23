@@ -10,7 +10,7 @@
 #include <glm/gtx/euler_angles.hpp>
 
 
-/* Vector 3 */
+/* BitVector 3 */
 
 glm::vec3 pitchPos(glm::vec3 const& pos, float const& angle);
 

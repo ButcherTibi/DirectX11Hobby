@@ -23,9 +23,9 @@ layout(binding = 2) uniform sampler2D Sampler;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    if (dot(in_poly_normal, ubuf.camera_forward) > 0) {
-        discard;
-    }
-    //outColor = vec4(in_uv.x, in_uv.y, 0, 1.0);
+    // if (dot(in_poly_normal, ubuf.camera_forward) > 0) {
+    //     discard;
+    // }
+    //outColor = vec4(abs(in_tess_normal), 1.0);
     outColor = texture(Sampler, in_uv);
 }

@@ -4,44 +4,224 @@
 #include "Importer.h"
 
 
+/* GLTF Types */
+
+struct Asset {
+	std::string version;
+};
+
+struct Scene {
+	std::vector<int64_t> nodes;
+};
+
+struct Node {
+	std::optional<int64_t> mesh;
+};
+
+struct Primitive {
+	std::map<std::string, int64_t> atributes;
+	std::optional<int64_t> indices;
+};
+
+struct Mesh {
+	std::vector<Primitive> primitives;
+};
+
+struct Buffer {
+	std::string uri;
+	int64_t byte_length;
+};
+
+struct BufferView {
+	int64_t buffer;
+	int64_t byte_offset = 0;
+	int64_t byte_length;
+	std::optional<uint64_t> target;
+};
+
+struct Accessor {
+	std::optional<int64_t> buffer_view;
+	int64_t byte_offset = 0;
+	int64_t component_type;
+	int64_t count;
+	std::string type;
+};
+
+struct Structure {
+	Asset asset;
+	std::vector<Scene> scenes;
+	std::vector<Node> nodes;
+	std::vector<Mesh> meshes;
+	std::vector<Buffer> buffers;
+	std::vector<BufferView> buffer_views;
+	std::vector<Accessor> accessors;
+};
+
+enum ComponentType {
+	GLTF_BYTE = 5120,
+	GLTF_UNSIGNED_BYTE = 5121,
+	GLTF_SHORT = 5122,
+	GLTF_UNSIGNED_SHORT = 5123,
+	GLTF_UNSIGNED_INT = 5125,
+	GLTF_FLOAT = 5126
+};
+
+/* Atributes */
+#define atribute_name_position "POSITION"
+#define atribute_name_texcoord_0 "TEXCOORD_0"
+#define atribute_name_normal "NORMAL"
+
+
+class BitVector {
+public:
+	std::vector<char> bytes;
+
+	uint64_t bit_count = 0;
+
+public:
+	/* add a bit to the end */
+	void push_back(bool bit);
+
+	/* return false if character is unrecognized */
+	bool pushBase64Char(char b64_c);
+};
+
+void BitVector::push_back(bool bit)
+{
+	if (!bit_count || bit_count % 8 == 0) {
+		bytes.push_back(bit << 7);
+	}
+	else {
+		uint8_t next_bit = 8 - (bit_count % 8) - 1;
+		bytes[bit_count / 8] |= bit << next_bit;
+	}
+	bit_count++;
+}
+
+/* converts one Base64 character to 6 bits */
+bool BitVector::pushBase64Char(char c)
+{
+	uint8_t d;
+
+	// A to Z
+	if (c > 0x40 && c < 0x5b) {
+		d = c - 65;  // Base64 A is 0
+	}
+	// a to z
+	else if (c > 0x60 && c < 0x7b) {
+		d = c - 97 + 26;  // Base64 a is 26
+	}
+	// 0 to 9
+	else if (c > 0x2F && c < 0x3a) {
+		d = c - 48 + 52;  // Base64 0 is 52
+	}
+	else if (c == '+') {
+		d = 0b111110;
+	}
+	else if (c == '/') {
+		d = 0b111111;
+	}
+	else if (c == '=') {
+		d = 0;
+	}
+	else {
+		return false;
+	}
+
+	push_back(d & 0b100000);
+	push_back(d & 0b010000);
+	push_back(d & 0b001000);
+	push_back(d & 0b000100);
+	push_back(d & 0b000010);
+	push_back(d & 0b000001);
+
+	return true;
+}
+
+ErrStack loadFromURI(std::string& uri, Path& this_file, BitVector& r_bin)
+{
+	ErrStack err;
+
+	// Data URI
+	std::string bin_tag = "data:application/octet-stream;base64,";
+	size_t uri_i = uri.find(bin_tag);
+
+	if (uri_i != std::string::npos) {
+
+		uri_i += bin_tag.length();
+		r_bin.bytes.reserve(uri.size());
+
+		// decode rest of URI as Base64 binary
+		for (; uri_i < uri.size(); uri_i++) {
+
+			if (uri[uri_i] >= 0x21) {
+				r_bin.pushBase64Char(uri[uri_i]);
+			}
+		}
+	}
+	// Relative URI path
+	else {
+		Path bin_file = this_file;
+		bin_file.pop_back();  // now point to directory containing file
+		bin_file.push_back(uri);  // point to file
+
+		if (bin_file.hasExtension("bin")) {
+
+			// load directly 
+			err = bin_file.read(r_bin.bytes);
+			if (err.isBad()) {
+				return err;
+			}
+			r_bin.bit_count = r_bin.bytes.size() * 8;
+		}
+		else {
+			return ErrStack(code_location, "unsupported URI");
+		}
+		// TODO: GLB format
+	}
+
+	return ErrStack();
+}
+
 /* WARNING: These macros add declarations */
 
 #define expectJSONint64(val, int64_num) \
 	int64_t* int64_num = std::get_if<int64_t>(&val->value); \
 	if (int64_num == nullptr) { \
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
 			"expected JSON field " + std::string(#int64_num) + " to be of INT32 type"); \
 	}
 
 #define expectJSONString(val, strg) \
 	std::string* strg = std::get_if<std::string>(&val->value); \
 	if (strg == nullptr) { \
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
 			"expected JSON field " + std::string(#strg) + " to be of STRING type"); \
 	}
 
 #define expectJSONArray(val, arr) \
 	std::vector<JSONValue*>* arr = std::get_if<std::vector<JSONValue*>>(&val->value); \
 	if (arr == nullptr) { \
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
 			"expected JSON field " + std::string(#arr) + " to be of ARRAY type"); \
 	}
 
 #define expectJSONObject(val, obj) \
 	std::vector<JSONField>* obj = std::get_if<std::vector<JSONField>>(&val->value); \
 	if (obj == nullptr) { \
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
 			"expected JSON field " + std::string(#obj) + " to be of OBJECT type"); \
 	}
 
+
  /* only checks for complaiance with required fields of the GLTF Standard */
-ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
+ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 {
 	JSONValue& root = *json_graph.root;
 
 	std::vector<JSONField> gltf_fields = std::get<std::vector<JSONField>>(root.value);
 	if (gltf_fields.empty()) {
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 			"GLTF has no fields");
 	}
 
@@ -51,8 +231,6 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 
 			expectJSONObject(field.value, asset_fields);
 
-			bool version_found = false;
-
 			for (JSONField& asset_field : *asset_fields) {
 
 				if (asset_field.name == "version") {
@@ -60,12 +238,11 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 					expectJSONString(asset_field.value, version);
 
 					gltf_struct.asset.version = *version;
-					version_found = true;
 				}
 			}
 
-			if (!version_found) {
-				return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+			if (!gltf_struct.asset.version.length()) {
+				return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 					"required field asset.version could not be found");
 			}
 		}
@@ -137,9 +314,8 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 
 				expectJSONObject(mesh, mesh_fields);
 
-				gltf::Mesh& mesh = gltf_struct.meshes[mesh_idx];
+				Mesh& mesh = gltf_struct.meshes[mesh_idx];
 
-				bool primitives_found = false;
 				for (JSONField& mesh_field : *mesh_fields) {
 
 					if (mesh_field.name == "primitives") {
@@ -148,44 +324,27 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 
 						mesh.primitives.resize(primitives->size());
 
-						primitives_found = true;
-
 						uint32_t primitive_idx = 0;
 						for (JSONValue* primitive : *primitives) {
 
 							expectJSONObject(primitive, primitive_fields);
 
-							gltf::Primitive& prim = mesh.primitives[primitive_idx];
+							Primitive& prim = mesh.primitives[primitive_idx];
 
-							bool attributes_found = false;
 							for (JSONField& primitive_field : *primitive_fields) {
 
 								// Primitives fields
 								if (primitive_field.name == "attributes") {
 
-									bool pos_found = false;
-
-									expectJSONObject(primitive_field.value, atributes);							
+									expectJSONObject(primitive_field.value, atributes);
 									for (JSONField& atributes_field : *atributes) {
 
-										// Vertex Atributes
-										if (atributes_field.name == atribute_name_position) {
-
-											expectJSONint64(atributes_field.value, position);
-											prim.atributes.insert(std::pair<std::string, int64_t>(atribute_name_position, *position));
-
-											pos_found = true;
-										}
-										else if (atributes_field.name == atribute_name_normal) {
-
-											expectJSONint64(atributes_field.value, normal);
-											prim.atributes.insert(std::pair<std::string, int64_t>(atribute_name_normal, *normal));
-										}
+										expectJSONint64(atributes_field.value, attr_value);
+										prim.atributes.insert(std::pair<std::string, int64_t>(atributes_field.name, *attr_value));
 									}
-									attributes_found = true;
 
-									if (!pos_found) {
-										return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+									if (prim.atributes.find(atribute_name_position) == prim.atributes.end()) {
+										return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 											"required field meshes.primitives.attributes.POSITION could not be found");
 									}
 								}
@@ -197,8 +356,8 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 								}
 							}
 
-							if (!attributes_found) {
-								return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+							if (!prim.atributes.size()) {
+								return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 									"required field meshes.primitives.attributes could not be found");
 							}
 
@@ -207,8 +366,8 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 					}
 				}
 
-				if (!primitives_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+				if (!mesh.primitives.size()) {
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field meshes.primitives could not be found");
 				}
 
@@ -229,7 +388,7 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				bool byte_length_found = false;
 				for (JSONField& buffer_field : *buffer_fields) {
 
-					gltf::Buffer& buff = gltf_struct.buffers[buffer_idx];
+					Buffer& buff = gltf_struct.buffers[buffer_idx];
 
 					if (buffer_field.name == "uri") {
 
@@ -246,7 +405,7 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				}
 
 				if (!byte_length_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field buffers.byteLength could not be found");
 				}
 
@@ -268,7 +427,7 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				bool byte_length_found = false;
 				for (JSONField& buffer_view_field : *buffer_view_fields) {
 
-					gltf::BufferView& buff_view = gltf_struct.buffer_views[buffer_view_idx];
+					BufferView& buff_view = gltf_struct.buffer_views[buffer_view_idx];
 
 					if (buffer_view_field.name == "buffer") {
 
@@ -297,11 +456,11 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				}
 
 				if (!buffer_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field bufferViews.buffer could not be found");
 				}
 				if (!byte_length_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field bufferViews.byteLength could not be found");
 				}
 
@@ -324,7 +483,7 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				bool type_found = false;
 				for (JSONField& accessor_field : *accessor_fields) {
 
-					gltf::Accessor& acc = gltf_struct.accessors[accessor_idx];
+					Accessor& acc = gltf_struct.accessors[accessor_idx];
 
 					if (accessor_field.name == "bufferView") {
 
@@ -360,15 +519,15 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 				}
 
 				if (!component_type_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field accessors.componentType could not be found");
 				}
 				if (!count_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field accessors.count could not be found");
 				}
 				if (!type_found) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 						"required field accessors.type could not be found");
 				}
 
@@ -377,35 +536,35 @@ ErrorStack jsonToGLTF(JSONGraph& json_graph, gltf::Structure& gltf_struct)
 		}
 	}
 
-	return ErrorStack();
+	return ErrStack();
 }
 
-ErrorStack gltf::loadIndexesFromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx, 
-	std::vector<bin::Vector>& bin_buffs, std::vector<uint32_t>& indexes)
+ErrStack loadIndexesFromBuffer(Structure& gltf_struct, uint64_t acc_idx, 
+	std::vector<BitVector>& bin_buffs, std::vector<uint32_t>& r_indexes)
 {
-	gltf::Accessor& acc = gltf_struct.accessors[acc_idx];
-	gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
+	Accessor& acc = gltf_struct.accessors[acc_idx];
+	BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
 
 	if (acc.type != "SCALAR") {
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 			"expected indices accessor type to be SCALAR but instead got " + acc.type);
 	}
 
 	uint64_t count = acc.count;
 
-	indexes.resize(count);
-	bin::Vector& buffer = bin_buffs[buff_view.buffer];
+	r_indexes.resize(count);
+	BitVector& buffer = bin_buffs[buff_view.buffer];
 	uint64_t offset = buff_view.byte_offset + acc.byte_offset;
 
 	switch (acc.component_type) {
 		// fast path
-	case gltf::UNSIGNED_INT: {
+	case GLTF_UNSIGNED_INT: {
 
-		std::memcpy(indexes.data(), buffer.bytes.data() + offset, sizeof(uint32_t) * indexes.size());
+		std::memcpy(r_indexes.data(), buffer.bytes.data() + offset, sizeof(uint32_t) * r_indexes.size());
 		break;
 	}
 
-	case gltf::UNSIGNED_BYTE: {
+	case GLTF_UNSIGNED_BYTE: {
 
 		std::vector<uint8_t> uint8_idxs;
 		uint8_idxs.resize(count);
@@ -413,12 +572,12 @@ ErrorStack gltf::loadIndexesFromBuffer(gltf::Structure& gltf_struct, uint64_t ac
 		std::memcpy(uint8_idxs.data(), buffer.bytes.data() + offset, sizeof(uint8_t) * uint8_idxs.size());
 
 		for (uint64_t i = 0; i < count; i++) {
-			indexes[i] = uint8_idxs[i];
+			r_indexes[i] = uint8_idxs[i];
 		}
 		break;
 	}
 
-	case gltf::UNSIGNED_SHORT: {
+	case GLTF_UNSIGNED_SHORT: {
 
 		std::vector<uint16_t> uint16_idxs;
 		uint16_idxs.resize(count);
@@ -426,54 +585,73 @@ ErrorStack gltf::loadIndexesFromBuffer(gltf::Structure& gltf_struct, uint64_t ac
 		std::memcpy(uint16_idxs.data(), buffer.bytes.data() + offset, sizeof(uint16_t) * uint16_idxs.size());
 
 		for (uint64_t i = 0; i < count; i++) {
-			indexes[i] = uint16_idxs[i];
+			r_indexes[i] = uint16_idxs[i];
 		}
 		break;
 	}
 	default:
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
 			"invalid component_type for index buffer allowed types are BYTE, UNSIGNED_SHORT, UNSIGNED_INT");
 	}
 
-	return ErrorStack();
+	return ErrStack();
 }
 
-ErrorStack gltf::loadVec3FromBuffer(gltf::Structure& gltf_struct, uint64_t acc_idx, 
-	std::vector<bin::Vector>& bin_buffs, std::vector<glm::vec3>& vecs)
+ErrStack loadVec2FromBuffer(Structure& gltf_struct, uint64_t acc_idx,
+	std::vector<BitVector>& bin_buffs, std::vector<glm::vec2>& r_vecs)
 {
-	gltf::Accessor& acc = gltf_struct.accessors[acc_idx];
-	gltf::BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
+	Accessor& acc = gltf_struct.accessors[acc_idx];
+	BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
+
+	if (acc.type != "VEC2") {
+		return ErrStack(code_location,
+			"expected texture coordinates atribute accesor type to be VEC2 but instead got " + acc.type);
+	}
+
+	r_vecs.resize(acc.count);
+	BitVector& buff = bin_buffs[buff_view.buffer];
+	uint64_t offset = buff_view.byte_offset + acc.byte_offset;
+
+	if (acc.component_type == GLTF_FLOAT) {
+		std::memcpy(r_vecs.data(), buff.bytes.data() + offset, sizeof(glm::vec2) * acc.count);
+	}
+	else {
+		return ErrStack(code_location,
+			"invalid component_type for texture coordinates, can only be FLOAT");
+	}
+
+	return ErrStack();
+}
+
+ErrStack loadVec3FromBuffer(Structure& gltf_struct, uint64_t acc_idx, 
+	std::vector<BitVector>& bin_buffs, std::vector<glm::vec3>& r_vecs)
+{
+	Accessor& acc = gltf_struct.accessors[acc_idx];
+	BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
 
 	if (acc.type != "VEC3") {
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(code_location,
 			"expected position atribute accessor type to be VEC3 but instead got " + acc.type);
 	}
 
-	uint64_t count = acc.count;
-
-	vecs.resize(count);
-	bin::Vector& buffer = bin_buffs[buff_view.buffer];
+	r_vecs.resize(acc.count);
+	BitVector& buffer = bin_buffs[buff_view.buffer];
 	uint64_t offset = buff_view.byte_offset + acc.byte_offset;
 
-	switch (acc.component_type) {
-		// fast path
-	case gltf::FLOAT: {
-		// PARANOIA: maybe sizeof(glm::vec3) != sizeof(float) * 3
-		std::memcpy(vecs.data(), buffer.bytes.data() + offset, sizeof(glm::vec3) * count);
-		break;
+	if (acc.component_type == GLTF_FLOAT) {
+		std::memcpy(r_vecs.data(), buffer.bytes.data() + offset, sizeof(glm::vec3) * acc.count);
+	}
+	else {
+		return ErrStack(code_location,
+			"invalid component_type for position, can only be FLOAT");
 	}
 
-	default:
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
-			"invalid component_type for position, can only be VEC3");
-	}
-
-	return ErrorStack();
+	return ErrStack();
 }
 
-ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
+ErrStack importGLTFMeshes(Path path, std::vector<LinkageMesh>& meshes)
 {
-	ErrorStack err;
+	ErrStack err;
 
 	std::vector<char> text;
 	err = path.read(text);
@@ -486,14 +664,14 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 	JSONGraph json;
 	uint64_t i = 0;
 
-	err = parseJSON(text, 0, true, false, json);
+	err = parseJSON(text, 0, json);
 	if (err.isBad()) {
 		err.pushError(code_location, "failed to parse JSON");
 		return err;
 	}
 
 	// JSON Types to C++ Types
-	gltf::Structure gltf_struct;
+	Structure gltf_struct;
 
 	err = jsonToGLTF(json, gltf_struct);
 	if (err.isBad()) {
@@ -502,19 +680,16 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 	}
 
 	// Convert URI to buffer data
-	std::vector<bin::Vector> bin_buffs;
+	std::vector<BitVector> bin_buffs;
 	{
 		bin_buffs.resize(gltf_struct.buffers.size());
-		std::vector<char> char_uri;
 
 		for (uint64_t i = 0; i < gltf_struct.buffers.size(); i++) {
 			
 			std::string& uri = gltf_struct.buffers[i].uri;
-			char_uri.assign(uri.begin(), uri.end());
+			BitVector& bin_buff = bin_buffs[i];
 
-			bin::Vector& bin_buff = bin_buffs[i];
-
-			err = bin::loadFromURI(char_uri, path, bin_buff);
+			err = loadFromURI(uri, path, bin_buff);
 			if (err.isBad()) {
 				err.pushError(code_location, "failed to parse URI");
 				return err;
@@ -526,8 +701,8 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 	{
 		// Primitives also count as meshes
 		uint64_t mesh_count = 0;
-		for (gltf::Mesh& gltf_mesh : gltf_struct.meshes) {
-			for (gltf::Primitive& prim : gltf_mesh.primitives) {
+		for (Mesh& gltf_mesh : gltf_struct.meshes) {
+			for (Primitive& prim : gltf_mesh.primitives) {
 
 				mesh_count++;
 			}
@@ -539,8 +714,8 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 		std::vector<uint32_t> indexes;
 
 		uint64_t mesh_idx = 0;
-		for (gltf::Mesh& gltf_mesh : gltf_struct.meshes) {
-			for (gltf::Primitive& prim : gltf_mesh.primitives) {
+		for (Mesh& gltf_mesh : gltf_struct.meshes) {
+			for (Primitive& prim : gltf_mesh.primitives) {
 
 				// Indexes
 				{
@@ -560,6 +735,20 @@ ErrorStack gltf::importMeshes(Path path, std::vector<LinkageMesh>& meshes)
 						err.pushError(code_location, "failed to load positions from buffer");
 						return err;
 					}
+				}
+
+				// UVs
+				auto uv_it = prim.atributes.find(atribute_name_texcoord_0);
+				if (uv_it != prim.atributes.end()) {
+
+					err = loadVec2FromBuffer(gltf_struct, uv_it->second, bin_buffs, attrs.uvs);
+					if (err.isBad()) {
+						err.pushError(code_location, "failed to load texture coordinates from buffer");
+						return err;
+					}
+				}
+				else {
+					attrs.uvs.clear();
 				}
 
 				// Normals

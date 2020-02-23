@@ -33,7 +33,7 @@ void skipWhiteSpace(uint64_t& i, std::vector<char>& text)
 
 		char& c = text[i];
 
-		// skip anything above whitespace
+		// skip anything below whitespace
 		if (c < 0x21) {
 			continue;
 		}
@@ -57,7 +57,7 @@ bool seekSymbol(uint64_t& i, std::vector<char>& text, char symbol)
 	return false;
 }
 
-ErrorStack confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keyword)
+ErrStack confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keyword)
 {
 	uint64_t idx = 0;
 
@@ -69,44 +69,22 @@ ErrorStack confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keyw
 
 			if (text[i] != keyword[idx]) {
 
-				return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+				return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
 					msgWithPos("failed to parse keyword " + keyword,
 					i, text));
 			}
 		}
 		else {
-			return ErrorStack();
+			return ErrStack();
 		}
 	}
-	return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
 		msgWithPos("premature end of characters in file when parsing keyword " + keyword,
 		i, text));
 }
 
-bool checkForKeyword(uint64_t& i, std::vector<char>& text, std::string keyword)
-{
-	uint64_t idx = 0;
-
-	for (; i < text.size(); i++, idx++) {
-
-		skipWhiteSpace(i, text);
-
-		if (idx < keyword.length()) {
-
-			if (text[i] != keyword[idx]) {
-
-				return false;
-			}
-		}
-		else {
-			return true;
-		}
-	}
-	return false;
-}
-
 /* assumes i after '"' */
-ErrorStack parseString(uint64_t& i, std::vector<char>& text, std::string& out)
+ErrStack parseString(uint64_t& i, std::vector<char>& text, std::string& out)
 {
 	for (; i < text.size(); i++) {
 
@@ -116,124 +94,53 @@ ErrorStack parseString(uint64_t& i, std::vector<char>& text, std::string& out)
 		if (c == '\n' || c == '\r') {
 			continue;
 		}
-
-		if (c == '"') {
-
+		else if (c == '"') {
 			i++;
-			return ErrorStack();
+			return ErrStack();
 		}
-		out.push_back(c);
+		else {
+			out.push_back(c);
+		}
 	}
-	return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
 		msgWithPos("missing ending '\"' or premature end of characters in file when parsing string",
 		i, text));
 }
 
 enum class NumberParseMode {
 	INTEGER,
-	FRACTION,
-	EXPONENT
+	FRACTION
 };
 
 #define isUTF8Number(c) \
 	c > 0x2f && c < 0x3a
 
-bool convertCharsToInt(std::vector<char>& integer_part, int64_t& int_num)
+void convertCharsToInt(std::vector<char>& integer_chars, int64_t& int_num)
 {
 	uint64_t m = 1;
 
-	int32_t count = (int32_t)integer_part.size() - 1;
+	int32_t count = (int32_t)integer_chars.size() - 1;
 	for (int32_t idx = count; idx != -1; idx--) {
 
-		int64_t digit = (int64_t)(integer_part[idx] - '0');
+		int64_t digit = (int64_t)(integer_chars[idx] - '0');
 		int64_t a = digit * m;
-
-		if (std::numeric_limits<int64_t>::max() - a < int_num) {
-			return false;
-		}
 
 		int_num += a;
 		m *= 10;
 	}
-
-	return true;
 }
 
-/* converts 1234 to 0.1234 */
-bool convertCharsToFrac(std::vector<char>& frac_part, double& dbl_num)
+ErrStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValue& number)
 {
-	int64_t int_num = 0;
-	if (!convertCharsToInt(frac_part, int_num) ||
-		frac_part.size() > 18)
-	{
-		return false;
-	}
+	this->integer_chars.clear();
+	this->frac_chars.clear();
 
-	dbl_num = (double)int_num / std::pow(10.0, (double)frac_part.size());
-	return true;
-}
-
-bool isSafeAdd(double a, double b)
-{
-	if ((b > 0) && (a > std::numeric_limits<double>::max() - b) ||  // overflow
-		(b < 0) && (a < std::numeric_limits<double>::min() - b))  // underflow
-	{
-		return false;
-	}
-	return true;
-}
-
-// not used but noted down how to
-bool isSafeSub(double a, double b)
-{
-	if ((b < 0) && (a > std::numeric_limits<double>::max() + b) ||  // overflow
-		(b > 0) && (a < std::numeric_limits<double>::min() + b))  // underflow
-	{
-		return false;
-	}
-	return true;
-}
-
-bool isSafeMul(double a, double b)
-{
-	if (a > std::numeric_limits<double>::max() / b ||  // overflow
-		a < std::numeric_limits<double>::min() / b)  // underflow
-	{
-		return false;
-	}
-	return true;
-}
-
-bool doSafePow(double a, double b, double& val)
-{
-	val = std::pow(a, b);
-
-	if (val == std::numeric_limits<double>::infinity() ||
-		val == -std::numeric_limits<double>::infinity() || 
-		std::isnan(val))
-	{
-		return false;
-	}
-	return true;
-}
-
-ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValue& number)
-{
 	NumberParseMode mode = NumberParseMode::INTEGER;
 
 	int64_t int_sign = 1;
-	double exp_sign = 1;
-
-	this->integer_part.clear();
-	this->frac_part.clear();
-	this->exp_part.clear();
-
-	int64_t int_num = 0;
-	double frac_num = 0;
+	int64_t int_part = 0;
 
 	for (; i < text.size(); i++) {
-
-		skipWhiteSpace(i, text);
 
 		char& c = text[i];
 
@@ -247,343 +154,227 @@ ErrorStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValu
 				int_sign = -1;
 			}
 			else if (isUTF8Number(c)) {
-				integer_part.push_back(c);
+				integer_chars.push_back(c);
 			}
 			else {
-				if (!convertCharsToInt(integer_part, int_num)) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-						msgWithPos("integer part of number too large to represent on int64_t",
-						i, text));
-				}
-				int_num *= int_sign;
+				convertCharsToInt(integer_chars, int_part);
+				int_part *= int_sign;
 
 				if (c == '.') {
 					mode = NumberParseMode::FRACTION;
-					continue;
 				}
-
-				number.value = (int64_t)int_num;
-
-				return ErrorStack();
+				else {
+					number.value = (int64_t)int_part;
+					return ErrStack();
+				}			
 			}
 			break;
 
 		case NumberParseMode::FRACTION:
 
 			if (isUTF8Number(c)) {
-				frac_part.push_back(c);
+				frac_chars.push_back(c);
 			}
 			else {
-				if (!convertCharsToFrac(frac_part, frac_num)) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-						msgWithPos("fraction part of number has too many digits",
-						i, text));
-				}
+				// Extract 0.1234
+				int64_t frac_part;
+				convertCharsToInt(frac_chars, frac_part);
+				double frac_part_dbl = (double)frac_part / std::pow(10.0, (double)frac_chars.size());
 
-				if (!isSafeAdd((double)int_num, frac_num)) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-						msgWithPos("number too large too represent",
-						i, text));
-				}
-				frac_num += (double)int_num;
-
-				if (c == 'e' || c == 'E') {
-					mode = NumberParseMode::EXPONENT;
-					continue;
-				}
-
-				number.value = (double)frac_num;
-
-				return ErrorStack();
+				number.value = (double)int_part + frac_part_dbl;
+				return ErrStack();
 			}
-			break;
-
-		case NumberParseMode::EXPONENT:
-
-			if (c == '+') {
-				exp_sign = 1.0;
-			}
-			else if (c == '-') {
-				exp_sign = -1.0;
-			}
-			else if (isUTF8Number(c)) {
-				exp_part.push_back(c);
-			}
-			else {
-				int64_t exp_int = 0;
-				if (!convertCharsToInt(exp_part, exp_int)) {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-						msgWithPos("exponent part of number too large to represent on int64_t",
-						i, text));
-				}
-
-				double exp_dbl;
-
-				if (doSafePow(10, (double)exp_int * exp_sign, exp_dbl) && 
-					isSafeMul(frac_num, exp_dbl)) 
-				{
-					number.value = double(frac_num * exp_dbl);
-				}
-				else {
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-						msgWithPos("number too large to represent on double",
-						i, text));
-				}
-				return ErrorStack();
-			}
-			break;
+			break;;
 		}	
 	}
-	return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
 		msgWithPos("premature end of characters in file when parsing number",
 		i, text));
 }
 
-ErrorStack JSONGraph::parseArray(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
+ErrStack JSONGraph::parseValue(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
 {
-	ErrorStack err;
+	ErrStack err;
 
-	std::vector<JSONValue*> values;
+	skipWhiteSpace(i, text);
+	char& c = text[i];
 
-	for (; i < text.size(); ) {
+	if (isUTF8Number(c) || c == '+' || c == '-') {
+		err = parseNumber(i, text, json_value);
+	}
+	else {
+		i++;
 
-		skipWhiteSpace(i, text);
-		char& c = text[i];
-
-		// skip to next value
-		if (c == ',') {
-
-			i++;
-			continue;
+		// string
+		if (c == '"') {
+			temp_string.clear();
+			err = parseString(i, text, temp_string);
+			json_value.value = temp_string;
 		}
-		else if (c == ']') {
-
-			json_value.value = values;
-
-			i++;
-			return ErrorStack();
+		else if (c == 't') {
+			err = confirmKeyword(i, text, "rue");
+			json_value.value = true;
 		}
-
-		JSONValue* val = &this->values.emplace_front();
-
-		// number
-		if (isUTF8Number(c) || c == '+' || c == '-') {
-
-			err = parseNumber(i, text, *val);
+		// false
+		else if (c == 'f') {
+			err = confirmKeyword(i, text, "alse");
+			json_value.value = false;
+		}
+		// null
+		else if (c == 'n') {
+			err = confirmKeyword(i, text, "ull");
+			json_value.value = nullptr;
+		}
+		// Array
+		else if (c == '[') {
+			err = parseArray(i, text, json_value);
+		}
+		// Object
+		else if (c == '{') {
+			err = parseObject(i, text, json_value);
 		}
 		else {
-			i++;
-
-			// string
-			if (c == '"') {
-
-				this->temp_string.clear();
-				err = parseString(i, text, this->temp_string);
-				val->value = temp_string;
-			}
-			else if (c == 't') {
-
-				err = confirmKeyword(i, text, "rue");
-				val->value = true;
-			}
-			// false
-			else if (c == 'f') {
-
-				err = confirmKeyword(i, text, "alse");
-				val->value = false;
-			}
-			// null
-			else if (c == 'n') {
-
-				err = confirmKeyword(i, text, "ull");
-				val->value = nullptr;
-			}
-			// Array
-			else if (c == '[') {
-				err = parseArray(i, text, *val);
-			}
-			// Object
-			else if (c == '{') {
-				err = parseObject(i, text, *val);
-			}
-			else {
-				return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-					msgWithPos("expected value but got " + asIs(c) + std::string(" instead"),
-					i - 1, text));
-			}
-		}	
-
-		if (err.isBad()) {
-			err.pushError(code_location, "failed to parse array");
-			return err;
+			return ErrStack(code_location,
+				msgWithPos("expected value but got " + asIs(c) + std::string(" instead"),
+					i, text));
 		}
-
-		// add value to array
-		values.push_back(val);
-		// skip ahead not required, already done by parser functions
 	}
-	return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	
+	checkErrStack(err, "failed to parse value");
+	return ErrStack();
+}
+
+ErrStack JSONGraph::parseArray(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
+{
+	std::vector<JSONValue*> array_vals;
+
+	// empty array
+	if (text[i] == ']') {
+		json_value.value = array_vals;
+		i++;
+		return ErrStack();
+	}
+
+	ErrStack err;
+
+	for (; i < text.size(); i++) {
+
+		skipWhiteSpace(i, text);
+
+		// Value
+		JSONValue* val = &this->values.emplace_front();
+		checkErrStack(parseValue(i, text, *val), "");
+
+		array_vals.push_back(val);
+
+		skipWhiteSpace(i, text);
+
+		// Next
+		if (text[i] == ',') {
+			continue;
+		}
+		// End of Array
+		else if (text[i] == ']') {
+			json_value.value = array_vals;
+			i++;
+			return ErrStack();
+		}
+		else {
+			return ErrStack(code_location, msgWithPos(
+				"expected separator ',' between array values or array end symbol ']'", i, text));
+		}
+	}
+	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing array",
 		i, text));
 }
 
-enum class ObjectParseMode {
-	FIELD_NAME,
-	VALUE
-};
-
-ErrorStack JSONGraph::parseObject(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
+ErrStack JSONGraph::parseObject(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
 {
-	ErrorStack err;
-
-	ObjectParseMode mode = ObjectParseMode::FIELD_NAME;
-
 	std::vector<JSONField> fields;
 
+	// Empty Object
+	skipWhiteSpace(i, text);
+	if (text[i] == '}') {
+		json_value.value = fields;
+		i++;
+		return ErrStack();
+	}
+	
 	JSONField* new_field = nullptr;
 
-	for (; i < text.size(); ) {
+	for (; i < text.size(); i++) {
 
 		skipWhiteSpace(i, text);
-		char& c = text[i];
 
-		switch (mode)
-		{
-		case ObjectParseMode::FIELD_NAME:
-			if (c == '"') {
+		if (text[i] == '"') {
 
-				// create new field
-				new_field = &fields.emplace_back();
+			// Parse Field Name
+			i++;
+			new_field = &fields.emplace_back();
+			checkErrStack(parseString(i, text, new_field->name), 
+				"failed to parse field name");
 
-				i++;
-				err = parseString(i, text, new_field->name);
-				if (err.isBad()) {
-
-					err.pushError(code_location, "failed to parse object");
-					return err;
-				}
-				else if (new_field->name.empty()) {
-
-					return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location, 
-						msgWithPos("expected field name is blank",
+			if (new_field->name.empty()) {
+				return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+					msgWithPos("expected field name is blank",
 						i - 1, text));
-				}
-
-				mode = ObjectParseMode::VALUE;
-				i++;
 			}
-			// another field after so skip
-			else if (c == ',') {
+
+			// Parse Value
+			skipWhiteSpace(i, text);
+			if (text[i] == ':') {
+			
 				i++;
-				continue;
-			}
-			// no more fields or object is empty
-			else if (c == '}') {
+				new_field->value = &this->values.emplace_front();
+				checkErrStack(parseValue(i, text, *new_field->value), 
+					"failed to parse field value");
 
-				json_value.value = fields;
-
-				i++;
-				return ErrorStack();
-			}
-			else {
-				return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-					msgWithPos("expected field name or object end symbol '}' but got " + asIs(c) + std::string(" instead"),
-					i, text));
-			}
-			break;
-
-		case ObjectParseMode::VALUE:
-			if (c == ':') {
-
-				i++;
 				skipWhiteSpace(i, text);
-				c = text[i];
 
-				JSONValue& field_value = this->values.emplace_front();
-
-				// Number
-				if (isUTF8Number(c) || c == '+' || c == '-') {
-
-					err = parseNumber(i, text, field_value);
+				// Field separator
+				if (text[i] == ',') {
+					continue;
+				}
+				// End of Object
+				else if (text[i] == '}') {
+					json_value.value = fields;
+					i++;
+					return ErrStack();
 				}
 				else {
-					i++;
-
-					// String
-					if (c == '"') {
-
-						this->temp_string.clear();
-						err = parseString(i, text, temp_string);
-						field_value.value = temp_string;
-					}
-					// true
-					else if (c == 't') {
-
-						err = confirmKeyword(i, text, "rue");
-						field_value.value = true;
-					}
-					// false
-					else if (c == 'f') {
-
-						err = confirmKeyword(i, text, "alse");
-						field_value.value = false;
-					}
-					// null
-					else if (c == 'n') {
-
-						err = confirmKeyword(i, text, "ull");
-						field_value.value = nullptr;
-					}
-					// Array
-					else if (c == '[') {
-						err = parseArray(i, text, field_value);
-					}
-					// Object
-					else if (c == '{') {
-						err = parseObject(i, text, field_value);
-					}
-					else {
-						return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-							msgWithPos("expected value but got " + asIs(c) + std::string(" instead"),
-							i - 1, text));
-					}
+					return ErrStack(code_location, msgWithPos(
+						"expected separator ',' between fields or object end symbol '}'", i, text));
 				}
-
-				if (err.isBad()) {
-					err.pushError(code_location, "failed to parse object");
-					return err;
-				}
-
-				// add found value to field
-				new_field->value = &field_value;
-				mode = ObjectParseMode::FIELD_NAME;
-				// skip ahead not required, already done by parser functions
 			}
 			else {
-				return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-					msgWithPos("expected separator ':' between field name and value but got " + asIs(c) + std::string(" instead"),
-					i, text));
+				return ErrStack(code_location, msgWithPos(
+					"expected separator ':' between field name and value", i, text));
 			}
 		}
+		else {
+			return ErrStack(code_location, msgWithPos(
+				"expected field name", i, text));
+		}
 	}
-	return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
-		msgWithPos("premature end of characters in file when parsing object",
+	return ErrStack(code_location, msgWithPos(
+		"premature end of characters in file when parsing object",
 		i, text));
 }
 
-ErrorStack parseJSON(std::vector<char>& text, uint64_t offset, bool use_64int, bool use_double,
+ErrStack parseJSON(std::vector<char>& text, uint64_t offset,
 	JSONGraph& json)
 {
 	uint64_t i = offset;
 
 	if (!seekSymbol(i, text, '{')) {
 
-		return ErrorStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+		return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
 			msgWithPos("expected object begin symbol '{' not found",
 			i, text));
 	}
 
-	ErrorStack err = json.parseObject(i, text, json.values.emplace_front());
+	ErrStack err = json.parseObject(i, text, json.values.emplace_front());
 	if (err.isBad()) {
 		return err;
 	}
@@ -595,5 +386,5 @@ ErrorStack parseJSON(std::vector<char>& text, uint64_t offset, bool use_64int, b
 
 	json.root = &(*last_it);
 
-	return ErrorStack();
+	return ErrStack();
 } 

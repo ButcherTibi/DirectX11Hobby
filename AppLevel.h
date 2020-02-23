@@ -7,12 +7,14 @@
 class AppLevel {
 public:
 	HWND hwnd = NULL;
+	uint32_t window_width;
+	uint32_t window_height;
 
 	bool run_app_loop = true;
 	float delta_time = 0.0f;
 
 public:
-	ErrorStack response();
+	ErrStack response();
 };
 
 extern AppLevel app_level;
