@@ -7,7 +7,7 @@
 #include "Primitives.h"
 #include "Importer.h"
 #include "VulkanSystems.h"
-#include "UserInterface.h"
+#include "TextRendering.h"
 
 // Image Loading
 #include "stb_image.h"
@@ -54,51 +54,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 
 	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
-}
-
-ErrStack AppLevel::response()
-{
-	// Controls
-	float rotate_shortcut = input.rotate_camera.duration;
-	float zoom_shortcut = input.zoom_camera.duration;
-	float pan_shortcut = input.pan_camera.duration;
-	float focus_shortcut = input.focus_camera.duration;
-
-	if (rotate_shortcut) {
-		
-		float rotation_sensitivity = 20.0f;
-		float delta_pitch = (float)input.mouse_delta_y * rotation_sensitivity * delta_time;
-		float delta_yaw = (float)input.mouse_delta_x * rotation_sensitivity * delta_time;
-
-		renderer.orbitCameraArcball(renderer.meshes[0].position, delta_pitch, delta_yaw);
-	}
-	else if (zoom_shortcut) {
-
-		float zoom_sensitivity = 0.5f;
-		float zoom_amount = (float)input.mouse_delta_y * zoom_sensitivity * delta_time;
-
-		renderer.zoomCamera(renderer.meshes[0].position, zoom_amount);
-	}
-	else if (pan_shortcut) {
-
-		float pan_sensitivity = 1.0f;
-		float delta_vertical = (float)input.mouse_delta_y * pan_sensitivity * delta_time;
-		float delta_horizontal = (float)input.mouse_delta_x * pan_sensitivity * delta_time;
-
-		renderer.panCamera(delta_vertical, delta_horizontal);
-	}
-	else if (focus_shortcut) {
-		renderer.camera.position = { 0, 0, 5 };
-		renderer.camera.rotation = { 1, 0, 0, 0 };
-	}
-
-	// Begin render comands
-	checkErrStack(renderer.waitForRendering(), "");
-	renderer.generateGPUData();
-	checkErrStack(renderer.loadGPUData(), "");
-	checkErrStack(renderer.draw(), "");
-
-	return ErrStack();
 }
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
@@ -174,157 +129,170 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	}
 
 	ErrStack err;
-	Path local_path;
-	Path::getExePath(local_path);
-	local_path.pop_back(3);
-	local_path.push_back("Sculpt");
 
 	// Load Shader Code
-	std::vector<char> vert_shader_code;
-	std::vector<char> frag_shader_code;
-	std::vector<char> ui_vertex_shader_code;
+	std::vector<char> g3d_vert_shader_code;
+	std::vector<char> g3d_frag_shader_code;
+	std::vector<char> ui_vert_shader_code;
 	std::vector<char> ui_frag_shader_code;
+	std::vector<char> comp_vert_shader_code;
+	std::vector<char> comp_frag_shader_code;
 	{
-		Path shader_path = local_path;
-		shader_path.push_back("shaders");
+		FileSysPath path;
+		err = path.recreateRelative("shaders/3D/vert.spv");
+		err = path.read(g3d_vert_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 
-		// 3D
-		{
-			Path path = shader_path;
-			path.push_back("3D/vert.spv");
+		path.recreateRelative("shaders/3D/frag.spv");
+		err = path.read(g3d_frag_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 
-			err = path.read(vert_shader_code);
-			if (err.isBad()) {
-				err.debugPrint();
-				return 1;
-			}
+		path.recreateRelative("shaders/UI/vert.spv");
+		err = path.read(ui_vert_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 
-			path = shader_path;
-			path.push_back("3D/frag.spv");
 
-			err = path.read(frag_shader_code);
-			if (err.isBad()) {
-				err.debugPrint();
-				return 1;
-			}
+		path.recreateRelative("shaders/UI/frag.spv");
+		err = path.read(ui_frag_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
 		}
 		
-		// UI
-		{
-			Path path = shader_path;
-			path.push_back("UI/vert.spv");
+		path.recreateRelative("shaders/Compose/vert.spv");
+		err = path.read(comp_vert_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
+		}
 
-			err = path.read(ui_vertex_shader_code);
-			if (err.isBad()) {
-				err.debugPrint();
-				return 1;
-			}
-
-			path = shader_path;
-			path.push_back("UI/frag.spv");
-
-			err = path.read(ui_frag_shader_code);
-			if (err.isBad()) {
-				err.debugPrint();
-				return 1;
-			}
+		path.recreateRelative("shaders/Compose/frag.spv");
+		err = path.read(comp_frag_shader_code);
+		if (err.isBad()) {
+			err.debugPrint();
+			return 1;
 		}
 	}
 
 	// Mesh
+	std::vector<LinkageMesh> meshes;
 	{
-		Path mesh_path = local_path;
-		mesh_path.push_back("meshes/DamagedHelmet/DamagedHelmet.gltf");
+		FileSysPath path;
+		path.recreateRelative("meshes/DamagedHelmet/DamagedHelmet.gltf");
 
-		// Mesh
-		err = importGLTFMeshes(mesh_path, renderer.meshes);
+		err = importGLTFMeshes(path, meshes);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
 	}
 
-	renderer.camera.position.z = 1.5;
+	Camera camera;
+	camera.position.z = 1.5;
 
 	// Mesh Diffuse Texture
+	BasicBitmap mesh_diffuse;
 	{
-		Path tex_path = local_path;
-		local_path.push_back("meshes/DamagedHelmet/Default_albedo.jpg");
-
+		FileSysPath tex_path;
+		tex_path.recreateRelative("meshes/DamagedHelmet/Default_albedo.jpg");
+		
 		int32_t width, height, channels;
 
-		uint8_t* tex_pixels = stbi_load(local_path.toWindowsPath().c_str(),
+		uint8_t* tex_pixels = stbi_load(tex_path.toWindowsPath().c_str(),
 			&width, &height, &channels, STBI_rgb_alpha);
 
-		BasicBitmap& img = renderer.mesh_difuse;
-		img.width = width;
-		img.height = height;
-		img.channels = 4;
-		img.mem_size = width * height * 4;
-		img.colors.resize(img.mem_size);
+		mesh_diffuse.width = width;
+		mesh_diffuse.height = height;
+		mesh_diffuse.channels = 4;
+		mesh_diffuse.colors.resize(mesh_diffuse.calcMemSize());
 
-		memcpy(img.colors.data(), tex_pixels, img.mem_size);
+		memcpy(mesh_diffuse.colors.data(), tex_pixels, mesh_diffuse.calcMemSize());
 
 		stbi_image_free(tex_pixels);
 	}
 
-	// UI Symbol Atlas Texture
+	// Text Rendering
+	TextStuff text_stuff;
 	{
-		Path font_path;
-		err = Path::getLocalFolder(font_path);
+		std::vector<uint8_t> roboto_font_ttf;
+		{
+			FileSysPath font_path;
+			font_path.recreateRelative("/UI/Fonts/Roboto/Roboto-Regular.ttf");
+			
+			err = font_path.read(roboto_font_ttf);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
+		}	
+
+		FontInfo info;
+		info.family_name = "roboto";
+		info.style_name = "regular";
+		info.sizes_px = {100};
+
+		err = text_stuff.addFont(roboto_font_ttf, info);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
-		font_path.push_back("/UI/Fonts/Roboto/Roboto-Regular.ttf");
 
-		std::vector<uint8_t> roboto_font_raw;
-		err = font_path.read(roboto_font_raw);
-		if (err.isBad()) {
-			err.isBad();
-			return 1;
-		}
-
-		std::vector<GlyphBitmap> char_bitmaps;
-		err = createFontBitmaps(roboto_font_raw, 12, char_bitmaps);
+		err = text_stuff.rebindToAtlas(1024);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
 
-		char_bitmaps[0].debugPrint();
+		ui::CharSeq seq;	
+		seq.setCharacters("Finally . . . Hello World from the GPU", 16, "roboto", "regular", { 0, 0.5f });
 
-		BasicBitmap& img = renderer.symbol_atlas;
-		img.colors = char_bitmaps[0].pixels;
-		img.width = char_bitmaps[0].width;
-		img.height = char_bitmaps[0].height;
-		img.channels = 1;
-		img.calcMemSize();
-	}
-
-	// Render
-	{
-		renderer.generateGPUData();
-
-		RendererCreateInfo info;
-		info.hinstance = hinstance;
-		info.hwnd = app_level.hwnd;
-		info.width = app_level.window_width;
-		info.height = app_level.window_height;
-		info.g3d_vert_shader_code = &vert_shader_code;
-		info.g3d_frag_shader_code = &frag_shader_code;
-		info.ui_vert_shader_code = &ui_vertex_shader_code;
-		info.ui_frag_shader_code = &ui_frag_shader_code;
-
-		err = renderer.create(info);
+		err = text_stuff.addInstances(seq, app_level.window_width, app_level.window_height);
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
 		}
 	}
-	
+
+	RenderingContent render_content;
+	render_content.hinstance = &hinstance;
+	render_content.hwnd = &app_level.hwnd;
+	render_content.width = app_level.window_width;
+	render_content.height = app_level.window_height;
+
+	// 3D
+	render_content.mesh_diffuse = &mesh_diffuse;
+	render_content.meshes = &meshes;
+	render_content.camera = &camera;
+	render_content.g3d_vert_shader_code = &g3d_vert_shader_code;
+	render_content.g3d_frag_shader_code = &g3d_frag_shader_code;
+
+	// UI
+	render_content.char_atlas_changed = true;
+	render_content.text_rendering = &text_stuff;
+	render_content.ui_vert_shader_code = &ui_vert_shader_code;
+	render_content.ui_frag_shader_code = &ui_frag_shader_code;
+
+	// Compose
+	render_content.comp_vert_shader_code = &comp_vert_shader_code;
+	render_content.comp_frag_shader_code = &comp_frag_shader_code;
+
+	err = renderer.recreate(render_content);
+	if (err.isBad()) {
+		err.debugPrint();
+		return 1;
+	}
 
 	steady_time frame_start;
+	float delta_time = 1;
 	
 	// Message loop
 	while (app_level.run_app_loop)
@@ -349,17 +317,46 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			break;
 		}
 
-		// Respond
-		err = app_level.response();
-		if (err.isBad()) {
-			break;
+		// Controls
+		float rotate_shortcut = input.rotate_camera.duration;
+		float zoom_shortcut = input.zoom_camera.duration;
+		float pan_shortcut = input.pan_camera.duration;
+		float focus_shortcut = input.focus_camera.duration;
+
+		if (rotate_shortcut) {
+
+			float rotation_sensitivity = 20.0f;
+			float delta_pitch = (float)input.mouse_delta_y * rotation_sensitivity * delta_time;
+			float delta_yaw = (float)input.mouse_delta_x * rotation_sensitivity * delta_time;
+
+			camera.orbitCameraArcball({ 0, 0, 0 }, delta_pitch, delta_yaw);
+		}
+		else if (zoom_shortcut) {
+
+			float zoom_sensitivity = 0.5f;
+			float zoom_amount = (float)input.mouse_delta_y * zoom_sensitivity * delta_time;
+
+			camera.zoomCamera({ 0, 0, 0 }, zoom_amount);
+		}
+		else if (pan_shortcut) {
+
+			float pan_sensitivity = 1.0f;
+			float delta_vertical = (float)input.mouse_delta_y * pan_sensitivity * delta_time;
+			float delta_horizontal = (float)input.mouse_delta_x * pan_sensitivity * delta_time;
+
+			camera.panCamera(delta_vertical, delta_horizontal);
+		}
+		else if (focus_shortcut) {
+			camera.position = { 0, 0, 5 };
+			camera.rotation = { 1, 0, 0, 0 };
 		}
 
-		//WaitMessage();  // pretty chill on CPU
-		app_level.delta_time = fsec_cast(std::chrono::steady_clock::now() - frame_start);
-	}
+		// Begin render comands
+		renderer.waitForRendering();
+		renderer.draw();
 
-	DestroyWindow(app_level.hwnd);
+		delta_time = fsec_cast(std::chrono::steady_clock::now() - frame_start);
+	}
 
 	if (err.isBad()) {
 		err.debugPrint();
@@ -367,6 +364,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	}
 
 	vkDeviceWaitIdle(renderer.logical_dev.logical_device);
+	DestroyWindow(app_level.hwnd);
 
 	return 0;
 }

@@ -12,9 +12,6 @@ public:
 
 	bool run_app_loop = true;
 	float delta_time = 0.0f;
-
-public:
-	ErrStack response();
 };
 
 extern AppLevel app_level;

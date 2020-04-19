@@ -49,21 +49,34 @@ namespace vks {
 		return ErrStack();
 	}
 
-	ErrStack Buffer::createOrGrowStaging(LogicalDevice* logical_dev, VkDeviceSize min_size,
-		VmaMemoryUsage mem_usage)
+	ErrStack Buffer::recreate(LogicalDevice* logical_dev,
+		VkDeviceSize min_size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage)
 	{
 		if (buff == VK_NULL_HANDLE) {
-			return create(logical_dev, min_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, mem_usage);
+			return create(logical_dev, min_size, usage, mem_usage);
 		}
 		else if (buff_alloc_info.size < min_size) {
 
 			destroy();
-			return create(logical_dev, min_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, mem_usage);
+			return create(logical_dev, min_size, usage, mem_usage);
 		}
 		return ErrStack();
 	}
 
-	ErrStack Buffer::load(LogicalDevice* logical_dev, CommandPool* cmd_pool, Buffer* staging,
+	ErrStack Buffer::recreateStaging(LogicalDevice* logical_dev, VkDeviceSize min_size)
+	{
+		if (buff == VK_NULL_HANDLE) {
+			return create(logical_dev, min_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+		}
+		else if (buff_alloc_info.size < min_size) {
+
+			destroy();
+			return create(logical_dev, min_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+		}
+		return ErrStack();
+	}
+
+	ErrStack Buffer::load(CommandPool* cmd_pool, Buffer* staging,
 		void* data, size_t size)
 	{
 		assert_cond(size > 0, "load size must be larger than zero");
@@ -87,6 +100,41 @@ namespace vks {
 		return ErrStack();
 	}
 
+	void Buffer::scheduleLoad(size_t offset, Buffer* staging, void* data, size_t size)
+	{
+		assert_cond(size > 0, "load size must be larger than zero");
+
+		scheduled_load_size += size;
+
+		if (load_type == LoadType::MEMCPY) {
+
+			void* dst = (uint8_t*)this->mem + offset;
+			std::memcpy(dst, data, size);
+		}
+		else {
+			void* dst = (uint8_t*)staging->mem + offset;
+			std::memcpy(dst, data, size);
+		}
+	}
+
+	ErrStack Buffer::flush(CommandPool* cmd_pool, Buffer* staging)
+	{
+		ErrStack err;
+		// Do nothing if memcpy because HOST_COHERENT
+
+		if (load_type == LoadType::STAGING) {
+
+			auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
+
+			VkBufferCopy regions = {};
+			regions.size = scheduled_load_size;
+			vkCmdCopyBuffer(record.cmd_buff, staging->buff, buff, 1, &regions);
+		}
+
+		scheduled_load_size = 0;
+		return err;
+	}
+
 	void Buffer::destroy()
 	{
 		if (this->load_type == LoadType::MEMCPY) {
@@ -106,88 +154,12 @@ namespace vks {
 		}
 	}
 
-
-	ErrStack changeImageLayout(LogicalDevice* logical_dev, CommandPool* cmd_pool,
-		Image* img, VkImageLayout new_layout)
+	ErrStack Buffer::setDebugName(std::string name)
 	{
-		ErrStack err;
-
-		{
-			auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
-			checkErrStack(err, "");
-
-			VkImageMemoryBarrier barrier = {};
-			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			barrier.oldLayout = img->layout;
-			barrier.newLayout = new_layout;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.image = img->img;
-			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			barrier.subresourceRange.baseMipLevel = 0;
-			barrier.subresourceRange.levelCount = img->mip_lvl;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-
-			VkPipelineStageFlags src_stage;
-			VkPipelineStageFlags dst_stage;
-
-			if (img->layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-				barrier.srcAccessMask = 0;
-				barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-				dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			}
-			else if (img->layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-			{
-				barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-				src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-				dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			}
-			else {
-				return ErrStack(code_location, "unsupported image layout transition");
-			}
-
-			vkCmdPipelineBarrier(
-				record.cmd_buff,
-				src_stage, dst_stage,
-				0,
-				0, NULL,
-				0, NULL,
-				1, &barrier
-			);
-
-			img->layout = new_layout;
-		}	
-
-		return err;
-	}
-
-	ErrStack copyBufferToImage(LogicalDevice* logical_dev, CommandPool* cmd_pool, Buffer* buff, Image* img)
-	{
-		ErrStack err;
-		auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
-
-		VkBufferImageCopy region = {};
-		region.bufferOffset = 0;
-		region.bufferRowLength = 0;
-		region.bufferImageHeight = 0;
-
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = 1;
-
-		region.imageOffset = { 0, 0, 0 };
-		region.imageExtent = {img->width, img->height, 1};
-
-		vkCmdCopyBufferToImage(record.cmd_buff, buff->buff, img->img, img->layout,
-			1, &region);
-
-		return err;
+		checkErrStack(logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(buff), VK_OBJECT_TYPE_BUFFER, name + " VkBuffer"), 
+			"");
+		return ErrStack();
 	}
 
 	ErrStack findSupportedImageFormat(vks::PhysicalDevice* phys_dev, std::vector<DesiredImageProps> desires,
@@ -214,9 +186,37 @@ namespace vks {
 		return ErrStack(code_location, "desired image properties not supported");
 	}
 
-	ErrStack Image::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
+	ErrStack Image::copyBufferToImage(CommandPool* cmd_pool, Buffer* buff)
+	{
+		ErrStack err;
+		auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
+
+		VkBufferImageCopy region = {};
+		region.bufferOffset = 0;
+		region.bufferRowLength = 0;
+		region.bufferImageHeight = 0;
+
+		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		region.imageSubresource.mipLevel = 0;
+		region.imageSubresource.baseArrayLayer = 0;
+		region.imageSubresource.layerCount = 1;
+
+		region.imageOffset = { 0, 0, 0 };
+		region.imageExtent = { width, height, 1 };
+
+		vkCmdCopyBufferToImage(record.cmd_buff, buff->buff, img, layout,
+			1, &region);
+
+		return err;
+	}
+
+	ErrStack Image::recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
 		ImageCreateInfo& img_info, VmaMemoryUsage mem_usage)
 	{
+		if (this->img != VK_NULL_HANDLE) {
+			this->destroy();
+		}
+
 		this->logical_dev = logical_dev;
 		this->width = img_info.width;
 		this->height = img_info.height;
@@ -225,7 +225,8 @@ namespace vks {
 		this->samples = img_info.samples;
 
 		DesiredImageProps img_prop;
-		checkErrStack(findSupportedImageFormat(phys_dev, *img_info.desired_props, img_prop), "");
+		checkErrStack(findSupportedImageFormat(phys_dev, *img_info.desired_props, img_prop), 
+			"failed to find supported image format");
 
 		VkImageCreateInfo vk_img_info = {};
 		vk_img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -256,25 +257,140 @@ namespace vks {
 			checkVkRes(vmaMapMemory(logical_dev->allocator, alloc, &mem), "");
 		}
 
+		// View
+		VkComponentMapping component_mapping = {};
+		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		VkImageSubresourceRange sub_resource = {};
+		sub_resource.aspectMask = img_info.aspect;
+		sub_resource.baseMipLevel = 0;
+		sub_resource.levelCount = img_info.mip_levels;
+		sub_resource.baseArrayLayer = 0;
+		sub_resource.layerCount = 1;
+
+		VkImageViewCreateInfo imageview_info = {};
+		imageview_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageview_info.image = img;
+		imageview_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		imageview_info.format = format;
+		imageview_info.components = component_mapping;
+		imageview_info.subresourceRange = sub_resource;
+
+		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
+			"failed to create image view");
+
 		return ErrStack();
 	}
 
-	ErrStack Image::load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff)
+	ErrStack Image::setDebugName(std::string name)
+	{
+		checkErrStack(logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(img), VK_OBJECT_TYPE_IMAGE, name + " VkImage"), "");
+
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(img_view), VK_OBJECT_TYPE_IMAGE, name + " VkImageView");
+	}
+
+	ErrStack Image::changeImageLayout(CommandPool* cmd_pool, VkImageLayout new_layout)
+	{
+		ErrStack err;
+
+		{
+			auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
+			checkErrStack(err, "");
+
+			VkImageMemoryBarrier barrier = {};
+			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrier.oldLayout = layout;
+			barrier.newLayout = new_layout;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.image = img;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseMipLevel = 0;
+			barrier.subresourceRange.levelCount = mip_lvl;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+
+			VkPipelineStageFlags src_stage;
+			VkPipelineStageFlags dst_stage;
+
+			if (layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+
+				barrier.srcAccessMask = 0;
+				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+				if (new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+				
+					barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;			
+					dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+				}
+				else if (new_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+
+					barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+					dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+				}
+				else {
+					return ErrStack(code_location, "unsupported image layout transition");
+				}
+			}
+			else if (layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+
+				barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+				if (new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+					barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+					dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				}
+				else {
+					return ErrStack(code_location, "unsupported image layout transition");
+				}
+			}
+			else {
+				return ErrStack(code_location, "unsupported image layout transition");
+			}
+
+			vkCmdPipelineBarrier(
+				record.cmd_buff,
+				src_stage, dst_stage,
+				0,
+				0, NULL,
+				0, NULL,
+				1, &barrier
+				);
+
+			layout = new_layout;
+		}
+
+		return err;
+	}
+
+	ErrStack Image::load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff,
+		VkImageLayout layout_after_load)
 	{
 		// Load Into Staging Buffer
-		checkErrStack(staging_buff->createOrGrowStaging(logical_dev, size), "");
-
 		std::memcpy(staging_buff->mem, colors, size);
 
 		// Load Staging Buffer into Image
 		if (layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-
-			checkErrStack(vks::changeImageLayout(logical_dev, cmd_pool, this,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), "");
+			checkErrStack(changeImageLayout(cmd_pool, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL), 
+				"failed to change image layout for optimal destination");
 		}
 		
-		checkErrStack(vks::copyBufferToImage(logical_dev, cmd_pool, staging_buff, this),
+		// Load Staging to Image
+		checkErrStack(copyBufferToImage(cmd_pool, staging_buff),
 			"failed to copy buffer to image");
+
+		// Change layout
+		if (this->layout != layout_after_load) {
+			checkErrStack(changeImageLayout(cmd_pool, layout_after_load), 
+				"failed to change image layout");
+		}
 
 		return ErrStack();
 	}
@@ -289,6 +405,9 @@ namespace vks {
 		img = VK_NULL_HANDLE;
 
 		this->load_type = LoadType::ENUM_NOT_INIT;
+
+		vkDestroyImageView(logical_dev->logical_device, img_view, NULL);
+		img_view = VK_NULL_HANDLE;
 	}
 
 	Image::~Image()

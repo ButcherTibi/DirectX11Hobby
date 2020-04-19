@@ -75,8 +75,6 @@ namespace vks {
 				return ErrStack(vk_res, code_location, "could not retrieve validation layer props");
 			}
 
-			validation_layers = { "VK_LAYER_LUNARG_standard_validation" };
-
 			err = find_layers(layer_props, validation_layers);
 			if (err.isBad()) {
 				return err;
@@ -103,8 +101,6 @@ namespace vks {
 			if (err.isBad()) {
 				return err;
 			}
-
-			instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 		}
 
 		// Create Instance
@@ -160,12 +156,12 @@ namespace vks {
 
 		// External Functions
 		{
-			getMemProps2 = (PFN_vkGetPhysicalDeviceMemoryProperties2KHR)
-				vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceMemoryProperties2KHR");
-
-			if (getMemProps2 == NULL) {
-				return ErrStack(ExtraError::FAILED_TO_GET_EXTERNAL_FUNCTION, code_location, "failed to retrieve function pointer for "
-					"vkGetPhysicalDeviceMemoryProperties2KHR");
+			set_vkdbg_name_func = (PFN_vkSetDebugUtilsObjectNameEXT)
+				vkGetInstanceProcAddr(instance, "vkSetDebugUtilsObjectNameEXT");
+			if (set_vkdbg_name_func == NULL) {
+				return ErrStack(ExtraError::FAILED_TO_GET_EXTERNAL_FUNCTION, code_location, 
+					"failed to retrieve function pointer for "
+					"vkSetDebugUtilsObjectNameEXT");
 			}
 		}
 
@@ -374,6 +370,8 @@ namespace vks {
 
 	ErrStack LogicalDevice::create(Instance* instance, PhysicalDevice* phys_dev)
 	{
+		this->instance = instance;
+
 		// Graphics queue
 		VkDeviceQueueCreateInfo graphics_queue_info = {};
 		graphics_queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -424,6 +422,22 @@ namespace vks {
 		return ErrStack();
 	}
 
+	ErrStack LogicalDevice::setDebugName(uint64_t obj, VkObjectType obj_type, std::string name)
+	{
+		VkDebugUtilsObjectNameInfoEXT info = {};
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		info.objectType = obj_type;
+		info.objectHandle = obj;
+		info.pObjectName = name.c_str();
+
+		VkResult res = instance->set_vkdbg_name_func(this->logical_device, &info);
+		if (res != VK_SUCCESS) {
+			return ErrStack(code_location, "failed to set debug name");
+		}
+
+		return ErrStack();
+	}
+
 	void LogicalDevice::destroy()
 	{
 		vmaDestroyAllocator(this->allocator);
@@ -444,8 +458,6 @@ namespace vks {
 		uint32_t width, uint32_t height)
 	{
 		this->logical_device = logical_dev;
-		this->desired_width = width;
-		this->desired_height = height;
 
 		// Surface Formats
 		{
@@ -519,13 +531,63 @@ namespace vks {
 		checkVkRes(vkCreateSwapchainKHR(logical_dev->logical_device, &swapchain_info, NULL, &swapchain),
 			"failed to create swapchain");
 
-		uint32_t image_count = 0;
-		checkVkRes(vkGetSwapchainImagesKHR(logical_device->logical_device, swapchain, &image_count, NULL),
-			"failed to retrieve swap chain image count");
+		// Image and ImageViews
+		{
+			uint32_t image_count = 0;
+			checkVkRes(vkGetSwapchainImagesKHR(logical_device->logical_device, swapchain, &image_count, NULL),
+				"failed to retrieve swap chain image count");
 
-		images.resize(image_count);
-		checkVkRes(vkGetSwapchainImagesKHR(logical_device->logical_device, swapchain, &image_count, images.data()),
-			"failed to retrieve swap chain images");
+			images.resize(image_count);
+			checkVkRes(vkGetSwapchainImagesKHR(logical_device->logical_device, swapchain, &image_count, images.data()),
+				"failed to retrieve swap chain images");
+
+			VkComponentMapping component_mapping = {};
+			component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+			VkImageSubresourceRange res_range = {};
+			res_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			res_range.baseMipLevel = 0;
+			res_range.levelCount = 1;
+			res_range.baseArrayLayer = 0;
+			res_range.layerCount = 1;;
+
+			views.resize(image_count);
+			for (uint32_t i = 0; i < image_count; i++) {
+
+				VkImageViewCreateInfo view_info = {};
+				view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+				view_info.image = images[i];
+				view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+				view_info.format = surface_format.format;
+				view_info.components = component_mapping;
+				view_info.subresourceRange = res_range;
+
+				checkVkRes(vkCreateImageView(logical_dev->logical_device, &view_info, NULL, &views[i]),
+					"failed to create swapchain image views");
+			}
+		}	
+
+		return ErrStack();
+	}
+
+	ErrStack Swapchain::setDebugName(std::string name)
+	{
+		checkErrStack(logical_device->setDebugName(
+			reinterpret_cast<uint64_t>(swapchain), VK_OBJECT_TYPE_SWAPCHAIN_KHR, "Swapchain"), "");
+
+		for (size_t i = 0; i < images.size(); i++) {
+
+			logical_device->setDebugName(
+				reinterpret_cast<uint64_t>(images[i]), VK_OBJECT_TYPE_IMAGE,
+				name + " VkImage[" + std::to_string(i) + "]");
+
+			checkErrStack(logical_device->setDebugName(
+				reinterpret_cast<uint64_t>(views[i]), VK_OBJECT_TYPE_IMAGE_VIEW, 
+				name + " VkImageView[" + std::to_string(i) + "]"), "");
+		}
 
 		return ErrStack();
 	}
@@ -534,88 +596,16 @@ namespace vks {
 	{
 		vkDestroySwapchainKHR(logical_device->logical_device, swapchain, NULL);
 		swapchain = VK_NULL_HANDLE;
+
+		for (size_t i = 0; i < views.size(); i++) {
+			vkDestroyImageView(logical_device->logical_device, views[i], NULL);
+		}
+		views.clear();
 	}
 
 	Swapchain::~Swapchain()
 	{
 		if (swapchain != VK_NULL_HANDLE) {
-			destroy();
-		}
-	}
-
-
-	ErrStack ImageView::createPresentView(LogicalDevice* logical_dev, VkImage img, VkFormat format, 
-		VkImageAspectFlags aspect)
-	{
-		this->logical_dev = logical_dev;
-
-		VkComponentMapping component_mapping = {};
-		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		VkImageSubresourceRange sub_resource = {};
-		sub_resource.aspectMask = aspect;
-		sub_resource.baseMipLevel = 0;
-		sub_resource.levelCount = 1;
-		sub_resource.baseArrayLayer = 0;
-		sub_resource.layerCount = 1;
-
-		VkImageViewCreateInfo imageview_info = {};
-		imageview_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		imageview_info.image = img;
-		imageview_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		imageview_info.format = format;
-		imageview_info.components = component_mapping;
-		imageview_info.subresourceRange = sub_resource;
-
-		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
-			"failed to create image view");
-
-		return ErrStack();
-	}
-
-	ErrStack ImageView::create(LogicalDevice* logical_dev, Image* img, VkImageAspectFlags aspect)
-	{
-		this->logical_dev = logical_dev;
-
-		VkComponentMapping component_mapping = {};
-		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		VkImageSubresourceRange sub_resource = {};
-		sub_resource.aspectMask = aspect;
-		sub_resource.baseMipLevel = 0;
-		sub_resource.levelCount = img->mip_lvl;
-		sub_resource.baseArrayLayer = 0;
-		sub_resource.layerCount = 1;
-
-		VkImageViewCreateInfo imageview_info = {};
-		imageview_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		imageview_info.image = img->img;
-		imageview_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		imageview_info.format = img->format;
-		imageview_info.components = component_mapping;
-		imageview_info.subresourceRange = sub_resource;
-
-		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
-			"failed to create image view");
-
-		return ErrStack();
-	}
-
-	void ImageView::destroy()
-	{
-		vkDestroyImageView(logical_dev->logical_device, img_view, NULL);
-		img_view = VK_NULL_HANDLE;
-	}
-
-	ImageView::~ImageView()
-	{
-		if (img_view != VK_NULL_HANDLE) {
 			destroy();
 		}
 	}
@@ -650,6 +640,7 @@ namespace vks {
 		this->logical_dev = logical_dev;
 
 		// Descriptions
+		// 3D
 		VkAttachmentDescription color_atach = {};
 		color_atach.format = present_format;
 		color_atach.samples = phys_dev->max_MSAA;
@@ -680,15 +671,27 @@ namespace vks {
 		msaa_resolve_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		msaa_resolve_atach.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+		// UI
 		VkAttachmentDescription ui_color_atach = {};
 		ui_color_atach.format = present_format;
 		ui_color_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		ui_color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		ui_color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		ui_color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		ui_color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		ui_color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		ui_color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ui_color_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		ui_color_atach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		// Composition
+		VkAttachmentDescription compose_atach = {};
+		compose_atach.format = present_format;
+		compose_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		compose_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		compose_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		compose_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		compose_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		compose_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		compose_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 		// Reference
 		VkAttachmentReference g3d_color_attach_ref = {};
@@ -699,59 +702,77 @@ namespace vks {
 		depth_attach_ref.attachment = 1;
 		depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		VkAttachmentReference msaa_resolve_attach_ref = {};
-		msaa_resolve_attach_ref.attachment = 2;
-		msaa_resolve_attach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		VkAttachmentReference msaa_resolve_read_attach_ref = {};
+		msaa_resolve_read_attach_ref.attachment = 2;
+		msaa_resolve_read_attach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 		VkAttachmentReference ui_color_attach_ref = {};
 		ui_color_attach_ref.attachment = 3;
 		ui_color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+		VkAttachmentReference ui_color_read_atach_ref = {};
+		ui_color_read_atach_ref.attachment = 3;
+		ui_color_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkAttachmentReference compose_atach_ref = {};
+		compose_atach_ref.attachment = 4;
+		compose_atach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 		// Attachments
-		std::array<VkAttachmentDescription, 4> attachments = {
+		std::array<VkAttachmentDescription, 5> attachments = {
 			color_atach, depth_atach, msaa_resolve_atach,
-			ui_color_atach
+			ui_color_atach, compose_atach
 		};
 
 		// Subpass Description
-		VkSubpassDescription subpass_descp = {};
-		subpass_descp.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass_descp.colorAttachmentCount = 1;
-		subpass_descp.pColorAttachments = &g3d_color_attach_ref;
-		subpass_descp.pResolveAttachments = &msaa_resolve_attach_ref;
-		subpass_descp.pDepthStencilAttachment = &depth_attach_ref;
+		VkSubpassDescription g3d_subpass = {};
+		g3d_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		g3d_subpass.colorAttachmentCount = 1;
+		g3d_subpass.pColorAttachments = &g3d_color_attach_ref;
+		g3d_subpass.pResolveAttachments = &msaa_resolve_read_attach_ref;
+		g3d_subpass.pDepthStencilAttachment = &depth_attach_ref;
 
-		VkSubpassDescription ui_subpass_descp = {};
-		ui_subpass_descp.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		ui_subpass_descp.inputAttachmentCount = 1;
-		ui_subpass_descp.pInputAttachments = &msaa_resolve_attach_ref;
-		ui_subpass_descp.colorAttachmentCount = 1;
-		ui_subpass_descp.pColorAttachments = &ui_color_attach_ref;
+		// UI
+		VkSubpassDescription ui_subpass = {};
+		ui_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		ui_subpass.colorAttachmentCount = 1;
+		ui_subpass.pColorAttachments = &ui_color_attach_ref;
 
-		std::array<VkSubpassDescription, 2> subpass_descps = {
-			subpass_descp, ui_subpass_descp,
+		// Composition
+		std::array<VkAttachmentReference, 2> input_atachments = {
+			msaa_resolve_read_attach_ref, ui_color_read_atach_ref
+		};
+
+		VkSubpassDescription compose_subpass = {};
+		compose_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		compose_subpass.inputAttachmentCount = (uint32_t)input_atachments.size();
+		compose_subpass.pInputAttachments = input_atachments.data();
+		compose_subpass.colorAttachmentCount = 1;
+		compose_subpass.pColorAttachments = &compose_atach_ref;
+
+		std::array<VkSubpassDescription, 3> subpass_descps = {
+			g3d_subpass, ui_subpass, compose_subpass
 		};
 
 		// Subpass Dependency
-		VkSubpassDependency g3d_depend = {};
-		g3d_depend.srcSubpass = VK_SUBPASS_EXTERNAL;
-		g3d_depend.dstSubpass = 1;
-		g3d_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		g3d_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		g3d_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		g3d_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		VkSubpassDependency g3d_compose_depend = {};
+		g3d_compose_depend.srcSubpass = 0;
+		g3d_compose_depend.dstSubpass = 2;
+		g3d_compose_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		g3d_compose_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		g3d_compose_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		g3d_compose_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-		VkSubpassDependency ui_depend = {};
-		ui_depend.srcSubpass = 0;
-		ui_depend.dstSubpass = VK_SUBPASS_EXTERNAL;
-		ui_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		ui_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		ui_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		ui_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		
+		VkSubpassDependency ui_compose_depend = {};
+		ui_compose_depend.srcSubpass = 1;
+		ui_compose_depend.dstSubpass = 2;
+		ui_compose_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		ui_compose_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		ui_compose_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		ui_compose_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 		std::array<VkSubpassDependency, 2> depends{
-			g3d_depend, ui_depend
+			g3d_compose_depend, ui_compose_depend
 		};
 
 		VkRenderPassCreateInfo renderpass_info = {};
@@ -787,16 +808,17 @@ namespace vks {
 	{
 		this->logical_dev = logical_dev;
 
-		size_t img_count = info.swapchain_views->size();
+		size_t img_count = info.swapchain->images.size();
 		frame_buffs.resize(img_count);
 
 		for (size_t i = 0; i < img_count; i++) {
 
-			std::array<VkImageView, 4> attachments = {
-				info.g3d_color_MSAA_view->img_view,
-				info.g3d_depth_view->img_view,
-				info.g3d_color_resolve_view->img_view,
-				info.swapchain_views[0][i].img_view
+			std::array<VkImageView, 5> attachments = {
+				info.g3d_color_MSAA_img->img_view,
+				info.g3d_depth_img->img_view,
+				info.g3d_color_resolve_img->img_view,
+				info.ui_color_img->img_view,
+				info.swapchain->views[i]
 			};
 
 			VkFramebufferCreateInfo framebuff_info = {};
@@ -913,90 +935,8 @@ namespace vks {
 
 		vkFreeCommandBuffers(logical_dev->logical_device, cmd_pool->cmd_pool, 1, &cmd_buff);
 	}
-
-
-	VkVertexInputBindingDescription GPU_3D_Vertex::getBindingDescription()
-	{
-		VkVertexInputBindingDescription bindingDescription;
-		bindingDescription.binding = 0;
-		bindingDescription.stride = sizeof(GPU_3D_Vertex);
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		return bindingDescription;
-	}
-
-	std::array<VkVertexInputAttributeDescription, 7> GPU_3D_Vertex::getAttributeDescriptions()
-	{
-		std::array<VkVertexInputAttributeDescription, 7> attrs_descp = {};
-
-		attrs_descp[0].binding = 0;
-		attrs_descp[0].location = 0;
-		attrs_descp[0].format = VK_FORMAT_R32_UINT;
-		attrs_descp[0].offset = offsetof(GPU_3D_Vertex, mesh_id);
-
-		attrs_descp[1].binding = 0;
-		attrs_descp[1].location = 1;
-		attrs_descp[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[1].offset = offsetof(GPU_3D_Vertex, pos);
-
-		attrs_descp[2].binding = 0;
-		attrs_descp[2].location = 2;
-		attrs_descp[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[2].offset = offsetof(GPU_3D_Vertex, vertex_normal);
-
-		attrs_descp[3].binding = 0;
-		attrs_descp[3].location = 3;
-		attrs_descp[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[3].offset = offsetof(GPU_3D_Vertex, tess_normal);
-
-		attrs_descp[4].binding = 0;
-		attrs_descp[4].location = 4;
-		attrs_descp[4].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[4].offset = offsetof(GPU_3D_Vertex, poly_normal);
-
-		attrs_descp[5].binding = 0;
-		attrs_descp[5].location = 5;
-		attrs_descp[5].format = VK_FORMAT_R32G32_SFLOAT;
-		attrs_descp[5].offset = offsetof(GPU_3D_Vertex, uv);
-
-		attrs_descp[6].binding = 0;
-		attrs_descp[6].location = 6;
-		attrs_descp[6].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attrs_descp[6].offset = offsetof(GPU_3D_Vertex, color);
-
-		return attrs_descp;
-	}
-
-
-	VkVertexInputBindingDescription GPU_UI_Vertex::getBindingDescription()
-	{
-		VkVertexInputBindingDescription bindingDescription;
-		bindingDescription.binding = 0;
-		bindingDescription.stride = sizeof(GPU_UI_Vertex);
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		return bindingDescription;
-	}
-
-	std::array<VkVertexInputAttributeDescription, 2> GPU_UI_Vertex::getAttributeDescriptions()
-	{
-		std::array<VkVertexInputAttributeDescription, 2> attrs_descp = {};
-
-		attrs_descp[0].binding = 0;
-		attrs_descp[0].location = 0;
-		attrs_descp[0].format = VK_FORMAT_R32G32_SFLOAT;
-		attrs_descp[0].offset = offsetof(GPU_UI_Vertex, pos);
-
-		attrs_descp[1].binding = 0;
-		attrs_descp[1].location = 1;
-		attrs_descp[1].format = VK_FORMAT_R32G32_SFLOAT;
-		attrs_descp[1].offset = offsetof(GPU_UI_Vertex, uv);
-
-		return attrs_descp;
-	}
 	
-	ErrStack Descriptor::create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings,
-		std::vector<VkDescriptorPoolSize>& pool_sizes)
+	ErrStack Descriptor::create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings)
 	{
 		this->logical_dev = logical_dev;
 
@@ -1013,13 +953,19 @@ namespace vks {
 			}
 		}
 
+		std::vector<VkDescriptorPoolSize> pools(bindings.size());
+		for (uint32_t i = 0; i < bindings.size(); i++) {
+			pools[i].type = bindings[i].descriptorType;
+			pools[i].descriptorCount = bindings[i].descriptorCount;
+		}
+
 		// Descriptor Pool
 		{
 			VkDescriptorPoolCreateInfo descp_pool_info = {};
 			descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			descp_pool_info.maxSets = 1;
-			descp_pool_info.poolSizeCount = (uint32_t)(pool_sizes.size());
-			descp_pool_info.pPoolSizes = pool_sizes.data();
+			descp_pool_info.poolSizeCount = (uint32_t)(pools.size());
+			descp_pool_info.pPoolSizes = pools.data();
 
 			VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
 			if (vk_res != VK_SUCCESS) {
@@ -1037,9 +983,18 @@ namespace vks {
 
 			VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
 			if (res != VK_SUCCESS) {
-				return ErrStack(res, code_location, "failed to allocate descriptor sets");
+				return ErrStack(res, code_location, "failed to allocate descriptor sizes");
 			}
 		}
+
+		return ErrStack();
+	}
+
+	ErrStack Descriptor::setDebugName(std::string name)
+	{
+		checkErrStack1(logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(descp_set), VK_OBJECT_TYPE_DESCRIPTOR_SET, 
+			name + " VkDescriptorSet"));
 
 		return ErrStack();
 	}

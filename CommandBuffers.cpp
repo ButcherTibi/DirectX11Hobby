@@ -6,8 +6,12 @@
 #include "VulkanSystems.h"
 
 
-ErrStack vks::RenderingComandBuffers::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count)
+ErrStack vks::RenderingComandBuffers::recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count)
 {
+	if (this->cmd_buff_tasks.size()) {
+		destroy();
+	}
+
 	this->logical_dev = logical_dev;
 
 	cmd_buff_tasks.resize((size_t)count);
@@ -62,7 +66,7 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 {
 	std::atomic_bool is_err = false;
 
-	std::for_each(std::execution::par, cmd_buff_tasks.begin(), cmd_buff_tasks.end(), 
+	std::for_each(std::execution::seq, cmd_buff_tasks.begin(), cmd_buff_tasks.end(), 
 		[this, &is_err, info](CmdBufferTask& task) {
 
 		VkCommandBufferBeginInfo buffer_begin_info = {};
@@ -84,11 +88,12 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 		renderpass_begin_info.renderArea.extent.height = info.height;
 
 		// Clear Values
-		clear_vals.resize(4);	
-		clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		std::array<VkClearValue, 5> clear_vals;
+		clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		clear_vals[1].depthStencil.depth = 1;
-		clear_vals[2].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-		clear_vals[3].color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		clear_vals[2].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		clear_vals[3].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		clear_vals[4].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		renderpass_begin_info.clearValueCount = (uint32_t)clear_vals.size();
 		renderpass_begin_info.pClearValues = clear_vals.data();
 
@@ -121,7 +126,25 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 				VkDeviceSize offsets[] = { 0 };
 				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffs, offsets);
 
-				vkCmdDraw(task.cmd_buff, info.ui_vertex_count, 1, 0, 0);
+				for (UI_DrawBatch& batch : *info.ui_draw_batches) {
+
+					if (batch.inst_count) {
+						vkCmdDraw(task.cmd_buff, batch.vert_count, batch.inst_count,
+							batch.vert_idx_start, batch.inst_idx_start);
+					}
+				}
+			}
+
+			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
+
+			// Compose Subpass
+			{
+				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					info.compose_pipe_layout->pipe_layout, 0, 1, &info.compose_descp->descp_set, 0, NULL);
+
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.compose_pipe->pipeline);
+
+				vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 			}
 		}
 		vkCmdEndRenderPass(task.cmd_buff);

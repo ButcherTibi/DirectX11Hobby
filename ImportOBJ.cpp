@@ -7,7 +7,7 @@
 #include "Importer.h"
 
 
-ErrStack importOBJMeshes(Path path, std::vector<LinkageMesh>& meshes)
+ErrStack importOBJMeshes(FileSysPath path, std::vector<LinkageMesh>& meshes)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;

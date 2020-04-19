@@ -52,8 +52,12 @@ vks::PipelineLayout::~PipelineLayout()
 	}
 }
 
-ErrStack vks::ShaderModule::create(LogicalDevice* logical_dev, std::vector<char>& code, VkShaderStageFlagBits stage)
+ErrStack vks::ShaderModule::recreate(LogicalDevice* logical_dev, std::vector<char>& code, VkShaderStageFlagBits stage)
 {
+	if (this->sh_module != VK_NULL_HANDLE) {
+		destroy();
+	}
+
 	this->logical_dev = logical_dev;
 	this->stage = stage;
 
@@ -66,6 +70,14 @@ ErrStack vks::ShaderModule::create(LogicalDevice* logical_dev, std::vector<char>
 	if (res != VK_SUCCESS) {
 		return ErrStack(res, code_location, "failed to create shader module");
 	}
+	return ErrStack();
+}
+
+ErrStack vks::ShaderModule::setDebugName(std::string name)
+{
+	checkErrStack1(logical_dev->setDebugName(
+		reinterpret_cast<uint64_t>(sh_module), VK_OBJECT_TYPE_DESCRIPTOR_SET, name));
+
 	return ErrStack();
 }
 
@@ -87,116 +99,13 @@ vks::GraphicsPipeline::GraphicsPipeline()
 	
 }
 
-void vks::GraphicsPipeline::configureFor3D()
+void vks::GraphicsPipeline::setToDefault()
 {
 	// Vertex input state
 	{
-		vertex_input_binding_descp = GPU_3D_Vertex::getBindingDescription();
-
-		for (auto& atribute_descp : GPU_3D_Vertex::getAttributeDescriptions()) {
-			vertex_input_atribute_descp.push_back(atribute_descp);
-		}
-
 		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vert_input_stage_info.vertexBindingDescriptionCount = 1;
-		vert_input_stage_info.pVertexBindingDescriptions = &vertex_input_binding_descp;
-		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descp.size();
-		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descp.data();
-	}
-
-	// Input Assembly state
-	{
-		input_assembly_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		input_assembly_state_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		input_assembly_state_info.primitiveRestartEnable = VK_FALSE;
-	}
-
-	// Viewport state 
-	{
-		viewport.x = 0.0f;
-		viewport.y = 0.0f;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-
-		scissor.offset = { 0, 0 };
-
-		viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		viewport_state_info.viewportCount = 1;
-		viewport_state_info.pViewports = &viewport;
-		viewport_state_info.scissorCount = 1;
-		viewport_state_info.pScissors = &scissor;
-	}
-
-	// Rasterization state
-	{
-		raster_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		raster_state_info.depthClampEnable = VK_FALSE;
-		raster_state_info.rasterizerDiscardEnable = VK_FALSE;
-		raster_state_info.polygonMode = VK_POLYGON_MODE_FILL;
-		raster_state_info.cullMode = VK_CULL_MODE_NONE;
-		raster_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		raster_state_info.depthBiasEnable = VK_FALSE;
-		raster_state_info.lineWidth = 1.0f;  // unused
-	}
-
-	// Multisample state
-	{
-		multisample_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		multisample_state_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-		multisample_state_info.sampleShadingEnable = VK_FALSE;
-	}
-
-	// Depth Stencil
-	{
-		depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		depth_stencil_state_info.depthTestEnable = VK_TRUE;
-		depth_stencil_state_info.depthWriteEnable = VK_TRUE;
-		depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS;
-		depth_stencil_state_info.depthBoundsTestEnable = VK_FALSE;
-		depth_stencil_state_info.stencilTestEnable = VK_FALSE;
-	}
-
-	// Color Blending state
-	{
-		VkPipelineColorBlendAttachmentState color_blend_attachment;
-		color_blend_attachment.blendEnable = VK_FALSE;
-		color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-		color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
-		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-		color_blend_attachments = { color_blend_attachment };
-
-		color_blend_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		color_blend_state_info.logicOpEnable = VK_FALSE;
-		color_blend_state_info.logicOp = VK_LOGIC_OP_NO_OP;
-		color_blend_state_info.attachmentCount = (uint32_t)color_blend_attachments.size();
-		color_blend_state_info.pAttachments = color_blend_attachments.data();
-		color_blend_state_info.blendConstants[0] = 0.0f;
-		color_blend_state_info.blendConstants[1] = 0.0f;
-		color_blend_state_info.blendConstants[2] = 0.0f;
-		color_blend_state_info.blendConstants[3] = 0.0f;
-	}
-}
-
-void vks::GraphicsPipeline::configureForUserInterface()
-{
-	// Vertex input state
-	{
-		vertex_input_binding_descp = GPU_UI_Vertex::getBindingDescription();
-
-		for (auto& atribute_descp : GPU_UI_Vertex::getAttributeDescriptions()) {
-			vertex_input_atribute_descp.push_back(atribute_descp);
-		}
-
-		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vert_input_stage_info.vertexBindingDescriptionCount = 1;
-		vert_input_stage_info.pVertexBindingDescriptions = &vertex_input_binding_descp;
-		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descp.size();
-		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descp.data();
+		vert_input_stage_info.vertexBindingDescriptionCount = 0;
+		vert_input_stage_info.vertexAttributeDescriptionCount = 0;
 	}
 
 	// Input Assembly state
@@ -277,9 +186,59 @@ void vks::GraphicsPipeline::configureForUserInterface()
 	}
 }
 
-ErrStack vks::GraphicsPipeline::create(LogicalDevice* logical_dev, ShaderModule* vertex_module, ShaderModule* frag_module,
+void vks::GraphicsPipeline::configureFor3D()
+{
+	// Vertex input state
+	{
+		vertex_input_binding_descp = GPU_3D_Vertex::getBindingDescription();
+
+		for (auto& atribute_descp : GPU_3D_Vertex::getAttributeDescriptions()) {
+			vertex_input_atribute_descp.push_back(atribute_descp);
+		}
+
+		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_stage_info.vertexBindingDescriptionCount = 1;
+		vert_input_stage_info.pVertexBindingDescriptions = &vertex_input_binding_descp;
+		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descp.size();
+		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descp.data();
+	}
+
+	// Depth Stencil
+	{
+		depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depth_stencil_state_info.depthTestEnable = VK_TRUE;
+		depth_stencil_state_info.depthWriteEnable = VK_TRUE;
+		depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS;
+		depth_stencil_state_info.depthBoundsTestEnable = VK_FALSE;
+		depth_stencil_state_info.stencilTestEnable = VK_FALSE;
+	}
+}
+
+void vks::GraphicsPipeline::configureForUserInterface()
+{
+	// Vertex input state
+	{
+		vertex_input_binding_descp = GPU_UI_Vertex::getBindingDescription();
+
+		for (auto& atribute_descp : GPU_UI_Vertex::getAttributeDescriptions()) {
+			vertex_input_atribute_descp.push_back(atribute_descp);
+		}
+
+		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_stage_info.vertexBindingDescriptionCount = 1;
+		vert_input_stage_info.pVertexBindingDescriptions = &vertex_input_binding_descp;
+		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descp.size();
+		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descp.data();
+	}
+}
+
+ErrStack vks::GraphicsPipeline::recreate(LogicalDevice* logical_dev, ShaderModule* vertex_module, ShaderModule* frag_module,
 	uint32_t width, uint32_t height, PipelineLayout* pipe_layout, Renderpass* renderpass, uint32_t subpass_idx)
 {
+	if (this->pipeline != VK_NULL_HANDLE) {
+		destroy();
+	}
+
 	this->logical_dev = logical_dev;
 
 	// Shader Stage

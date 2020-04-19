@@ -3,7 +3,7 @@
 
 #include "MathTypes.h"
 #include "stb_image.h"
-#include "UserInterface.h"
+#include "TextRendering.h"
 
 // Header
 #include "Renderer.h"
@@ -28,9 +28,288 @@ glm::vec3 Camera::forward()
 	return glm::normalize(rotatePos({ 0.0f, 0.0f, -1.0f }, glm::inverse(rotation)));
 }
 
-void BasicBitmap::calcMemSize()
+void Camera::rotateCameraUpLocked(float delta_pitch, float delta_yaw)
 {
-	this->mem_size = width * height * channels;
+	float pitch_rad = glm::radians(delta_pitch);
+	float yaw_rad = glm::radians(delta_yaw);
+
+	rotation = rotateQuat(rotation, pitch_rad, right());
+	rotation = glm::normalize(rotation);
+	rotation = rotateQuat(rotation, yaw_rad, { 0, 1, 0 });
+	rotation = glm::normalize(rotation);
+}
+
+void Camera::orbitCameraArcball(glm::vec3 center, float delta_pitch, float delta_yaw)
+{
+	glm::vec3 right_axis = right();
+	glm::vec3 up_axis = up();
+
+	float pitch_rad = glm::radians(delta_pitch);
+	float yaw_rad = glm::radians(delta_yaw);
+
+	// Orbit Position
+	position = rotatePos(position, -pitch_rad, right_axis, center);
+	position = rotatePos(position, -yaw_rad, up_axis, center);
+
+	// Make camera point at center
+	rotation = rotateQuat(rotation, pitch_rad, right_axis);
+	rotation = glm::normalize(rotation);
+	rotation = rotateQuat(rotation, yaw_rad, up_axis);
+	rotation = glm::normalize(rotation);
+}
+
+void Camera::zoomCamera(glm::vec3 center, float zoom)
+{
+	float dist = glm::distance(center, position);
+	float amount = dist * zoom;
+
+	glm::vec3 cam_forward = forward();
+	glm::vec3 cam_pos = position + cam_forward * amount;
+
+	// only move camera if center is not behind
+	if (glm::dot(cam_pos - center, cam_forward) < 0) {
+		position = cam_pos;
+	}
+	// TODO: make camera stop at exactly dot == 0
+}
+
+void Camera::panCamera(float delta_vertical, float delta_horizontal)
+{
+	position += up() * delta_vertical;
+	position += right() * -delta_horizontal;
+}
+
+ErrStack Renderer::create3D_DiffuseTexture(BasicBitmap& mesh_diffuse)
+{
+	std::vector<vks::DesiredImageProps> props(1);
+	props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+	vks::ImageCreateInfo info = {};
+	info.desired_props = &props;
+	info.width = mesh_diffuse.width;
+	info.height = mesh_diffuse.height;
+	info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+	checkErrStack(mesh_diffuse_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+		"failed to create texture image");
+	checkErrStack(mesh_diffuse_img.setDebugName("mesh diffuse texture"), "");
+
+	// Load Bitmap into Image
+	checkErrStack1(staging_buff.recreateStaging(&logical_dev, mesh_diffuse.calcMemSize()));
+
+	checkErrStack(mesh_diffuse_img.load(mesh_diffuse.colors.data(), mesh_diffuse.calcMemSize(),
+		&cmd_pool, &staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+		"failed to load pixels into image");
+
+	return ErrStack();
+}
+
+ErrStack Renderer::recreate3D_MeshBuffers(std::vector<LinkageMesh>& meshes)
+{
+	std::vector<GPU_3D_Vertex> gpu_3d_verts;
+	std::vector<GPU_3D_Instance> gpu_3d_storage;
+
+	// calculate sizes
+	size_t vertex_buff_size;
+	size_t storage_buff_size;
+	{
+		uint32_t total_idxs_size = 0;
+
+		for (LinkageMesh& mesh : meshes) {
+
+			total_idxs_size += mesh.ttris_count * 3;
+		}
+
+		gpu_3d_verts.resize(total_idxs_size);
+		gpu_3d_storage.resize(meshes.size());
+
+		vertex_buff_size = gpu_3d_verts.size() * sizeof(GPU_3D_Vertex);
+		storage_buff_size = gpu_3d_storage.size() * sizeof(GPU_3D_Instance);
+
+		g3d_vertex_count = total_idxs_size;
+	}
+
+	size_t staging_size = vertex_buff_size > storage_buff_size ? vertex_buff_size : storage_buff_size;
+	checkErrStack1(staging_buff.recreateStaging(&logical_dev, staging_size));
+
+	checkErrStack(g3d_vertex_buff.recreate(&logical_dev, vertex_buff_size,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY),
+		"failed to recreate 3D vertex buffer");
+
+	checkErrStack(g3d_storage_buff.recreate(&logical_dev, storage_buff_size,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY),
+		"failed to recreate 3D storage buffer");
+
+	// Extract Data
+	uint64_t vert_idx = 0;
+
+	for (uint64_t mesh_idx = 0; mesh_idx < meshes.size(); mesh_idx++) {
+
+		LinkageMesh& mesh = meshes[mesh_idx];
+
+		for (Poly& p : mesh.polys) {
+			for (TesselationTris& t : p.tess_tris) {
+				for (Vertex* v : t.vs) {
+
+					GPU_3D_Vertex& gpu_v = gpu_3d_verts[vert_idx];
+
+					// Vertex
+					gpu_v.mesh_id = (uint32_t)mesh_idx;
+					gpu_v.pos = v->pos;
+					gpu_v.vertex_normal = v->normal;
+					gpu_v.tess_normal = t.normal;
+					gpu_v.poly_normal = p.normal;
+					gpu_v.uv = v->uv;
+					gpu_v.color = v->color;
+					vert_idx++;
+				}
+			}
+		}
+
+		// Mesh Data
+		GPU_3D_Instance& gpu_mesh = gpu_3d_storage[mesh_idx];
+		gpu_mesh.pos = mesh.position;
+		gpu_mesh.rot.data = mesh.rotation.data;  // same order x,y,z,w
+	}
+
+	// Load extracted data
+	checkErrStack(g3d_vertex_buff.load(&cmd_pool, &staging_buff,
+		gpu_3d_verts.data(), vertex_buff_size),
+		"failed to load 3D vertices");
+
+	checkErrStack(g3d_storage_buff.load(&cmd_pool, &staging_buff,
+		gpu_3d_storage.data(), storage_buff_size),
+		"failed to load storage data");
+
+	return ErrStack();
+}
+
+ErrStack Renderer::recreate3D_UniformBuffer(Camera& camera)
+{
+	size_t uniform_buff_size = sizeof(GPU_3D_Uniform);
+
+	checkErrStack1(staging_buff.recreateStaging(&logical_dev, uniform_buff_size));
+
+	checkErrStack(g3d_uniform_buff.recreate(&logical_dev, uniform_buff_size,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_CPU_TO_GPU),
+		"failed to recreate 3D uniform buffer");
+
+	// extract data
+	GPU_3D_Uniform gpu_uniform;
+	gpu_uniform.camera_pos = camera.position;
+	gpu_uniform.camera_rot.data = camera.rotation.data;
+
+	// conform aspect ratio to render resolution
+	float width = (float)swapchain.resolution.width;
+	float height = (float)swapchain.resolution.height;
+
+	gpu_uniform.camera_perspective = glm::perspectiveFovRH_ZO(
+		glm::radians(camera.fov), width, height,
+		camera.near_plane, camera.far_plane);
+
+	gpu_uniform.camera_forward = camera.forward();
+
+	// load
+	checkErrStack(g3d_uniform_buff.load(&cmd_pool, &staging_buff,
+		&gpu_uniform, g3d_uniform_buff.buff_alloc_info.size), "");
+
+	return ErrStack();
+}
+
+ErrStack Renderer::recreateUI_MeshBuffers(TextStuff& txt_rend)
+{
+	// calculate sizes
+	size_t vertex_buff_size = txt_rend.char_meshs.size() * 6 * sizeof(GPU_UI_Vertex);
+	size_t storage_buff_size = 0;
+	{
+		ui_batches.resize(txt_rend.char_meshs.size());
+
+		for (CharacterMesh& mesh : txt_rend.char_meshs) {
+			storage_buff_size += mesh.instances.size() * sizeof(GPU_UI_Instance);
+		}
+	}
+
+	size_t staging_size = vertex_buff_size > storage_buff_size ? vertex_buff_size : storage_buff_size;
+	checkErrStack1(staging_buff.recreateStaging(&logical_dev, staging_size));
+
+	checkErrStack(ui_vertex_buff.recreate(&logical_dev, vertex_buff_size,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY),
+		"failed to recreate UI vertex buffer");
+
+	checkErrStack(ui_storage_buff.recreate(&logical_dev, storage_buff_size,
+		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		VMA_MEMORY_USAGE_GPU_ONLY),
+		"failed to recreate UI storage buffer");
+
+	// Transfer Vertices To Vertex Buffer
+	uint32_t batch_idx = 0;
+	uint32_t vert_count = 0;
+
+	for (CharacterMesh& mesh : txt_rend.char_meshs) {
+
+		UI_DrawBatch& batch = ui_batches[batch_idx++];
+		batch.vert_count = 6;
+		batch.vert_idx_start = vert_count;
+
+		std::array<GPU_UI_Vertex, 6> gpu_verts;
+		gpu_verts[0].local_pos = mesh.verts[0];
+		gpu_verts[1].local_pos = mesh.verts[1];
+		gpu_verts[2].local_pos = mesh.verts[3];
+
+		gpu_verts[3].local_pos = mesh.verts[1];
+		gpu_verts[4].local_pos = mesh.verts[2];
+		gpu_verts[5].local_pos = mesh.verts[3];
+
+		for (uint32_t i = 0; i < gpu_verts.size(); i++) {
+			gpu_verts[i].local_vert_idx = i;
+		}
+
+		ui_vertex_buff.scheduleLoad(vert_count * sizeof(GPU_UI_Vertex), &staging_buff,
+			gpu_verts.data(), gpu_verts.size() * sizeof(GPU_UI_Vertex));
+
+		vert_count += batch.vert_count;
+	}
+	checkErrStack(ui_vertex_buff.flush(&cmd_pool, &staging_buff),
+		"failed to flush UI vertex buffer content");
+
+	// Transfer Instances To Storage Buffer
+	batch_idx = 0;
+	uint32_t inst_count = 0;
+
+	for (CharacterMesh& mesh : txt_rend.char_meshs) {
+
+		UI_DrawBatch& batch = ui_batches[batch_idx++];
+		batch.inst_count = (uint32_t)mesh.instances.size();
+		batch.inst_idx_start = inst_count;
+
+		for (CharacterInstance& inst : mesh.instances) {
+
+			GPU_UI_Instance gpu_inst;
+			gpu_inst.pos = inst.screen_pos;
+			gpu_inst.scale = inst.scale;
+
+			gpu_inst.uvs[0] = inst.zone->bb_uv.getTopLeft();
+			gpu_inst.uvs[1] = inst.zone->bb_uv.getTopRight();
+			gpu_inst.uvs[2] = inst.zone->bb_uv.getBotLeft();
+
+			gpu_inst.uvs[3] = inst.zone->bb_uv.getTopRight();
+			gpu_inst.uvs[4] = inst.zone->bb_uv.getBotRight();
+			gpu_inst.uvs[5] = inst.zone->bb_uv.getBotLeft();
+
+			ui_storage_buff.scheduleLoad(inst_count * sizeof(GPU_UI_Instance), &staging_buff,
+				&gpu_inst, sizeof(GPU_UI_Instance));
+
+			inst_count++;
+		}
+	}
+	checkErrStack(ui_storage_buff.flush(&cmd_pool, &staging_buff),
+		"failed to flush UI storage buffer content");
+
+	return ErrStack();
 }
 
 Renderer::Renderer()
@@ -38,217 +317,200 @@ Renderer::Renderer()
 
 }
 
-ErrStack Renderer::create(RendererCreateInfo& render_info)
+struct UpdateVulkanObjects {
+	bool instance;
+	bool surface;
+	bool phys_dev;
+	bool logical_dev;
+	bool cmd_pool;
+	bool staging_buff;
+
+	// Frame
+	bool swapchain;
+	bool g3d_color_MSAA_img;
+	bool g3d_depth_img;
+	bool g3d_resolve_img;
+	bool ui_color_img;
+	bool renderpass;
+	bool framebuffs;
+
+	// 3D
+	bool g3d_descp_layout;
+	bool g3d_mesh_diffuse_tex;
+	bool g3d_mesh_diffuse_sampler;
+	bool g3d_vertex_buff;
+	bool g3d_storage_buff;
+	bool g3d_uniform_buff;
+	bool g3d_vertex_shader;
+	bool g3d_fragment_shader;
+	bool g3d_pipe_layout;
+	bool g3d_pipe;
+	bool g3d_descp_set_write;
+
+	// UI
+	bool ui_descp_layout;
+	bool ui_char_atlas_tex;
+	bool ui_char_atlas_sampler;
+	bool ui_vertex_buff;
+	bool ui_storage_buff;
+	bool ui_vertex_shader;
+	bool ui_fragment_shader;
+	bool ui_pipe_layout;
+	bool ui_pipe;
+	bool ui_descp_set_write;
+
+	// Composition
+	bool comp_descp_layout;
+	bool comp_vertex_shader;
+	bool comp_fragment_shader;
+	bool comp_pipe_layout;
+	bool comp_pipe;
+	bool comp_descp_set_write;
+
+	// Command Buffers
+	bool cmd_buffs;
+	bool cmd_buffs_update;
+
+	// Sync
+	bool present_img_acquired_sem;
+	bool rendering_ended_sem;
+};
+
+ErrStack Renderer::recreate(RenderingContent& content)
 {
-	checkErrStack(instance.create(), "");
-	checkErrStack(surface.create(&instance, render_info.hinstance, render_info.hwnd), "");
-	checkErrStack(phys_dev.create(&instance, &surface), "");
-	checkErrStack(logical_dev.create(&instance, &phys_dev), "");
-	checkErrStack(swapchain.create(&surface, &phys_dev, &logical_dev, render_info.width, render_info.height), "");
-
-	checkErrStack(cmd_pool.create(&logical_dev, &phys_dev), "");
-
-	// Images
-	{
-		// 3D color multisample
-		{
-			std::vector<vks::DesiredImageProps> g3d_color_MSAA_props(1);
-			g3d_color_MSAA_props[0].format = swapchain.surface_format.format;
-			g3d_color_MSAA_props[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-			vks::ImageCreateInfo info = {};
-			info.desired_props = &g3d_color_MSAA_props;
-			info.width = swapchain.resolution.width;
-			info.height = swapchain.resolution.height;
-			info.samples = phys_dev.max_MSAA;
-			checkErrStack(g3d_color_MSAA_img.create(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create image for 3D color MSAA");
-		}
-
-		// Depth
-		{
-			std::vector<vks::DesiredImageProps> depth_props(1);
-			depth_props[0].format = VK_FORMAT_D32_SFLOAT;
-			depth_props[0].usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-			vks::ImageCreateInfo img_create_info = {};
-			img_create_info.desired_props = &depth_props;
-			img_create_info.width = swapchain.resolution.width;
-			img_create_info.height = swapchain.resolution.height;
-			img_create_info.samples = phys_dev.max_MSAA;
-			checkErrStack(g3d_depth_img.create(&logical_dev, &phys_dev, img_create_info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create depth image");
-		}
-		
-		// 3D Color Resolve
-		{
-			std::vector<vks::DesiredImageProps> msaa_props(1);
-			msaa_props[0].format = swapchain.surface_format.format;
-			msaa_props[0].usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-
-			vks::ImageCreateInfo msaa_img_info = {};
-			msaa_img_info.desired_props = &msaa_props;
-			msaa_img_info.width = swapchain.resolution.width;
-			msaa_img_info.height = swapchain.resolution.height;
-			checkErrStack(g3d_color_resolve_img.create(&logical_dev, &phys_dev, msaa_img_info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create MSAA image");
-		}		
-
-		// Swapchain Images
-		swapchain_images = swapchain.images;
-
-		// Model texture
-		{
-			std::vector<vks::DesiredImageProps> props(1);
-			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-			vks::ImageCreateInfo info = {};
-			info.desired_props = &props;
-			info.width = mesh_difuse.width;
-			info.height = mesh_difuse.height;
-
-			checkErrStack(tex_img.create(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create texture image");
-
-			checkErrStack(tex_img.load(mesh_difuse.colors.data(), mesh_difuse.mem_size, &cmd_pool, &staging_buff),
-				"failed to load pixels into image");
-
-			checkErrStack(vks::changeImageLayout(&logical_dev, &cmd_pool, &tex_img,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), "");
-		}
-
-		// UI Atlas
-		{
-			std::vector<vks::DesiredImageProps> props(1);
-			props[0].format = VK_FORMAT_R8_UNORM;
-			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-			vks::ImageCreateInfo info = {};
-			info.desired_props = &props;
-			info.width = symbol_atlas.width;
-			info.height = symbol_atlas.height;
-
-			checkErrStack(ui_symbol_atlas_img.create(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create symbol atlas image");
-
-			checkErrStack(ui_symbol_atlas_img.load(symbol_atlas.colors.data(), symbol_atlas.mem_size, &cmd_pool, &staging_buff),
-				"failed to load pixels into symbol atlas image");
-
-			vks::changeImageLayout(&logical_dev, &cmd_pool, &ui_symbol_atlas_img,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		}
+	if (instance.instance == VK_NULL_HANDLE) {
+		checkErrStack1(instance.create());
 	}
 
-	// Image Views
-	{
-		swapchain_img_views.resize(swapchain_images.size());
-		for (size_t i = 0; i < swapchain_img_views.size(); i++) {
-			checkErrStack(swapchain_img_views[i].createPresentView(&logical_dev, swapchain_images[i],
-				swapchain.surface_format.format, VK_IMAGE_ASPECT_COLOR_BIT), "");
-		}
-
-		checkErrStack(g3d_color_MSAA_view.create(&logical_dev, &g3d_color_MSAA_img, VK_IMAGE_ASPECT_COLOR_BIT), "");
-		checkErrStack(g3d_depth_view.create(&logical_dev, &g3d_depth_img, VK_IMAGE_ASPECT_DEPTH_BIT), "");		
-		checkErrStack(g3d_color_resolve_view.create(&logical_dev, &g3d_color_resolve_img, VK_IMAGE_ASPECT_COLOR_BIT), "");
-
-		// Texture
-		checkErrStack(tex_view.create(&logical_dev, &tex_img, VK_IMAGE_ASPECT_COLOR_BIT), "");
-		checkErrStack(ui_symbol_atlas_view.create(&logical_dev, &ui_symbol_atlas_img, VK_IMAGE_ASPECT_COLOR_BIT), "");
-	}
-	
-	// Samplers
-	{
-		// Texture Sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.anisotropyEnable = VK_TRUE;
-			info.maxAnisotropy = 16;
-			info.compareEnable = VK_FALSE;
-			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-			checkErrStack(sampler.create(&logical_dev, info), "");
-		}
-		
-		// UI Symbol Sampler
-		{
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_NEAREST;
-			info.minFilter = VK_FILTER_NEAREST;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.anisotropyEnable = VK_FALSE;
-			info.compareEnable = VK_FALSE;
-			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-			checkErrStack(ui_symbol_sampler.create(&logical_dev, info), "");
-		}
+	if (surface.surface == VK_NULL_HANDLE) {
+		checkErrStack1(surface.create(&instance, *content.hinstance, *content.hwnd));
 	}
 
-	// Renderpass
-	{
-		checkErrStack(renderpass.create(&logical_dev, &phys_dev, swapchain.surface_format.format, g3d_depth_img.format), 
+	if (phys_dev.physical_device == VK_NULL_HANDLE) {
+		checkErrStack1(phys_dev.create(&instance, &surface));
+	}
+
+	if (logical_dev.logical_device == VK_NULL_HANDLE) {
+		checkErrStack1(logical_dev.create(&instance, &phys_dev));
+	}
+
+	if (cmd_pool.cmd_pool == VK_NULL_HANDLE) {
+		checkErrStack1(cmd_pool.create(&logical_dev, &phys_dev));
+	}
+
+	if (staging_buff.buff == VK_NULL_HANDLE) {
+		checkErrStack1(staging_buff.recreateStaging(&logical_dev, 1));
+		checkErrStack1(staging_buff.setDebugName("staging"));
+	}
+
+	if (swapchain.swapchain == VK_NULL_HANDLE) {
+		checkErrStack1(swapchain.create(&surface, &phys_dev, &logical_dev,
+			content.width, content.height));
+		checkErrStack1(swapchain.setDebugName("swapchain"));
+	}
+
+	std::vector<vks::DesiredImageProps> props;
+
+	// 3D color multisample
+	if (g3d_color_MSAA_img.img == VK_NULL_HANDLE) {
+
+		props.resize(1);
+		props[0].format = swapchain.surface_format.format;
+		props[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+		vks::ImageCreateInfo info = {};
+		info.desired_props = &props;
+		info.width = swapchain.resolution.width;
+		info.height = swapchain.resolution.height;
+		info.samples = phys_dev.max_MSAA;
+		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		checkErrStack(g3d_color_MSAA_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+			"failed to create image for 3D color MSAA");
+
+		checkErrStack(g3d_color_MSAA_img.setDebugName("3D color MSAA"), "");
+	}
+
+	// 3D Depth
+	if (g3d_depth_img.img == VK_NULL_HANDLE) {
+
+		props.resize(1);
+		props[0].format = VK_FORMAT_D32_SFLOAT;
+		props[0].usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+		vks::ImageCreateInfo info = {};
+		info.desired_props = &props;
+		info.width = swapchain.resolution.width;
+		info.height = swapchain.resolution.height;
+		info.samples = phys_dev.max_MSAA;
+		info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+		checkErrStack(g3d_depth_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+			"failed to create image for 3D depth");
+
+		checkErrStack(g3d_depth_img.setDebugName("3D depth"), "")
+	}
+
+	// 3D Color Resolve
+	if (g3d_color_resolve_img.img == VK_NULL_HANDLE) {
+
+		props.resize(1);
+		props[0].format = swapchain.surface_format.format;
+		props[0].usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+		vks::ImageCreateInfo info = {};
+		info.desired_props = &props;
+		info.width = swapchain.resolution.width;
+		info.height = swapchain.resolution.height;
+		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		checkErrStack(g3d_color_resolve_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+			"failed to create image for 3D color resolve");
+
+		checkErrStack(g3d_color_resolve_img.setDebugName("3D color resolve"), "");
+	}
+
+	// UI Color
+	if (ui_color_img.img == VK_NULL_HANDLE) {
+
+		props.resize(1);
+		props[0].format = swapchain.surface_format.format;
+		props[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+
+		vks::ImageCreateInfo info = {};
+		info.desired_props = &props;
+		info.width = swapchain.resolution.width;
+		info.height = swapchain.resolution.height;
+		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		checkErrStack(ui_color_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+			"failed to create image for UI color");
+
+		checkErrStack(ui_color_img.setDebugName("UI color"), "");
+	}
+
+
+	if (renderpass.renderpass == VK_NULL_HANDLE) {
+
+		checkErrStack(renderpass.create(&logical_dev, &phys_dev, 
+			swapchain.surface_format.format, g3d_depth_img.format),
 			"failed to create renderpass");
 	}
 
-	// Framebuffers
-	{
+	if (!frame_buffs.frame_buffs.size()) {
+
 		vks::FrameBufferCreateInfo framebuffs_info = {};
-		framebuffs_info.g3d_color_MSAA_view = &g3d_color_MSAA_view;
-		framebuffs_info.g3d_depth_view = &g3d_depth_view;
-		framebuffs_info.g3d_color_resolve_view = &g3d_color_resolve_view;
-		framebuffs_info.swapchain_views = &swapchain_img_views;
+		framebuffs_info.g3d_color_MSAA_img = &g3d_color_MSAA_img;
+		framebuffs_info.g3d_depth_img = &g3d_depth_img;
+		framebuffs_info.g3d_color_resolve_img = &g3d_color_resolve_img;
+		framebuffs_info.ui_color_img = &ui_color_img;
+		framebuffs_info.swapchain = &swapchain;
 
-		checkErrStack(frame_buffs.create(&logical_dev, framebuffs_info, &renderpass,
-			swapchain.resolution.width, swapchain.resolution.height), "");
-	}
-	
-	// Buffers
-	{
-		size_t uniform_buff_size = sizeof(vks::GPUUniform);
-		size_t vertex_buff_size = sizeof(vks::GPU_3D_Vertex) * gpu_3d_verts.size();
-		size_t storage_buff_size = sizeof(vks::GPUMeshProperties) * gpu_storage.size();
-		size_t ui_vertex_size = sizeof(vks::GPU_3D_Vertex) * gpu_ui_verts.size();
-
-		// Staging
-		{
-			std::array<size_t, 4> resource_sizes = {
-			uniform_buff_size, vertex_buff_size, storage_buff_size,
-			ui_vertex_size
-			};
-			size_t staging_size = *std::max_element(resource_sizes.begin(), resource_sizes.end());
-
-			checkErrStack(staging_buff.createOrGrowStaging(&logical_dev, staging_size), "");
-		}	
-
-		checkErrStack(uniform_buff.create(&logical_dev, uniform_buff_size,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU), "");
-		checkErrStack(vertex_buff.create(&logical_dev, vertex_buff_size,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU), "");
-		checkErrStack(storage_buff.create(&logical_dev, storage_buff_size,
-			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY), "");
-		
-		// User Interface
-		checkErrStack(ui_vertex_buff.create(&logical_dev, ui_vertex_size,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY), "");	
+		checkErrStack1(frame_buffs.create(&logical_dev, framebuffs_info, &renderpass,
+			swapchain.resolution.width, swapchain.resolution.height));
 	}
 
-	// 3D Pipeline
+	// 3D Subpass
 	{
-		// Descriptor
-		{
-			// Descriptor Layout
+		if (g3d_descp.descp_pool == VK_NULL_HANDLE) {
+
 			std::vector<VkDescriptorSetLayoutBinding> bindings(3);
-
 			bindings[0].binding = 0;
 			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			bindings[0].descriptorCount = 1;
@@ -267,341 +529,427 @@ ErrStack Renderer::create(RendererCreateInfo& render_info)
 			bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			bindings[2].pImmutableSamplers = NULL;
 
-			// Descriptor Pool
-			std::vector<VkDescriptorPoolSize> pool_sizes(3);
-			pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			pool_sizes[0].descriptorCount = 1;  // swapchain image count ???
-
-			pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			pool_sizes[1].descriptorCount = 1;
-
-			pool_sizes[2].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			pool_sizes[2].descriptorCount = 1;
-
-			checkErrStack(g3d_descp.create(&logical_dev, bindings, pool_sizes),
-				"failed to create descriptor");
-
-			// Descriptor Set
-			std::vector<vks::DescriptorWrite> descp_writes(3);
-
-			VkDescriptorBufferInfo uniform_buff_info = {};
-			uniform_buff_info.buffer = uniform_buff.buff;
-			uniform_buff_info.offset = 0;
-			uniform_buff_info.range = uniform_buff.buff_alloc_info.size;
-
-			descp_writes[0].dstBinding = 0;
-			descp_writes[0].dstArrayElement = 0;
-			descp_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			descp_writes[0].descriptorCount = 1;
-			descp_writes[0].buff_info = &uniform_buff_info;
-
-			VkDescriptorBufferInfo storage_buff_info = {};
-			storage_buff_info.buffer = storage_buff.buff;
-			storage_buff_info.offset = 0;
-			storage_buff_info.range = storage_buff.buff_alloc_info.size;
-
-			descp_writes[1].dstBinding = 1;
-			descp_writes[1].dstArrayElement = 0;
-			descp_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			descp_writes[1].descriptorCount = 1;
-			descp_writes[1].buff_info = &storage_buff_info;
-
-			VkDescriptorImageInfo image_info = {};
-			image_info.sampler = sampler.sampler;
-			image_info.imageView = tex_view.img_view;
-			image_info.imageLayout = tex_img.layout;
-
-			descp_writes[2].dstBinding = 2;
-			descp_writes[2].dstArrayElement = 0;
-			descp_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			descp_writes[2].descriptorCount = 1;
-			descp_writes[2].img_info = &image_info;
-
-			g3d_descp.update(descp_writes);
+			checkErrStack(g3d_descp.create(&logical_dev, bindings),
+				"failed to create 3D descriptor");
 		}
 
-		checkErrStack(g3d_pipe_layout.create(&logical_dev, &g3d_descp), "");
-		checkErrStack(g3d_vertex_module.create(&logical_dev, *render_info.g3d_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT), "");
-		checkErrStack(g3d_frag_module.create(&logical_dev, *render_info.g3d_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT), "");
+		// 3D Mesh Diffuse Texture
+		if (content.mesh_diffuse != nullptr) {
 
-		g3d_pipe.configureFor3D();
-		g3d_pipe.multisample_state_info.rasterizationSamples = phys_dev.max_MSAA;
-		checkErrStack(g3d_pipe.create(&logical_dev, &g3d_vertex_module, &g3d_frag_module,
-			render_info.width, render_info.height, &g3d_pipe_layout, &renderpass, 0), "");
+			BasicBitmap* mesh_diffuse = content.mesh_diffuse;
+
+			std::vector<vks::DesiredImageProps> props(1);
+			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+			vks::ImageCreateInfo info = {};
+			info.desired_props = &props;
+			info.width = mesh_diffuse->width;
+			info.height = mesh_diffuse->height;
+			info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+			checkErrStack(mesh_diffuse_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+				"failed to create texture image");
+			checkErrStack(mesh_diffuse_img.setDebugName("mesh diffuse texture"), "");
+
+			// Load Bitmap into Image
+			checkErrStack1(staging_buff.recreateStaging(&logical_dev, mesh_diffuse->calcMemSize()));
+
+			checkErrStack(mesh_diffuse_img.load(mesh_diffuse->colors.data(), mesh_diffuse->calcMemSize(),
+				&cmd_pool, &staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+				"failed to load pixels into image");
+		}
+
+		if (mesh_diffuse_sampler.sampler == VK_NULL_HANDLE) {
+
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_LINEAR;
+			info.minFilter = VK_FILTER_LINEAR;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.anisotropyEnable = VK_TRUE;
+			info.maxAnisotropy = 16;
+			info.compareEnable = VK_FALSE;
+			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+			checkErrStack(mesh_diffuse_sampler.create(&logical_dev, info), "");
+		}
+
+		if (content.meshes != nullptr) {
+			
+			checkErrStack(recreate3D_MeshBuffers(*content.meshes),
+				"failed to fill buffers from meshes");
+		}
+
+		if (content.camera != nullptr) {
+
+			checkErrStack(recreate3D_UniformBuffer(*content.camera),
+				"failed to fill uniform buffer from camera");
+		}
+
+		// Vertex Shader
+		if (content.g3d_vert_shader_code != nullptr) {
+
+			checkErrStack(g3d_vertex_module.recreate(&logical_dev,
+				*content.g3d_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
+				"failed to create 3D vertex shader module");
+		}
+
+		// Fragment Shader 
+		if (content.g3d_frag_shader_code != nullptr) {
+
+			checkErrStack(g3d_frag_module.recreate(&logical_dev,
+				*content.g3d_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
+				"failed to create 3D fragment shader module");
+		}
+
+		// Pipeline Layout
+		if (g3d_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+			checkErrStack1(g3d_pipe_layout.create(&logical_dev, &g3d_descp));
+		}
+
+		// Pipeline
+		if (content.width != 0 ||
+			content.height != 0 ||
+			content.g3d_vert_shader_code != nullptr ||
+			content.g3d_frag_shader_code != nullptr)
+		{
+			g3d_pipe.setToDefault();
+			g3d_pipe.configureFor3D();
+			g3d_pipe.multisample_state_info.rasterizationSamples = phys_dev.max_MSAA;
+
+			checkErrStack(g3d_pipe.recreate(&logical_dev, &g3d_vertex_module, &g3d_frag_module,
+				swapchain.resolution.width, swapchain.resolution.height,
+				&g3d_pipe_layout, &renderpass, 0),
+				"failed to create 3D pipeline");
+		}
+
+		std::vector<vks::DescriptorWrite> descp_writes;
+
+		// Descriptor Update
+		if (content.mesh_diffuse != nullptr) {
+
+			vks::DescriptorWrite& write = descp_writes.emplace_back();
+
+			VkDescriptorImageInfo image_info = {};
+			image_info.sampler = mesh_diffuse_sampler.sampler;
+			image_info.imageView = mesh_diffuse_img.img_view;
+			image_info.imageLayout = mesh_diffuse_img.layout;
+
+			write.dstBinding = 2;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write.descriptorCount = 1;
+			write.img_info = &image_info;
+		}
+
+		if (content.meshes != nullptr) {
+
+			vks::DescriptorWrite& write = descp_writes.emplace_back();
+
+			VkDescriptorBufferInfo storage_buff_info = {};
+			storage_buff_info.buffer = g3d_storage_buff.buff;
+			storage_buff_info.offset = 0;
+			storage_buff_info.range = g3d_storage_buff.buff_alloc_info.size;
+
+			write.dstBinding = 1;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			write.descriptorCount = 1;
+			write.buff_info = &storage_buff_info;
+		}
+
+		if (content.camera != nullptr) {
+
+			vks::DescriptorWrite& write = descp_writes.emplace_back();
+
+			VkDescriptorBufferInfo uniform_buff_info = {};
+			uniform_buff_info.buffer = g3d_uniform_buff.buff;
+			uniform_buff_info.offset = 0;
+			uniform_buff_info.range = g3d_uniform_buff.buff_alloc_info.size;
+
+			write.dstBinding = 0;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.descriptorCount = 1;
+			write.buff_info = &uniform_buff_info;
+		}
+
+		if (descp_writes.size()) {
+			g3d_descp.update(descp_writes);
+		}
 	}
 
-	// UI Pipeline
+	// UI Subpass
 	{
-		// Descriptors
-		{
+		// Descriptor
+		if (ui_descp.descp_pool == VK_NULL_HANDLE) {
+
 			std::vector<VkDescriptorSetLayoutBinding> bindings(2);
 			bindings[0] = {};
 			bindings[0].binding = 0;
-			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			bindings[0].descriptorCount = 1;
 			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 			bindings[1] = {};
 			bindings[1].binding = 1;
-			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			bindings[1].descriptorCount = 1;
+			bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+			checkErrStack(ui_descp.create(&logical_dev, bindings),
+				"failed to create UI descriptor");
+		}
+
+		// Character Atlas Image
+		if (content.char_atlas_changed) {
+
+			TextureAtlas& atlas = content.text_rendering->atlas;
+
+			std::vector<vks::DesiredImageProps> props(1);
+			props[0].format = VK_FORMAT_R8_UNORM;
+			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+			vks::ImageCreateInfo info = {};
+			info.desired_props = &props;
+			info.width = atlas.tex_size;
+			info.height = atlas.tex_size;
+			info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+			checkErrStack(ui_char_atlas_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
+				"failed to create symbol atlas image");
+			checkErrStack(ui_char_atlas_img.setDebugName("character atlas"), "");
+
+			checkErrStack(ui_char_atlas_img.load(atlas.colors.data(), atlas.mem_size, 
+				& cmd_pool, & staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+				"failed to load pixels into symbol atlas image");
+		}
+
+		if (ui_char_atlas_sampler.sampler == VK_NULL_HANDLE) {
+
+			VkSamplerCreateInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			info.magFilter = VK_FILTER_NEAREST;
+			info.minFilter = VK_FILTER_NEAREST;
+			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			info.anisotropyEnable = VK_FALSE;
+			info.compareEnable = VK_FALSE;
+			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+			checkErrStack(ui_char_atlas_sampler.create(&logical_dev, info), "");
+		}
+
+		if (content.text_rendering != nullptr) {
+
+			checkErrStack(recreateUI_MeshBuffers(*content.text_rendering),
+				"failed to fill UI mesh buffers");
+		}
+
+		if (content.ui_vert_shader_code != nullptr) {
+
+			checkErrStack(ui_vertex_module.recreate(&logical_dev,
+				*content.ui_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
+				"failed to create UI vertex shader");
+		}
+
+		if (content.ui_frag_shader_code != nullptr) {
+
+			checkErrStack(ui_frag_module.recreate(&logical_dev,
+				*content.ui_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
+				"failed to create UI fragment shader");
+		}
+
+		if (ui_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+			checkErrStack(ui_pipe_layout.create(&logical_dev, &ui_descp),
+				"failed to create UI pipeline layout");
+		}
+
+		if (content.width || content.height ||
+			content.ui_vert_shader_code != nullptr || content.ui_frag_shader_code)
+		{
+			ui_pipe.setToDefault();
+			ui_pipe.configureForUserInterface();
+
+			checkErrStack(ui_pipe.recreate(&logical_dev, &ui_vertex_module, &ui_frag_module,
+				swapchain.resolution.width, swapchain.resolution.height,
+				&ui_pipe_layout, &renderpass, 1),
+				"failed to create UI pipeline");
+		}
+
+		// Desciptor Update
+		std::vector<vks::DescriptorWrite> writes;
+
+		if (content.char_atlas_changed) {
+
+			vks::DescriptorWrite& write = writes.emplace_back();
+
+			VkDescriptorImageInfo ui_symbols_descp_img = {};
+			ui_symbols_descp_img.sampler = ui_char_atlas_sampler.sampler;
+			ui_symbols_descp_img.imageView = ui_char_atlas_img.img_view;
+			ui_symbols_descp_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			write.dstBinding = 0;
+			write.dstArrayElement = 0;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write.img_info = &ui_symbols_descp_img;
+		}
+
+		if (content.text_rendering != nullptr) {
+
+			vks::DescriptorWrite& write = writes.emplace_back();
+
+			VkDescriptorBufferInfo ui_instance_descp_buff = {};
+			ui_instance_descp_buff.buffer = ui_storage_buff.buff;
+			ui_instance_descp_buff.offset = 0;
+			ui_instance_descp_buff.range = ui_storage_buff.buff_alloc_info.size;
+
+			write.dstBinding = 1;
+			write.dstArrayElement = 0;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			write.buff_info = &ui_instance_descp_buff;
+		}
+
+		if (writes.size()) {
+			ui_descp.update(writes);
+		}
+	}
+
+	// Composition Subpass
+	{
+		if (compose_descp.descp_pool == VK_NULL_HANDLE) {
+
+			std::vector<VkDescriptorSetLayoutBinding> bindings(2);
+			bindings[0].binding = 0;
+			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			bindings[0].descriptorCount = 1;
+			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			bindings[1].binding = 1;
+			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 			bindings[1].descriptorCount = 1;
 			bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-			std::vector<VkDescriptorPoolSize> pool_sizes(2);
-			pool_sizes[0].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			pool_sizes[0].descriptorCount = 1;
-
-			pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			pool_sizes[1].descriptorCount = 1;
-
-			checkErrStack(ui_descp.create(&logical_dev, bindings, pool_sizes),
-				"failed to create descriptor for composition subpass");
-
-			// Descriptor Set Write
-			std::vector<vks::DescriptorWrite> write(2);
-
-			VkDescriptorImageInfo g3d_color_descp_img = {};
-			g3d_color_descp_img.imageView = g3d_color_resolve_view.img_view;
-			g3d_color_descp_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	
-			write[0].dstBinding = 0;
-			write[0].dstArrayElement = 0;
-			write[0].descriptorCount = 1;
-			write[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			write[0].img_info = &g3d_color_descp_img;
-
-			VkDescriptorImageInfo ui_symbols_descp_img = {};
-			ui_symbols_descp_img.sampler = ui_symbol_sampler.sampler;
-			ui_symbols_descp_img.imageView = ui_symbol_atlas_view.img_view;
-			ui_symbols_descp_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			write[1].dstBinding = 1;
-			write[1].dstArrayElement = 0;
-			write[1].descriptorCount = 1;
-			write[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write[1].img_info = &ui_symbols_descp_img;
-
-			ui_descp.update(write);
+			checkErrStack(compose_descp.create(&logical_dev, bindings), 
+				"failed to create Compose descriptor");
 		}
 
-		checkErrStack(ui_pipe_layout.create(&logical_dev, &ui_descp), "");
-		checkErrStack(ui_vertex_module.create(&logical_dev, *render_info.ui_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT), "");
-		checkErrStack(ui_frag_module.create(&logical_dev, *render_info.ui_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT), "");
+		if (content.comp_vert_shader_code != nullptr) {
 
-		ui_pipe.configureForUserInterface();
-		checkErrStack(ui_pipe.create(&logical_dev, &ui_vertex_module, &ui_frag_module,
-			swapchain.resolution.width, swapchain.resolution.height,
-			&ui_pipe_layout, &renderpass, 1), "");
+			checkErrStack(compose_vert_module.recreate(&logical_dev, 
+				*content.comp_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
+				"failed to create Compose vertex shader");
+		}
+
+		if (content.comp_frag_shader_code != nullptr) {
+
+			checkErrStack(compose_frag_module.recreate(&logical_dev,
+				*content.comp_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
+				"failed to create Compose fragment shader");
+		}
+
+		if (compose_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+			checkErrStack1(compose_pipe_layout.create(&logical_dev, &compose_descp));
+		}
+
+		if (content.comp_vert_shader_code != nullptr ||
+			content.comp_frag_shader_code != nullptr)
+		{
+			compose_pipe.setToDefault();
+
+			checkErrStack(compose_pipe.recreate(&logical_dev,
+				&compose_vert_module, &compose_frag_module,
+				swapchain.resolution.width, swapchain.resolution.height,
+				&compose_pipe_layout, &renderpass, 2),
+				"failed to create compose pipeline");
+		}
+
+		// Desciptor Update
+		std::vector<vks::DescriptorWrite> writes;
+
+		if (content.width || content.height) {
+
+			// 3D renderpass result
+			vks::DescriptorWrite& g3d_write = writes.emplace_back();
+
+			VkDescriptorImageInfo g3d_img = {};
+			g3d_img.imageView = g3d_color_resolve_img.img_view;
+			g3d_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			g3d_write.img_info = &g3d_img;
+			g3d_write.dstBinding = 0;
+			g3d_write.dstArrayElement = 0;
+			g3d_write.descriptorCount = 1;
+			g3d_write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+			// UI renderpass result
+			vks::DescriptorWrite& ui_write = writes.emplace_back();
+
+			VkDescriptorImageInfo ui_img = {};
+			ui_img.imageView = ui_color_img.img_view;
+			ui_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			ui_write.img_info = &ui_img;
+			ui_write.dstBinding = 1;
+			ui_write.dstArrayElement = 0;
+			ui_write.descriptorCount = 1;
+			ui_write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		}
+
+		if (writes.size()) {
+			compose_descp.update(writes);
+		}
 	}
 
 	// Command Buffers
-	checkErrStack(render_cmd_buffs.create(&logical_dev, &phys_dev, (uint32_t)swapchain.images.size()), "");
+	checkErrStack1(render_cmd_buffs.recreate(&logical_dev, &phys_dev, (uint32_t)swapchain.images.size()));
 
-	vks::RenderingCmdBuffsUpdateInfo info = {};
-	info.renderpass = &renderpass;
-	info.frame_buffs = &frame_buffs;
-	info.width = swapchain.resolution.width;
-	info.height = swapchain.resolution.height;
+	// Command Buffer Update
+	{
+		vks::RenderingCmdBuffsUpdateInfo info = {};
+		info.renderpass = &renderpass;
+		info.frame_buffs = &frame_buffs;
+		info.width = swapchain.resolution.width;
+		info.height = swapchain.resolution.height;
 
-	// 3D
-	info.g3d_pipe_layout = &g3d_pipe_layout;
-	info.g3d_pipe = &g3d_pipe;
-	info.g3d_descp = &g3d_descp;
-	info.g3d_vertex_buff = &vertex_buff;
-	info.g3d_vertex_count = (uint32_t)gpu_3d_verts.size();
+		// 3D
+		info.g3d_descp = &g3d_descp;
+		info.g3d_pipe_layout = &g3d_pipe_layout;
+		info.g3d_pipe = &g3d_pipe;
+		info.g3d_vertex_buff = &g3d_vertex_buff;
+		info.g3d_vertex_count = g3d_vertex_count;
 
-	// UI
-	info.ui_descp = &ui_descp;
-	info.ui_pipe_layout = &ui_pipe_layout;
-	info.ui_pipe = &ui_pipe;
-	info.ui_vertex_buff = &ui_vertex_buff;
-	info.ui_vertex_count = (uint32_t)gpu_ui_verts.size();
+		// UI
+		info.ui_descp = &ui_descp;
+		info.ui_pipe_layout = &ui_pipe_layout;
+		info.ui_pipe = &ui_pipe;
+		info.ui_draw_batches = &ui_batches;
+		info.ui_vertex_buff = &ui_vertex_buff;
+		info.ui_storage_buff = &ui_storage_buff;
 
-	checkErrStack(render_cmd_buffs.update(info),
-		"");
+		// Compose
+		info.compose_descp = &compose_descp;
+		info.compose_pipe_layout = &compose_pipe_layout;
+		info.compose_pipe = &compose_pipe;
+
+		checkErrStack(render_cmd_buffs.update(info), "failed to update rendering commands");
+	}
 
 	// Syncronization
 	checkErrStack(img_acquired.create(&logical_dev),
 		"failed to create semaphore for acquiring image from swapchain");
 	checkErrStack(rendering_ended_sem.create(&logical_dev),
 		"failed to create semaphore for rendering ended");
-
-	return ErrStack();
-}
-
-void Renderer::rotateCameraUpLocked(float delta_pitch, float delta_yaw)
-{
-	float pitch_rad = glm::radians(delta_pitch);
-	float yaw_rad = glm::radians(delta_yaw);
-
-	camera.rotation = rotateQuat(camera.rotation, pitch_rad, camera.right());
-	camera.rotation = glm::normalize(camera.rotation);
-	camera.rotation = rotateQuat(camera.rotation, yaw_rad, { 0, 1, 0 });
-	camera.rotation = glm::normalize(camera.rotation);
-}
-
-void Renderer::orbitCameraArcball(glm::vec3 center, float delta_pitch, float delta_yaw)
-{
-	glm::vec3 right_axis = camera.right();
-	glm::vec3 up_axis = camera.up();
-
-	float pitch_rad = glm::radians(delta_pitch);
-	float yaw_rad = glm::radians(delta_yaw);
-
-	// Orbit Position
-	camera.position = rotatePos(camera.position, -pitch_rad, right_axis, center);
-	camera.position = rotatePos(camera.position, -yaw_rad, up_axis, center);
-
-	// Make camera point at center
-	camera.rotation = rotateQuat(camera.rotation, pitch_rad, right_axis);
-	camera.rotation = glm::normalize(camera.rotation);
-	camera.rotation = rotateQuat(camera.rotation, yaw_rad, up_axis);
-	camera.rotation = glm::normalize(camera.rotation);
-}
-
-void Renderer::zoomCamera(glm::vec3 center, float zoom)
-{
-	float dist = glm::distance(center, camera.position);
-	float amount = dist * zoom;
-
-	glm::vec3 cam_forward = camera.forward();
-	glm::vec3 cam_pos = camera.position + cam_forward * amount;
-
-	// only move camera if center is not behind
-	if (glm::dot(cam_pos - center, cam_forward) < 0) {
-		camera.position = cam_pos;
-	}
-	// TODO: make camera stop at exactly dot == 0
-}
-
-void Renderer::panCamera(float delta_vertical, float delta_horizontal)
-{
-	camera.position += camera.up() * delta_vertical;
-	camera.position += camera.right() * -delta_horizontal;
-}
-
-ErrStack Renderer::waitForRendering()
-{
-	checkVkRes(vkDeviceWaitIdle(logical_dev.logical_device), "");
-	return ErrStack();
-}
-
-void Renderer::getRenderResolution(uint32_t& width, uint32_t& height)
-{
-	width = swapchain.resolution.width;
-	height = swapchain.resolution.height;
-}
-
-void Renderer::getRequestedRenderResolution(uint32_t& width, uint32_t& height)
-{
-	width = swapchain.desired_width;
-	height = swapchain.desired_height;
-}
-
-void Renderer::changeRenderResolution(uint32_t width, uint32_t height)
-{
-
-}
-
-void Renderer::generateGPUData()
-{
-	// calculate sizes
-	{
-		//uint64_t total_verts_size = 0;
-		uint64_t total_idxs_size = 0;
-
-		for (LinkageMesh& mesh : meshes) {
-
-			total_idxs_size += mesh.ttris_count * 3;
-		}
-
-		this->gpu_3d_verts.resize(total_idxs_size);
-		this->gpu_storage.resize(meshes.size());
-	}
-
-	// extract data
-	uint64_t i = 0;
-
-	for (uint64_t mesh_idx = 0; mesh_idx < meshes.size(); mesh_idx++) {
-
-		LinkageMesh& mesh = meshes[mesh_idx];
-
-		for (Poly& p : mesh.polys) {
-			for (TesselationTris& t : p.tess_tris) {
-				for (Vertex* v : t.vs) {
-
-					vks::GPU_3D_Vertex& gpu_v = gpu_3d_verts[i];
-
-					// Vertex
-					gpu_v.mesh_id = (uint32_t)mesh_idx;
-					gpu_v.pos = v->pos;
-					gpu_v.vertex_normal = v->normal;
-					gpu_v.tess_normal = t.normal;
-					gpu_v.poly_normal = p.normal;
-					gpu_v.uv = v->uv;
-					gpu_v.color = v->color;
-					i++;
-				}
-			}
-		}
-
-		// Mesh Data
-		vks::GPUMeshProperties& gpu_mesh = gpu_storage[mesh_idx];
-		gpu_mesh.pos = mesh.position;
-		gpu_mesh.rot.data = mesh.rotation.data;  // same order x,y,z,w
-	}
-
-	// Uniform
-	{
-		gpu_uniform.camera_pos = camera.position;
-		gpu_uniform.camera_rot.data = camera.rotation.data;
-
-		// conform aspect ratio to render resolution
-		uint32_t render_width;
-		uint32_t render_height;
-		getRenderResolution(render_width, render_height);
-
-		gpu_uniform.camera_perspective = glm::perspectiveFovRH_ZO(
-			glm::radians(camera.fov), (float) render_width, (float) render_height,
-			camera.near_plane, camera.far_plane);
-
-		gpu_uniform.camera_forward = camera.forward();
-	}
-
-	// UI Vertices
-	{
-		this->gpu_ui_verts.resize(6);
-
-		// Positions
-		gpu_ui_verts[0].pos = { 0, 0};
-		gpu_ui_verts[1].pos = { 1, 0};
-		gpu_ui_verts[2].pos = { 0, 1};
-
-		gpu_ui_verts[3].pos = { 0, 1 };
-		gpu_ui_verts[4].pos = { 1, 0 };
-		gpu_ui_verts[5].pos = { 1, 1 };
-
-		// UVs
-		gpu_ui_verts[0].uv = { 0, 0 };
-		gpu_ui_verts[1].uv = { 1, 0 };
-		gpu_ui_verts[2].uv = { 0, 1 };
-
-		gpu_ui_verts[3].uv = { 0, 1 };
-		gpu_ui_verts[4].uv = { 1, 0 };
-		gpu_ui_verts[5].uv = { 1, 1 };
-	}
-}
-
-ErrStack Renderer::loadGPUData()
-{
-	// 3D
-	checkErrStack(vertex_buff.load(&logical_dev, &cmd_pool, &staging_buff, gpu_3d_verts.data(), vertex_buff.buff_alloc_info.size), "");
-	checkErrStack(uniform_buff.load(&logical_dev, &cmd_pool, &staging_buff, &gpu_uniform, uniform_buff.buff_alloc_info.size), "");
-	checkErrStack(storage_buff.load(&logical_dev, &cmd_pool, &staging_buff, gpu_storage.data(), storage_buff.buff_alloc_info.size), "");
-
-	// UI
-	checkErrStack(ui_vertex_buff.load(&logical_dev, &cmd_pool, &staging_buff,
-		gpu_ui_verts.data(), ui_vertex_buff.buff_alloc_info.size), "");
 
 	return ErrStack();
 }
@@ -644,5 +992,11 @@ ErrStack Renderer::draw()
 	checkVkRes(vkQueuePresentKHR(logical_dev.queue, &present_info),
 		"failed to present image");
 
+	return ErrStack();
+}
+
+ErrStack Renderer::waitForRendering()
+{
+	checkVkRes(vkDeviceWaitIdle(logical_dev.logical_device), "");
 	return ErrStack();
 }

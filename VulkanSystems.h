@@ -10,16 +10,21 @@
 
 // Mine
 #include "ErrorStuff.h"
+#include "GPU_ShaderTypes.h"
 
 
 namespace vks {
 
 	class Instance {
 	public:
-		std::vector<const char*> validation_layers;
-		std::vector<const char*> instance_extensions = { VK_KHR_SURFACE_EXTENSION_NAME,
+		std::vector<const char*> validation_layers = {
+			"VK_LAYER_LUNARG_standard_validation" 
+		};
+		std::vector<const char*> instance_extensions = { 
+			VK_KHR_SURFACE_EXTENSION_NAME,
 			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
 
 		VkInstance instance = VK_NULL_HANDLE;
@@ -29,7 +34,7 @@ namespace vks {
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		VkDebugUtilsMessengerEXT callback = VK_NULL_HANDLE;
 
-		PFN_vkGetPhysicalDeviceMemoryProperties2KHR getMemProps2;
+		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func;
 
 	public:
 		ErrStack create();
@@ -57,7 +62,8 @@ namespace vks {
 	class PhysicalDevice {
 	public:
 		VkPhysicalDeviceFeatures phys_dev_features = {};
-		std::vector<const char*> device_extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		std::vector<const char*> device_extensions = { 
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			VK_EXT_MEMORY_BUDGET_EXTENSION_NAME };
 
 		VkPhysicalDevice physical_device;
@@ -75,6 +81,7 @@ namespace vks {
 
 
 	class LogicalDevice {
+		Instance* instance = nullptr;
 	public:
 		float queue_priority = 1.0f;
 
@@ -87,6 +94,8 @@ namespace vks {
 	public:
 		ErrStack create(Instance* instance, PhysicalDevice* phys_dev);
 
+		ErrStack setDebugName(uint64_t obj, VkObjectType obj_type, std::string name);
+
 		void destroy();
 
 		~LogicalDevice();
@@ -94,12 +103,9 @@ namespace vks {
 
 
 	class Swapchain {
-		LogicalDevice const* logical_device = nullptr;
+		LogicalDevice* logical_device = nullptr;
 
 	public:
-		uint32_t desired_width;
-		uint32_t desired_height;
-
 		VkSurfaceCapabilitiesKHR capabilities;
 		VkExtent2D resolution = {800, 600};
 
@@ -111,10 +117,13 @@ namespace vks {
 		VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
 		std::vector<VkImage> images;
+		std::vector<VkImageView> views;
 
 	public:
 		ErrStack create(Surface* surface, PhysicalDevice* phys_dev, LogicalDevice* logical_dev,
 			uint32_t width, uint32_t height);
+
+		ErrStack setDebugName(std::string name);
 
 		void destroy();
 
@@ -157,7 +166,7 @@ namespace vks {
 
 
 	class Buffer {
-		LogicalDevice const* logical_dev = nullptr;
+		LogicalDevice* logical_dev = nullptr;
 
 	public:
 		VkBuffer buff = VK_NULL_HANDLE;	
@@ -166,23 +175,32 @@ namespace vks {
 		VmaAllocation buff_alloc;
 		VmaAllocationInfo buff_alloc_info;
 
-		// helper
 		LoadType load_type = LoadType::ENUM_NOT_INIT;
+		size_t scheduled_load_size = 0;
 
 	public:
 		ErrStack create(LogicalDevice* logical_dev,
 			VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
 
-		ErrStack createOrGrowStaging(LogicalDevice* logical_dev, VkDeviceSize min_size,
-			VmaMemoryUsage mem_usage = VmaMemoryUsage::VMA_MEMORY_USAGE_CPU_ONLY);
+		// add param for if reallocated
+		ErrStack recreate(LogicalDevice* logical_dev, 
+			VkDeviceSize min_size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
 
-		ErrStack load(LogicalDevice* logical_dev, CommandPool* cmd_pool, Buffer* staging,
+		ErrStack recreateStaging(LogicalDevice* logical_dev, VkDeviceSize min_size);
+
+		ErrStack load(CommandPool* cmd_pool, Buffer* staging,
 			void* data, size_t size);
+
+		void scheduleLoad(size_t offset, Buffer* staging, void* data, size_t size);
+
+		ErrStack flush(CommandPool* cmd_pool, Buffer* staging);
 
 		/* destroy memory used for buffer */
 		void destroy();
 
 		~Buffer();
+
+		ErrStack setDebugName(std::string name);
 	};
 
 
@@ -203,6 +221,9 @@ namespace vks {
 		uint32_t height;
 		uint32_t mip_levels = 1;
 		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+
+		// View
+		VkImageAspectFlags aspect;
 	};
 
 	class Image {
@@ -216,47 +237,35 @@ namespace vks {
 		VmaAllocationInfo alloc_info;
 		LoadType load_type = LoadType::ENUM_NOT_INIT;
 
-		// Properties
+		// Image Properties
 		uint32_t width;
 		uint32_t height;
 		VkFormat format;
 		VkImageLayout layout;
 		uint32_t mip_lvl;
 		uint32_t samples;
+
+		// View
+		VkImageView img_view = VK_NULL_HANDLE;
+
+	private:
+		ErrStack copyBufferToImage(CommandPool* cmd_pool, Buffer* buff);
+
 	public:
-		ErrStack create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
+		ErrStack recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
 			ImageCreateInfo& img_info, VmaMemoryUsage mem_usage);
 
-		ErrStack load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff);
+		ErrStack setDebugName(std::string name);
+
+		ErrStack changeImageLayout(CommandPool* cmd_pool, VkImageLayout new_layout);
+
+		ErrStack load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff,
+			VkImageLayout layout_after_load);
 
 		void destroy();
 
-		~Image();
+		~Image();	
 	};
-
-
-	ErrStack changeImageLayout(LogicalDevice* logical_dev, CommandPool* cmd_pool,
-		Image* img, VkImageLayout new_layout);
-
-	ErrStack copyBufferToImage(LogicalDevice* logical_dev, CommandPool* cmd_pool, Buffer* buff, Image* img);
-
-
-	class ImageView {
-		LogicalDevice* logical_dev = nullptr;
-	public:
-
-		VkImageView img_view = VK_NULL_HANDLE;
-	public:
-		ErrStack createPresentView(LogicalDevice* logical_dev, VkImage img, VkFormat format,
-			VkImageAspectFlags aspect);
-
-		ErrStack create(LogicalDevice* logical_dev, Image* img, VkImageAspectFlags aspect);
-
-		void destroy();
-
-		~ImageView();
-	};
-
 
 	class Sampler {
 		LogicalDevice const* logical_dev = nullptr;
@@ -287,10 +296,11 @@ namespace vks {
 
 
 	struct FrameBufferCreateInfo {
-		ImageView* g3d_color_MSAA_view = nullptr;
-		ImageView* g3d_depth_view = nullptr;
-		ImageView* g3d_color_resolve_view = nullptr;
-		std::vector<ImageView>* swapchain_views;
+		Image* g3d_color_MSAA_img = nullptr;
+		Image* g3d_depth_img = nullptr;
+		Image* g3d_color_resolve_img = nullptr;
+		Image* ui_color_img = nullptr;
+		Swapchain* swapchain = nullptr;
 	};
 
 	class Framebuffers {
@@ -308,52 +318,7 @@ namespace vks {
 	};
 
 
-	/* Vertex Buffer Types */
-
-	class GPU_3D_Vertex {
-	public:
-		uint32_t mesh_id;
-		glm::vec3 pos;
-		glm::vec3 vertex_normal;
-		glm::vec3 tess_normal;
-		glm::vec3 poly_normal;
-
-		glm::vec2 uv;
-		glm::vec3 color;
-
-		static VkVertexInputBindingDescription getBindingDescription();
-		static std::array<VkVertexInputAttributeDescription, 7> getAttributeDescriptions();
-	};
-
-	class GPU_UI_Vertex {
-	public:
-		glm::vec2 pos;
-		glm::vec2 uv;
-
-		static VkVertexInputBindingDescription getBindingDescription();
-		static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
-	};
-
-
-	/* Uniform Buffer Types */
-
-	struct GPUUniform {
-		alignas(16) glm::vec3 camera_pos;
-		alignas(16) glm::vec4 camera_rot;
-		alignas(16) glm::mat4 camera_perspective;
-		alignas(16) glm::vec3 camera_forward;
-	};
-
-
-	/* Storage Buffer Types */
-
-	struct GPUMeshProperties {
-		alignas(16) glm::vec3 pos;
-		alignas(16) glm::vec4 rot;
-	};
-
-
-	struct DescriptorWrite {	
+	struct DescriptorWrite {
 		VkDescriptorImageInfo* img_info = NULL;  // layout must be the one at rendertime
 		VkDescriptorBufferInfo* buff_info = NULL;
 
@@ -364,7 +329,7 @@ namespace vks {
 	};
 
 	class Descriptor {
-		LogicalDevice const* logical_dev = nullptr;
+		LogicalDevice* logical_dev = nullptr;
 
 	public:
 
@@ -375,8 +340,9 @@ namespace vks {
 		std::vector<VkWriteDescriptorSet> writes;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings,
-			std::vector<VkDescriptorPoolSize>& pool_sizes);
+		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings);
+
+		ErrStack setDebugName(std::string name);
 
 		void update(std::vector<DescriptorWrite>& descp_writes);
 
@@ -403,21 +369,57 @@ namespace vks {
 	};
 
 
+	// shove the code back inside it
 	class ShaderModule {
-		LogicalDevice const* logical_dev = nullptr;
+		LogicalDevice* logical_dev = nullptr;
 	public:
 
 		VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 		VkShaderModule sh_module = VK_NULL_HANDLE;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, std::vector<char>& code, VkShaderStageFlagBits stage);
+		ErrStack recreate(LogicalDevice* logical_dev, std::vector<char>& code, VkShaderStageFlagBits stage);
+
+		ErrStack setDebugName(std::string name);
 
 		void destroy();
 
 		~ShaderModule();
 	};
 
+	struct GraphicsPipelineInfo {
+		// Shaders
+		std::vector<ShaderModule*> shader_modules;
+
+		// Vertex Input
+		VkVertexInputBindingDescription vertex_input_binding_descp = {};
+		std::vector<VkVertexInputAttributeDescription> vertex_input_atribute_descp;
+
+		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
+
+		// Input Assembly
+		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
+
+		// Tesselation
+
+		// Viewport state 
+		VkViewport viewport = {};
+		VkRect2D scissor = {};
+		VkPipelineViewportStateCreateInfo viewport_state_info = {};
+
+		// Rasterization state
+		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
+
+		// MultiSample
+		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
+
+		// DepthSample
+		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
+
+		// Color Blending state
+		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
+		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
+	};
 
 	class GraphicsPipeline {
 		LogicalDevice const* logical_dev = nullptr;
@@ -457,12 +459,15 @@ namespace vks {
 
 	public:
 		GraphicsPipeline();
+		
+		void setToDefault();
 
-		void configureForUserInterface();
+		// Helpers
 		void configureFor3D();
+		void configureForUserInterface();
 
-		ErrStack create(LogicalDevice* logical_dev, ShaderModule* vertex_module, ShaderModule* frag_module,
-			uint32_t width, uint32_t height, 
+		ErrStack recreate(LogicalDevice* logical_dev, ShaderModule* vertex_module, ShaderModule* frag_module,
+			uint32_t width, uint32_t height,
 			PipelineLayout* pipe_layout, Renderpass* renderpass, uint32_t subpass_idx);
 
 		void destroy();
@@ -483,7 +488,7 @@ namespace vks {
 		Renderpass* renderpass;
 		Framebuffers* frame_buffs;
 		uint32_t width;
-		uint32_t height;	
+		uint32_t height;
 
 		// 3D
 		Descriptor* g3d_descp;
@@ -498,8 +503,14 @@ namespace vks {
 		PipelineLayout* ui_pipe_layout;
 		GraphicsPipeline* ui_pipe;
 
+		std::vector<UI_DrawBatch>* ui_draw_batches;
 		Buffer* ui_vertex_buff;
-		uint32_t ui_vertex_count;		
+		Buffer* ui_storage_buff;
+
+		// Compose
+		Descriptor* compose_descp;
+		PipelineLayout* compose_pipe_layout;
+		GraphicsPipeline* compose_pipe;
 	};
 
 	class RenderingComandBuffers {
@@ -507,10 +518,8 @@ namespace vks {
 	public:
 		std::vector<CmdBufferTask> cmd_buff_tasks;
 
-		std::vector<VkClearValue> clear_vals;
-
 	public:
-		ErrStack create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count);
+		ErrStack recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count);
 
 		ErrStack update(const RenderingCmdBuffsUpdateInfo& info);
 

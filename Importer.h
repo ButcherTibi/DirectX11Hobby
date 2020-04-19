@@ -83,13 +83,10 @@ public:
 	ErrStack parseObject(uint64_t& i, std::vector<char>& text, JSONValue& json_value);
 };
 
-// TODO: add support for specifing if a field requires certain representation
-/* use @param offset to skip start of file if desired
- * @param use_64int parse ints as int64_t or int32_t
- * @param use_double parse real numbers as float or double */
+/* use @param offset to skip start of file if desired */
 ErrStack parseJSON(std::vector<char>& text, uint64_t offset, JSONGraph& json);
 
-ErrStack importGLTFMeshes(Path path, std::vector<LinkageMesh>& meshes);
+ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes);
 
 // not tested
-ErrStack importOBJMeshes(Path path, std::vector<LinkageMesh>& meshes);
+ErrStack importOBJMeshes(FileSysPath path, std::vector<LinkageMesh>& meshes);

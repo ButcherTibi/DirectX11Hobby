@@ -100,10 +100,10 @@ struct ErrStack
 
 	ErrStack();
 	ErrStack(Error err);
-	ErrStack(std::string location, std::string msg);
-	ErrStack(ExtraError res, std::string location, std::string msg);
 
-	/* with Windows message */
+	ErrStack(std::string location, std::string msg);
+
+	ErrStack(ExtraError res, std::string location, std::string msg);
 	ErrStack(ExtraError res, std::string location, std::string msg, std::string win_msg);
 
 	ErrStack(VkResult res, std::string location, std::string msg);
@@ -127,6 +127,12 @@ std::string asIs(char c);
 #define checkErrStack(err_stack, msg) \
 	if (err_stack.isBad()) { \
 		err_stack.pushError(code_location, msg); \
+		return err_stack; \
+	}
+
+#define checkErrStack1(err_stack) \
+	if (err_stack.isBad()) { \
+		err_stack.pushError(code_location, ""); \
 		return err_stack; \
 	}
 

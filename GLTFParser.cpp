@@ -138,7 +138,7 @@ bool BitVector::pushBase64Char(char c)
 	return true;
 }
 
-ErrStack loadFromURI(std::string& uri, Path& this_file, BitVector& r_bin)
+ErrStack loadFromURI(std::string& uri, FileSysPath& this_file, BitVector& r_bin)
 {
 	ErrStack err;
 
@@ -161,17 +161,15 @@ ErrStack loadFromURI(std::string& uri, Path& this_file, BitVector& r_bin)
 	}
 	// Relative URI path
 	else {
-		Path bin_file = this_file;
+		FileSysPath bin_file = this_file;
 		bin_file.pop_back();  // now point to directory containing file
 		bin_file.push_back(uri);  // point to file
 
 		if (bin_file.hasExtension("bin")) {
 
 			// load directly 
-			err = bin_file.read(r_bin.bytes);
-			if (err.isBad()) {
-				return err;
-			}
+			checkErrStack(bin_file.read(r_bin.bytes), 
+				"failed to read from URI");
 			r_bin.bit_count = r_bin.bytes.size() * 8;
 		}
 		else {
@@ -649,22 +647,18 @@ ErrStack loadVec3FromBuffer(Structure& gltf_struct, uint64_t acc_idx,
 	return ErrStack();
 }
 
-ErrStack importGLTFMeshes(Path path, std::vector<LinkageMesh>& meshes)
+ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 {
 	ErrStack err;
 
-	std::vector<char> text;
-	err = path.read(text);
-
-	if (err.isBad()) {
-		return err;
-	}
+	std::vector<char> file_content;
+	checkErrStack1(path.read(file_content));
 
 	// JSON Text to JSON Types
 	JSONGraph json;
 	uint64_t i = 0;
 
-	err = parseJSON(text, 0, json);
+	err = parseJSON(file_content, 0, json);
 	if (err.isBad()) {
 		err.pushError(code_location, "failed to parse JSON");
 		return err;

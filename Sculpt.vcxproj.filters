@@ -49,6 +49,9 @@
     <Filter Include="Source Files\UserInterface">
       <UniqueIdentifier>{c66b86a8-8f33-4af0-8aae-a8e67523627d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\TextureAtlas">
+      <UniqueIdentifier>{a17daa4c-fb9d-437f-95cc-188a38c3a23c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MathUtils.cpp">
@@ -126,8 +129,17 @@
     <ClCompile Include="FontRasterization.cpp">
       <Filter>Source Files\UserInterface</Filter>
     </ClCompile>
-    <ClCompile Include="CharacterAtlas.cpp">
+    <ClCompile Include="CommonTypes.cpp">
+      <Filter>Source Files\Mine</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureAtlas.cpp">
+      <Filter>Source Files\TextureAtlas</Filter>
+    </ClCompile>
+    <ClCompile Include="UIComponents.cpp">
       <Filter>Source Files\UserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU_ShaderTypes.cpp">
+      <Filter>Source Files\VulkanSystems</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -254,8 +266,20 @@
     <ClInclude Include="tiny_obj_loader.h">
       <Filter>Source Files\ThirdParty\tiny_obj_loader</Filter>
     </ClInclude>
-    <ClInclude Include="UserInterface.h">
+    <ClInclude Include="CommonTypes.h">
+      <Filter>Source Files\Mine</Filter>
+    </ClInclude>
+    <ClInclude Include="TextRendering.h">
       <Filter>Source Files\UserInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureAtlas.h">
+      <Filter>Source Files\TextureAtlas</Filter>
+    </ClInclude>
+    <ClInclude Include="UIComponents.h">
+      <Filter>Source Files\UserInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_ShaderTypes.h">
+      <Filter>Source Files\VulkanSystems</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
