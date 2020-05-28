@@ -151,3 +151,36 @@ public:
 };
 
 extern InputState input;
+
+//RAWINPUTDEVICE raw_input_dev;
+//raw_input_dev.usUsagePage = 0x01;
+//raw_input_dev.usUsage = 0x02;
+//raw_input_dev.dwFlags = 0;
+//raw_input_dev.hwndTarget = app_level.hwnd;
+//
+//if (!RegisterRawInputDevices(&raw_input_dev, 1, sizeof(RAWINPUTDEVICE))) {
+//
+//	printf("Error: \n"
+//		"failed to register raw mouse input device \n"
+//		"Windows error: %s \n", getLastError().c_str());
+//	return 1;
+//}
+
+//// Input
+//case WM_INPUT: {
+//	uint32_t cb_size;
+//	GetRawInputData((HRAWINPUT)lParam, RID_INPUT, NULL, &cb_size, sizeof(RAWINPUTHEADER));
+//	
+//	RAWINPUT raw_input;
+//	uint32_t input_size = GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &raw_input, &cb_size,
+//		sizeof(RAWINPUTHEADER));
+
+//	if (input_size == (UINT)-1) {
+//		printf("failed to get raw input \n");
+//	}
+//	else if (input_size) {
+//		input.mouse_delta_x = raw_input.data.mouse.lLastX;
+//		input.mouse_delta_y = raw_input.data.mouse.lLastY;
+//	}
+//	break;
+//}

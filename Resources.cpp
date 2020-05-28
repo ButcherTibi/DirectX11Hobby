@@ -76,14 +76,12 @@ namespace vks {
 		return ErrStack();
 	}
 
-	ErrStack Buffer::load(CommandPool* cmd_pool, Buffer* staging,
-		void* data, size_t size)
+	ErrStack Buffer::load(void* data, size_t size ,CommandPool* cmd_pool, Buffer* staging)
 	{
 		assert_cond(size > 0, "load size must be larger than zero");
 
 		if (load_type == LoadType::MEMCPY) {
 			std::memcpy(mem, data, size);
-			return ErrStack();
 		}
 		else {
 			std::memcpy(staging->mem, data, size);
@@ -162,30 +160,6 @@ namespace vks {
 		return ErrStack();
 	}
 
-	ErrStack findSupportedImageFormat(vks::PhysicalDevice* phys_dev, std::vector<DesiredImageProps> desires,
-		DesiredImageProps& result)
-	{
-		VkResult vk_res;
-
-		for (DesiredImageProps desire : desires) {
-
-			vk_res = vkGetPhysicalDeviceImageFormatProperties(phys_dev->physical_device, desire.format, desire.type,
-				desire.tiling, desire.usage, 0, &desire.props_found);
-			if (vk_res == VK_SUCCESS) {
-				result = desire;
-				return ErrStack();
-			}
-			else if (vk_res == VK_ERROR_FORMAT_NOT_SUPPORTED) {
-				continue;
-			}
-			else {
-				return ErrStack(vk_res, code_location, "failed to check for desired image properties");
-			}
-		}
-
-		return ErrStack(code_location, "desired image properties not supported");
-	}
-
 	ErrStack Image::copyBufferToImage(CommandPool* cmd_pool, Buffer* buff)
 	{
 		ErrStack err;
@@ -210,45 +184,24 @@ namespace vks {
 		return err;
 	}
 
-	ErrStack Image::recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
-		ImageCreateInfo& img_info, VmaMemoryUsage mem_usage)
+	ErrStack Image::recreate(LogicalDevice* logical_dev, VkImageCreateInfo* info, VmaMemoryUsage mem_usage)
 	{
 		if (this->img != VK_NULL_HANDLE) {
 			this->destroy();
 		}
 
 		this->logical_dev = logical_dev;
-		this->width = img_info.width;
-		this->height = img_info.height;
-		this->layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		this->mip_lvl = img_info.mip_levels;
-		this->samples = img_info.samples;
-
-		DesiredImageProps img_prop;
-		checkErrStack(findSupportedImageFormat(phys_dev, *img_info.desired_props, img_prop), 
-			"failed to find supported image format");
-
-		VkImageCreateInfo vk_img_info = {};
-		vk_img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		vk_img_info.flags = 0;
-		vk_img_info.imageType = img_prop.type;
-		vk_img_info.format = img_prop.format;
-		this->format = img_prop.format;
-		vk_img_info.extent.width = img_info.width;
-		vk_img_info.extent.height = img_info.height;
-		vk_img_info.extent.depth = 1;
-		vk_img_info.mipLevels = img_info.mip_levels;
-		vk_img_info.arrayLayers = 1;
-		vk_img_info.samples = img_info.samples;
-		vk_img_info.tiling = img_prop.tiling;
-		vk_img_info.usage = img_prop.usage;
-		vk_img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		vk_img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		this->width = info->extent.width;
+		this->height = info->extent.height;
+		this->format = info->format;
+		this->layout = info->initialLayout;
+		this->mip_lvl = info->mipLevels;
+		this->samples = info->samples;
 
 		VmaAllocationCreateInfo alloc_create_info = {};
 		alloc_create_info.usage = mem_usage;
 
-		checkVkRes(vmaCreateImage(logical_dev->allocator, &vk_img_info, &alloc_create_info,
+		checkVkRes(vmaCreateImage(logical_dev->allocator, info, &alloc_create_info,
 			&img, &alloc, &alloc_info),
 			"failed to create image");
 
@@ -257,41 +210,13 @@ namespace vks {
 			checkVkRes(vmaMapMemory(logical_dev->allocator, alloc, &mem), "");
 		}
 
-		// View
-		VkComponentMapping component_mapping = {};
-		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		VkImageSubresourceRange sub_resource = {};
-		sub_resource.aspectMask = img_info.aspect;
-		sub_resource.baseMipLevel = 0;
-		sub_resource.levelCount = img_info.mip_levels;
-		sub_resource.baseArrayLayer = 0;
-		sub_resource.layerCount = 1;
-
-		VkImageViewCreateInfo imageview_info = {};
-		imageview_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		imageview_info.image = img;
-		imageview_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		imageview_info.format = format;
-		imageview_info.components = component_mapping;
-		imageview_info.subresourceRange = sub_resource;
-
-		checkVkRes(vkCreateImageView(logical_dev->logical_device, &imageview_info, NULL, &img_view),
-			"failed to create image view");
-
 		return ErrStack();
 	}
 
 	ErrStack Image::setDebugName(std::string name)
 	{
-		checkErrStack(logical_dev->setDebugName(
-			reinterpret_cast<uint64_t>(img), VK_OBJECT_TYPE_IMAGE, name + " VkImage"), "");
-
 		return logical_dev->setDebugName(
-			reinterpret_cast<uint64_t>(img_view), VK_OBJECT_TYPE_IMAGE, name + " VkImageView");
+			reinterpret_cast<uint64_t>(img), VK_OBJECT_TYPE_IMAGE, name + " VkImage");
 	}
 
 	ErrStack Image::changeImageLayout(CommandPool* cmd_pool, VkImageLayout new_layout)
@@ -405,14 +330,40 @@ namespace vks {
 		img = VK_NULL_HANDLE;
 
 		this->load_type = LoadType::ENUM_NOT_INIT;
-
-		vkDestroyImageView(logical_dev->logical_device, img_view, NULL);
-		img_view = VK_NULL_HANDLE;
 	}
 
 	Image::~Image()
 	{
 		if (img != VK_NULL_HANDLE) {
+			destroy();
+		}
+	}
+
+	ErrStack ImageView::create(LogicalDevice* logical_dev, VkImageViewCreateInfo* info)
+	{
+		this->logical_dev = logical_dev;
+
+		checkVkRes(vkCreateImageView(logical_dev->logical_device, info, NULL, &view),
+			"failed to create image view");
+
+		return ErrStack();
+	}
+
+	ErrStack ImageView::setDebugName(std::string name)
+	{
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(view), VK_OBJECT_TYPE_IMAGE, name + " VkImageView");
+	}
+
+	void ImageView::destroy()
+	{
+		vkDestroyImageView(logical_dev->logical_device, view, NULL);
+		view = VK_NULL_HANDLE;
+	}
+
+	ImageView::~ImageView()
+	{
+		if (view != VK_NULL_HANDLE) {
 			destroy();
 		}
 	}

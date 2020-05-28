@@ -9,57 +9,35 @@
 #include "glm\vec4.hpp"
 #include "glm\mat4x4.hpp"
 
+// Vulkan
+#include "vulkan\vulkan.h"
 
-// 3D
-class GPU_3D_Vertex {
-public:
-	uint32_t mesh_id;
+
+// Rects Subpass
+struct GPU_Rects_Vertex {
 	glm::vec3 pos;
-	glm::vec3 vertex_normal;
-	glm::vec3 tess_normal;
-	glm::vec3 poly_normal;
-
-	glm::vec2 uv;
 	glm::vec3 color;
 
-	static VkVertexInputBindingDescription getBindingDescription();
-	static std::array<VkVertexInputAttributeDescription, 7> getAttributeDescriptions();
-};
-
-struct GPU_3D_Uniform {
-	alignas(16) glm::vec3 camera_pos;
-	alignas(16) glm::vec4 camera_rot;
-	alignas(16) glm::mat4 camera_perspective;
-	alignas(16) glm::vec3 camera_forward;
-};
-
-// these bad
-struct GPU_3D_Instance {
-	alignas(16) glm::vec3 pos;
-	alignas(16) glm::vec4 rot;
-};
-
-
-// UI
-class GPU_UI_Vertex {
 public:
-	glm::vec2 local_pos;
-	glm::uint local_vert_idx;
-
 	static VkVertexInputBindingDescription getBindingDescription();
 	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
 };
 
-struct GPU_UI_Instance {
-	glm::vec2 pos;
-	float scale;
-	float pad;
-	glm::vec2 uvs[6];
+// Cicles Subpass
+struct GPU_Circles_Vertex {
+	glm::vec3 pos;
+	glm::vec3 color;
+	glm::vec2 center;
+	float radius;
+
+public:
+	static VkVertexInputBindingDescription getBindingDescription();
+	static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
 };
 
-struct UI_DrawBatch {
-	uint32_t vert_idx_start;
-	uint32_t vert_count;
-	uint32_t inst_idx_start;
-	uint32_t inst_count = 0;
+struct GPU_Uniform {
+	float screen_width;
+	float screen_height;
+	float pad_0;
+	float pad_1;
 };

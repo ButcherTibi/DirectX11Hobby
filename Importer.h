@@ -87,6 +87,3 @@ public:
 ErrStack parseJSON(std::vector<char>& text, uint64_t offset, JSONGraph& json);
 
 ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes);
-
-// not tested
-ErrStack importOBJMeshes(FileSysPath path, std::vector<LinkageMesh>& meshes);

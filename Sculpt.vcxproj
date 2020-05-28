@@ -199,12 +199,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
-    <ClCompile Include="BinaryParser.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
     <ClCompile Include="TextureAtlas.cpp" />
     <ClCompile Include="CommonTypes.cpp" />
     <ClCompile Include="GLTFParser.cpp" />
-    <ClCompile Include="ImportOBJ.cpp" />
     <ClCompile Include="JSONParser.cpp" />
     <ClCompile Include="LinkageMesh.cpp" />
     <ClCompile Include="FileIO.cpp" />
@@ -217,7 +215,6 @@
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="Resources.cpp" />
     <ClCompile Include="stb_image.cpp" />
-    <ClCompile Include="tiny_obj_loader.cpp" />
     <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="UIComponents.cpp" />
     <ClCompile Include="vma_implementation.cpp" />
@@ -248,7 +245,6 @@
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MathTypes.h" />
     <ClInclude Include="TextureAtlas.h" />
-    <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3.h" />
     <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3native.h" />
     <ClInclude Include="ThirdParty\imgui-master\imconfig.h" />
     <ClInclude Include="ThirdParty\imgui-master\imgui.h" />
@@ -273,8 +269,6 @@
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalXamlProvider.h" />
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\ProvidersApi.h" />
     <ClInclude Include="ThirdParty\NoesisGUI\Providers\Src\stb_image.h" />
-    <ClInclude Include="tiny_obj_loader.h" />
-    <ClInclude Include="TextRendering.h" />
     <ClInclude Include="UIComponents.h" />
     <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />

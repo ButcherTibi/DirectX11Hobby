@@ -1,10 +1,11 @@
 
-#include <fstream>
-#include <vector>
+// Windows
+#include <Windows.h>
 
-// Other
+// Mine
 #include "ErrorStuff.h"
 
+// Header
 #include "FileIO.h"
 
 

@@ -1,5 +1,6 @@
 
-
+// Windows
+#include <Windows.h>
 
 // Header
 #include "ErrorStuff.h"
@@ -7,7 +8,7 @@
 
 Error::Error(std::string location, std::string msg)
 {
-	this->vk_err = VK_RESULT_MAX_ENUM;
+	this->vk_err = 0;
 	this->err = ExtraError::OK;
 
 	this->location = location;
@@ -16,14 +17,14 @@ Error::Error(std::string location, std::string msg)
 
 Error::Error(ExtraError res, std::string location, std::string msg)
 {
-	this->vk_err = VK_RESULT_MAX_ENUM;
+	this->vk_err = 0;
 	this->err = res;
 
 	this->location = location;
 	this->msg = msg;
 }
 
-Error::Error(VkResult res, std::string location, std::string msg)
+Error::Error(uint32_t res, std::string location, std::string msg)
 {
 	this->vk_err = res;
 	this->err = ExtraError::OK;
@@ -32,7 +33,7 @@ Error::Error(VkResult res, std::string location, std::string msg)
 	this->msg = msg;
 }
 
-Error::Error(VkResult res, ExtraError err, std::string location, std::string msg)
+Error::Error(uint32_t res, ExtraError err, std::string location, std::string msg)
 {
 	this->vk_err = res;
 	this->err = err;
@@ -66,12 +67,12 @@ ErrStack::ErrStack(ExtraError res, std::string location, std::string msg, std::s
 	error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
 }
 
-ErrStack::ErrStack(VkResult res, std::string location, std::string msg)
+ErrStack::ErrStack(uint32_t res, std::string location, std::string msg)
 {
 	error_stack.push_back(Error(res, location, msg));
 }
 
-ErrStack::ErrStack(VkResult res, ExtraError err, std::string location, std::string msg)
+ErrStack::ErrStack(uint32_t res, ExtraError err, std::string location, std::string msg)
 {
 	error_stack.push_back(Error(res, location, msg));
 }
@@ -96,13 +97,13 @@ bool ErrStack::isBad()
 
 void ErrStack::debugPrint()
 {
-	std::cout << "ErrStack :" << std::endl;
+	printf("ErrStack : \n");
 	for (size_t i = 0; i < error_stack.size(); i++) {
 
 		Error& error = error_stack[i];
-		std::cout << i << "." << std::endl;
-		std::cout << "  " << error.location << std::endl;
-		std::cout << "  msg = " << error.msg << std::endl;
+		printf("%I64d. \n", i);
+		printf("  %s \n", error.location.c_str());
+		printf("  msg= %s \n", error.msg.c_str());
 	}
 }
 

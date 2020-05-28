@@ -177,7 +177,7 @@ void Poly::tesselateFirstWinding(LinkageMesh* me)
 		me->ttris_count += 2;
 	}
 	else {
-		std::cout << "Error tesselation of NPolygon not supported" << std::endl;
+		printf("Error tesselation of NPolygon not supported \n");
 		return;
 	}
 }
@@ -231,7 +231,7 @@ void Poly::tesselateAnyWinding(LinkageMesh* me)
 		}		
 	}
 	else {
-		std::cout << "Error tesselation of NPolygon not supported" << std::endl;
+		printf("Error tesselation of NPolygon not supported");
 		return;
 	}
 }

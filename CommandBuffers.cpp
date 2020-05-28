@@ -22,7 +22,7 @@ ErrStack vks::RenderingComandBuffers::recreate(LogicalDevice* logical_dev, Physi
 
 	std::atomic_bool is_err = false;
 
-	std::for_each(std::execution::par, cmd_buff_tasks.begin(), cmd_buff_tasks.end(), 
+	std::for_each(std::execution::seq, cmd_buff_tasks.begin(), cmd_buff_tasks.end(),
 		[this, &is_err, &phys_dev, &logical_dev](CmdBufferTask& task) {
 
 		// Command Pool
@@ -92,47 +92,37 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 		clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		clear_vals[1].depthStencil.depth = 1;
 		clear_vals[2].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		clear_vals[3].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		clear_vals[3].depthStencil.depth = 1;
 		clear_vals[4].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		renderpass_begin_info.clearValueCount = (uint32_t)clear_vals.size();
 		renderpass_begin_info.pClearValues = clear_vals.data();
 
 		vkCmdBeginRenderPass(task.cmd_buff, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 		{
-			// 3D Subpass
-			{			
-				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, 
-					info.g3d_pipe_layout->pipe_layout, 0, 1, &info.g3d_descp->descp_set, 0, NULL);
-
-				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.g3d_pipe->pipeline);  // must go before buffers
-
-				VkBuffer vertex_buffers[] = { info.g3d_vertex_buff->buff };
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-
-				vkCmdDraw(task.cmd_buff, info.g3d_vertex_count, 1, 0, 0);
-			}
-
-			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
-
-			// UI Subpass
+			// Rects Subpass
 			{
 				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					info.ui_pipe_layout->pipe_layout, 0, 1, &info.ui_descp->descp_set, 0, NULL);
+					info.rects_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.rects_pipe->pipeline);
 
-				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.ui_pipe->pipeline);
-
-				VkBuffer vertex_buffs[] = { info.ui_vertex_buff->buff };
+				VkBuffer vertex_buffers[] = { info.rects_vertex_buff->buff };
 				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffs, offsets);
+				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+				vkCmdDraw(task.cmd_buff, info.rects_vertex_count, 1, 0, 0);
+			}
+			
+			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
 
-				for (UI_DrawBatch& batch : *info.ui_draw_batches) {
+			// Circles Subpass
+			{
+				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					info.circles_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.circles_pipe->pipeline);
 
-					if (batch.inst_count) {
-						vkCmdDraw(task.cmd_buff, batch.vert_count, batch.inst_count,
-							batch.vert_idx_start, batch.inst_idx_start);
-					}
-				}
+				VkBuffer vertex_buffers[] = { info.circles_vertex_buff->buff };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+				vkCmdDraw(task.cmd_buff, info.circles_vertex_count, 1, 0, 0);
 			}
 
 			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
@@ -140,12 +130,13 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 			// Compose Subpass
 			{
 				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					info.compose_pipe_layout->pipe_layout, 0, 1, &info.compose_descp->descp_set, 0, NULL);
+					info.compose_pipe_layout->pipe_layout, 0, 1, &info.compose_descp_set->descp_set, 0, NULL);
 
 				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.compose_pipe->pipeline);
 
 				vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 			}
+			
 		}
 		vkCmdEndRenderPass(task.cmd_buff);
 
@@ -223,9 +214,13 @@ vks::Fence::~Fence()
 	}
 }
 
-ErrStack vks::Semaphore::create(LogicalDevice* logical_dev)
+ErrStack vks::Semaphore::recreate(LogicalDevice* logical_dev)
 {
 	this->logical_dev = logical_dev;
+
+	if (this->semaphore != VK_NULL_HANDLE) {
+		destroy();
+	}
 
 	VkSemaphoreCreateInfo sem_info = {};
 	sem_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;

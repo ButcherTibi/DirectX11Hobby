@@ -8,6 +8,17 @@
 #include "glm\vec3.hpp"
 #include "glm\mat4x4.hpp"
 
+// VMA
+#include "vk_mem_alloc.h"
+
+// Windows
+#include <Windows.h>
+
+// Vulkan
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_win32.h>
+
 // Mine
 #include "ErrorStuff.h"
 #include "GPU_ShaderTypes.h"
@@ -188,8 +199,7 @@ namespace vks {
 
 		ErrStack recreateStaging(LogicalDevice* logical_dev, VkDeviceSize min_size);
 
-		ErrStack load(CommandPool* cmd_pool, Buffer* staging,
-			void* data, size_t size);
+		ErrStack load(void* data, size_t size, CommandPool* cmd_pool, Buffer* staging);
 
 		void scheduleLoad(size_t offset, Buffer* staging, void* data, size_t size);
 
@@ -203,28 +213,6 @@ namespace vks {
 		ErrStack setDebugName(std::string name);
 	};
 
-
-	struct DesiredImageProps
-	{
-		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-		VkImageType type = VK_IMAGE_TYPE_2D;
-		VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
-		VkImageUsageFlags usage;
-
-		// Not used
-		VkImageFormatProperties props_found;
-	};
-
-	struct ImageCreateInfo {
-		std::vector<DesiredImageProps>* desired_props;
-		uint32_t width;
-		uint32_t height;
-		uint32_t mip_levels = 1;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-
-		// View
-		VkImageAspectFlags aspect;
-	};
 
 	class Image {
 		LogicalDevice* logical_dev = nullptr;
@@ -245,15 +233,11 @@ namespace vks {
 		uint32_t mip_lvl;
 		uint32_t samples;
 
-		// View
-		VkImageView img_view = VK_NULL_HANDLE;
-
 	private:
 		ErrStack copyBufferToImage(CommandPool* cmd_pool, Buffer* buff);
 
 	public:
-		ErrStack recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev,
-			ImageCreateInfo& img_info, VmaMemoryUsage mem_usage);
+		ErrStack recreate(LogicalDevice* logical_dev, VkImageCreateInfo* info, VmaMemoryUsage mem_usage);
 
 		ErrStack setDebugName(std::string name);
 
@@ -266,6 +250,24 @@ namespace vks {
 
 		~Image();	
 	};
+
+
+	class ImageView {
+		LogicalDevice* logical_dev = nullptr;
+
+	public:
+		VkImageView view;
+
+	public:
+		ErrStack create(LogicalDevice* logical_dev, VkImageViewCreateInfo* info);
+
+		ErrStack setDebugName(std::string name);
+
+		void destroy();
+
+		~ImageView();
+	};
+
 
 	class Sampler {
 		LogicalDevice const* logical_dev = nullptr;
@@ -286,8 +288,7 @@ namespace vks {
 
 		VkRenderPass renderpass = VK_NULL_HANDLE;
 	public:
-		ErrStack create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, VkFormat present_format,
-			VkFormat depth_format);
+		ErrStack create(LogicalDevice* logical_dev, VkRenderPassCreateInfo* info);
 
 		void destroy();
 
@@ -295,22 +296,15 @@ namespace vks {
 	};
 
 
-	struct FrameBufferCreateInfo {
-		Image* g3d_color_MSAA_img = nullptr;
-		Image* g3d_depth_img = nullptr;
-		Image* g3d_color_resolve_img = nullptr;
-		Image* ui_color_img = nullptr;
-		Swapchain* swapchain = nullptr;
-	};
-
 	class Framebuffers {
 		LogicalDevice* logical_dev = nullptr;
 	public:
 
 		std::vector<VkFramebuffer> frame_buffs;
 	public:
-		ErrStack create(LogicalDevice* logical_dev, FrameBufferCreateInfo& info,
-			Renderpass* renderpass, uint32_t width, uint32_t height);
+		ErrStack create(LogicalDevice* logical_dev, Renderpass* renderpass,
+			std::array<VkImageView, 4>& attachments, std::vector<VkImageView>& swapchain_views,
+			uint32_t width, uint32_t height);
 
 		void destroy();
 
@@ -318,38 +312,52 @@ namespace vks {
 	};
 
 
-	struct DescriptorWrite {
-		VkDescriptorImageInfo* img_info = NULL;  // layout must be the one at rendertime
-		VkDescriptorBufferInfo* buff_info = NULL;
-
-		uint32_t dstBinding;
-		uint32_t dstArrayElement;
-		uint32_t descriptorCount;
-		VkDescriptorType descriptorType;
-	};
-
-	class Descriptor {
+	class DescriptorSetLayout {
 		LogicalDevice* logical_dev = nullptr;
 
 	public:
-
 		VkDescriptorSetLayout descp_layout = VK_NULL_HANDLE;
-		VkDescriptorPool descp_pool = VK_NULL_HANDLE;
-		VkDescriptorSet descp_set = VK_NULL_HANDLE;
-
-		std::vector<VkWriteDescriptorSet> writes;
 
 	public:
 		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings);
 
 		ErrStack setDebugName(std::string name);
 
-		void update(std::vector<DescriptorWrite>& descp_writes);
+		void destroy();
 
-		void destroyLayout();
-		void destroyPool();
+		~DescriptorSetLayout();
+	};
 
-		~Descriptor();
+
+	class DescriptorPool {
+		LogicalDevice* logical_dev = nullptr;
+
+	public:
+		VkDescriptorPool descp_pool = VK_NULL_HANDLE;
+
+	public:
+		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools);
+
+		ErrStack setDebugName(std::string name);
+
+		void destroy();
+
+		~DescriptorPool();
+	};
+
+
+	class DescriptorSet {
+		LogicalDevice* logical_dev = nullptr;
+
+	public:
+		VkDescriptorSet descp_set = VK_NULL_HANDLE;
+
+	public:
+		ErrStack create(LogicalDevice* logical_dev, DescriptorPool* pool, DescriptorSetLayout* layout);
+
+		ErrStack setDebugName(std::string name);
+
+		void update(std::vector<VkWriteDescriptorSet>& writes);
 	};
 
 
@@ -360,8 +368,7 @@ namespace vks {
 		VkPipelineLayout pipe_layout = VK_NULL_HANDLE;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, Descriptor* descp);
-		ErrStack create(LogicalDevice* logical_dev);
+		ErrStack create(LogicalDevice* logical_dev, VkPipelineLayoutCreateInfo* info);
 
 		void destroy();
 
@@ -387,88 +394,17 @@ namespace vks {
 		~ShaderModule();
 	};
 
-	struct GraphicsPipelineInfo {
-		// Shaders
-		std::vector<ShaderModule*> shader_modules;
-
-		// Vertex Input
-		VkVertexInputBindingDescription vertex_input_binding_descp = {};
-		std::vector<VkVertexInputAttributeDescription> vertex_input_atribute_descp;
-
-		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
-
-		// Input Assembly
-		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
-
-		// Tesselation
-
-		// Viewport state 
-		VkViewport viewport = {};
-		VkRect2D scissor = {};
-		VkPipelineViewportStateCreateInfo viewport_state_info = {};
-
-		// Rasterization state
-		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
-
-		// MultiSample
-		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
-
-		// DepthSample
-		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
-
-		// Color Blending state
-		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
-		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
-	};
 
 	class GraphicsPipeline {
-		LogicalDevice const* logical_dev = nullptr;
+		LogicalDevice* logical_dev = nullptr;
 	public:	
-		// Shader Stages
-		std::vector<VkPipelineShaderStageCreateInfo> shader_stages;
-
-		// Vertex Input
-		VkVertexInputBindingDescription vertex_input_binding_descp = {};
-		std::vector<VkVertexInputAttributeDescription> vertex_input_atribute_descp;
-
-		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
-
-		// Input Assembly
-		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
-
-		// Viewport state 
-		VkViewport viewport = {};
-		VkRect2D scissor = {};
-		VkPipelineViewportStateCreateInfo viewport_state_info = {};
-
-		// Rasterization state
-		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
-
-		// MultiSample
-		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
-
-		// DepthSample
-		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
-
-		// Color Blending state
-		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
-		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
 		
-
 		VkPipeline pipeline = VK_NULL_HANDLE;
 
 	public:
-		GraphicsPipeline();
-		
-		void setToDefault();
+		ErrStack create(LogicalDevice* logical_dev, VkGraphicsPipelineCreateInfo* info);
 
-		// Helpers
-		void configureFor3D();
-		void configureForUserInterface();
-
-		ErrStack recreate(LogicalDevice* logical_dev, ShaderModule* vertex_module, ShaderModule* frag_module,
-			uint32_t width, uint32_t height,
-			PipelineLayout* pipe_layout, Renderpass* renderpass, uint32_t subpass_idx);
+		ErrStack setDebugName(std::string name);
 
 		void destroy();
 
@@ -490,25 +426,27 @@ namespace vks {
 		uint32_t width;
 		uint32_t height;
 
-		// 3D
-		Descriptor* g3d_descp;
-		PipelineLayout* g3d_pipe_layout;
-		GraphicsPipeline* g3d_pipe;
+		// Common
+		Buffer* uniform_buff;
+		DescriptorSet* uniform_descp_set;
 
-		Buffer* g3d_vertex_buff;
-		uint32_t g3d_vertex_count;
+		// Rects
+		PipelineLayout* rects_pipe_layout;
+		GraphicsPipeline* rects_pipe;
 
-		// UI
-		Descriptor* ui_descp;
-		PipelineLayout* ui_pipe_layout;
-		GraphicsPipeline* ui_pipe;
+		Buffer* rects_vertex_buff;
+		uint32_t rects_vertex_count;
 
-		std::vector<UI_DrawBatch>* ui_draw_batches;
-		Buffer* ui_vertex_buff;
-		Buffer* ui_storage_buff;
+		// Circles
+		PipelineLayout* circles_pipe_layout;
+		GraphicsPipeline* circles_pipe;
+
+		Buffer* circles_vertex_buff;
+		uint32_t circles_vertex_count;
 
 		// Compose
-		Descriptor* compose_descp;
+		DescriptorSet* compose_descp_set;
+		
 		PipelineLayout* compose_pipe_layout;
 		GraphicsPipeline* compose_pipe;
 	};
@@ -551,7 +489,7 @@ namespace vks {
 		VkSemaphore semaphore = VK_NULL_HANDLE;
 	
 	public:
-		ErrStack create(LogicalDevice* logical_dev);
+		ErrStack recreate(LogicalDevice* logical_dev);
 
 		void destroy();
 

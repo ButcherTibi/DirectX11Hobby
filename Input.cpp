@@ -1,6 +1,8 @@
 
+// Windows
+#include <Windows.h>
+
 // Standard
-#include <iostream>
 #include <execution>
 
 #include "Input.h"
@@ -31,7 +33,7 @@ bool msbWinShort(SHORT val)
 		return val & 0x8000'0000'0000'0000;
 	}
 
-	std::cout << "The Windows SHORT isn't short at all" << std::endl;
+	printf("The Windows SHORT isn't short at all");
 
 	return false;
 }

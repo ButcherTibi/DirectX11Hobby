@@ -1,382 +1,141 @@
 
-// Standard
-
+// mine
 #include "MathTypes.h"
-#include "stb_image.h"
-#include "TextRendering.h"
+#include "FileIO.h"
 
 // Header
 #include "Renderer.h"
 
 
 // globals
-Renderer renderer;
+VulkanRenderer renderer;
 
 
-glm::vec3 Camera::right()
+void calcBoxVerts(ui::BoxModel& box,
+	std::array<GPU_Rects_Vertex, 18>& rects_verts,
+	std::array<GPU_Circles_Vertex, 24>& circles_verts)
 {
-	return glm::normalize(rotatePos({ 1.0f, 0.0f, 0.0f }, glm::inverse(rotation)));
-}
-
-glm::vec3 Camera::up()
-{
-	return glm::normalize(rotatePos({ 0.0f, 1.0f, 0.0f }, glm::inverse(rotation)));
-}
-
-glm::vec3 Camera::forward()
-{
-	return glm::normalize(rotatePos({ 0.0f, 0.0f, -1.0f }, glm::inverse(rotation)));
-}
-
-void Camera::rotateCameraUpLocked(float delta_pitch, float delta_yaw)
-{
-	float pitch_rad = glm::radians(delta_pitch);
-	float yaw_rad = glm::radians(delta_yaw);
-
-	rotation = rotateQuat(rotation, pitch_rad, right());
-	rotation = glm::normalize(rotation);
-	rotation = rotateQuat(rotation, yaw_rad, { 0, 1, 0 });
-	rotation = glm::normalize(rotation);
-}
-
-void Camera::orbitCameraArcball(glm::vec3 center, float delta_pitch, float delta_yaw)
-{
-	glm::vec3 right_axis = right();
-	glm::vec3 up_axis = up();
-
-	float pitch_rad = glm::radians(delta_pitch);
-	float yaw_rad = glm::radians(delta_yaw);
-
-	// Orbit Position
-	position = rotatePos(position, -pitch_rad, right_axis, center);
-	position = rotatePos(position, -yaw_rad, up_axis, center);
-
-	// Make camera point at center
-	rotation = rotateQuat(rotation, pitch_rad, right_axis);
-	rotation = glm::normalize(rotation);
-	rotation = rotateQuat(rotation, yaw_rad, up_axis);
-	rotation = glm::normalize(rotation);
-}
-
-void Camera::zoomCamera(glm::vec3 center, float zoom)
-{
-	float dist = glm::distance(center, position);
-	float amount = dist * zoom;
-
-	glm::vec3 cam_forward = forward();
-	glm::vec3 cam_pos = position + cam_forward * amount;
-
-	// only move camera if center is not behind
-	if (glm::dot(cam_pos - center, cam_forward) < 0) {
-		position = cam_pos;
-	}
-	// TODO: make camera stop at exactly dot == 0
-}
-
-void Camera::panCamera(float delta_vertical, float delta_horizontal)
-{
-	position += up() * delta_vertical;
-	position += right() * -delta_horizontal;
-}
-
-ErrStack Renderer::create3D_DiffuseTexture(BasicBitmap& mesh_diffuse)
-{
-	std::vector<vks::DesiredImageProps> props(1);
-	props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-	vks::ImageCreateInfo info = {};
-	info.desired_props = &props;
-	info.width = mesh_diffuse.width;
-	info.height = mesh_diffuse.height;
-	info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	checkErrStack(mesh_diffuse_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-		"failed to create texture image");
-	checkErrStack(mesh_diffuse_img.setDebugName("mesh diffuse texture"), "");
-
-	// Load Bitmap into Image
-	checkErrStack1(staging_buff.recreateStaging(&logical_dev, mesh_diffuse.calcMemSize()));
-
-	checkErrStack(mesh_diffuse_img.load(mesh_diffuse.colors.data(), mesh_diffuse.calcMemSize(),
-		&cmd_pool, &staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-		"failed to load pixels into image");
-
-	return ErrStack();
-}
-
-ErrStack Renderer::recreate3D_MeshBuffers(std::vector<LinkageMesh>& meshes)
-{
-	std::vector<GPU_3D_Vertex> gpu_3d_verts;
-	std::vector<GPU_3D_Instance> gpu_3d_storage;
-
-	// calculate sizes
-	size_t vertex_buff_size;
-	size_t storage_buff_size;
+	auto createRoundedRectangle = [&rects_verts, &circles_verts](glm::vec3 origin, float width, float height,
+		float tl_radius, float tr_radius, float br_radius, float bl_radius,
+		size_t rect_idx, size_t circles_idx)
 	{
-		uint32_t total_idxs_size = 0;
+		glm::vec2 vec2_origin{ origin.x, origin.y };
 
-		for (LinkageMesh& mesh : meshes) {
+		glm::vec2 top_left_up = vec2_origin;
+		glm::vec2 top_left_down = vec2_origin;
 
-			total_idxs_size += mesh.ttris_count * 3;
-		}
+		glm::vec2 top_right_up = vec2_origin;
+		glm::vec2 top_right_down = vec2_origin;
 
-		gpu_3d_verts.resize(total_idxs_size);
-		gpu_3d_storage.resize(meshes.size());
+		glm::vec2 bot_right_up = vec2_origin;
+		glm::vec2 bot_right_down = vec2_origin;
 
-		vertex_buff_size = gpu_3d_verts.size() * sizeof(GPU_3D_Vertex);
-		storage_buff_size = gpu_3d_storage.size() * sizeof(GPU_3D_Instance);
+		glm::vec2 bot_left_up = vec2_origin;
+		glm::vec2 bot_left_down = vec2_origin;
 
-		g3d_vertex_count = total_idxs_size;
-	}
+		// Box positions
+		top_left_up.x += tl_radius;
+		top_left_down.y += tl_radius;
 
-	size_t staging_size = vertex_buff_size > storage_buff_size ? vertex_buff_size : storage_buff_size;
-	checkErrStack1(staging_buff.recreateStaging(&logical_dev, staging_size));
+		top_right_up.x += width - tr_radius;
+		top_right_down.x += width;
+		top_right_down.y += tr_radius;
 
-	checkErrStack(g3d_vertex_buff.recreate(&logical_dev, vertex_buff_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VMA_MEMORY_USAGE_GPU_ONLY),
-		"failed to recreate 3D vertex buffer");
+		bot_right_up.x += width;
+		bot_right_up.y += height - br_radius;
+		bot_right_down.x += width - br_radius;
+		bot_right_down.y += height;
 
-	checkErrStack(g3d_storage_buff.recreate(&logical_dev, storage_buff_size,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VMA_MEMORY_USAGE_GPU_ONLY),
-		"failed to recreate 3D storage buffer");
+		bot_left_up.y += height - bl_radius;
+		bot_left_down.x += bl_radius;
+		bot_left_down.y += height;
 
-	// Extract Data
-	uint64_t vert_idx = 0;
+		// Box triangles
+		rects_verts[rect_idx].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 1].pos = { top_right_up, origin.z };
+		rects_verts[rect_idx + 2].pos = { top_right_down, origin.z };
 
-	for (uint64_t mesh_idx = 0; mesh_idx < meshes.size(); mesh_idx++) {
+		rects_verts[rect_idx + 3].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 4].pos = { top_right_down, origin.z };
+		rects_verts[rect_idx + 5].pos = { bot_right_up, origin.z };
+		
+		rects_verts[rect_idx + 6].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 7].pos = { bot_right_up, origin.z };
+		rects_verts[rect_idx + 8].pos = { bot_right_down, origin.z };
+		
+		rects_verts[rect_idx + 9].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 10].pos = { bot_right_down, origin.z };
+		rects_verts[rect_idx + 11].pos = { bot_left_down, origin.z };
+		
+		rects_verts[rect_idx + 12].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 13].pos = { bot_left_down, origin.z };
+		rects_verts[rect_idx + 14].pos = { bot_left_up, origin.z };
+		
+		rects_verts[rect_idx + 15].pos = { top_left_up, origin.z };
+		rects_verts[rect_idx + 16].pos = { bot_left_up, origin.z };
+		rects_verts[rect_idx + 17].pos = { top_left_down, origin.z };
 
-		LinkageMesh& mesh = meshes[mesh_idx];
+		// Corner Circles
+		auto createRectangle = [&circles_verts](glm::vec3 origin, float radius, size_t idx) {
 
-		for (Poly& p : mesh.polys) {
-			for (TesselationTris& t : p.tess_tris) {
-				for (Vertex* v : t.vs) {
+			glm::vec2 vec2_origin{ origin.x, origin.y };
+			
+			glm::vec2 top_left = vec2_origin;
+			glm::vec2 top_right = vec2_origin;
+			glm::vec2 bot_right = vec2_origin;
+			glm::vec2 bot_left = vec2_origin;
+		
+			float diameter = radius * 2;
+			top_right.x += diameter;
+			bot_right += diameter;
+			bot_left.y += diameter;
 
-					GPU_3D_Vertex& gpu_v = gpu_3d_verts[vert_idx];
+			// Position
+			circles_verts[idx].pos = { top_left, origin.z };
+			circles_verts[idx + 1].pos = { top_right, origin.z };
+			circles_verts[idx + 2].pos = { bot_right, origin.z };
 
-					// Vertex
-					gpu_v.mesh_id = (uint32_t)mesh_idx;
-					gpu_v.pos = v->pos;
-					gpu_v.vertex_normal = v->normal;
-					gpu_v.tess_normal = t.normal;
-					gpu_v.poly_normal = p.normal;
-					gpu_v.uv = v->uv;
-					gpu_v.color = v->color;
-					vert_idx++;
-				}
+			circles_verts[idx + 3].pos = { bot_left, origin.z };
+			circles_verts[idx + 4].pos = { top_left, origin.z };
+			circles_verts[idx + 5].pos = { bot_right, origin.z };
+
+			// Center and Radius
+			glm::vec2 center = vec2_origin;
+			center += radius;
+
+			for (auto i = idx; i < idx + 6; i++) {
+				circles_verts[idx].center = center;
+				circles_verts[idx].radius = radius;
 			}
-		}
+		};
 
-		// Mesh Data
-		GPU_3D_Instance& gpu_mesh = gpu_3d_storage[mesh_idx];
-		gpu_mesh.pos = mesh.position;
-		gpu_mesh.rot.data = mesh.rotation.data;  // same order x,y,z,w
-	}
+		glm::vec3 tr_origin = origin;
+		glm::vec3 br_origin = origin;
+		glm::vec3 bl_origin = origin;
 
-	// Load extracted data
-	checkErrStack(g3d_vertex_buff.load(&cmd_pool, &staging_buff,
-		gpu_3d_verts.data(), vertex_buff_size),
-		"failed to load 3D vertices");
+		// Top Left Circle
+		createRectangle(origin, tl_radius, circles_idx);
 
-	checkErrStack(g3d_storage_buff.load(&cmd_pool, &staging_buff,
-		gpu_3d_storage.data(), storage_buff_size),
-		"failed to load storage data");
+		// Top Right Circle
+		tr_origin.x += width - (tr_radius * 2);
+		createRectangle(tr_origin, tr_radius, circles_idx + 6);
 
-	return ErrStack();
+		// Bot Right Circle
+		br_origin.x += width - (br_radius * 2);
+		br_origin.y += height - (br_radius * 2);
+		createRectangle(br_origin, br_radius, circles_idx + 12);
+
+		// Bot Left Circle
+		bl_origin.y += height - (bl_radius * 2);
+		createRectangle(bl_origin, bl_radius, circles_idx + 18);
+	};
+
+	// Create Border Box
+	
 }
 
-ErrStack Renderer::recreate3D_UniformBuffer(Camera& camera)
-{
-	size_t uniform_buff_size = sizeof(GPU_3D_Uniform);
 
-	checkErrStack1(staging_buff.recreateStaging(&logical_dev, uniform_buff_size));
-
-	checkErrStack(g3d_uniform_buff.recreate(&logical_dev, uniform_buff_size,
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VMA_MEMORY_USAGE_CPU_TO_GPU),
-		"failed to recreate 3D uniform buffer");
-
-	// extract data
-	GPU_3D_Uniform gpu_uniform;
-	gpu_uniform.camera_pos = camera.position;
-	gpu_uniform.camera_rot.data = camera.rotation.data;
-
-	// conform aspect ratio to render resolution
-	float width = (float)swapchain.resolution.width;
-	float height = (float)swapchain.resolution.height;
-
-	gpu_uniform.camera_perspective = glm::perspectiveFovRH_ZO(
-		glm::radians(camera.fov), width, height,
-		camera.near_plane, camera.far_plane);
-
-	gpu_uniform.camera_forward = camera.forward();
-
-	// load
-	checkErrStack(g3d_uniform_buff.load(&cmd_pool, &staging_buff,
-		&gpu_uniform, g3d_uniform_buff.buff_alloc_info.size), "");
-
-	return ErrStack();
-}
-
-ErrStack Renderer::recreateUI_MeshBuffers(TextStuff& txt_rend)
-{
-	// calculate sizes
-	size_t vertex_buff_size = txt_rend.char_meshs.size() * 6 * sizeof(GPU_UI_Vertex);
-	size_t storage_buff_size = 0;
-	{
-		ui_batches.resize(txt_rend.char_meshs.size());
-
-		for (CharacterMesh& mesh : txt_rend.char_meshs) {
-			storage_buff_size += mesh.instances.size() * sizeof(GPU_UI_Instance);
-		}
-	}
-
-	size_t staging_size = vertex_buff_size > storage_buff_size ? vertex_buff_size : storage_buff_size;
-	checkErrStack1(staging_buff.recreateStaging(&logical_dev, staging_size));
-
-	checkErrStack(ui_vertex_buff.recreate(&logical_dev, vertex_buff_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VMA_MEMORY_USAGE_GPU_ONLY),
-		"failed to recreate UI vertex buffer");
-
-	checkErrStack(ui_storage_buff.recreate(&logical_dev, storage_buff_size,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VMA_MEMORY_USAGE_GPU_ONLY),
-		"failed to recreate UI storage buffer");
-
-	// Transfer Vertices To Vertex Buffer
-	uint32_t batch_idx = 0;
-	uint32_t vert_count = 0;
-
-	for (CharacterMesh& mesh : txt_rend.char_meshs) {
-
-		UI_DrawBatch& batch = ui_batches[batch_idx++];
-		batch.vert_count = 6;
-		batch.vert_idx_start = vert_count;
-
-		std::array<GPU_UI_Vertex, 6> gpu_verts;
-		gpu_verts[0].local_pos = mesh.verts[0];
-		gpu_verts[1].local_pos = mesh.verts[1];
-		gpu_verts[2].local_pos = mesh.verts[3];
-
-		gpu_verts[3].local_pos = mesh.verts[1];
-		gpu_verts[4].local_pos = mesh.verts[2];
-		gpu_verts[5].local_pos = mesh.verts[3];
-
-		for (uint32_t i = 0; i < gpu_verts.size(); i++) {
-			gpu_verts[i].local_vert_idx = i;
-		}
-
-		ui_vertex_buff.scheduleLoad(vert_count * sizeof(GPU_UI_Vertex), &staging_buff,
-			gpu_verts.data(), gpu_verts.size() * sizeof(GPU_UI_Vertex));
-
-		vert_count += batch.vert_count;
-	}
-	checkErrStack(ui_vertex_buff.flush(&cmd_pool, &staging_buff),
-		"failed to flush UI vertex buffer content");
-
-	// Transfer Instances To Storage Buffer
-	batch_idx = 0;
-	uint32_t inst_count = 0;
-
-	for (CharacterMesh& mesh : txt_rend.char_meshs) {
-
-		UI_DrawBatch& batch = ui_batches[batch_idx++];
-		batch.inst_count = (uint32_t)mesh.instances.size();
-		batch.inst_idx_start = inst_count;
-
-		for (CharacterInstance& inst : mesh.instances) {
-
-			GPU_UI_Instance gpu_inst;
-			gpu_inst.pos = inst.screen_pos;
-			gpu_inst.scale = inst.scale;
-
-			gpu_inst.uvs[0] = inst.zone->bb_uv.getTopLeft();
-			gpu_inst.uvs[1] = inst.zone->bb_uv.getTopRight();
-			gpu_inst.uvs[2] = inst.zone->bb_uv.getBotLeft();
-
-			gpu_inst.uvs[3] = inst.zone->bb_uv.getTopRight();
-			gpu_inst.uvs[4] = inst.zone->bb_uv.getBotRight();
-			gpu_inst.uvs[5] = inst.zone->bb_uv.getBotLeft();
-
-			ui_storage_buff.scheduleLoad(inst_count * sizeof(GPU_UI_Instance), &staging_buff,
-				&gpu_inst, sizeof(GPU_UI_Instance));
-
-			inst_count++;
-		}
-	}
-	checkErrStack(ui_storage_buff.flush(&cmd_pool, &staging_buff),
-		"failed to flush UI storage buffer content");
-
-	return ErrStack();
-}
-
-Renderer::Renderer()
-{
-
-}
-
-struct UpdateVulkanObjects {
-	bool instance;
-	bool surface;
-	bool phys_dev;
-	bool logical_dev;
-	bool cmd_pool;
-	bool staging_buff;
-
-	// Frame
-	bool swapchain;
-	bool g3d_color_MSAA_img;
-	bool g3d_depth_img;
-	bool g3d_resolve_img;
-	bool ui_color_img;
-	bool renderpass;
-	bool framebuffs;
-
-	// 3D
-	bool g3d_descp_layout;
-	bool g3d_mesh_diffuse_tex;
-	bool g3d_mesh_diffuse_sampler;
-	bool g3d_vertex_buff;
-	bool g3d_storage_buff;
-	bool g3d_uniform_buff;
-	bool g3d_vertex_shader;
-	bool g3d_fragment_shader;
-	bool g3d_pipe_layout;
-	bool g3d_pipe;
-	bool g3d_descp_set_write;
-
-	// UI
-	bool ui_descp_layout;
-	bool ui_char_atlas_tex;
-	bool ui_char_atlas_sampler;
-	bool ui_vertex_buff;
-	bool ui_storage_buff;
-	bool ui_vertex_shader;
-	bool ui_fragment_shader;
-	bool ui_pipe_layout;
-	bool ui_pipe;
-	bool ui_descp_set_write;
-
-	// Composition
-	bool comp_descp_layout;
-	bool comp_vertex_shader;
-	bool comp_fragment_shader;
-	bool comp_pipe_layout;
-	bool comp_pipe;
-	bool comp_descp_set_write;
-
-	// Command Buffers
-	bool cmd_buffs;
-	bool cmd_buffs_update;
-
-	// Sync
-	bool present_img_acquired_sem;
-	bool rendering_ended_sem;
-};
-
-ErrStack Renderer::recreate(RenderingContent& content)
+ErrStack VulkanRenderer::recreate(RenderingContent& content)
 {
 	if (instance.instance == VK_NULL_HANDLE) {
 		checkErrStack1(instance.create());
@@ -409,506 +168,1002 @@ ErrStack Renderer::recreate(RenderingContent& content)
 		checkErrStack1(swapchain.setDebugName("swapchain"));
 	}
 
-	std::vector<vks::DesiredImageProps> props;
+	if (rects_color_img.img == VK_NULL_HANDLE) {
 
-	// 3D color multisample
-	if (g3d_color_MSAA_img.img == VK_NULL_HANDLE) {
+		VkImageCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.imageType = VK_IMAGE_TYPE_2D;
+		info.format = swapchain.surface_format.format;
+		info.extent.width = swapchain.resolution.width;
+		info.extent.height = swapchain.resolution.height;
+		info.extent.depth = 1;
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		props.resize(1);
-		props[0].format = swapchain.surface_format.format;
-		props[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-		vks::ImageCreateInfo info = {};
-		info.desired_props = &props;
-		info.width = swapchain.resolution.width;
-		info.height = swapchain.resolution.height;
-		info.samples = phys_dev.max_MSAA;
-		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		checkErrStack(g3d_color_MSAA_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-			"failed to create image for 3D color MSAA");
-
-		checkErrStack(g3d_color_MSAA_img.setDebugName("3D color MSAA"), "");
+		checkErrStack(rects_color_img.recreate(&logical_dev, &info, VMA_MEMORY_USAGE_GPU_ONLY), "");
+		checkErrStack(rects_color_img.setDebugName("rects color"), "");
 	}
 
-	// 3D Depth
-	if (g3d_depth_img.img == VK_NULL_HANDLE) {
+	if (rects_depth_img.img == VK_NULL_HANDLE) {
 
-		props.resize(1);
-		props[0].format = VK_FORMAT_D32_SFLOAT;
-		props[0].usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		VkImageCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.imageType = VK_IMAGE_TYPE_2D;
+		info.format = VK_FORMAT_D32_SFLOAT;
+		info.extent.width = swapchain.resolution.width;
+		info.extent.height = swapchain.resolution.height;
+		info.extent.depth = 1;
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		vks::ImageCreateInfo info = {};
-		info.desired_props = &props;
-		info.width = swapchain.resolution.width;
-		info.height = swapchain.resolution.height;
-		info.samples = phys_dev.max_MSAA;
-		info.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-		checkErrStack(g3d_depth_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-			"failed to create image for 3D depth");
-
-		checkErrStack(g3d_depth_img.setDebugName("3D depth"), "")
+		checkErrStack(rects_depth_img.recreate(&logical_dev, &info, VMA_MEMORY_USAGE_GPU_ONLY), "");
+		checkErrStack(rects_depth_img.setDebugName("rects depth"), "");
 	}
 
-	// 3D Color Resolve
-	if (g3d_color_resolve_img.img == VK_NULL_HANDLE) {
+	if (circles_color_img.img == VK_NULL_HANDLE) {
 
-		props.resize(1);
-		props[0].format = swapchain.surface_format.format;
-		props[0].usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		VkImageCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.imageType = VK_IMAGE_TYPE_2D;
+		info.format = swapchain.surface_format.format;;
+		info.extent.width = swapchain.resolution.width;
+		info.extent.height = swapchain.resolution.height;
+		info.extent.depth = 1;
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		vks::ImageCreateInfo info = {};
-		info.desired_props = &props;
-		info.width = swapchain.resolution.width;
-		info.height = swapchain.resolution.height;
-		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		checkErrStack(g3d_color_resolve_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-			"failed to create image for 3D color resolve");
-
-		checkErrStack(g3d_color_resolve_img.setDebugName("3D color resolve"), "");
+		checkErrStack(circles_color_img.recreate(&logical_dev, &info, VMA_MEMORY_USAGE_GPU_ONLY), "");
+		checkErrStack(circles_color_img.setDebugName("circles color"), "");
 	}
 
-	// UI Color
-	if (ui_color_img.img == VK_NULL_HANDLE) {
+	if (circles_depth_img.img == VK_NULL_HANDLE) {
 
-		props.resize(1);
-		props[0].format = swapchain.surface_format.format;
-		props[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		VkImageCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		info.imageType = VK_IMAGE_TYPE_2D;
+		info.format = VK_FORMAT_D32_SFLOAT;
+		info.extent.width = swapchain.resolution.width;
+		info.extent.height = swapchain.resolution.height;
+		info.extent.depth = 1;
+		info.mipLevels = 1;
+		info.arrayLayers = 1;
+		info.samples = VK_SAMPLE_COUNT_1_BIT;
+		info.tiling = VK_IMAGE_TILING_OPTIMAL;
+		info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-		vks::ImageCreateInfo info = {};
-		info.desired_props = &props;
-		info.width = swapchain.resolution.width;
-		info.height = swapchain.resolution.height;
-		info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-		checkErrStack(ui_color_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-			"failed to create image for UI color");
-
-		checkErrStack(ui_color_img.setDebugName("UI color"), "");
+		checkErrStack(circles_depth_img.recreate(&logical_dev, &info, VMA_MEMORY_USAGE_GPU_ONLY), "");
+		checkErrStack(circles_depth_img.setDebugName("rects depth"), "");
 	}
-
 
 	if (renderpass.renderpass == VK_NULL_HANDLE) {
 
-		checkErrStack(renderpass.create(&logical_dev, &phys_dev, 
-			swapchain.surface_format.format, g3d_depth_img.format),
+		VkAttachmentDescription color_atach = {};
+		color_atach.format = swapchain.surface_format.format;
+		color_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		color_atach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentDescription depth_atach = {};
+		depth_atach.format = VK_FORMAT_D32_SFLOAT;
+		depth_atach.samples = VK_SAMPLE_COUNT_1_BIT;
+		depth_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		depth_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		depth_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		depth_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		depth_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		depth_atach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		// Rects pass
+		VkAttachmentReference rects_color_atach_ref = {};
+		rects_color_atach_ref.attachment = 0;
+		rects_color_atach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference rects_color_read_atach_ref = {};
+		rects_color_read_atach_ref.attachment = 0;
+		rects_color_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkAttachmentReference rects_depth_atach_ref = {};
+		rects_depth_atach_ref.attachment = 1;
+		rects_depth_atach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference rects_depth_read_atach_ref = {};
+		rects_depth_read_atach_ref.attachment = 1;
+		rects_depth_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkSubpassDescription rects_subpass = {};
+		rects_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		rects_subpass.colorAttachmentCount = 1;
+		rects_subpass.pColorAttachments = &rects_color_atach_ref;
+		rects_subpass.pDepthStencilAttachment = &rects_depth_atach_ref;
+
+		// Circles pass
+		VkAttachmentReference circles_color_atach_ref = {};
+		circles_color_atach_ref.attachment = 2;
+		circles_color_atach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference circles_color_read_atach_ref = {};
+		circles_color_read_atach_ref.attachment = 2;
+		circles_color_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkAttachmentReference circles_depth_atach_ref = {};
+		circles_depth_atach_ref.attachment = 3;
+		circles_depth_atach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference circles_depth_read_atach_ref = {};
+		circles_depth_read_atach_ref.attachment = 3;
+		circles_depth_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		VkSubpassDescription circles_subpass = {};
+		circles_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		circles_subpass.colorAttachmentCount = 1;
+		circles_subpass.pColorAttachments = &circles_color_atach_ref;
+		circles_subpass.pDepthStencilAttachment = &circles_depth_atach_ref;
+
+		// Composite pass
+		VkAttachmentDescription compose_color_atach = color_atach;
+		compose_color_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		VkAttachmentReference compose_color_atach_ref = {};
+		compose_color_atach_ref.attachment = 4;
+		compose_color_atach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		std::array<VkAttachmentReference, 4> input_atachments = {
+			rects_color_read_atach_ref, rects_depth_read_atach_ref,
+			circles_color_read_atach_ref, circles_depth_read_atach_ref
+		};
+
+		VkSubpassDescription compose_subpass = {};
+		compose_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		compose_subpass.inputAttachmentCount = (uint32_t)input_atachments.size();
+		compose_subpass.pInputAttachments = input_atachments.data();
+		compose_subpass.colorAttachmentCount = 1;
+		compose_subpass.pColorAttachments = &compose_color_atach_ref;
+
+		// Dependencies
+		VkSubpassDependency rects_depend = {};
+		rects_depend.srcSubpass = 0;
+		rects_depend.dstSubpass = 2;
+		rects_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		rects_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		rects_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		rects_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+		VkSubpassDependency circles_depend = {};
+		circles_depend.srcSubpass = 0;
+		circles_depend.dstSubpass = 2;
+		circles_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		circles_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		circles_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		circles_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+		VkSubpassDependency compose_depend = {};
+		compose_depend.srcSubpass = 1;
+		compose_depend.dstSubpass = 2;
+		compose_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		compose_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		compose_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		compose_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+		// Attachments
+		std::array<VkAttachmentDescription, 5> attachments = {
+			color_atach, depth_atach, color_atach, depth_atach,
+			compose_color_atach
+		};
+
+		std::array<VkSubpassDescription, 3> subpass_descps = {
+			rects_subpass, circles_subpass, compose_subpass
+		};
+
+		std::array<VkSubpassDependency, 3> depends = {
+			rects_depend, circles_depend, compose_depend
+		};
+
+		VkRenderPassCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		info.attachmentCount = (uint32_t)attachments.size();
+		info.pAttachments = attachments.data();
+		info.subpassCount = (uint32_t)subpass_descps.size();
+		info.pSubpasses = subpass_descps.data();
+		info.dependencyCount = (uint32_t)depends.size();
+		info.pDependencies = depends.data();
+
+		checkErrStack(renderpass.create(&logical_dev, &info),
 			"failed to create renderpass");
+	}
+
+	if (rects_color_view.view == VK_NULL_HANDLE) {
+
+		VkComponentMapping component_mapping = {};
+		VkImageSubresourceRange sub_range = {};
+		sub_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		sub_range.levelCount = 1;
+		sub_range.layerCount = 1;
+
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = rects_color_img.img;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		info.format = rects_color_img.format;
+		info.components = component_mapping;
+		info.subresourceRange = sub_range;
+
+		checkErrStack(rects_color_view.create(&logical_dev, &info), "");
+	}
+
+	if (rects_depth_view.view == VK_NULL_HANDLE) {
+
+		VkComponentMapping component_mapping = {};
+		VkImageSubresourceRange sub_range = {};
+		sub_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		sub_range.levelCount = 1;
+		sub_range.layerCount = 1;
+
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = rects_depth_img.img;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		info.format = rects_depth_img.format;
+		info.components = component_mapping;
+		info.subresourceRange = sub_range;
+
+		checkErrStack(rects_depth_view.create(&logical_dev, &info), "");
+	}
+
+	if (circles_color_view.view == VK_NULL_HANDLE) {
+
+		VkComponentMapping component_mapping = {};
+		VkImageSubresourceRange sub_range = {};
+		sub_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		sub_range.levelCount = 1;
+		sub_range.layerCount = 1;
+
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = circles_color_img.img;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		info.format = circles_color_img.format;
+		info.components = component_mapping;
+		info.subresourceRange = sub_range;
+
+		checkErrStack(circles_color_view.create(&logical_dev, &info), "");
+	}
+
+	if (circles_depth_view.view == VK_NULL_HANDLE) {
+
+		VkComponentMapping component_mapping = {};
+		VkImageSubresourceRange sub_range = {};
+		sub_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		sub_range.levelCount = 1;
+		sub_range.layerCount = 1;
+
+		VkImageViewCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		info.image = circles_depth_img.img;
+		info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		info.format = circles_depth_img.format;
+		info.components = component_mapping;
+		info.subresourceRange = sub_range;
+
+		checkErrStack(circles_depth_view.create(&logical_dev, &info), "");
 	}
 
 	if (!frame_buffs.frame_buffs.size()) {
 
-		vks::FrameBufferCreateInfo framebuffs_info = {};
-		framebuffs_info.g3d_color_MSAA_img = &g3d_color_MSAA_img;
-		framebuffs_info.g3d_depth_img = &g3d_depth_img;
-		framebuffs_info.g3d_color_resolve_img = &g3d_color_resolve_img;
-		framebuffs_info.ui_color_img = &ui_color_img;
-		framebuffs_info.swapchain = &swapchain;
+		std::array<VkImageView, 4> attachments = {
+			rects_color_view.view, rects_depth_view.view,
+			circles_color_view.view, circles_depth_view.view
+		};
 
-		checkErrStack1(frame_buffs.create(&logical_dev, framebuffs_info, &renderpass,
-			swapchain.resolution.width, swapchain.resolution.height));
+		checkErrStack(frame_buffs.create(&logical_dev, &renderpass,
+			attachments, swapchain.views,
+			swapchain.resolution.width, swapchain.resolution.height),
+			"");
 	}
 
-	// 3D Subpass
-	{
-		if (g3d_descp.descp_pool == VK_NULL_HANDLE) {
+	// Subpass Commons
+	if (uniform_buff.buff == VK_NULL_HANDLE) {
 
-			std::vector<VkDescriptorSetLayoutBinding> bindings(3);
-			bindings[0].binding = 0;
-			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			bindings[0].descriptorCount = 1;
-			bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-			bindings[0].pImmutableSamplers = NULL;
+		GPU_Uniform uniform;
+		uniform.screen_width = (float)swapchain.resolution.width;
+		uniform.screen_height = (float)swapchain.resolution.height;
 
-			bindings[1].binding = 1;
-			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			bindings[1].descriptorCount = 1;
-			bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			bindings[1].pImmutableSamplers = NULL;
+		checkErrStack1(uniform_buff.create(&logical_dev, sizeof(GPU_Uniform),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU));
 
-			bindings[2].binding = 2;
-			bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			bindings[2].descriptorCount = 1;
-			bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			bindings[2].pImmutableSamplers = NULL;
-
-			checkErrStack(g3d_descp.create(&logical_dev, bindings),
-				"failed to create 3D descriptor");
-		}
-
-		// 3D Mesh Diffuse Texture
-		if (content.mesh_diffuse != nullptr) {
-
-			BasicBitmap* mesh_diffuse = content.mesh_diffuse;
-
-			std::vector<vks::DesiredImageProps> props(1);
-			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-			vks::ImageCreateInfo info = {};
-			info.desired_props = &props;
-			info.width = mesh_diffuse->width;
-			info.height = mesh_diffuse->height;
-			info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-
-			checkErrStack(mesh_diffuse_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create texture image");
-			checkErrStack(mesh_diffuse_img.setDebugName("mesh diffuse texture"), "");
-
-			// Load Bitmap into Image
-			checkErrStack1(staging_buff.recreateStaging(&logical_dev, mesh_diffuse->calcMemSize()));
-
-			checkErrStack(mesh_diffuse_img.load(mesh_diffuse->colors.data(), mesh_diffuse->calcMemSize(),
-				&cmd_pool, &staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-				"failed to load pixels into image");
-		}
-
-		if (mesh_diffuse_sampler.sampler == VK_NULL_HANDLE) {
-
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_LINEAR;
-			info.minFilter = VK_FILTER_LINEAR;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.anisotropyEnable = VK_TRUE;
-			info.maxAnisotropy = 16;
-			info.compareEnable = VK_FALSE;
-			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-			checkErrStack(mesh_diffuse_sampler.create(&logical_dev, info), "");
-		}
-
-		if (content.meshes != nullptr) {
-			
-			checkErrStack(recreate3D_MeshBuffers(*content.meshes),
-				"failed to fill buffers from meshes");
-		}
-
-		if (content.camera != nullptr) {
-
-			checkErrStack(recreate3D_UniformBuffer(*content.camera),
-				"failed to fill uniform buffer from camera");
-		}
-
-		// Vertex Shader
-		if (content.g3d_vert_shader_code != nullptr) {
-
-			checkErrStack(g3d_vertex_module.recreate(&logical_dev,
-				*content.g3d_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
-				"failed to create 3D vertex shader module");
-		}
-
-		// Fragment Shader 
-		if (content.g3d_frag_shader_code != nullptr) {
-
-			checkErrStack(g3d_frag_module.recreate(&logical_dev,
-				*content.g3d_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
-				"failed to create 3D fragment shader module");
-		}
-
-		// Pipeline Layout
-		if (g3d_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
-
-			checkErrStack1(g3d_pipe_layout.create(&logical_dev, &g3d_descp));
-		}
-
-		// Pipeline
-		if (content.width != 0 ||
-			content.height != 0 ||
-			content.g3d_vert_shader_code != nullptr ||
-			content.g3d_frag_shader_code != nullptr)
-		{
-			g3d_pipe.setToDefault();
-			g3d_pipe.configureFor3D();
-			g3d_pipe.multisample_state_info.rasterizationSamples = phys_dev.max_MSAA;
-
-			checkErrStack(g3d_pipe.recreate(&logical_dev, &g3d_vertex_module, &g3d_frag_module,
-				swapchain.resolution.width, swapchain.resolution.height,
-				&g3d_pipe_layout, &renderpass, 0),
-				"failed to create 3D pipeline");
-		}
-
-		std::vector<vks::DescriptorWrite> descp_writes;
-
-		// Descriptor Update
-		if (content.mesh_diffuse != nullptr) {
-
-			vks::DescriptorWrite& write = descp_writes.emplace_back();
-
-			VkDescriptorImageInfo image_info = {};
-			image_info.sampler = mesh_diffuse_sampler.sampler;
-			image_info.imageView = mesh_diffuse_img.img_view;
-			image_info.imageLayout = mesh_diffuse_img.layout;
-
-			write.dstBinding = 2;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.descriptorCount = 1;
-			write.img_info = &image_info;
-		}
-
-		if (content.meshes != nullptr) {
-
-			vks::DescriptorWrite& write = descp_writes.emplace_back();
-
-			VkDescriptorBufferInfo storage_buff_info = {};
-			storage_buff_info.buffer = g3d_storage_buff.buff;
-			storage_buff_info.offset = 0;
-			storage_buff_info.range = g3d_storage_buff.buff_alloc_info.size;
-
-			write.dstBinding = 1;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			write.descriptorCount = 1;
-			write.buff_info = &storage_buff_info;
-		}
-
-		if (content.camera != nullptr) {
-
-			vks::DescriptorWrite& write = descp_writes.emplace_back();
-
-			VkDescriptorBufferInfo uniform_buff_info = {};
-			uniform_buff_info.buffer = g3d_uniform_buff.buff;
-			uniform_buff_info.offset = 0;
-			uniform_buff_info.range = g3d_uniform_buff.buff_alloc_info.size;
-
-			write.dstBinding = 0;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.descriptorCount = 1;
-			write.buff_info = &uniform_buff_info;
-		}
-
-		if (descp_writes.size()) {
-			g3d_descp.update(descp_writes);
-		}
+		checkErrStack1(uniform_buff.load(&uniform, sizeof(GPU_Uniform),
+			&cmd_pool, &staging_buff));
 	}
 
-	// UI Subpass
-	{
-		// Descriptor
-		if (ui_descp.descp_pool == VK_NULL_HANDLE) {
+	if (uniform_descp_layout.descp_layout == VK_NULL_HANDLE) {
 
-			std::vector<VkDescriptorSetLayoutBinding> bindings(2);
-			bindings[0] = {};
-			bindings[0].binding = 0;
-			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			bindings[0].descriptorCount = 1;
-			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		std::vector<VkDescriptorSetLayoutBinding> bindings(1);
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-			bindings[1] = {};
-			bindings[1].binding = 1;
-			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			bindings[1].descriptorCount = 1;
-			bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-			checkErrStack(ui_descp.create(&logical_dev, bindings),
-				"failed to create UI descriptor");
-		}
-
-		// Character Atlas Image
-		if (content.char_atlas_changed) {
-
-			TextureAtlas& atlas = content.text_rendering->atlas;
-
-			std::vector<vks::DesiredImageProps> props(1);
-			props[0].format = VK_FORMAT_R8_UNORM;
-			props[0].usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-			vks::ImageCreateInfo info = {};
-			info.desired_props = &props;
-			info.width = atlas.tex_size;
-			info.height = atlas.tex_size;
-			info.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-
-			checkErrStack(ui_char_atlas_img.recreate(&logical_dev, &phys_dev, info, VMA_MEMORY_USAGE_GPU_ONLY),
-				"failed to create symbol atlas image");
-			checkErrStack(ui_char_atlas_img.setDebugName("character atlas"), "");
-
-			checkErrStack(ui_char_atlas_img.load(atlas.colors.data(), atlas.mem_size, 
-				& cmd_pool, & staging_buff, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
-				"failed to load pixels into symbol atlas image");
-		}
-
-		if (ui_char_atlas_sampler.sampler == VK_NULL_HANDLE) {
-
-			VkSamplerCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			info.magFilter = VK_FILTER_NEAREST;
-			info.minFilter = VK_FILTER_NEAREST;
-			info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-			info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			info.anisotropyEnable = VK_FALSE;
-			info.compareEnable = VK_FALSE;
-			info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-
-			checkErrStack(ui_char_atlas_sampler.create(&logical_dev, info), "");
-		}
-
-		if (content.text_rendering != nullptr) {
-
-			checkErrStack(recreateUI_MeshBuffers(*content.text_rendering),
-				"failed to fill UI mesh buffers");
-		}
-
-		if (content.ui_vert_shader_code != nullptr) {
-
-			checkErrStack(ui_vertex_module.recreate(&logical_dev,
-				*content.ui_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
-				"failed to create UI vertex shader");
-		}
-
-		if (content.ui_frag_shader_code != nullptr) {
-
-			checkErrStack(ui_frag_module.recreate(&logical_dev,
-				*content.ui_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
-				"failed to create UI fragment shader");
-		}
-
-		if (ui_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
-
-			checkErrStack(ui_pipe_layout.create(&logical_dev, &ui_descp),
-				"failed to create UI pipeline layout");
-		}
-
-		if (content.width || content.height ||
-			content.ui_vert_shader_code != nullptr || content.ui_frag_shader_code)
-		{
-			ui_pipe.setToDefault();
-			ui_pipe.configureForUserInterface();
-
-			checkErrStack(ui_pipe.recreate(&logical_dev, &ui_vertex_module, &ui_frag_module,
-				swapchain.resolution.width, swapchain.resolution.height,
-				&ui_pipe_layout, &renderpass, 1),
-				"failed to create UI pipeline");
-		}
-
-		// Desciptor Update
-		std::vector<vks::DescriptorWrite> writes;
-
-		if (content.char_atlas_changed) {
-
-			vks::DescriptorWrite& write = writes.emplace_back();
-
-			VkDescriptorImageInfo ui_symbols_descp_img = {};
-			ui_symbols_descp_img.sampler = ui_char_atlas_sampler.sampler;
-			ui_symbols_descp_img.imageView = ui_char_atlas_img.img_view;
-			ui_symbols_descp_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			write.dstBinding = 0;
-			write.dstArrayElement = 0;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			write.img_info = &ui_symbols_descp_img;
-		}
-
-		if (content.text_rendering != nullptr) {
-
-			vks::DescriptorWrite& write = writes.emplace_back();
-
-			VkDescriptorBufferInfo ui_instance_descp_buff = {};
-			ui_instance_descp_buff.buffer = ui_storage_buff.buff;
-			ui_instance_descp_buff.offset = 0;
-			ui_instance_descp_buff.range = ui_storage_buff.buff_alloc_info.size;
-
-			write.dstBinding = 1;
-			write.dstArrayElement = 0;
-			write.descriptorCount = 1;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			write.buff_info = &ui_instance_descp_buff;
-		}
-
-		if (writes.size()) {
-			ui_descp.update(writes);
-		}
+		checkErrStack1(uniform_descp_layout.create(&logical_dev, bindings));
 	}
 
-	// Composition Subpass
+	if (uniform_descp_pool.descp_pool == VK_NULL_HANDLE) {
+
+		std::vector<VkDescriptorPoolSize> sizes(1);
+		sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		sizes[0].descriptorCount = 1;
+
+		checkErrStack1(uniform_descp_pool.create(&logical_dev, sizes));
+	}
+
+	if (uniform_descp_set.descp_set == VK_NULL_HANDLE) {
+		
+		checkErrStack1(uniform_descp_set.create(&logical_dev, &uniform_descp_pool, &uniform_descp_layout));
+
+		std::vector<VkWriteDescriptorSet> writes(1);
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].dstSet = uniform_descp_set.descp_set;
+		writes[0].dstBinding = 0;
+		writes[0].dstArrayElement = 0;
+		writes[0].descriptorCount = 1;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+		VkDescriptorBufferInfo uniform_buff_info = {};
+		uniform_buff_info.buffer = uniform_buff.buff;
+		uniform_buff_info.range = sizeof(GPU_Uniform);
+		writes[0].pBufferInfo = &uniform_buff_info;
+
+		uniform_descp_set.update(writes);
+	}
+
+	// Create Geometry
 	{
-		if (compose_descp.descp_pool == VK_NULL_HANDLE) {
+		ui::BoxModel box = {};
+		box.background_color = { 1, 0, 0, 1 };
 
-			std::vector<VkDescriptorSetLayoutBinding> bindings(2);
-			bindings[0].binding = 0;
-			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			bindings[0].descriptorCount = 1;
-			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		box.paddingbox_width = 100;
+		box.paddingbox_height = 100;
+		box.padding_tl_radius = 25;
+		box.padding_tr_radius = 25;
+		box.padding_br_radius = 25;
+		box.padding_bl_radius = 25;
 
-			bindings[1].binding = 1;
-			bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-			bindings[1].descriptorCount = 1;
-			bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		box.borderbox_width = 100;
+		box.borderbox_height = 110;
+		box.border_top_thick = 10;
 
-			checkErrStack(compose_descp.create(&logical_dev, bindings), 
-				"failed to create Compose descriptor");
+		std::array<GPU_Rects_Vertex, 18> rects_verts;
+		std::array<GPU_Circles_Vertex, 24> circles_verts;
+		calcBoxVerts(box, rects_verts, circles_verts);
+
+		checkErrStack1(rects_vertex_buff.create(&logical_dev, rects_verts.size() * sizeof(GPU_Rects_Vertex),
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+
+		checkErrStack1(rects_vertex_buff.load(rects_verts.data(), rects_verts.size() * sizeof(GPU_Rects_Vertex),
+			&cmd_pool, &staging_buff));
+
+		rects_vertex_count = rects_verts.size();
+
+		checkErrStack1(circles_vertex_buff.create(&logical_dev, circles_verts.size() * sizeof(GPU_Circles_Vertex),
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY));
+
+		checkErrStack1(circles_vertex_buff.load(circles_verts.data(), circles_verts.size() * sizeof(GPU_Circles_Vertex),
+			&cmd_pool, &staging_buff));
+
+		circles_vertex_count = circles_verts.size();
+	}
+
+	if (rects_vert_module.sh_module == VK_NULL_HANDLE) {
+		
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Rects/vert.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(rects_vert_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_VERTEX_BIT));
+	}
+
+	if (rects_frag_module.sh_module == VK_NULL_HANDLE) {
+
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Rects/frag.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(rects_frag_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_FRAGMENT_BIT));
+	}
+
+	if (rects_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+		VkPipelineLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		info.setLayoutCount = 1;
+		info.pSetLayouts = &uniform_descp_layout.descp_layout;
+
+		checkErrStack(rects_pipe_layout.create(&logical_dev, &info), "");
+	}
+
+	if (rects_pipe.pipeline == VK_NULL_HANDLE) {
+
+		std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+		shader_stages[0] = {};
+		shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[0].stage = rects_vert_module.stage;
+		shader_stages[0].module = rects_vert_module.sh_module;
+		shader_stages[0].pName = "main";
+
+		shader_stages[1] = {};
+		shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[1].stage = rects_frag_module.stage;
+		shader_stages[1].module = rects_frag_module.sh_module;
+		shader_stages[1].pName = "main";
+
+		// Vertex Input Description
+		VkVertexInputBindingDescription vert_input_binding_descp = {};
+		vert_input_binding_descp = GPU_Rects_Vertex::getBindingDescription();
+
+		std::vector<VkVertexInputAttributeDescription> vertex_input_atribute_descps;
+		for (auto& atribute_descp : GPU_Rects_Vertex::getAttributeDescriptions()) {
+			vertex_input_atribute_descps.push_back(atribute_descp);
 		}
 
-		if (content.comp_vert_shader_code != nullptr) {
+		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
+		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_stage_info.vertexBindingDescriptionCount = 1;
+		vert_input_stage_info.pVertexBindingDescriptions = &vert_input_binding_descp;
+		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descps.size();
+		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descps.data();
 
-			checkErrStack(compose_vert_module.recreate(&logical_dev, 
-				*content.comp_vert_shader_code, VK_SHADER_STAGE_VERTEX_BIT),
-				"failed to create Compose vertex shader");
+		// Input Asembly State
+		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
+		input_assembly_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		input_assembly_state_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		input_assembly_state_info.primitiveRestartEnable = VK_FALSE;
+
+		// Viewport
+		VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapchain.resolution.width;
+		viewport.height = (float)swapchain.resolution.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		VkRect2D scissor = {};
+		scissor.extent.width = swapchain.resolution.width;
+		scissor.extent.height = swapchain.resolution.height;
+
+		VkPipelineViewportStateCreateInfo viewport_state_info = {};
+		viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewport_state_info.viewportCount = 1;
+		viewport_state_info.pViewports = &viewport;
+		viewport_state_info.scissorCount = 1;
+		viewport_state_info.pScissors = &scissor;
+
+		// Rasterization
+		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
+		raster_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		raster_state_info.depthClampEnable = VK_FALSE;
+		raster_state_info.rasterizerDiscardEnable = VK_FALSE;
+		raster_state_info.polygonMode = VK_POLYGON_MODE_FILL;
+		raster_state_info.cullMode = VK_CULL_MODE_NONE;
+		raster_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		raster_state_info.depthBiasEnable = VK_FALSE;
+		raster_state_info.lineWidth = 1.0f;
+
+		// MSAA
+		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
+		multisample_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisample_state_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisample_state_info.sampleShadingEnable = VK_FALSE;
+
+		// Depth Stencil
+		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
+		depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depth_stencil_state_info.depthTestEnable = VK_FALSE;
+		depth_stencil_state_info.depthWriteEnable = VK_FALSE;
+		depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS;
+		depth_stencil_state_info.depthBoundsTestEnable = VK_FALSE;
+		depth_stencil_state_info.stencilTestEnable = VK_FALSE;
+
+		// Color Blending
+		VkPipelineColorBlendAttachmentState color_blend_attachment;
+		color_blend_attachment.blendEnable = VK_FALSE;
+		color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments = {
+			color_blend_attachment
+		};
+
+		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
+		color_blend_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		color_blend_state_info.logicOpEnable = VK_FALSE;
+		color_blend_state_info.logicOp = VK_LOGIC_OP_NO_OP;
+		color_blend_state_info.attachmentCount = (uint32_t)color_blend_attachments.size();
+		color_blend_state_info.pAttachments = color_blend_attachments.data();
+		color_blend_state_info.blendConstants[0] = 0.0f;
+		color_blend_state_info.blendConstants[1] = 0.0f;
+		color_blend_state_info.blendConstants[2] = 0.0f;
+		color_blend_state_info.blendConstants[3] = 0.0f;
+		
+		// Pipeline 
+		VkGraphicsPipelineCreateInfo pipeline_info = {};
+		pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipeline_info.stageCount = (uint32_t)shader_stages.size();
+		pipeline_info.pStages = shader_stages.data();
+		pipeline_info.pVertexInputState = &vert_input_stage_info;
+		pipeline_info.pInputAssemblyState = &input_assembly_state_info;
+		pipeline_info.pTessellationState = NULL;
+		pipeline_info.pViewportState = &viewport_state_info;
+		pipeline_info.pRasterizationState = &raster_state_info;
+		pipeline_info.pMultisampleState = &multisample_state_info;
+		pipeline_info.pDepthStencilState = &depth_stencil_state_info;
+		pipeline_info.pColorBlendState = &color_blend_state_info;
+		pipeline_info.pDynamicState = NULL;
+		pipeline_info.layout = rects_pipe_layout.pipe_layout;
+		pipeline_info.renderPass = renderpass.renderpass;
+		pipeline_info.subpass = 0;
+
+		checkErrStack(rects_pipe.create(&logical_dev, &pipeline_info), "");
+		checkErrStack1(rects_pipe.setDebugName("rect pipeline"));
+	}
+
+	// Circles Subpass
+	if (circles_vert_module.sh_module == VK_NULL_HANDLE) {
+
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Circles/vert.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(circles_vert_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_VERTEX_BIT));
+	}
+
+	if (circles_frag_module.sh_module == VK_NULL_HANDLE) {
+
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Circles/frag.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(circles_frag_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_FRAGMENT_BIT));
+	}
+
+	if (circles_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+		VkPipelineLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		info.setLayoutCount = 1;
+		info.pSetLayouts = &uniform_descp_layout.descp_layout;
+
+		checkErrStack(circles_pipe_layout.create(&logical_dev, &info), "");
+	}
+
+	if (circles_pipe.pipeline == VK_NULL_HANDLE) {
+
+		std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+		shader_stages[0] = {};
+		shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[0].stage = circles_vert_module.stage;
+		shader_stages[0].module = circles_vert_module.sh_module;
+		shader_stages[0].pName = "main";
+
+		shader_stages[1] = {};
+		shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[1].stage = circles_frag_module.stage;
+		shader_stages[1].module = circles_frag_module.sh_module;
+		shader_stages[1].pName = "main";
+
+		// Vertex Input Description
+		VkVertexInputBindingDescription vert_input_binding_descp = {};
+		vert_input_binding_descp = GPU_Circles_Vertex::getBindingDescription();
+
+		std::vector<VkVertexInputAttributeDescription> vertex_input_atribute_descps;
+		for (auto& atribute_descp : GPU_Circles_Vertex::getAttributeDescriptions()) {
+			vertex_input_atribute_descps.push_back(atribute_descp);
 		}
 
-		if (content.comp_frag_shader_code != nullptr) {
+		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
+		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_stage_info.vertexBindingDescriptionCount = 1;
+		vert_input_stage_info.pVertexBindingDescriptions = &vert_input_binding_descp;
+		vert_input_stage_info.vertexAttributeDescriptionCount = (uint32_t)vertex_input_atribute_descps.size();
+		vert_input_stage_info.pVertexAttributeDescriptions = vertex_input_atribute_descps.data();
 
-			checkErrStack(compose_frag_module.recreate(&logical_dev,
-				*content.comp_frag_shader_code, VK_SHADER_STAGE_FRAGMENT_BIT),
-				"failed to create Compose fragment shader");
-		}
+		// Input Asembly State
+		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
+		input_assembly_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		input_assembly_state_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		input_assembly_state_info.primitiveRestartEnable = VK_FALSE;
 
-		if (compose_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+		// Viewport
+		VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapchain.resolution.width;
+		viewport.height = (float)swapchain.resolution.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
 
-			checkErrStack1(compose_pipe_layout.create(&logical_dev, &compose_descp));
-		}
+		VkRect2D scissor = {};
+		scissor.extent.width = swapchain.resolution.width;
+		scissor.extent.height = swapchain.resolution.height;
 
-		if (content.comp_vert_shader_code != nullptr ||
-			content.comp_frag_shader_code != nullptr)
-		{
-			compose_pipe.setToDefault();
+		VkPipelineViewportStateCreateInfo viewport_state_info = {};
+		viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewport_state_info.viewportCount = 1;
+		viewport_state_info.pViewports = &viewport;
+		viewport_state_info.scissorCount = 1;
+		viewport_state_info.pScissors = &scissor;
 
-			checkErrStack(compose_pipe.recreate(&logical_dev,
-				&compose_vert_module, &compose_frag_module,
-				swapchain.resolution.width, swapchain.resolution.height,
-				&compose_pipe_layout, &renderpass, 2),
-				"failed to create compose pipeline");
-		}
+		// Rasterization
+		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
+		raster_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		raster_state_info.depthClampEnable = VK_FALSE;
+		raster_state_info.rasterizerDiscardEnable = VK_FALSE;
+		raster_state_info.polygonMode = VK_POLYGON_MODE_FILL;
+		raster_state_info.cullMode = VK_CULL_MODE_NONE;
+		raster_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		raster_state_info.depthBiasEnable = VK_FALSE;
+		raster_state_info.lineWidth = 1.0f;
 
-		// Desciptor Update
-		std::vector<vks::DescriptorWrite> writes;
+		// MSAA
+		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
+		multisample_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisample_state_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisample_state_info.sampleShadingEnable = VK_FALSE;
 
-		if (content.width || content.height) {
+		// Depth Stencil
+		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
+		depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depth_stencil_state_info.depthTestEnable = VK_FALSE;
+		depth_stencil_state_info.depthWriteEnable = VK_FALSE;
+		depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS;
+		depth_stencil_state_info.depthBoundsTestEnable = VK_FALSE;
+		depth_stencil_state_info.stencilTestEnable = VK_FALSE;
 
-			// 3D renderpass result
-			vks::DescriptorWrite& g3d_write = writes.emplace_back();
+		// Color Blending
+		VkPipelineColorBlendAttachmentState color_blend_attachment;
+		color_blend_attachment.blendEnable = VK_FALSE;
+		color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-			VkDescriptorImageInfo g3d_img = {};
-			g3d_img.imageView = g3d_color_resolve_img.img_view;
-			g3d_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments = {
+			color_blend_attachment
+		};
 
-			g3d_write.img_info = &g3d_img;
-			g3d_write.dstBinding = 0;
-			g3d_write.dstArrayElement = 0;
-			g3d_write.descriptorCount = 1;
-			g3d_write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
+		color_blend_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		color_blend_state_info.logicOpEnable = VK_FALSE;
+		color_blend_state_info.logicOp = VK_LOGIC_OP_NO_OP;
+		color_blend_state_info.attachmentCount = (uint32_t)color_blend_attachments.size();
+		color_blend_state_info.pAttachments = color_blend_attachments.data();
+		color_blend_state_info.blendConstants[0] = 0.0f;
+		color_blend_state_info.blendConstants[1] = 0.0f;
+		color_blend_state_info.blendConstants[2] = 0.0f;
+		color_blend_state_info.blendConstants[3] = 0.0f;
 
-			// UI renderpass result
-			vks::DescriptorWrite& ui_write = writes.emplace_back();
+		// Pipeline 
+		VkGraphicsPipelineCreateInfo pipeline_info = {};
+		pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipeline_info.stageCount = (uint32_t)shader_stages.size();
+		pipeline_info.pStages = shader_stages.data();
+		pipeline_info.pVertexInputState = &vert_input_stage_info;
+		pipeline_info.pInputAssemblyState = &input_assembly_state_info;
+		pipeline_info.pTessellationState = NULL;
+		pipeline_info.pViewportState = &viewport_state_info;
+		pipeline_info.pRasterizationState = &raster_state_info;
+		pipeline_info.pMultisampleState = &multisample_state_info;
+		pipeline_info.pDepthStencilState = &depth_stencil_state_info;
+		pipeline_info.pColorBlendState = &color_blend_state_info;
+		pipeline_info.pDynamicState = NULL;
+		pipeline_info.layout = circles_pipe_layout.pipe_layout;
+		pipeline_info.renderPass = renderpass.renderpass;
+		pipeline_info.subpass = 1;
 
-			VkDescriptorImageInfo ui_img = {};
-			ui_img.imageView = ui_color_img.img_view;
-			ui_img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		checkErrStack(circles_pipe.create(&logical_dev, &pipeline_info), "");
+		checkErrStack1(circles_pipe.setDebugName("circles"));
+	}
 
-			ui_write.img_info = &ui_img;
-			ui_write.dstBinding = 1;
-			ui_write.dstArrayElement = 0;
-			ui_write.descriptorCount = 1;
-			ui_write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		}
+	// Compose Subpass
+	if (compose_vert_module.sh_module == VK_NULL_HANDLE) {
 
-		if (writes.size()) {
-			compose_descp.update(writes);
-		}
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Compose/vert.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(compose_vert_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_VERTEX_BIT));
+	}
+
+	if (compose_frag_module.sh_module == VK_NULL_HANDLE) {
+
+		FileSysPath path;
+		checkErrStack1(path.recreateRelative("shaders/Compose/frag.spv"));
+
+		std::vector<char> shader_code;
+		checkErrStack1(path.read(shader_code));
+
+		checkErrStack1(compose_frag_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_FRAGMENT_BIT));
+	}
+
+	if (compose_descp_layout.descp_layout == VK_NULL_HANDLE) {
+
+		std::vector<VkDescriptorSetLayoutBinding> bindings(4);
+		// Rects Color Image
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Rects Depth Image
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Circles Color Image
+		bindings[2].binding = 2;
+		bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		bindings[2].descriptorCount = 1;
+		bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// Circles Depth Image
+		bindings[3].binding = 3;
+		bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		bindings[3].descriptorCount = 1;
+		bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		checkErrStack1(compose_descp_layout.create(&logical_dev, bindings));
+		checkErrStack1(compose_descp_layout.setDebugName("compose"));
+	}
+
+	if (compose_descp_pool.descp_pool == VK_NULL_HANDLE) {
+
+		std::vector<VkDescriptorPoolSize> sizes(4);
+		sizes[0].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		sizes[0].descriptorCount = 1;
+
+		sizes[1].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		sizes[1].descriptorCount = 1;
+
+		sizes[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		sizes[2].descriptorCount = 1;
+
+		sizes[3].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		sizes[3].descriptorCount = 1;
+
+		checkErrStack1(compose_descp_pool.create(&logical_dev, sizes));
+		checkErrStack1(compose_descp_pool.setDebugName("compose"));
+	}
+
+	if (compose_descp_set.descp_set == VK_NULL_HANDLE) {
+
+		checkErrStack1(compose_descp_set.create(&logical_dev, &compose_descp_pool, &compose_descp_layout));
+		checkErrStack1(compose_descp_set.setDebugName("compose"));
+
+		std::vector<VkWriteDescriptorSet> writes(4);
+		// Rects Color Image
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].dstSet = compose_descp_set.descp_set;
+		writes[0].dstBinding = 0;
+		writes[0].dstArrayElement = 0;
+		writes[0].descriptorCount = 1;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+		VkDescriptorImageInfo rects_color = {};
+		rects_color.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		rects_color.imageView = rects_color_view.view;
+		writes[0].pImageInfo = &rects_color;
+		
+		// Rects Depth Image
+		writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[1].dstSet = compose_descp_set.descp_set;
+		writes[1].dstBinding = 1;
+		writes[1].dstArrayElement = 0;
+		writes[1].descriptorCount = 1;
+		writes[1].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+		VkDescriptorImageInfo rects_depth = {};
+		rects_depth.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		rects_depth.imageView = rects_depth_view.view;
+		writes[1].pImageInfo = &rects_depth;
+
+		// Circles Color Image
+		writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[2].dstSet = compose_descp_set.descp_set;
+		writes[2].dstBinding = 2;
+		writes[2].dstArrayElement = 0;
+		writes[2].descriptorCount = 1;
+		writes[2].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+		VkDescriptorImageInfo circles_color = {};
+		circles_color.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		circles_color.imageView = circles_color_view.view;
+		writes[2].pImageInfo = &circles_color;
+
+		// Circles Depth Image
+		writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[3].dstSet = compose_descp_set.descp_set;
+		writes[3].dstBinding = 3;
+		writes[3].dstArrayElement = 0;
+		writes[3].descriptorCount = 1;
+		writes[3].descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+
+		VkDescriptorImageInfo circles_depth = {};
+		circles_depth.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		circles_depth.imageView = circles_depth_view.view;
+		writes[3].pImageInfo = &circles_depth;
+
+		compose_descp_set.update(writes);
+	}
+
+	if (compose_pipe_layout.pipe_layout == VK_NULL_HANDLE) {
+
+		VkPipelineLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		info.setLayoutCount = 1;
+		info.pSetLayouts = &compose_descp_layout.descp_layout;
+
+		checkErrStack1(compose_pipe_layout.create(&logical_dev, &info));
+	}
+
+	if (compose_pipe.pipeline == VK_NULL_HANDLE) {
+
+		std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+		shader_stages[0] = {};
+		shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[0].stage = compose_vert_module.stage;
+		shader_stages[0].module = compose_vert_module.sh_module;
+		shader_stages[0].pName = "main";
+
+		shader_stages[1] = {};
+		shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[1].stage = compose_frag_module.stage;
+		shader_stages[1].module = compose_frag_module.sh_module;
+		shader_stages[1].pName = "main";
+
+		// Vertex Input Description
+		VkPipelineVertexInputStateCreateInfo vert_input_stage_info = {};
+		vert_input_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_stage_info.vertexBindingDescriptionCount = 0;
+		vert_input_stage_info.pVertexBindingDescriptions = NULL;
+		vert_input_stage_info.vertexAttributeDescriptionCount = 0;
+		vert_input_stage_info.pVertexAttributeDescriptions = NULL;
+
+		// Input Asembly State
+		VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
+		input_assembly_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		input_assembly_state_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		input_assembly_state_info.primitiveRestartEnable = VK_FALSE;
+
+		// Viewport
+		VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapchain.resolution.width;
+		viewport.height = (float)swapchain.resolution.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		VkRect2D scissor = {};
+		scissor.extent.width = swapchain.resolution.width;
+		scissor.extent.height = swapchain.resolution.height;
+
+		VkPipelineViewportStateCreateInfo viewport_state_info = {};
+		viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewport_state_info.viewportCount = 1;
+		viewport_state_info.pViewports = &viewport;
+		viewport_state_info.scissorCount = 1;
+		viewport_state_info.pScissors = &scissor;
+
+		// Rasterization
+		VkPipelineRasterizationStateCreateInfo raster_state_info = {};
+		raster_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		raster_state_info.depthClampEnable = VK_FALSE;
+		raster_state_info.rasterizerDiscardEnable = VK_FALSE;
+		raster_state_info.polygonMode = VK_POLYGON_MODE_FILL;
+		raster_state_info.cullMode = VK_CULL_MODE_NONE;
+		raster_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		raster_state_info.depthBiasEnable = VK_FALSE;
+		raster_state_info.lineWidth = 1.0f;
+
+		// MSAA
+		VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
+		multisample_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisample_state_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisample_state_info.sampleShadingEnable = VK_FALSE;
+
+		// Depth Stencil
+		VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
+		depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depth_stencil_state_info.depthTestEnable = VK_FALSE;
+		depth_stencil_state_info.depthWriteEnable = VK_FALSE;
+		depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS;
+		depth_stencil_state_info.depthBoundsTestEnable = VK_FALSE;
+		depth_stencil_state_info.stencilTestEnable = VK_FALSE;
+
+		// Color Blending
+		VkPipelineColorBlendAttachmentState color_blend_attachment;
+		color_blend_attachment.blendEnable = VK_FALSE;
+		color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+		std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments = {
+			color_blend_attachment
+		};
+
+		VkPipelineColorBlendStateCreateInfo color_blend_state_info = {};
+		color_blend_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		color_blend_state_info.logicOpEnable = VK_FALSE;
+		color_blend_state_info.logicOp = VK_LOGIC_OP_NO_OP;
+		color_blend_state_info.attachmentCount = (uint32_t)color_blend_attachments.size();
+		color_blend_state_info.pAttachments = color_blend_attachments.data();
+		color_blend_state_info.blendConstants[0] = 0.0f;
+		color_blend_state_info.blendConstants[1] = 0.0f;
+		color_blend_state_info.blendConstants[2] = 0.0f;
+		color_blend_state_info.blendConstants[3] = 0.0f;
+
+		// Pipeline 
+		VkGraphicsPipelineCreateInfo pipeline_info = {};
+		pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		pipeline_info.stageCount = (uint32_t)shader_stages.size();
+		pipeline_info.pStages = shader_stages.data();
+		pipeline_info.pVertexInputState = &vert_input_stage_info;
+		pipeline_info.pInputAssemblyState = &input_assembly_state_info;
+		pipeline_info.pTessellationState = NULL;
+		pipeline_info.pViewportState = &viewport_state_info;
+		pipeline_info.pRasterizationState = &raster_state_info;
+		pipeline_info.pMultisampleState = &multisample_state_info;
+		pipeline_info.pDepthStencilState = &depth_stencil_state_info;
+		pipeline_info.pColorBlendState = &color_blend_state_info;
+		pipeline_info.pDynamicState = NULL;
+		pipeline_info.layout = compose_pipe_layout.pipe_layout;
+		pipeline_info.renderPass = renderpass.renderpass;
+		pipeline_info.subpass = 2;
+
+		checkErrStack(compose_pipe.create(&logical_dev, &pipeline_info), "");
+		checkErrStack1(compose_pipe.setDebugName("compose"));
 	}
 
 	// Command Buffers
@@ -922,23 +1177,24 @@ ErrStack Renderer::recreate(RenderingContent& content)
 		info.width = swapchain.resolution.width;
 		info.height = swapchain.resolution.height;
 
-		// 3D
-		info.g3d_descp = &g3d_descp;
-		info.g3d_pipe_layout = &g3d_pipe_layout;
-		info.g3d_pipe = &g3d_pipe;
-		info.g3d_vertex_buff = &g3d_vertex_buff;
-		info.g3d_vertex_count = g3d_vertex_count;
+		// Common
+		info.uniform_buff = &uniform_buff;
+		info.uniform_descp_set = &uniform_descp_set;
 
-		// UI
-		info.ui_descp = &ui_descp;
-		info.ui_pipe_layout = &ui_pipe_layout;
-		info.ui_pipe = &ui_pipe;
-		info.ui_draw_batches = &ui_batches;
-		info.ui_vertex_buff = &ui_vertex_buff;
-		info.ui_storage_buff = &ui_storage_buff;
+		// Rects
+		info.rects_vertex_buff = &rects_vertex_buff;
+		info.rects_vertex_count = rects_vertex_count;
+		info.rects_pipe_layout = &rects_pipe_layout;
+		info.rects_pipe = &rects_pipe;
+
+		// Circles
+		info.circles_vertex_buff = &circles_vertex_buff;
+		info.circles_vertex_count = circles_vertex_count;
+		info.circles_pipe_layout = &circles_pipe_layout;
+		info.circles_pipe = &circles_pipe;
 
 		// Compose
-		info.compose_descp = &compose_descp;
+		info.compose_descp_set = &compose_descp_set;
 		info.compose_pipe_layout = &compose_pipe_layout;
 		info.compose_pipe = &compose_pipe;
 
@@ -946,15 +1202,20 @@ ErrStack Renderer::recreate(RenderingContent& content)
 	}
 
 	// Syncronization
-	checkErrStack(img_acquired.create(&logical_dev),
-		"failed to create semaphore for acquiring image from swapchain");
-	checkErrStack(rendering_ended_sem.create(&logical_dev),
-		"failed to create semaphore for rendering ended");
+	if (img_acquired.semaphore == VK_NULL_HANDLE) {
+		checkErrStack(img_acquired.recreate(&logical_dev),
+			"failed to create semaphore for acquiring image from swapchain");
+	}
+
+	if (rendering_ended_sem.semaphore == VK_NULL_HANDLE) {
+		checkErrStack(rendering_ended_sem.recreate(&logical_dev),
+			"failed to create semaphore for rendering ended");
+	}
 
 	return ErrStack();
 }
 
-ErrStack Renderer::draw()
+ErrStack VulkanRenderer::draw()
 {
 	uint32_t image_index;
 
@@ -995,7 +1256,7 @@ ErrStack Renderer::draw()
 	return ErrStack();
 }
 
-ErrStack Renderer::waitForRendering()
+ErrStack VulkanRenderer::waitForRendering()
 {
 	checkVkRes(vkDeviceWaitIdle(logical_dev.logical_device), "");
 	return ErrStack();

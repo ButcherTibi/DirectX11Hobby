@@ -49,7 +49,7 @@ namespace vks {
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 	{
-		std::cerr << "Vulkan Debug: " << pCallbackData->pMessage << std::endl << std::endl;
+		printf("Vulkan Debug: %s \n\n", pCallbackData->pMessage);
 
 		return VK_FALSE;
 	}
@@ -177,7 +177,7 @@ namespace vks {
 				func(instance, callback, NULL);
 			}
 			else {
-				std::cout << code_location << "debug callback already freed" << std::endl;
+				printf("%s debug callback already freed \n", code_location);
 			}
 			callback = VK_NULL_HANDLE;
 		}
@@ -580,13 +580,13 @@ namespace vks {
 
 		for (size_t i = 0; i < images.size(); i++) {
 
-			logical_device->setDebugName(
+			checkErrStack1(logical_device->setDebugName(
 				reinterpret_cast<uint64_t>(images[i]), VK_OBJECT_TYPE_IMAGE,
-				name + " VkImage[" + std::to_string(i) + "]");
+				name + " VkImage[" + std::to_string(i) + "]"));
 
-			checkErrStack(logical_device->setDebugName(
+			checkErrStack1(logical_device->setDebugName(
 				reinterpret_cast<uint64_t>(views[i]), VK_OBJECT_TYPE_IMAGE_VIEW, 
-				name + " VkImageView[" + std::to_string(i) + "]"), "");
+				name + " VkImageView[" + std::to_string(i) + "]"));
 		}
 
 		return ErrStack();
@@ -634,158 +634,13 @@ namespace vks {
 	}
 
 
-	ErrStack Renderpass::create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, VkFormat present_format, 
-		VkFormat depth_format)
+	ErrStack Renderpass::create(LogicalDevice* logical_dev, VkRenderPassCreateInfo* info)
 	{
 		this->logical_dev = logical_dev;
 
-		// Descriptions
-		// 3D
-		VkAttachmentDescription color_atach = {};
-		color_atach.format = present_format;
-		color_atach.samples = phys_dev->max_MSAA;
-		color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		color_atach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentDescription depth_atach = {};
-		depth_atach.format = depth_format;
-		depth_atach.samples = phys_dev->max_MSAA;
-		depth_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		depth_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depth_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		depth_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		depth_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		depth_atach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentDescription msaa_resolve_atach = {};
-		msaa_resolve_atach.format = present_format;
-		msaa_resolve_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		msaa_resolve_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		msaa_resolve_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		msaa_resolve_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		msaa_resolve_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		msaa_resolve_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		msaa_resolve_atach.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		// UI
-		VkAttachmentDescription ui_color_atach = {};
-		ui_color_atach.format = present_format;
-		ui_color_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		ui_color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		ui_color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		ui_color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		ui_color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		ui_color_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		ui_color_atach.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		// Composition
-		VkAttachmentDescription compose_atach = {};
-		compose_atach.format = present_format;
-		compose_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		compose_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		compose_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		compose_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		compose_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		compose_atach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		compose_atach.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-		// Reference
-		VkAttachmentReference g3d_color_attach_ref = {};
-		g3d_color_attach_ref.attachment = 0;
-		g3d_color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference depth_attach_ref = {};
-		depth_attach_ref.attachment = 1;
-		depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference msaa_resolve_read_attach_ref = {};
-		msaa_resolve_read_attach_ref.attachment = 2;
-		msaa_resolve_read_attach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		VkAttachmentReference ui_color_attach_ref = {};
-		ui_color_attach_ref.attachment = 3;
-		ui_color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkAttachmentReference ui_color_read_atach_ref = {};
-		ui_color_read_atach_ref.attachment = 3;
-		ui_color_read_atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-		VkAttachmentReference compose_atach_ref = {};
-		compose_atach_ref.attachment = 4;
-		compose_atach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		// Attachments
-		std::array<VkAttachmentDescription, 5> attachments = {
-			color_atach, depth_atach, msaa_resolve_atach,
-			ui_color_atach, compose_atach
-		};
-
-		// Subpass Description
-		VkSubpassDescription g3d_subpass = {};
-		g3d_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		g3d_subpass.colorAttachmentCount = 1;
-		g3d_subpass.pColorAttachments = &g3d_color_attach_ref;
-		g3d_subpass.pResolveAttachments = &msaa_resolve_read_attach_ref;
-		g3d_subpass.pDepthStencilAttachment = &depth_attach_ref;
-
-		// UI
-		VkSubpassDescription ui_subpass = {};
-		ui_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		ui_subpass.colorAttachmentCount = 1;
-		ui_subpass.pColorAttachments = &ui_color_attach_ref;
-
-		// Composition
-		std::array<VkAttachmentReference, 2> input_atachments = {
-			msaa_resolve_read_attach_ref, ui_color_read_atach_ref
-		};
-
-		VkSubpassDescription compose_subpass = {};
-		compose_subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		compose_subpass.inputAttachmentCount = (uint32_t)input_atachments.size();
-		compose_subpass.pInputAttachments = input_atachments.data();
-		compose_subpass.colorAttachmentCount = 1;
-		compose_subpass.pColorAttachments = &compose_atach_ref;
-
-		std::array<VkSubpassDescription, 3> subpass_descps = {
-			g3d_subpass, ui_subpass, compose_subpass
-		};
-
-		// Subpass Dependency
-		VkSubpassDependency g3d_compose_depend = {};
-		g3d_compose_depend.srcSubpass = 0;
-		g3d_compose_depend.dstSubpass = 2;
-		g3d_compose_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		g3d_compose_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		g3d_compose_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		g3d_compose_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-		VkSubpassDependency ui_compose_depend = {};
-		ui_compose_depend.srcSubpass = 1;
-		ui_compose_depend.dstSubpass = 2;
-		ui_compose_depend.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		ui_compose_depend.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		ui_compose_depend.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		ui_compose_depend.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-		std::array<VkSubpassDependency, 2> depends{
-			g3d_compose_depend, ui_compose_depend
-		};
-
-		VkRenderPassCreateInfo renderpass_info = {};
-		renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderpass_info.attachmentCount = (uint32_t)attachments.size();
-		renderpass_info.pAttachments = attachments.data();
-		renderpass_info.subpassCount = (uint32_t)subpass_descps.size();
-		renderpass_info.pSubpasses = subpass_descps.data();
-		renderpass_info.dependencyCount = (uint32_t)depends.size();
-		renderpass_info.pDependencies = depends.data();
-
-		checkVkRes(vkCreateRenderPass(logical_dev->logical_device, &renderpass_info, NULL, &renderpass),
+		checkVkRes(vkCreateRenderPass(logical_dev->logical_device, info, NULL, &renderpass),
 			"failed to create renderpass");
+
 		return ErrStack();
 	}
 
@@ -803,22 +658,23 @@ namespace vks {
 	}
 
 
-	ErrStack Framebuffers::create(LogicalDevice* logical_dev, FrameBufferCreateInfo& info,
-		Renderpass* renderpass, uint32_t width, uint32_t height)
+	ErrStack Framebuffers::create(LogicalDevice* logical_dev, Renderpass* renderpass, 
+		std::array<VkImageView, 4>& views, std::vector<VkImageView>& swapchain_views, 
+		uint32_t width, uint32_t height)
 	{
 		this->logical_dev = logical_dev;
 
-		size_t img_count = info.swapchain->images.size();
+		size_t img_count = swapchain_views.size();
 		frame_buffs.resize(img_count);
 
 		for (size_t i = 0; i < img_count; i++) {
 
 			std::array<VkImageView, 5> attachments = {
-				info.g3d_color_MSAA_img->img_view,
-				info.g3d_depth_img->img_view,
-				info.g3d_color_resolve_img->img_view,
-				info.ui_color_img->img_view,
-				info.swapchain->views[i]
+				views[0],
+				views[1],
+				views[2],
+				views[3],
+				swapchain_views[i]
 			};
 
 			VkFramebufferCreateInfo framebuff_info = {};
@@ -936,113 +792,108 @@ namespace vks {
 		vkFreeCommandBuffers(logical_dev->logical_device, cmd_pool->cmd_pool, 1, &cmd_buff);
 	}
 	
-	ErrStack Descriptor::create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings)
+	ErrStack DescriptorSetLayout::create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings)
 	{
 		this->logical_dev = logical_dev;
 
-		// Descriptor Layout
-		{
-			VkDescriptorSetLayoutCreateInfo descp_layout_info = {};
-			descp_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			descp_layout_info.bindingCount = (uint32_t)(bindings.size());
-			descp_layout_info.pBindings = bindings.data();
+		VkDescriptorSetLayoutCreateInfo descp_layout_info = {};
+		descp_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		descp_layout_info.bindingCount = (uint32_t)(bindings.size());
+		descp_layout_info.pBindings = bindings.data();
 
-			VkResult res = vkCreateDescriptorSetLayout(logical_dev->logical_device, &descp_layout_info, NULL, &descp_layout);
-			if (res != VK_SUCCESS) {
-				return ErrStack(res, code_location, "failed to create descriptor set layout");
-			}
-		}
-
-		std::vector<VkDescriptorPoolSize> pools(bindings.size());
-		for (uint32_t i = 0; i < bindings.size(); i++) {
-			pools[i].type = bindings[i].descriptorType;
-			pools[i].descriptorCount = bindings[i].descriptorCount;
-		}
-
-		// Descriptor Pool
-		{
-			VkDescriptorPoolCreateInfo descp_pool_info = {};
-			descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			descp_pool_info.maxSets = 1;
-			descp_pool_info.poolSizeCount = (uint32_t)(pools.size());
-			descp_pool_info.pPoolSizes = pools.data();
-
-			VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
-			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, code_location, "failed to create descriptor pool");
-			}
-		}
-
-		// Descriptor Sets
-		{
-			VkDescriptorSetAllocateInfo descp_sets_info = {};
-			descp_sets_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			descp_sets_info.descriptorPool = descp_pool;
-			descp_sets_info.descriptorSetCount = 1;
-			descp_sets_info.pSetLayouts = &descp_layout;
-
-			VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
-			if (res != VK_SUCCESS) {
-				return ErrStack(res, code_location, "failed to allocate descriptor sizes");
-			}
+		VkResult res = vkCreateDescriptorSetLayout(logical_dev->logical_device, &descp_layout_info, NULL, &descp_layout);
+		if (res != VK_SUCCESS) {
+			return ErrStack(res, code_location, "failed to create descriptor set layout");
 		}
 
 		return ErrStack();
 	}
 
-	ErrStack Descriptor::setDebugName(std::string name)
+	ErrStack DescriptorSetLayout::setDebugName(std::string name)
 	{
-		checkErrStack1(logical_dev->setDebugName(
-			reinterpret_cast<uint64_t>(descp_set), VK_OBJECT_TYPE_DESCRIPTOR_SET, 
-			name + " VkDescriptorSet"));
-
-		return ErrStack();
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(descp_layout), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+			name + " VkDescriptorSetLayout");
 	}
 
-	void Descriptor::update(std::vector<DescriptorWrite>& descp_writes)
-	{
-		this->writes.resize(descp_writes.size());
-
-		for (size_t i = 0; i < descp_writes.size(); i++) {
-
-			VkWriteDescriptorSet& vk_write = this->writes[i];
-			DescriptorWrite& write = descp_writes[i];
-
-			vk_write = {};
-			vk_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			vk_write.dstSet = descp_set;
-			vk_write.dstBinding = write.dstBinding;
-			vk_write.dstArrayElement = write.dstArrayElement;
-			vk_write.descriptorCount = write.descriptorCount;
-			vk_write.descriptorType = write.descriptorType;
-			vk_write.pImageInfo = write.img_info;
-			vk_write.pBufferInfo = write.buff_info;
-		}
-
-		vkUpdateDescriptorSets(logical_dev->logical_device,
-			(uint32_t)writes.size(), writes.data(), 0, NULL);
-	}
-
-	void Descriptor::destroyLayout()
+	void DescriptorSetLayout::destroy()
 	{
 		vkDestroyDescriptorSetLayout(logical_dev->logical_device, this->descp_layout, NULL);
 		descp_layout = VK_NULL_HANDLE;
 	}
 
-	void Descriptor::destroyPool()
+	DescriptorSetLayout::~DescriptorSetLayout()
+	{
+		if (descp_layout != VK_NULL_HANDLE) {
+			destroy();
+		}
+	}
+
+	ErrStack DescriptorPool::create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools)
+	{
+		this->logical_dev = logical_dev;
+
+		VkDescriptorPoolCreateInfo descp_pool_info = {};
+		descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descp_pool_info.maxSets = 1;
+		descp_pool_info.poolSizeCount = (uint32_t)(pools.size());
+		descp_pool_info.pPoolSizes = pools.data();
+
+		VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
+		if (vk_res != VK_SUCCESS) {
+			return ErrStack(vk_res, code_location, "failed to create descriptor pool");
+		}
+
+		return ErrStack();
+	}
+
+	ErrStack DescriptorPool::setDebugName(std::string name)
+	{
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(this->descp_pool), VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+			name + " VkDescriptorPool");
+	}
+
+	void DescriptorPool::destroy()
 	{
 		vkDestroyDescriptorPool(logical_dev->logical_device, this->descp_pool, NULL);
 		descp_pool = VK_NULL_HANDLE;
 	}
 
-	Descriptor::~Descriptor()
+	DescriptorPool::~DescriptorPool()
 	{
-		if (descp_layout != VK_NULL_HANDLE) {
-			destroyLayout();
+		if (descp_pool != VK_NULL_HANDLE) {
+			destroy();
+		}
+	}
+
+	ErrStack DescriptorSet::create(LogicalDevice* logical_dev, DescriptorPool* pool, DescriptorSetLayout* layout)
+	{
+		this->logical_dev = logical_dev;
+
+		VkDescriptorSetAllocateInfo descp_sets_info = {};
+		descp_sets_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		descp_sets_info.descriptorPool = pool->descp_pool;
+		descp_sets_info.descriptorSetCount = 1;
+		descp_sets_info.pSetLayouts = &layout->descp_layout;
+
+		VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
+		if (res != VK_SUCCESS) {
+			return ErrStack(res, code_location, "failed to allocate descriptor sizes");
 		}
 
-		if (descp_pool != VK_NULL_HANDLE) {
-			destroyPool();
-		}
+		return ErrStack();
+	}
+
+	ErrStack DescriptorSet::setDebugName(std::string name)
+	{
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(descp_set), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+			name + " VkDescriptorSet");
+	}
+
+	void DescriptorSet::update(std::vector<VkWriteDescriptorSet>& writes)
+	{
+		vkUpdateDescriptorSets(logical_dev->logical_device, (uint32_t)writes.size(), writes.data(), 0, NULL);
 	}
 }

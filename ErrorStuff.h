@@ -2,12 +2,13 @@
 
 // Standard
 #include <vector>
+#include <string>
 
 
 #define code_location \
-	"ln = " + std::to_string(__LINE__) + \
+	("ln = " + std::to_string(__LINE__) + \
 	" fn = " + __func__ + \
-	" in file " + __FILE__
+	" in file " + __FILE__).c_str()
 
 
 #define var_name(var) \
@@ -78,9 +79,8 @@ enum class ExtraError {
 
 
 /* Error containing error cause, code location and message */
-struct Error
-{
-	VkResult vk_err = VK_RESULT_MAX_ENUM;
+struct Error {
+	uint32_t vk_err = 0;
 	ExtraError err = ExtraError::OK;
 
 	std::string location;
@@ -88,14 +88,13 @@ struct Error
 
 	Error(std::string location, std::string msg);
 	Error(ExtraError res, std::string location, std::string msg);
-	Error(VkResult res, std::string location, std::string msg);
-	Error(VkResult res, ExtraError err, std::string location, std::string msg);
+	Error(uint32_t res, std::string location, std::string msg);
+	Error(uint32_t res, ExtraError err, std::string location, std::string msg);
 };
 
 // change this to return an idx to a global vector of error
 // add time maybe ?
-struct ErrStack
-{
+struct [[nodiscard]] ErrStack {
 	std::vector<Error> error_stack;
 
 	ErrStack();
@@ -106,8 +105,8 @@ struct ErrStack
 	ErrStack(ExtraError res, std::string location, std::string msg);
 	ErrStack(ExtraError res, std::string location, std::string msg, std::string win_msg);
 
-	ErrStack(VkResult res, std::string location, std::string msg);
-	ErrStack(VkResult res, ExtraError err, std::string location, std::string msg);
+	ErrStack(uint32_t res, std::string location, std::string msg);
+	ErrStack(uint32_t res, ExtraError err, std::string location, std::string msg);
 
 	void pushError(std::string location, std::string msg);
 
@@ -160,4 +159,5 @@ std::string asIs(char c);
 #define assert_cond(param, msg) \
 	if constexpr(enable_runtime_assertions) \
 		if (param != true) \
-			std::cout << code_location << "WARNING: assertion failed for condition (" << #param << ") isnt true, " << msg << std::endl;
+			printf("%s %s%s%s %s \n", code_location, \
+				"WARNING: assertion failed for condition (", #param, ") isn't true, ", msg);
