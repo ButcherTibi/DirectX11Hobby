@@ -12,8 +12,32 @@ layout(location = 0) out vec4 outColor;
 void main() {
     vec2 pixel_pos = vec2(gl_FragCoord.x, gl_FragCoord.y);
 
-    if (distance(pixel_pos, center_in) <= radius_in) {
-        outColor = vec4(color_in, 1);
+    // Sample Points
+    vec2 top_left = pixel_pos + vec2(-0.5, -0.5);
+    vec2 top_right = pixel_pos + vec2(0.5, -0.5);
+    vec2 bot_right = pixel_pos + vec2(0.5, 0.5);
+    vec2 bot_left = pixel_pos + vec2(-0.5, 0.5);
+
+    float count = 0;
+    if (distance(pixel_pos, center_in) < radius_in) {
+        count++;
+    }
+    if (distance(top_left, center_in) < radius_in) {
+        count++;
+    }
+    if (distance(top_right, center_in) < radius_in) {
+        count++;
+    }
+    if (distance(bot_right, center_in) < radius_in) {
+        count++;
+    }
+    if (distance(bot_left, center_in) < radius_in) {
+        count++;
+    }
+    
+    if (count > 0) {
+        float alpha = count / 5;
+        outColor = vec4(color_in, alpha);
     }
     else {
         discard;

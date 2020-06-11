@@ -67,10 +67,10 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 	std::atomic_bool is_err = false;
 
 	std::for_each(std::execution::seq, cmd_buff_tasks.begin(), cmd_buff_tasks.end(), 
-		[this, &is_err, info](CmdBufferTask& task) {
+		[this, &is_err, &info](CmdBufferTask& task) {
 
 		VkCommandBufferBeginInfo buffer_begin_info = {};
-		buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;	
 
 		VkResult vk_res = vkBeginCommandBuffer(task.cmd_buff, &buffer_begin_info);
 		if (vk_res != VK_SUCCESS) {
@@ -79,64 +79,184 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 			return;
 		}
 
-		VkRenderPassBeginInfo renderpass_begin_info = {};
-		renderpass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderpass_begin_info.renderPass = info.renderpass->renderpass;
-		renderpass_begin_info.framebuffer = info.frame_buffs->frame_buffs[task.idx];
-		renderpass_begin_info.renderArea.offset = { 0, 0 };
-		renderpass_begin_info.renderArea.extent.width = info.width;
-		renderpass_begin_info.renderArea.extent.height = info.height;
-
-		// Clear Values
-		std::array<VkClearValue, 5> clear_vals;
-		clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		clear_vals[1].depthStencil.depth = 1;
-		clear_vals[2].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		clear_vals[3].depthStencil.depth = 1;
-		clear_vals[4].color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		renderpass_begin_info.clearValueCount = (uint32_t)clear_vals.size();
-		renderpass_begin_info.pClearValues = clear_vals.data();
-
-		vkCmdBeginRenderPass(task.cmd_buff, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+		// Clear Compose Image
 		{
-			// Rects Subpass
+			cmdChangeImageLayout(task.cmd_buff, info.compose_img->img, 
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+			VkImageMemoryBarrier barrier = {};
+			VkPipelineStageFlags src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			VkPipelineStageFlags dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+			VkClearColorValue clear = {};
+			clear.float32[0] = 0;
+			clear.float32[1] = 0;
+			clear.float32[2] = 0;
+			clear.float32[3] = 0;
+
+			VkImageSubresourceRange range = {};
+			range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			range.baseArrayLayer = 0;
+			range.layerCount = 1;
+			range.baseMipLevel = 0;
+			range.levelCount = 1;
+
+			vkCmdClearColorImage(task.cmd_buff, info.compose_img->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range);
+
+			cmdChangeImageLayout(task.cmd_buff, info.compose_img->img, 
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		}	
+
+		std::array<VkClearValue, 1> clear_vals;
+		clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+		for (GPU_ElementsLayer& layer : *info.layers) {
+
+			// Border Rect Renderpass
+			VkRenderPassBeginInfo border_rect_info = {};
+			border_rect_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			border_rect_info.renderPass = info.rect_renderpass->renderpass;
+			border_rect_info.framebuffer = info.border_rect_frames[0][task.idx].frame_buff;
+			border_rect_info.renderArea.offset = { 0, 0 };
+			border_rect_info.renderArea.extent.width = info.width;
+			border_rect_info.renderArea.extent.height = info.height;
+			border_rect_info.clearValueCount = (uint32_t)clear_vals.size();
+			border_rect_info.pClearValues = clear_vals.data();
+
+			vkCmdBeginRenderPass(task.cmd_buff, &border_rect_info, VK_SUBPASS_CONTENTS_INLINE);
 			{
 				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					info.rects_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
-				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.rects_pipe->pipeline);
+					info.rect_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.rect_pipe->pipeline);
 
-				VkBuffer vertex_buffers[] = { info.rects_vertex_buff->buff };
-				VkDeviceSize offsets[] = { 0 };
+				VkBuffer vertex_buffers[] = { info.border_rect_vertex_buff->buff };
+				VkDeviceSize offsets[] = { layer.border_rect.offset };
 				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-				vkCmdDraw(task.cmd_buff, info.rects_vertex_count, 1, 0, 0);
+				vkCmdDraw(task.cmd_buff, layer.border_rect.vertex_count, 1, 0, 0);
 			}
-			
-			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdEndRenderPass(task.cmd_buff);
 
-			// Circles Subpass
+			// Border Circles Renderpass
+			VkRenderPassBeginInfo border_circles_info = {};
+			border_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			border_circles_info.renderPass = info.circles_renderpass->renderpass;
+			border_circles_info.framebuffer = info.border_circles_frames[0][task.idx].frame_buff;
+			border_circles_info.renderArea.offset = { 0, 0 };
+			border_circles_info.renderArea.extent.width = info.width;
+			border_circles_info.renderArea.extent.height = info.height;
+			border_circles_info.clearValueCount = (uint32_t)clear_vals.size();
+			border_circles_info.pClearValues = clear_vals.data();
+
+			vkCmdBeginRenderPass(task.cmd_buff, &border_circles_info, VK_SUBPASS_CONTENTS_INLINE);
 			{
 				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
 					info.circles_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
 				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.circles_pipe->pipeline);
 
-				VkBuffer vertex_buffers[] = { info.circles_vertex_buff->buff };
-				VkDeviceSize offsets[] = { 0 };
+				VkBuffer vertex_buffers[] = { info.border_circles_vertex_buff->buff };
+				VkDeviceSize offsets[] = { layer.border_circles.offset };
 				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-				vkCmdDraw(task.cmd_buff, info.circles_vertex_count, 1, 0, 0);
+				vkCmdDraw(task.cmd_buff, layer.border_circles.vertex_count, 1, 0, 0);
 			}
+			vkCmdEndRenderPass(task.cmd_buff);
 
-			vkCmdNextSubpass(task.cmd_buff, VK_SUBPASS_CONTENTS_INLINE);
+			// Padding Rect Renderpass
+			VkRenderPassBeginInfo padding_rect_info = {};
+			padding_rect_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			padding_rect_info.renderPass = info.rect_renderpass->renderpass;
+			padding_rect_info.framebuffer = info.padding_rect_frames[0][task.idx].frame_buff;
+			padding_rect_info.renderArea.offset = { 0, 0 };
+			padding_rect_info.renderArea.extent.width = info.width;
+			padding_rect_info.renderArea.extent.height = info.height;
+			padding_rect_info.clearValueCount = (uint32_t)clear_vals.size();
+			padding_rect_info.pClearValues = clear_vals.data();
 
-			// Compose Subpass
+			vkCmdBeginRenderPass(task.cmd_buff, &padding_rect_info, VK_SUBPASS_CONTENTS_INLINE);
+			{
+				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					info.rect_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.rect_pipe->pipeline);
+
+				VkBuffer vertex_buffers[] = { info.padding_rect_vertex_buff->buff };
+				VkDeviceSize offsets[] = { layer.padding_rect.offset };
+				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+				vkCmdDraw(task.cmd_buff, layer.padding_rect.vertex_count, 1, 0, 0);
+			}
+			vkCmdEndRenderPass(task.cmd_buff);
+
+			// Padding Circles Renderpass
+			VkRenderPassBeginInfo padding_circles_info = {};
+			padding_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			padding_circles_info.renderPass = info.circles_renderpass->renderpass;
+			padding_circles_info.framebuffer = info.padding_circles_frames[0][task.idx].frame_buff;
+			padding_circles_info.renderArea.offset = { 0, 0 };
+			padding_circles_info.renderArea.extent.width = info.width;
+			padding_circles_info.renderArea.extent.height = info.height;
+			padding_circles_info.clearValueCount = (uint32_t)clear_vals.size();
+			padding_circles_info.pClearValues = clear_vals.data();
+
+			vkCmdBeginRenderPass(task.cmd_buff, &padding_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+			{
+				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					info.circles_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.circles_pipe->pipeline);
+
+				VkBuffer vertex_buffers[] = { info.padding_circles_vertex_buff->buff };
+				VkDeviceSize offsets[] = { layer.padding_circles.offset };
+				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+				vkCmdDraw(task.cmd_buff, layer.padding_circles.vertex_count, 1, 0, 0);
+			}
+			vkCmdEndRenderPass(task.cmd_buff);
+
+			// Compose Renderpass
+			VkRenderPassBeginInfo compose_info = {};
+			compose_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			compose_info.renderPass = info.compose_renderpass->renderpass;
+			compose_info.framebuffer = info.compose_frames[0][task.idx].frame_buff;
+			compose_info.renderArea.offset = { 0, 0 };
+			compose_info.renderArea.extent.width = info.width;
+			compose_info.renderArea.extent.height = info.height;
+
+			std::array<VkClearValue, 3> compose_clears;
+			compose_clears[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			compose_clears[1].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			compose_clears[2].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			compose_info.clearValueCount = compose_clears.size();
+			compose_info.pClearValues = compose_clears.data();
+
+			vkCmdBeginRenderPass(task.cmd_buff, &compose_info, VK_SUBPASS_CONTENTS_INLINE);
 			{
 				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
 					info.compose_pipe_layout->pipe_layout, 0, 1, &info.compose_descp_set->descp_set, 0, NULL);
-
 				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.compose_pipe->pipeline);
 
 				vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 			}
-			
+			vkCmdEndRenderPass(task.cmd_buff);
+		}
+
+		// Copy Renderpass
+		VkRenderPassBeginInfo copy_info = {};
+		copy_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		copy_info.renderPass = info.copy_renderpass->renderpass;
+		copy_info.framebuffer = info.copy_frames[0][task.idx].frame_buff;
+		copy_info.renderArea.offset = { 0, 0 };
+		copy_info.renderArea.extent.width = info.width;
+		copy_info.renderArea.extent.height = info.height;
+
+		std::array<VkClearValue, 2> copy_clears;
+		copy_clears[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		copy_clears[1].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		copy_info.clearValueCount = copy_clears.size();
+		copy_info.pClearValues = copy_clears.data();
+
+		vkCmdBeginRenderPass(task.cmd_buff, &copy_info, VK_SUBPASS_CONTENTS_INLINE);
+		{
+			vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+				info.copy_pipe_layout->pipe_layout, 0, 1, &info.copy_descp_set->descp_set, 0, NULL);
+			vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.copy_pipe->pipeline);
+
+			vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 		}
 		vkCmdEndRenderPass(task.cmd_buff);
 

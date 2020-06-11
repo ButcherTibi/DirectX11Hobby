@@ -3,38 +3,31 @@
 
 // Input Attachments
 layout(input_attachment_index = 0, set = 0, binding = 0)
-    uniform subpassInput rects_color_subpass;
+    uniform subpassInput border_color_subpass;
 
 layout(input_attachment_index = 0, set = 0, binding = 1)
-    uniform subpassInput rects_depth_subpass;
-
-layout(input_attachment_index = 0, set = 0, binding = 2)
-    uniform subpassInput circles_color_subpass;
-
-layout(input_attachment_index = 0, set = 0, binding = 3)
-    uniform subpassInput circles_depth_subpass;
+    uniform subpassInput padding_color_subpass;
 
 // Outputs
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    vec4 rects_color_pixel = subpassLoad(rects_color_subpass);
-    vec4 rects_depth_pixel = subpassLoad(rects_depth_subpass);
-    vec4 circles_color_pixel = subpassLoad(circles_color_subpass);
-    vec4 circles_depth_pixel = subpassLoad(circles_depth_subpass);
+    vec4 border_pixel = subpassLoad(border_color_subpass);
+    vec4 padding_pixel = subpassLoad(padding_color_subpass);
+    
+    if (padding_pixel.a > 0) {
+        
+        if (padding_pixel.a < 1) {
 
-    if (rects_depth_pixel.x > circles_depth_pixel.x) {
-        outColor = rects_color_pixel;
+            float src_alpha = padding_pixel.a;
+            float src_alpha_rev = 1 - src_alpha;
+            outColor = vec4(padding_pixel.xyz * src_alpha + border_pixel.xyz * src_alpha_rev, 1);
+        }
+        else {
+            outColor = padding_pixel;
+        }
     }
-    else if (rects_depth_pixel.x < circles_depth_pixel.x) {
-        outColor = circles_color_pixel;
-    } 
     else {
-        if (rects_color_pixel.a > 0) {
-            outColor = rects_color_pixel;
-        }
-        else if (circles_color_pixel.a > 0) {
-            outColor = circles_color_pixel;
-        }
+        outColor = border_pixel;
     }
 }

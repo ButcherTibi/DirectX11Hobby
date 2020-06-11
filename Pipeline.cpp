@@ -51,7 +51,7 @@ ErrStack vks::ShaderModule::recreate(LogicalDevice* logical_dev, std::vector<cha
 ErrStack vks::ShaderModule::setDebugName(std::string name)
 {
 	return logical_dev->setDebugName(
-		reinterpret_cast<uint64_t>(sh_module), VK_OBJECT_TYPE_DESCRIPTOR_SET, name);
+		reinterpret_cast<uint64_t>(sh_module), VK_OBJECT_TYPE_DESCRIPTOR_SET, name + "VkShaderModule");
 }
 
 void vks::ShaderModule::destroy()
@@ -82,7 +82,7 @@ ErrStack vks::GraphicsPipeline::create(LogicalDevice* logical_dev, VkGraphicsPip
 ErrStack vks::GraphicsPipeline::setDebugName(std::string name)
 {
 	return logical_dev->setDebugName(
-		reinterpret_cast<uint64_t>(pipeline), VK_OBJECT_TYPE_PIPELINE, name);
+		reinterpret_cast<uint64_t>(pipeline), VK_OBJECT_TYPE_PIPELINE, name + "VkGraphicsPipeline");
 }
 
 void vks::GraphicsPipeline::destroy()

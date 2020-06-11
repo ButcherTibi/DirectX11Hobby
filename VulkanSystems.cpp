@@ -644,6 +644,12 @@ namespace vks {
 		return ErrStack();
 	}
 
+	ErrStack Renderpass::setDebugName(std::string name)
+	{
+		return logical_dev->setDebugName(
+			reinterpret_cast<uint64_t>(renderpass), VK_OBJECT_TYPE_RENDER_PASS, name);
+	}
+
 	void Renderpass::destroy()
 	{
 		vkDestroyRenderPass(logical_dev->logical_device, renderpass, NULL);
@@ -658,51 +664,41 @@ namespace vks {
 	}
 
 
-	ErrStack Framebuffers::create(LogicalDevice* logical_dev, Renderpass* renderpass, 
-		std::array<VkImageView, 4>& views, std::vector<VkImageView>& swapchain_views, 
-		uint32_t width, uint32_t height)
+	ErrStack Framebuffer::create(LogicalDevice* logical_dev, Renderpass* renderpass,
+		std::vector<VkImageView>& attachments, uint32_t width, uint32_t height)
 	{
-		this->logical_dev = logical_dev;
+		this->logical_dev_ = logical_dev;
 
-		size_t img_count = swapchain_views.size();
-		frame_buffs.resize(img_count);
+		VkFramebufferCreateInfo framebuff_info = {};
+		framebuff_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebuff_info.renderPass = renderpass->renderpass;
+		framebuff_info.attachmentCount = (uint32_t)attachments.size();
+		framebuff_info.pAttachments = attachments.data();
+		framebuff_info.width = width;
+		framebuff_info.height = height;
+		framebuff_info.layers = 1;
 
-		for (size_t i = 0; i < img_count; i++) {
+		checkVkRes(vkCreateFramebuffer(logical_dev->logical_device, &framebuff_info, NULL,
+			&frame_buff), "failed to create framebuffer");
 
-			std::array<VkImageView, 5> attachments = {
-				views[0],
-				views[1],
-				views[2],
-				views[3],
-				swapchain_views[i]
-			};
-
-			VkFramebufferCreateInfo framebuff_info = {};
-			framebuff_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			framebuff_info.renderPass = renderpass->renderpass;
-			framebuff_info.attachmentCount = (uint32_t)attachments.size();
-			framebuff_info.pAttachments = attachments.data();
-			framebuff_info.width = width;
-			framebuff_info.height = height;
-			framebuff_info.layers = 1;
-
-			checkVkRes(vkCreateFramebuffer(logical_dev->logical_device, &framebuff_info, NULL,
-				&frame_buffs[i]), "failed to create framebuffer");
-		}
 		return ErrStack();
 	}
 
-	void Framebuffers::destroy()
+	void Framebuffer::destroy()
 	{
-		for (auto frame_buff : frame_buffs) {
-			vkDestroyFramebuffer(logical_dev->logical_device, frame_buff, NULL);
-		}
-		frame_buffs.clear();
+		vkDestroyFramebuffer(logical_dev_->logical_device, frame_buff, NULL);
+		frame_buff = VK_NULL_HANDLE;
 	}
 
-	Framebuffers::~Framebuffers()
+	ErrStack Framebuffer::setDebugName(std::string name)
 	{
-		if (frame_buffs.size() > 0) {
+		return logical_dev_->setDebugName(
+			reinterpret_cast<uint64_t>(frame_buff), VK_OBJECT_TYPE_FRAMEBUFFER, name + " VkFramebuffer");
+	}
+
+	Framebuffer::~Framebuffer()
+	{
+		if (frame_buff != VK_NULL_HANDLE) {
 			destroy();
 		}
 	}

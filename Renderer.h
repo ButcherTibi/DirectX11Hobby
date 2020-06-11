@@ -21,65 +21,81 @@ struct RenderingContent {
 	// Swapchain
 	uint32_t width = 0;
 	uint32_t height = 0;
-
-	ui::UserInterface* user_interface;
 };
 
 class VulkanRenderer {
 public:
-	// Vulkan Systems
 	vks::Instance instance;
 	vks::Surface surface;
 
 	vks::PhysicalDevice phys_dev;
 	vks::LogicalDevice logical_dev;
 
-	vks::CommandPool cmd_pool;
-	vks::Buffer staging_buff;
-
-	// Frame
 	vks::Swapchain swapchain;
+	vks::CommandPool cmd_pool;
 
-	vks::Image rects_color_img;
-	vks::Image rects_depth_img;
-	vks::Image circles_color_img;
-	vks::Image circles_depth_img;
-	vks::Renderpass renderpass;
+	vks::Image border_color_img;
+	vks::Image padding_color_img;
+	vks::Image compose_color_img;
+	
+	vks::ImageView border_color_view;
+	vks::ImageView padding_color_view;
+	vks::ImageView compose_color_view;
 
-	vks::ImageView rects_color_view;
-	vks::ImageView rects_depth_view;
-	vks::ImageView circles_color_view;
-	vks::ImageView circles_depth_view;
-	vks::Framebuffers frame_buffs;
+	vks::ShaderModule rect_vert_module;
+	vks::ShaderModule rect_frag_module;
+	vks::ShaderModule circles_vert_module;
+	vks::ShaderModule circles_frag_module;
 
-	// Subpass Commons
+	// Common Stuff
+	vks::StagingBuffer uniform_staging_buff;
 	vks::Buffer uniform_buff;
 
 	vks::DescriptorSetLayout uniform_descp_layout;
 	vks::DescriptorPool uniform_descp_pool;
 	vks::DescriptorSet uniform_descp_set;
 
-	// Rects Subpass
-	vks::Buffer rects_vertex_buff;
-	uint32_t rects_vertex_count;
+	std::vector<GPU_ElementsLayer> layers;
 
-	vks::ShaderModule rects_vert_module;
-	vks::ShaderModule rects_frag_module;
+	// Rect
+	vks::Renderpass rect_renderpass;
+	vks::PipelineLayout rect_pipe_layout;
+	vks::GraphicsPipeline rect_pipe;
 
-	vks::PipelineLayout rects_pipe_layout;
-	vks::GraphicsPipeline rects_pipe;
-
-	// Circles Subpass
-	vks::Buffer circles_vertex_buff;
-	uint32_t circles_vertex_count;
-
-	vks::ShaderModule circles_vert_module;
-	vks::ShaderModule circles_frag_module;
-
+	// Circle
+	vks::Renderpass circles_renderpass;
 	vks::PipelineLayout circles_pipe_layout;
 	vks::GraphicsPipeline circles_pipe;
 
-	// Compose Subpass
+	// Border Rect Pass
+	vks::StagingBuffer border_rect_staging_buff;
+	vks::Buffer border_rect_vertex_buff;
+	uint32_t border_rect_vertex_count;
+
+	std::vector<vks::Framebuffer> border_rect_frames;
+
+	// Border Circles Pass
+	vks::StagingBuffer border_circles_staging_buff;
+	vks::Buffer border_circles_vertex_buff;
+
+	std::vector<vks::Framebuffer> border_circles_frames;
+
+	// Padding Rect Pass
+	vks::StagingBuffer padding_rect_staging_buff;
+	vks::Buffer padding_rect_vertex_buff;
+
+	std::vector<vks::Framebuffer> padding_rect_frames;
+
+	// Padding Circle Pass
+	vks::StagingBuffer padding_circles_staging_buff;
+	vks::Buffer padding_circles_vertex_buff;
+
+	std::vector<vks::Framebuffer> padding_circles_frames;
+
+	// Compose Pass
+	vks::Renderpass compose_renderpass;
+	std::vector<vks::Framebuffer> compose_frames;
+
 	vks::DescriptorSetLayout compose_descp_layout;
 	vks::DescriptorPool compose_descp_pool;
 	vks::DescriptorSet compose_descp_set;
@@ -90,6 +106,19 @@ public:
 	vks::PipelineLayout compose_pipe_layout;
 	vks::GraphicsPipeline compose_pipe;
 
+	// Copy Pass
+	vks::DescriptorSetLayout copy_descp_layout;
+	vks::DescriptorPool copy_descp_pool;
+	vks::DescriptorSet copy_descp_set;
+
+	vks::ShaderModule copy_frag_module;
+
+	vks::Renderpass copy_renderpass;
+	std::vector<vks::Framebuffer> copy_frames;
+
+	vks::PipelineLayout copy_pipe_layout;
+	vks::GraphicsPipeline copy_pipe;
+
 	// Command Buffer
 	vks::RenderingComandBuffers render_cmd_buffs;
 
@@ -98,6 +127,8 @@ public:
 
 public:
 	ErrStack recreate(RenderingContent& content);
+
+	ErrStack calc(ui::UserInterface& user);
 
 	ErrStack draw();
 

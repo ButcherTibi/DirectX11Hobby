@@ -169,49 +169,77 @@ namespace vks {
 	};
 
 
+	class StagingBuffer {
+	public:
+		LogicalDevice* logical_dev = nullptr;
+
+		VkBuffer buff = VK_NULL_HANDLE;
+		VmaAllocation buff_alloc;
+		VmaAllocationInfo vma_r_info = {};
+		void* mem;	
+		size_t load_size = 0;
+
+	public:
+		ErrStack create_(size_t buff_size,
+			VkBuffer& new_buff, VmaAllocation& new_alloc, void*& new_mem);
+
+		ErrStack reserve(size_t size);
+
+		ErrStack push(void* data, size_t size);
+
+		void clear();
+
+		void destroy();
+
+		~StagingBuffer();
+
+		ErrStack setDebugName(std::string name);
+	};
+
+
 	enum class LoadType {
 		STAGING,
 		MEMCPY,
-		ENUM_NOT_INIT
 	};
 
 
 	class Buffer {
-		LogicalDevice* logical_dev = nullptr;
-
 	public:
-		VkBuffer buff = VK_NULL_HANDLE;	
+		LogicalDevice* logical_dev_ = nullptr;
+		CommandPool* cmd_pool_ = nullptr;
+		StagingBuffer* staging_ = nullptr;
+		VkBufferUsageFlags usage_;
+		VmaMemoryUsage mem_usage_;
+		LoadType load_type_;
+		size_t load_size_;
+
+		VkBuffer buff = VK_NULL_HANDLE;
 		void* mem;
-
 		VmaAllocation buff_alloc;
-		VmaAllocationInfo buff_alloc_info;
-
-		LoadType load_type = LoadType::ENUM_NOT_INIT;
-		size_t scheduled_load_size = 0;
+		VmaAllocationInfo vma_r_info = {};
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev,
-			VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
+		ErrStack create_(size_t size, VkBuffer& new_buff, VmaAllocation& new_alloc, void*& new_mem);
 
-		// add param for if reallocated
-		ErrStack recreate(LogicalDevice* logical_dev, 
-			VkDeviceSize min_size, VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
+		void create(LogicalDevice* logical_dev, CommandPool* cmd_pool, StagingBuffer* staging,
+			VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
 
-		ErrStack recreateStaging(LogicalDevice* logical_dev, VkDeviceSize min_size);
+		ErrStack push(void* data, size_t size);
 
-		ErrStack load(void* data, size_t size, CommandPool* cmd_pool, Buffer* staging);
+		ErrStack flush();
 
-		void scheduleLoad(size_t offset, Buffer* staging, void* data, size_t size);
+		void clear();
 
-		ErrStack flush(CommandPool* cmd_pool, Buffer* staging);
-
-		/* destroy memory used for buffer */
 		void destroy();
 
 		~Buffer();
 
 		ErrStack setDebugName(std::string name);
 	};
+
+
+	void cmdChangeImageLayout(VkCommandBuffer cmd_buff, VkImage img, VkImageLayout old_layout,
+		VkImageLayout new_layout);
 
 
 	class Image {
@@ -223,7 +251,7 @@ namespace vks {
 
 		VmaAllocation alloc;
 		VmaAllocationInfo alloc_info;
-		LoadType load_type = LoadType::ENUM_NOT_INIT;
+		LoadType load_type;
 
 		// Image Properties
 		uint32_t width;
@@ -290,25 +318,28 @@ namespace vks {
 	public:
 		ErrStack create(LogicalDevice* logical_dev, VkRenderPassCreateInfo* info);
 
+		ErrStack setDebugName(std::string name);
+
 		void destroy();
 
 		~Renderpass();
 	};
 
 
-	class Framebuffers {
-		LogicalDevice* logical_dev = nullptr;
+	class Framebuffer {
 	public:
+		LogicalDevice* logical_dev_ = nullptr;
 
-		std::vector<VkFramebuffer> frame_buffs;
+		VkFramebuffer frame_buff;
 	public:
 		ErrStack create(LogicalDevice* logical_dev, Renderpass* renderpass,
-			std::array<VkImageView, 4>& attachments, std::vector<VkImageView>& swapchain_views,
-			uint32_t width, uint32_t height);
+			std::vector<VkImageView>& attachments, uint32_t width, uint32_t height);
 
 		void destroy();
 
-		~Framebuffers();
+		ErrStack setDebugName(std::string name);
+
+		~Framebuffer();
 	};
 
 
@@ -421,34 +452,60 @@ namespace vks {
 	};
 
 	struct RenderingCmdBuffsUpdateInfo {
-		Renderpass* renderpass;
-		Framebuffers* frame_buffs;
 		uint32_t width;
 		uint32_t height;
 
 		// Common
+		Image* compose_img;
+
 		Buffer* uniform_buff;
 		DescriptorSet* uniform_descp_set;
 
-		// Rects
-		PipelineLayout* rects_pipe_layout;
-		GraphicsPipeline* rects_pipe;
+		std::vector<GPU_ElementsLayer>* layers;
 
-		Buffer* rects_vertex_buff;
-		uint32_t rects_vertex_count;
+		// Rect
+		Renderpass* rect_renderpass;
+		PipelineLayout* rect_pipe_layout;
+		GraphicsPipeline* rect_pipe;
 
 		// Circles
+		Renderpass* circles_renderpass;
 		PipelineLayout* circles_pipe_layout;
 		GraphicsPipeline* circles_pipe;
 
-		Buffer* circles_vertex_buff;
-		uint32_t circles_vertex_count;
+		// Border Rect pass
+		Buffer* border_rect_vertex_buff;
+		std::vector<Framebuffer>* border_rect_frames;
+
+		// Border Circles pass
+		Buffer* border_circles_vertex_buff;
+		std::vector<Framebuffer>* border_circles_frames;
+
+		// Padding Rect pass
+		Buffer* padding_rect_vertex_buff;
+		std::vector<Framebuffer>* padding_rect_frames;
+
+		// Padding Circles pass
+		Buffer* padding_circles_vertex_buff;
+		std::vector<Framebuffer>* padding_circles_frames;
 
 		// Compose
 		DescriptorSet* compose_descp_set;
-		
+
+		Renderpass* compose_renderpass;
+		std::vector<Framebuffer>* compose_frames;
+
 		PipelineLayout* compose_pipe_layout;
 		GraphicsPipeline* compose_pipe;
+
+		// Copy
+		DescriptorSet* copy_descp_set;
+
+		Renderpass* copy_renderpass;
+		std::vector<Framebuffer>* copy_frames;
+
+		PipelineLayout* copy_pipe_layout;
+		GraphicsPipeline* copy_pipe;
 	};
 
 	class RenderingComandBuffers {

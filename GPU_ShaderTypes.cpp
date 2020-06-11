@@ -19,7 +19,7 @@ std::array<VkVertexInputAttributeDescription, 2> GPU_Rects_Vertex::getAttributeD
 
 	attrs_descp[0].binding = 0;
 	attrs_descp[0].location = 0;
-	attrs_descp[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attrs_descp[0].format = VK_FORMAT_R32G32_SFLOAT;
 	attrs_descp[0].offset = offsetof(GPU_Rects_Vertex, pos);
 
 	attrs_descp[1].binding = 0;
@@ -46,7 +46,7 @@ std::array<VkVertexInputAttributeDescription, 4> GPU_Circles_Vertex::getAttribut
 
 	attrs_descp[0].binding = 0;
 	attrs_descp[0].location = 0;
-	attrs_descp[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attrs_descp[0].format = VK_FORMAT_R32G32_SFLOAT;
 	attrs_descp[0].offset = offsetof(GPU_Circles_Vertex, pos);
 
 	attrs_descp[1].binding = 0;
