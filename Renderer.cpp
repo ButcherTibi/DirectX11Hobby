@@ -1587,6 +1587,8 @@ ErrStack VulkanRenderer::recreate(RenderingContent& content)
 		info.height = swapchain.resolution.height;
 
 		// Common
+		info.border_img = &border_color_img;
+		info.padding_img = &padding_color_img;
 		info.compose_img = &compose_color_img;
 
 		info.uniform_buff = &uniform_buff;
@@ -1637,6 +1639,13 @@ ErrStack VulkanRenderer::recreate(RenderingContent& content)
 		info.copy_pipe = &copy_pipe;
 
 		checkErrStack(render_cmd_buffs.update(info), "failed to update rendering commands");
+	}
+
+	// Command Buffer
+	{
+		auto f = [](vks::CmdBufferTask& task) {
+
+		};
 	}
 
 	// Syncronization

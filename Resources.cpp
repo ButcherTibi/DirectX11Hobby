@@ -324,7 +324,7 @@ namespace vks {
 		VkPipelineStageFlags dst_stage;
 
 		VkImageMemoryBarrier barrier = {};
-		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;	
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 
 		if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
 			setUndefined(barrier.srcAccessMask, src_stage);

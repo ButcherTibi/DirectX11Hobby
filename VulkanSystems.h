@@ -456,6 +456,8 @@ namespace vks {
 		uint32_t height;
 
 		// Common
+		Image* border_img;
+		Image* padding_img;
 		Image* compose_img;
 
 		Buffer* uniform_buff;
@@ -464,6 +466,7 @@ namespace vks {
 		std::vector<GPU_ElementsLayer>* layers;
 
 		// Rect
+
 		Renderpass* rect_renderpass;
 		PipelineLayout* rect_pipe_layout;
 		GraphicsPipeline* rect_pipe;

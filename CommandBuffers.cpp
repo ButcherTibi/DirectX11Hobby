@@ -103,7 +103,7 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 
 			vkCmdClearColorImage(task.cmd_buff, info.compose_img->img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range);
 
-			cmdChangeImageLayout(task.cmd_buff, info.compose_img->img, 
+			cmdChangeImageLayout(task.cmd_buff, info.compose_img->img,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		}	
 
@@ -136,30 +136,6 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 			}
 			vkCmdEndRenderPass(task.cmd_buff);
 
-			// Border Circles Renderpass
-			VkRenderPassBeginInfo border_circles_info = {};
-			border_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-			border_circles_info.renderPass = info.circles_renderpass->renderpass;
-			border_circles_info.framebuffer = info.border_circles_frames[0][task.idx].frame_buff;
-			border_circles_info.renderArea.offset = { 0, 0 };
-			border_circles_info.renderArea.extent.width = info.width;
-			border_circles_info.renderArea.extent.height = info.height;
-			border_circles_info.clearValueCount = (uint32_t)clear_vals.size();
-			border_circles_info.pClearValues = clear_vals.data();
-
-			vkCmdBeginRenderPass(task.cmd_buff, &border_circles_info, VK_SUBPASS_CONTENTS_INLINE);
-			{
-				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-					info.circles_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
-				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.circles_pipe->pipeline);
-
-				VkBuffer vertex_buffers[] = { info.border_circles_vertex_buff->buff };
-				VkDeviceSize offsets[] = { layer.border_circles.offset };
-				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-				vkCmdDraw(task.cmd_buff, layer.border_circles.vertex_count, 1, 0, 0);
-			}
-			vkCmdEndRenderPass(task.cmd_buff);
-
 			// Padding Rect Renderpass
 			VkRenderPassBeginInfo padding_rect_info = {};
 			padding_rect_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -181,6 +157,35 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 				VkDeviceSize offsets[] = { layer.padding_rect.offset };
 				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
 				vkCmdDraw(task.cmd_buff, layer.padding_rect.vertex_count, 1, 0, 0);
+			}
+			vkCmdEndRenderPass(task.cmd_buff);
+
+			// Wait for the color attachment to writen then read in shader
+			vkCmdPipelineBarrier(task.cmd_buff,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, NULL, 0, NULL, 0, NULL);
+
+			// Border Circles Renderpass
+			VkRenderPassBeginInfo border_circles_info = {};
+			border_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			border_circles_info.renderPass = info.circles_renderpass->renderpass;
+			border_circles_info.framebuffer = info.border_circles_frames[0][task.idx].frame_buff;
+			border_circles_info.renderArea.offset = { 0, 0 };
+			border_circles_info.renderArea.extent.width = info.width;
+			border_circles_info.renderArea.extent.height = info.height;
+			border_circles_info.clearValueCount = (uint32_t)clear_vals.size();
+			border_circles_info.pClearValues = clear_vals.data();
+
+			vkCmdBeginRenderPass(task.cmd_buff, &border_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+			{
+				vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+					info.circles_pipe_layout->pipe_layout, 0, 1, &info.uniform_descp_set->descp_set, 0, NULL);
+				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, info.circles_pipe->pipeline);
+
+				VkBuffer vertex_buffers[] = { info.border_circles_vertex_buff->buff };
+				VkDeviceSize offsets[] = { layer.border_circles.offset };
+				vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+				vkCmdDraw(task.cmd_buff, layer.border_circles.vertex_count, 1, 0, 0);
 			}
 			vkCmdEndRenderPass(task.cmd_buff);
 
@@ -208,6 +213,11 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 			}
 			vkCmdEndRenderPass(task.cmd_buff);
 
+			// Wait for the border and padding images to be written then read in fragment shader
+			vkCmdPipelineBarrier(task.cmd_buff,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, NULL, 0, NULL, 0, NULL);
+
 			// Compose Renderpass
 			VkRenderPassBeginInfo compose_info = {};
 			compose_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -234,6 +244,11 @@ ErrStack vks::RenderingComandBuffers::update(const RenderingCmdBuffsUpdateInfo& 
 			}
 			vkCmdEndRenderPass(task.cmd_buff);
 		}
+
+		// Wait for the compose image to be written by all layers then copy to swapchain
+		vkCmdPipelineBarrier(task.cmd_buff,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0, 0, NULL, 0, NULL, 0, NULL);
 
 		// Copy Renderpass
 		VkRenderPassBeginInfo copy_info = {};
