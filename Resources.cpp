@@ -66,6 +66,8 @@ namespace vks {
 
 	ErrStack Buffer::push(void* data, size_t size)
 	{
+		ErrStack err_stack;
+
 		if (buff == VK_NULL_HANDLE) {
 			checkErrStack1(create_(size, buff, buff_alloc, mem));
 		}
@@ -112,6 +114,8 @@ namespace vks {
 
 	ErrStack Buffer::flush()
 	{
+		ErrStack err_stack;
+
 		if (load_type_ == LoadType::STAGING) {
 
 			if (vma_r_info.size < this->load_size_) {
@@ -194,6 +198,8 @@ namespace vks {
 
 	ErrStack StagingBuffer::reserve(size_t size)
 	{
+		ErrStack err_stack;
+
 		if (buff == VK_NULL_HANDLE) {
 			checkErrStack1(create_(size, buff, buff_alloc, mem));
 			load_size = 0;
@@ -232,6 +238,8 @@ namespace vks {
 
 	ErrStack StagingBuffer::push(void* data, size_t size)
 	{
+		ErrStack err_stack;
+
 		if (buff == VK_NULL_HANDLE) {
 
 			checkErrStack1(create_(size, buff, buff_alloc, mem));
@@ -448,11 +456,10 @@ namespace vks {
 
 	ErrStack Image::changeImageLayout(CommandPool* cmd_pool, VkImageLayout new_layout)
 	{
-		ErrStack err;
-
+		ErrStack err_stack;
 		{
-			auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err);
-			checkErrStack(err, "");
+			auto record = SingleCommandBuffer(logical_dev, cmd_pool, &err_stack);
+			checkErrStack(err_stack, "");
 
 			cmdChangeImageLayout(record.cmd_buff, img,
 				this->layout, new_layout);
@@ -460,12 +467,14 @@ namespace vks {
 			this->layout = new_layout;
 		}
 
-		return err;
+		return err_stack;
 	}
 
 	ErrStack Image::load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff,
 		VkImageLayout layout_after_load)
 	{
+		ErrStack err_stack;
+
 		// Load Into Staging Buffer
 		std::memcpy(staging_buff->mem, colors, size);
 
@@ -505,9 +514,13 @@ namespace vks {
 		}
 	}
 
-	ErrStack ImageView::create(LogicalDevice* logical_dev, VkImageViewCreateInfo* info)
+	ErrStack ImageView::recreate(LogicalDevice* logical_dev, VkImageViewCreateInfo* info)
 	{
 		this->logical_dev = logical_dev;
+
+		if (this->view != VK_NULL_HANDLE) {
+			destroy();
+		}
 
 		checkVkRes(vkCreateImageView(logical_dev->logical_device, info, NULL, &view),
 			"failed to create image view");

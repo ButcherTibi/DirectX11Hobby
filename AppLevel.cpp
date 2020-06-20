@@ -90,13 +90,51 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
 	ErrStack err;
 
-	RenderingContent render_content;
-	render_content.hinstance = &hinstance;
-	render_content.hwnd = &app_level.hwnd;
-	render_content.width = app_level.display_width;
-	render_content.height = app_level.display_height;
+	UserInterface user_interface = {};
+	user_interface.recreateGraph(1, 1);
 
-	err = renderer.recreate(render_content);
+	BasicElement basic_elem_0 = {};
+	basic_elem_0.width.setRelative(0.5);
+	basic_elem_0.height.setRelative(0.5);
+
+	basic_elem_0.background_color = { 1, 0, 0, 1 };
+	basic_elem_0.padding_tl_radius = 50;
+	basic_elem_0.padding_tr_radius = 150;
+	basic_elem_0.padding_br_radius = 150;
+
+	basic_elem_0.border_right.setAbsolute(2);
+	basic_elem_0.border_bot.setAbsolute(2);
+
+	basic_elem_0.border_color = { 0, 1, 0, 0.5 };
+	basic_elem_0.border_tl_radius = 50;
+	basic_elem_0.border_tr_radius = 150;
+	basic_elem_0.border_br_radius = 150;
+
+	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
+
+	// Renderer
+	err = renderer.createContext(&hinstance, &app_level.hwnd);
+	if (err.isBad()) {
+		err.debugPrint();
+		return 1;
+	}
+
+	uint32_t requested_width = app_level.display_width;
+	uint32_t requested_height = app_level.display_height;
+	uint32_t rendering_width;
+	uint32_t rendering_height;
+	err = renderer.getPhysicalSurfaceResolution(rendering_width, rendering_height);
+	if (err.isBad()) {
+		err.debugPrint();
+		return 1;
+	}
+
+	// we now have the actual resolution of the rendering surface so calculate user interface layout
+	user_interface.changeResolution((float)rendering_width, (float)rendering_height);
+	user_interface.calcGraphLayout();
+	renderer.user_interface = &user_interface;
+
+	err = renderer.recreate(rendering_width, rendering_height);
 	if (err.isBad()) {
 		err.debugPrint();
 		return 1;
@@ -112,11 +150,34 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			DispatchMessageA(&msg);
 		}
 
+		if (app_level.display_width != requested_width ||
+			app_level.display_height != requested_height)
+		{
+			err = renderer.getPhysicalSurfaceResolution(rendering_width, rendering_height);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
+
+			user_interface.changeResolution((float)rendering_width, (float)rendering_height);
+			user_interface.calcGraphLayout();
+		}
+
 		// Begin render comands
 		err = renderer.waitForRendering();
 		if (err.isBad()) {
 			err.debugPrint();
 			return 1;
+		}
+
+		if (app_level.display_width != requested_width ||
+			app_level.display_height != requested_height)
+		{
+			err = renderer.changeResolution(rendering_width, rendering_height);
+			if (err.isBad()) {
+				err.debugPrint();
+				return 1;
+			}
 		}
 
 		err = renderer.draw();

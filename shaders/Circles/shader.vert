@@ -3,7 +3,7 @@
 
 // Inputs
 layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 color;
+layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 center;
 layout(location = 3) in	float radius;
 
@@ -12,7 +12,7 @@ layout(binding = 0) uniform GPU_Uniform {
 } uniform_buff;
 
 // Outputs
-layout(location = 0) out vec3 color_out;
+layout(location = 0) out vec4 color_out;
 layout(location = 1) out vec2 center_out;
 layout(location = 2) out float radius_out;
 

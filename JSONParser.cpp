@@ -194,13 +194,13 @@ ErrStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValue&
 
 ErrStack JSONGraph::parseValue(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
 {
-	ErrStack err;
+	ErrStack err_stack;
 
 	skipWhiteSpace(i, text);
 	char& c = text[i];
 
 	if (isUTF8Number(c) || c == '+' || c == '-') {
-		err = parseNumber(i, text, json_value);
+		err_stack = parseNumber(i, text, json_value);
 	}
 	else {
 		i++;
@@ -208,30 +208,30 @@ ErrStack JSONGraph::parseValue(uint64_t& i, std::vector<char>& text, JSONValue& 
 		// string
 		if (c == '"') {
 			temp_string.clear();
-			err = parseString(i, text, temp_string);
+			err_stack = parseString(i, text, temp_string);
 			json_value.value = temp_string;
 		}
 		else if (c == 't') {
-			err = confirmKeyword(i, text, "rue");
+			err_stack = confirmKeyword(i, text, "rue");
 			json_value.value = true;
 		}
 		// false
 		else if (c == 'f') {
-			err = confirmKeyword(i, text, "alse");
+			err_stack = confirmKeyword(i, text, "alse");
 			json_value.value = false;
 		}
 		// null
 		else if (c == 'n') {
-			err = confirmKeyword(i, text, "ull");
+			err_stack = confirmKeyword(i, text, "ull");
 			json_value.value = nullptr;
 		}
 		// Array
 		else if (c == '[') {
-			err = parseArray(i, text, json_value);
+			err_stack = parseArray(i, text, json_value);
 		}
 		// Object
 		else if (c == '{') {
-			err = parseObject(i, text, json_value);
+			err_stack = parseObject(i, text, json_value);
 		}
 		else {
 			return ErrStack(code_location,
@@ -240,7 +240,7 @@ ErrStack JSONGraph::parseValue(uint64_t& i, std::vector<char>& text, JSONValue& 
 		}
 	}
 	
-	checkErrStack(err, "failed to parse value");
+	checkErrStack(err_stack, "failed to parse value");
 	return ErrStack();
 }
 
@@ -255,7 +255,7 @@ ErrStack JSONGraph::parseArray(uint64_t& i, std::vector<char>& text, JSONValue& 
 		return ErrStack();
 	}
 
-	ErrStack err;
+	ErrStack err_stack;
 
 	for (; i < text.size(); i++) {
 
@@ -291,6 +291,8 @@ ErrStack JSONGraph::parseArray(uint64_t& i, std::vector<char>& text, JSONValue& 
 
 ErrStack JSONGraph::parseObject(uint64_t& i, std::vector<char>& text, JSONValue& json_value)
 {
+	ErrStack err_stack;
+
 	std::vector<JSONField> fields;
 
 	// Empty Object

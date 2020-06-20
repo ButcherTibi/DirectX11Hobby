@@ -140,7 +140,7 @@ bool BitVector::pushBase64Char(char c)
 
 ErrStack loadFromURI(std::string& uri, FileSysPath& this_file, BitVector& r_bin)
 {
-	ErrStack err;
+	ErrStack err_stack;
 
 	// Data URI
 	std::string bin_tag = "data:application/octet-stream;base64,";
@@ -649,7 +649,7 @@ ErrStack loadVec3FromBuffer(Structure& gltf_struct, uint64_t acc_idx,
 
 ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 {
-	ErrStack err;
+	ErrStack err_stack;
 
 	std::vector<char> file_content;
 	checkErrStack1(path.read(file_content));
@@ -658,20 +658,12 @@ ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 	JSONGraph json;
 	uint64_t i = 0;
 
-	err = parseJSON(file_content, 0, json);
-	if (err.isBad()) {
-		err.pushError(code_location, "failed to parse JSON");
-		return err;
-	}
+	checkErrStack(parseJSON(file_content, 0, json), "failed to parse JSON");
 
 	// JSON Types to C++ Types
 	Structure gltf_struct;
 
-	err = jsonToGLTF(json, gltf_struct);
-	if (err.isBad()) {
-		err.pushError(code_location, "failed to parse GLTF");
-		return err;
-	}
+	checkErrStack(jsonToGLTF(json, gltf_struct), "failed to parse GLTF");
 
 	// Convert URI to buffer data
 	std::vector<BitVector> bin_buffs;
@@ -683,11 +675,7 @@ ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 			std::string& uri = gltf_struct.buffers[i].uri;
 			BitVector& bin_buff = bin_buffs[i];
 
-			err = loadFromURI(uri, path, bin_buff);
-			if (err.isBad()) {
-				err.pushError(code_location, "failed to parse URI");
-				return err;
-			}
+			checkErrStack(loadFromURI(uri, path, bin_buff), "failed to parse URI");
 		}
 	}
 
@@ -713,33 +701,24 @@ ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 
 				// Indexes
 				{
-					err = loadIndexesFromBuffer(gltf_struct, prim.indices.value(), bin_buffs, indexes);
-					if (err.isBad()) {
-						err.pushError(code_location, "failed to load indexes from buffer");
-						return err;
-					}
+					checkErrStack(loadIndexesFromBuffer(gltf_struct, prim.indices.value(), bin_buffs, indexes),
+						"failed to load indexes from buffer");
 				}
 
 				// Positions
 				{
 					uint64_t acc_idx = prim.atributes.at(atribute_name_position);
 
-					err = loadVec3FromBuffer(gltf_struct, acc_idx, bin_buffs, attrs.positions);
-					if (err.isBad()) {
-						err.pushError(code_location, "failed to load positions from buffer");
-						return err;
-					}
+					checkErrStack(loadVec3FromBuffer(gltf_struct, acc_idx, bin_buffs, attrs.positions),
+						"failed to load positions from buffer");
 				}
 
 				// UVs
 				auto uv_it = prim.atributes.find(atribute_name_texcoord_0);
 				if (uv_it != prim.atributes.end()) {
 
-					err = loadVec2FromBuffer(gltf_struct, uv_it->second, bin_buffs, attrs.uvs);
-					if (err.isBad()) {
-						err.pushError(code_location, "failed to load texture coordinates from buffer");
-						return err;
-					}
+					checkErrStack(loadVec2FromBuffer(gltf_struct, uv_it->second, bin_buffs, attrs.uvs),
+						"failed to load texture coordinates from buffer");
 				}
 				else {
 					attrs.uvs.clear();
@@ -749,11 +728,8 @@ ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 				auto normal_it = prim.atributes.find(atribute_name_normal);
 				if (normal_it != prim.atributes.end()) {
 
-					err = loadVec3FromBuffer(gltf_struct, normal_it->second, bin_buffs, attrs.normals);
-					if (err.isBad()) {
-						err.pushError(code_location, "failed to load normals from buffer");
-						return err;
-					}
+					checkErrStack(loadVec3FromBuffer(gltf_struct, normal_it->second, bin_buffs, attrs.normals),
+						"failed to load normals from buffer");
 				}
 				else {
 					attrs.normals.clear();
@@ -767,5 +743,5 @@ ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
 		}
 	}
 
-	return err;
+	return err_stack;
 }

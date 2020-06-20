@@ -3,14 +3,14 @@
 
 // Inputs
 layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 color;
+layout(location = 1) in vec4 color;
 
 layout(binding = 0) uniform GPU_Uniform {
 	vec4 data_0;
 } uniform_buff;
 
 // Outputs
-layout(location = 0) out vec3 color_out;
+layout(location = 0) out vec4 color_out;
 
 void main()
 {   

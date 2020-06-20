@@ -117,7 +117,7 @@ namespace vks {
 		LogicalDevice* logical_device = nullptr;
 
 	public:
-		VkSurfaceCapabilitiesKHR capabilities;
+		//VkSurfaceCapabilitiesKHR capabilities;
 		VkExtent2D resolution = {800, 600};
 
 		VkSurfaceTransformFlagBitsKHR pre_transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
@@ -287,7 +287,7 @@ namespace vks {
 		VkImageView view;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, VkImageViewCreateInfo* info);
+		ErrStack recreate(LogicalDevice* logical_dev, VkImageViewCreateInfo* info);
 
 		ErrStack setDebugName(std::string name);
 
@@ -367,7 +367,7 @@ namespace vks {
 		VkDescriptorPool descp_pool = VK_NULL_HANDLE;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools);
+		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools, uint32_t max_sets);
 
 		ErrStack setDebugName(std::string name);
 
@@ -451,66 +451,6 @@ namespace vks {
 		ErrStack err;
 	};
 
-	struct RenderingCmdBuffsUpdateInfo {
-		uint32_t width;
-		uint32_t height;
-
-		// Common
-		Image* border_img;
-		Image* padding_img;
-		Image* compose_img;
-
-		Buffer* uniform_buff;
-		DescriptorSet* uniform_descp_set;
-
-		std::vector<GPU_ElementsLayer>* layers;
-
-		// Rect
-
-		Renderpass* rect_renderpass;
-		PipelineLayout* rect_pipe_layout;
-		GraphicsPipeline* rect_pipe;
-
-		// Circles
-		Renderpass* circles_renderpass;
-		PipelineLayout* circles_pipe_layout;
-		GraphicsPipeline* circles_pipe;
-
-		// Border Rect pass
-		Buffer* border_rect_vertex_buff;
-		std::vector<Framebuffer>* border_rect_frames;
-
-		// Border Circles pass
-		Buffer* border_circles_vertex_buff;
-		std::vector<Framebuffer>* border_circles_frames;
-
-		// Padding Rect pass
-		Buffer* padding_rect_vertex_buff;
-		std::vector<Framebuffer>* padding_rect_frames;
-
-		// Padding Circles pass
-		Buffer* padding_circles_vertex_buff;
-		std::vector<Framebuffer>* padding_circles_frames;
-
-		// Compose
-		DescriptorSet* compose_descp_set;
-
-		Renderpass* compose_renderpass;
-		std::vector<Framebuffer>* compose_frames;
-
-		PipelineLayout* compose_pipe_layout;
-		GraphicsPipeline* compose_pipe;
-
-		// Copy
-		DescriptorSet* copy_descp_set;
-
-		Renderpass* copy_renderpass;
-		std::vector<Framebuffer>* copy_frames;
-
-		PipelineLayout* copy_pipe_layout;
-		GraphicsPipeline* copy_pipe;
-	};
-
 	class RenderingComandBuffers {
 		LogicalDevice const* logical_dev = nullptr;
 	public:
@@ -518,8 +458,6 @@ namespace vks {
 
 	public:
 		ErrStack recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count);
-
-		ErrStack update(const RenderingCmdBuffsUpdateInfo& info);
 
 		void destroy();
 

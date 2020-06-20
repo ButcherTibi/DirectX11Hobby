@@ -489,33 +489,13 @@ namespace vks {
 			}
 		}
 
-		// Trim resolution
-		{
-			// Surface Capabilities
-			checkVkRes(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev->physical_device, surface->surface, &capabilities),
-				"failed to get physical device surface capabilities");
-
-			VkExtent2D min_img_extent = capabilities.minImageExtent;
-			VkExtent2D max_img_extent = capabilities.maxImageExtent;
-
-			this->resolution.width = clamp(width, min_img_extent.width, max_img_extent.width);
-			this->resolution.height = clamp(height, min_img_extent.height, max_img_extent.height);
-
-			/* when minimizing minImageExtent and maxImageExtent will be zero
-			 * at that point vkCreateSwapchainKHR will not like ANY resolution
-			 * this triggers fewer warnings */
-			if (!resolution.width || !resolution.height) {
-				this->resolution.width = width;
-				this->resolution.height = height;
-			}
-
-			printf("Swapchain Resolution = (%d, %d) \n", resolution.width, resolution.height);
-		}
+		this->resolution.width = width;
+		this->resolution.height = height;
 
 		VkSwapchainCreateInfoKHR swapchain_info = {};
 		swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 		swapchain_info.surface = surface->surface;
-		swapchain_info.minImageCount = capabilities.minImageCount;
+		swapchain_info.minImageCount = 1;
 		swapchain_info.imageFormat = surface_format.format;
 		swapchain_info.imageColorSpace = surface_format.colorSpace;
 		swapchain_info.imageExtent = resolution;
@@ -575,6 +555,8 @@ namespace vks {
 
 	ErrStack Swapchain::setDebugName(std::string name)
 	{
+		ErrStack err_stack;
+
 		checkErrStack(logical_device->setDebugName(
 			reinterpret_cast<uint64_t>(swapchain), VK_OBJECT_TYPE_SWAPCHAIN_KHR, "Swapchain"), "");
 
@@ -825,13 +807,13 @@ namespace vks {
 		}
 	}
 
-	ErrStack DescriptorPool::create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools)
+	ErrStack DescriptorPool::create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools, uint32_t max_sets)
 	{
 		this->logical_dev = logical_dev;
 
 		VkDescriptorPoolCreateInfo descp_pool_info = {};
 		descp_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		descp_pool_info.maxSets = 1;
+		descp_pool_info.maxSets = max_sets;
 		descp_pool_info.poolSizeCount = (uint32_t)(pools.size());
 		descp_pool_info.pPoolSizes = pools.data();
 

@@ -16,7 +16,7 @@
 // Rects Subpass
 struct GPU_Rects_Vertex {
 	glm::vec2 pos;
-	glm::vec3 color;
+	glm::vec4 color;
 
 public:
 	static VkVertexInputBindingDescription getBindingDescription();
@@ -26,7 +26,7 @@ public:
 // Cicles Subpass
 struct GPU_Circles_Vertex {
 	glm::vec2 pos;
-	glm::vec3 color;
+	glm::vec4 color;
 	glm::vec2 center;
 	float radius;
 
@@ -37,6 +37,7 @@ public:
 	static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
 };
 
+
 struct GPU_Uniform {
 	float screen_width;
 	float screen_height;
@@ -44,14 +45,25 @@ struct GPU_Uniform {
 	float pad_1;
 };
 
+
 struct GPU_Draw {
 	uint32_t vertex_count;
 	size_t offset;
 };
 
+struct GPU_CornerCircles {
+	uint32_t vertex_count;
+	uint32_t first_vertex;
+};
+
 struct GPU_ElementsLayer {
 	GPU_Draw border_rect;
-	GPU_Draw border_circles;
+
+	size_t border_circles_offset;
+	std::array<GPU_CornerCircles, 4> border_circles;
+
 	GPU_Draw padding_rect;
-	GPU_Draw padding_circles;
+
+	size_t padding_circles_offset;
+	std::array<GPU_CornerCircles, 4> padding_circles;
 };

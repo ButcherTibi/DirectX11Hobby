@@ -97,7 +97,7 @@ bool ErrStack::isBad()
 
 void ErrStack::debugPrint()
 {
-	printf("ErrStack : \n");
+	printf("ErrStack: \n");
 	for (size_t i = 0; i < error_stack.size(); i++) {
 
 		Error& error = error_stack[i];

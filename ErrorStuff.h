@@ -123,13 +123,15 @@ std::string getLastError();
 std::string asIs(char c);
 
 
-#define checkErrStack(err_stack, msg) \
+#define checkErrStack(err, msg) \
+	err_stack = err; \
 	if (err_stack.isBad()) { \
 		err_stack.pushError(code_location, msg); \
 		return err_stack; \
 	}
 
-#define checkErrStack1(err_stack) \
+#define checkErrStack1(err) \
+	err_stack = err; \
 	if (err_stack.isBad()) { \
 		err_stack.pushError(code_location, ""); \
 		return err_stack; \
