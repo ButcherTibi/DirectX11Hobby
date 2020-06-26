@@ -93,24 +93,81 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	UserInterface user_interface = {};
 	user_interface.recreateGraph(1, 1);
 
-	BasicElement basic_elem_0 = {};
-	basic_elem_0.width.setRelative(0.5);
-	basic_elem_0.height.setRelative(0.5);
+	Flex* root = std::get_if<Flex>(&user_interface.elems.front().elem);
+	root->axis_align = FlexAxisAlign::SPACE_BETWEEN;
+	root->cross_axis_align = FlexCrossAxisAlign::CENTER;
+	
+	{
+		Flex basic_elem_0 = {};
+		basic_elem_0.box_sizing = BoxSizing::BORDER;
+		basic_elem_0.width.setRelative(0.25);
+		basic_elem_0.height.setRelative(0.5);
 
-	basic_elem_0.background_color = { 1, 0, 0, 1 };
-	basic_elem_0.padding_tl_radius = 50;
-	basic_elem_0.padding_tr_radius = 150;
-	basic_elem_0.padding_br_radius = 150;
+		basic_elem_0.background_color = { 1, 0, 0, 1 };
+		basic_elem_0.padding_right.setAbsolute(20);
+		basic_elem_0.padding_tl_radius = 50;
+		basic_elem_0.padding_tr_radius = 150;
+		basic_elem_0.padding_br_radius = 150;
 
-	basic_elem_0.border_right.setAbsolute(2);
-	basic_elem_0.border_bot.setAbsolute(2);
+		basic_elem_0.border_right.setAbsolute(2);
+		basic_elem_0.border_bot.setAbsolute(2);
 
-	basic_elem_0.border_color = { 0, 1, 0, 0.5 };
-	basic_elem_0.border_tl_radius = 50;
-	basic_elem_0.border_tr_radius = 150;
-	basic_elem_0.border_br_radius = 150;
+		basic_elem_0.border_color = { 0, 1, 0, 1 };
+		basic_elem_0.border_tl_radius = 50;
+		basic_elem_0.border_tr_radius = 150;
+		basic_elem_0.border_br_radius = 150;
 
-	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
+		user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
+	}
+	
+	{
+		Flex basic_elem_0 = {};
+		basic_elem_0.box_sizing = BoxSizing::BORDER;
+		basic_elem_0.width.setRelative(0.25);
+		basic_elem_0.height.setRelative(0.25);
+
+		basic_elem_0.background_color = { 1, 0, 0, 1 };
+		basic_elem_0.padding_right.setAbsolute(20);
+		basic_elem_0.padding_tl_radius = 50;
+		basic_elem_0.padding_tr_radius = 150;
+		basic_elem_0.padding_br_radius = 150;
+
+		basic_elem_0.border_right.setAbsolute(2);
+		basic_elem_0.border_bot.setAbsolute(2);
+
+		basic_elem_0.border_color = { 0, 1, 0, 1 };
+		basic_elem_0.border_tl_radius = 50;
+		basic_elem_0.border_tr_radius = 150;
+		basic_elem_0.border_br_radius = 150;
+
+		basic_elem_0.flex_cross_axis_align_self = FlexCrossAxisAlign::START;
+
+		user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
+	}
+
+	{
+		Flex basic_elem_0 = {};
+		basic_elem_0.box_sizing = BoxSizing::BORDER;
+		basic_elem_0.width.setRelative(0.25);
+		basic_elem_0.height.setRelative(0.25);
+
+		basic_elem_0.background_color = { 1, 0, 0, 1 };
+		basic_elem_0.padding_right.setAbsolute(20);
+		basic_elem_0.padding_tl_radius = 50;
+		basic_elem_0.padding_tr_radius = 150;
+		basic_elem_0.padding_br_radius = 150;
+
+		basic_elem_0.border_right.setAbsolute(2);
+		basic_elem_0.border_bot.setAbsolute(2);
+
+		basic_elem_0.border_color = { 0, 1, 0, 1 };
+		basic_elem_0.border_tl_radius = 50;
+		basic_elem_0.border_tr_radius = 150;
+		basic_elem_0.border_br_radius = 150;
+
+		user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
+	}
+	
 
 	// Renderer
 	err = renderer.createContext(&hinstance, &app_level.hwnd);
@@ -131,7 +188,6 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
 	// we now have the actual resolution of the rendering surface so calculate user interface layout
 	user_interface.changeResolution((float)rendering_width, (float)rendering_height);
-	user_interface.calcGraphLayout();
 	renderer.user_interface = &user_interface;
 
 	err = renderer.recreate(rendering_width, rendering_height);
@@ -160,7 +216,6 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			}
 
 			user_interface.changeResolution((float)rendering_width, (float)rendering_height);
-			user_interface.calcGraphLayout();
 		}
 
 		// Begin render comands
@@ -178,6 +233,11 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 				err.debugPrint();
 				return 1;
 			}
+
+			requested_width = app_level.display_width;
+			requested_height = app_level.display_height;
+
+			printf("resolution = (%d, %d) \n", requested_width, requested_height);
 		}
 
 		err = renderer.draw();

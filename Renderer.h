@@ -42,6 +42,9 @@ public:
 	// Common Stuff
 	vks::StagingBuffer common_staging_buff;
 	vks::Buffer uniform_buff;
+	vks::Buffer vertex_buff;
+
+	vks::ShaderModule fullscreen_vert_module;
 
 	vks::DescriptorSetLayout uniform_descp_layout;
 
@@ -67,29 +70,12 @@ public:
 	vks::PipelineLayout circles_pipe_layout;
 	vks::GraphicsPipeline circles_pipe;
 
-	// Border Rect Pass
-	vks::StagingBuffer border_rect_staging_buff;
-	vks::Buffer border_rect_vertex_buff;
-
-	// Border Circles Pass
-	vks::StagingBuffer border_circles_staging_buff;
-	vks::Buffer border_circles_vertex_buff;
-
-	// Padding Rect Pass
-	vks::StagingBuffer padding_rect_staging_buff;
-	vks::Buffer padding_rect_vertex_buff;
-
-	// Padding Circle Pass
-	vks::StagingBuffer padding_circles_staging_buff;
-	vks::Buffer padding_circles_vertex_buff;
-
 	// Compose Pass
 	vks::Renderpass compose_renderpass;
 
-	vks::DescriptorSetLayout compose_descp_layout;
-
-	vks::ShaderModule compose_vert_module;
 	vks::ShaderModule compose_frag_module;
+
+	vks::DescriptorSetLayout compose_descp_layout;
 
 	vks::PipelineLayout compose_pipe_layout;
 	vks::GraphicsPipeline compose_pipe;
@@ -97,9 +83,9 @@ public:
 	// Copy Pass
 	vks::Renderpass copy_renderpass;
 
-	vks::DescriptorSetLayout copy_descp_layout;
-
 	vks::ShaderModule copy_frag_module;
+
+	vks::DescriptorSetLayout copy_descp_layout;
 
 	vks::PipelineLayout copy_pipe_layout;
 	vks::GraphicsPipeline copy_pipe;

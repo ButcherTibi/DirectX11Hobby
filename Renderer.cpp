@@ -47,7 +47,7 @@ ErrStack VulkanRenderer::recreateFrameImagesAndViews(uint32_t width, uint32_t he
 		info.arrayLayers = 1;
 		info.samples = VK_SAMPLE_COUNT_1_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -68,7 +68,7 @@ ErrStack VulkanRenderer::recreateFrameImagesAndViews(uint32_t width, uint32_t he
 		info.arrayLayers = 1;
 		info.samples = VK_SAMPLE_COUNT_1_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -89,7 +89,7 @@ ErrStack VulkanRenderer::recreateFrameImagesAndViews(uint32_t width, uint32_t he
 		info.arrayLayers = 1;
 		info.samples = VK_SAMPLE_COUNT_1_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -110,7 +110,7 @@ ErrStack VulkanRenderer::recreateFrameImagesAndViews(uint32_t width, uint32_t he
 		info.arrayLayers = 1;
 		info.samples = VK_SAMPLE_COUNT_1_BIT;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
-		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+		info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -498,19 +498,9 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 					0, NULL, 0, NULL, barriers.size(), barriers.data());
 			};
 
-			VkCommandBufferBeginInfo buffer_begin_info = {};
-			buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			auto clearImage = [&](vks::Image& image) {
 
-			VkResult vk_res = vkBeginCommandBuffer(task.cmd_buff, &buffer_begin_info);
-			if (vk_res != VK_SUCCESS) {
-				task.err = ErrStack(vk_res, code_location, "failed to begin command buffer");
-				is_err.store(true);
-				return;
-			}
-
-			// Clear Compose Image
-			{
-				vks::cmdChangeImageLayout(task.cmd_buff, compose_color_img.img,
+				vks::cmdChangeImageLayout(task.cmd_buff, image.img,
 					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 				VkImageMemoryBarrier barrier = {};
@@ -530,11 +520,23 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 				range.baseMipLevel = 0;
 				range.levelCount = 1;
 
-				vkCmdClearColorImage(task.cmd_buff, compose_color_img.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range);
+				vkCmdClearColorImage(task.cmd_buff, image.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range);
 
-				vks::cmdChangeImageLayout(task.cmd_buff, compose_color_img.img,
+				vks::cmdChangeImageLayout(task.cmd_buff, image.img,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			};
+
+			VkCommandBufferBeginInfo buffer_begin_info = {};
+			buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+			VkResult vk_res = vkBeginCommandBuffer(task.cmd_buff, &buffer_begin_info);
+			if (vk_res != VK_SUCCESS) {
+				task.err = ErrStack(vk_res, code_location, "failed to begin command buffer");
+				is_err.store(true);
+				return;
 			}
+
+			clearImage(compose_color_img);
 
 			VkViewport viewport = {};
 			viewport.width = (float)swapchain.resolution.width;
@@ -549,35 +551,45 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 			clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 			clear_vals[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
 
+			VkBuffer vertex_buffers[] = { vertex_buff.buff };
+
 			for (GPU_ElementsLayer& layer : layers) {
 
+				clearImage(border_color_img);
+				clearImage(padding_color_img);
+				clearImage(border_mask_img);
+				clearImage(padding_mask_img);
+
 				// Border Rect Renderpass
-				VkRenderPassBeginInfo border_rect_info = {};
-				border_rect_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				border_rect_info.renderPass = rect_renderpass.renderpass;
-				border_rect_info.framebuffer = border_rect_frames[task.idx].frame_buff;
-				border_rect_info.renderArea.offset = { 0, 0 };
-				border_rect_info.renderArea.extent.width = swapchain.resolution.width;
-				border_rect_info.renderArea.extent.height = swapchain.resolution.height;
-				border_rect_info.clearValueCount = (uint32_t)clear_vals.size();
-				border_rect_info.pClearValues = clear_vals.data();
+				if (layer.border_rects.vertex_count) {
+					
+					VkRenderPassBeginInfo border_rect_info = {};
+					border_rect_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+					border_rect_info.renderPass = rect_renderpass.renderpass;
+					border_rect_info.framebuffer = border_rect_frames[task.idx].frame_buff;
+					border_rect_info.renderArea.offset = { 0, 0 };
+					border_rect_info.renderArea.extent.width = swapchain.resolution.width;
+					border_rect_info.renderArea.extent.height = swapchain.resolution.height;
+					border_rect_info.clearValueCount = (uint32_t)clear_vals.size();
+					border_rect_info.pClearValues = clear_vals.data();
 
-				vkCmdBeginRenderPass(task.cmd_buff, &border_rect_info, VK_SUBPASS_CONTENTS_INLINE);
-				{
-					vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						rect_pipe_layout.pipe_layout, 0, 1, &uniform_descp_set.descp_set, 0, NULL);
+					vkCmdBeginRenderPass(task.cmd_buff, &border_rect_info, VK_SUBPASS_CONTENTS_INLINE);
+					{
+						vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							rect_pipe_layout.pipe_layout, 0, 1, &uniform_descp_set.descp_set, 0, NULL);
 
-					vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, rect_pipe.pipeline);
+						vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, rect_pipe.pipeline);
 
-					vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
-					vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
+						vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
+						vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
 
-					VkBuffer vertex_buffers[] = { border_rect_vertex_buff.buff };
-					VkDeviceSize offsets[] = { layer.border_rect.offset };
-					vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-					vkCmdDraw(task.cmd_buff, layer.border_rect.vertex_count, 1, 0, 0);
+						VkBuffer vertex_buffers[] = { vertex_buff.buff };
+						VkDeviceSize offsets[] = { layer.border_rects.offset };
+						vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+						vkCmdDraw(task.cmd_buff, layer.border_rects.vertex_count, 1, 0, 0);
+					}
+					vkCmdEndRenderPass(task.cmd_buff);
 				}
-				vkCmdEndRenderPass(task.cmd_buff);
 
 				// Padding Rect Renderpass
 				VkRenderPassBeginInfo padding_rect_info = {};
@@ -600,10 +612,10 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 					vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
 					vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
 
-					VkBuffer vertex_buffers[] = { padding_rect_vertex_buff.buff };
-					VkDeviceSize offsets[] = { layer.padding_rect.offset };
+					VkBuffer vertex_buffers[] = { vertex_buff.buff };
+					VkDeviceSize offsets[] = { layer.padding_rects.offset };
 					vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
-					vkCmdDraw(task.cmd_buff, layer.padding_rect.vertex_count, 1, 0, 0);
+					vkCmdDraw(task.cmd_buff, layer.padding_rects.vertex_count, 1, 0, 0);
 				}
 				vkCmdEndRenderPass(task.cmd_buff);
 
@@ -650,86 +662,140 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 				}
 
 				// Border Circles Renderpass
-				VkRenderPassBeginInfo border_circles_info = {};
-				border_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				border_circles_info.renderPass = circles_renderpass.renderpass;
-				border_circles_info.framebuffer = border_circles_frames[task.idx].frame_buff;
-				border_circles_info.renderArea.offset = { 0, 0 };
-				border_circles_info.renderArea.extent.width = swapchain.resolution.width;
-				border_circles_info.renderArea.extent.height = swapchain.resolution.height;
-				border_circles_info.clearValueCount = (uint32_t)clear_vals.size();
-				border_circles_info.pClearValues = clear_vals.data();
-
-				vkCmdBeginRenderPass(task.cmd_buff, &border_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+				if (layer.border_tl_circles.vertex_count || layer.border_tr_circles.vertex_count ||
+					layer.border_br_circles.vertex_count || layer.border_bl_circles.vertex_count) 
 				{
-					std::array<VkDescriptorSet, 2> descp_sets = {
-						uniform_descp_set.descp_set, border_circles_descp_set.descp_set
-					};	
-					vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						circles_pipe_layout.pipe_layout, 0, descp_sets.size(), descp_sets.data(), 0, NULL);
+					VkRenderPassBeginInfo border_circles_info = {};
+					border_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+					border_circles_info.renderPass = circles_renderpass.renderpass;
+					border_circles_info.framebuffer = border_circles_frames[task.idx].frame_buff;
+					border_circles_info.renderArea.offset = { 0, 0 };
+					border_circles_info.renderArea.extent.width = swapchain.resolution.width;
+					border_circles_info.renderArea.extent.height = swapchain.resolution.height;
+					border_circles_info.clearValueCount = (uint32_t)clear_vals.size();
+					border_circles_info.pClearValues = clear_vals.data();
 
-					vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, circles_pipe.pipeline);
-				
-					vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
-					vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
+					vkCmdBeginRenderPass(task.cmd_buff, &border_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+					{
+						std::array<VkDescriptorSet, 2> descp_sets = {
+							uniform_descp_set.descp_set, border_circles_descp_set.descp_set
+						};
+						vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							circles_pipe_layout.pipe_layout, 0, descp_sets.size(), descp_sets.data(), 0, NULL);
 
-					VkBuffer vertex_buffers[] = { border_circles_vertex_buff.buff };
-					VkDeviceSize offsets[] = { layer.border_circles_offset };
-					vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+						vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, circles_pipe.pipeline);
 
-					vkCmdDraw(task.cmd_buff, layer.border_circles[0].vertex_count, 1, layer.border_circles[0].first_vertex, 0);
+						vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
+						vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
 
-					waitForImage(border_color_img);
-					vkCmdDraw(task.cmd_buff, layer.border_circles[1].vertex_count, 1, layer.border_circles[1].first_vertex, 0);
+						if (layer.border_tl_circles.vertex_count) {
 
-					waitForImage(border_color_img);
-					vkCmdDraw(task.cmd_buff, layer.border_circles[2].vertex_count, 1, layer.border_circles[2].first_vertex, 0);
+							VkDeviceSize offsets[] = { layer.border_tl_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
 
-					waitForImage(border_color_img);
-					vkCmdDraw(task.cmd_buff, layer.border_circles[3].vertex_count, 1, layer.border_circles[3].first_vertex, 0);
+							vkCmdDraw(task.cmd_buff, layer.border_tl_circles.vertex_count, 1, 0, 0);
+						}
+
+						if (layer.border_tr_circles.vertex_count) {
+
+							waitForImage(border_color_img);
+
+							VkDeviceSize offsets[] = { layer.border_tr_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.border_tr_circles.vertex_count, 1, 0, 0);
+						}
+
+						if (layer.border_br_circles.vertex_count) {
+
+							waitForImage(border_color_img);
+
+							VkDeviceSize offsets[] = { layer.border_br_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.border_br_circles.vertex_count, 1, 0, 0);
+						}
+
+						if (layer.border_bl_circles.vertex_count) {
+
+							waitForImage(border_color_img);
+
+							VkDeviceSize offsets[] = { layer.border_bl_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.border_bl_circles.vertex_count, 1, 0, 0);
+						}
+					}
+					vkCmdEndRenderPass(task.cmd_buff);
 				}
-				vkCmdEndRenderPass(task.cmd_buff);
 
 				// Padding Circles Renderpass
-				VkRenderPassBeginInfo padding_circles_info = {};
-				padding_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-				padding_circles_info.renderPass = circles_renderpass.renderpass;
-				padding_circles_info.framebuffer = padding_circles_frames[task.idx].frame_buff;
-				padding_circles_info.renderArea.offset = { 0, 0 };
-				padding_circles_info.renderArea.extent.width = swapchain.resolution.width;
-				padding_circles_info.renderArea.extent.height = swapchain.resolution.height;
-				padding_circles_info.clearValueCount = (uint32_t)clear_vals.size();
-				padding_circles_info.pClearValues = clear_vals.data();
-
-				vkCmdBeginRenderPass(task.cmd_buff, &padding_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+				if (layer.padding_tl_circles.vertex_count || layer.padding_tr_circles.vertex_count ||
+					layer.padding_br_circles.vertex_count || layer.padding_bl_circles.vertex_count)
 				{
-					std::array<VkDescriptorSet, 2> descp_sets = {
-						uniform_descp_set.descp_set, padding_circles_descp_set.descp_set
-					};
-					vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
-						circles_pipe_layout.pipe_layout, 0, descp_sets.size(), descp_sets.data(), 0, NULL);
+					VkRenderPassBeginInfo padding_circles_info = {};
+					padding_circles_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+					padding_circles_info.renderPass = circles_renderpass.renderpass;
+					padding_circles_info.framebuffer = padding_circles_frames[task.idx].frame_buff;
+					padding_circles_info.renderArea.offset = { 0, 0 };
+					padding_circles_info.renderArea.extent.width = swapchain.resolution.width;
+					padding_circles_info.renderArea.extent.height = swapchain.resolution.height;
+					padding_circles_info.clearValueCount = (uint32_t)clear_vals.size();
+					padding_circles_info.pClearValues = clear_vals.data();
 
-					vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, circles_pipe.pipeline);
+					vkCmdBeginRenderPass(task.cmd_buff, &padding_circles_info, VK_SUBPASS_CONTENTS_INLINE);
+					{
+						std::array<VkDescriptorSet, 2> descp_sets = {
+							uniform_descp_set.descp_set, padding_circles_descp_set.descp_set
+						};
+						vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
+							circles_pipe_layout.pipe_layout, 0, descp_sets.size(), descp_sets.data(), 0, NULL);
 
-					vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
-					vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
+						vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, circles_pipe.pipeline);
 
-					VkBuffer vertex_buffers[] = { padding_circles_vertex_buff.buff };
-					VkDeviceSize offsets[] = { layer.padding_circles_offset };
-					vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+						vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
+						vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
 
-					vkCmdDraw(task.cmd_buff, layer.padding_circles[0].vertex_count, 1, layer.padding_circles[0].first_vertex, 0);
+						if (layer.padding_tl_circles.vertex_count) {
 
-					waitForImage(padding_color_img);
-					vkCmdDraw(task.cmd_buff, layer.padding_circles[1].vertex_count, 1, layer.padding_circles[1].first_vertex, 0);
+							VkDeviceSize offsets[] = { layer.padding_tl_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
 
-					waitForImage(padding_color_img);
-					vkCmdDraw(task.cmd_buff, layer.padding_circles[2].vertex_count, 1, layer.padding_circles[2].first_vertex, 0);
+							vkCmdDraw(task.cmd_buff, layer.padding_tl_circles.vertex_count, 1, 0, 0);
+						}
 
-					waitForImage(padding_color_img);
-					vkCmdDraw(task.cmd_buff, layer.padding_circles[3].vertex_count, 1, layer.padding_circles[3].first_vertex, 0);
+						if (layer.padding_tr_circles.vertex_count) {
+
+							waitForImage(padding_color_img);
+
+							VkDeviceSize offsets[] = { layer.padding_tr_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.padding_tr_circles.vertex_count, 1, 0, 0);
+						}
+
+						if (layer.padding_br_circles.vertex_count) {
+
+							waitForImage(padding_color_img);
+
+							VkDeviceSize offsets[] = { layer.padding_br_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.padding_br_circles.vertex_count, 1, 0, 0);
+						}
+
+						if (layer.padding_bl_circles.vertex_count) {
+
+							waitForImage(padding_color_img);
+
+							VkDeviceSize offsets[] = { layer.padding_bl_circles.offset };
+							vkCmdBindVertexBuffers(task.cmd_buff, 0, 1, vertex_buffers, offsets);
+
+							vkCmdDraw(task.cmd_buff, layer.padding_bl_circles.vertex_count, 1, 0, 0);
+						}
+					}
+					vkCmdEndRenderPass(task.cmd_buff);
 				}
-				vkCmdEndRenderPass(task.cmd_buff);
 
 				// Wait for the border and padding to be writen then fragment access
 				{
@@ -794,6 +860,9 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 					vkCmdBindDescriptorSets(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS,
 						compose_pipe_layout.pipe_layout, 0, 1, &compose_descp_set.descp_set, 0, NULL);
 					vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, compose_pipe.pipeline);
+
+					vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
+					vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
 
 					vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 				}
@@ -887,6 +956,9 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 					copy_pipe_layout.pipe_layout, 0, 1, &copy_descp_set.descp_set, 0, NULL);
 				vkCmdBindPipeline(task.cmd_buff, VK_PIPELINE_BIND_POINT_GRAPHICS, copy_pipe.pipeline);
 
+				vkCmdSetViewport(task.cmd_buff, 0, 1, &viewport);
+				vkCmdSetScissor(task.cmd_buff, 0, 1, &scissor);
+
 				vkCmdDraw(task.cmd_buff, 6, 1, 0, 0);
 			}
 			vkCmdEndRenderPass(task.cmd_buff);
@@ -969,7 +1041,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		VkAttachmentDescription color_atach = {};
 		color_atach.format = swapchain.surface_format.format;
 		color_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		color_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		color_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -983,7 +1055,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		VkAttachmentDescription mask_atach = {};
 		mask_atach.format = VK_FORMAT_R8G8_UNORM;
 		mask_atach.samples = VK_SAMPLE_COUNT_1_BIT;
-		mask_atach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		mask_atach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		mask_atach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		mask_atach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		mask_atach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1617,7 +1689,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		std::vector<char> shader_code;
 		checkErrStack1(path.read(shader_code));
 
-		checkErrStack1(compose_vert_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_VERTEX_BIT));
+		checkErrStack1(fullscreen_vert_module.recreate(&logical_dev, shader_code, VK_SHADER_STAGE_VERTEX_BIT));
 	}
 
 	// Compose Fragment Shader Module
@@ -1646,8 +1718,8 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
 		shader_stages[0] = {};
 		shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		shader_stages[0].stage = compose_vert_module.stage;
-		shader_stages[0].module = compose_vert_module.sh_module;
+		shader_stages[0].stage = fullscreen_vert_module.stage;
+		shader_stages[0].module = fullscreen_vert_module.sh_module;
 		shader_stages[0].pName = "main";
 
 		shader_stages[1] = {};
@@ -1742,6 +1814,16 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		color_blend_state_info.blendConstants[2] = 0.0f;
 		color_blend_state_info.blendConstants[3] = 0.0f;
 
+		//  Dynamic State
+		std::array<VkDynamicState, 2> dynamic_states = {
+			VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR
+		};
+
+		VkPipelineDynamicStateCreateInfo dynamic_state_info = {};
+		dynamic_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state_info.dynamicStateCount = dynamic_states.size();
+		dynamic_state_info.pDynamicStates = dynamic_states.data();
+
 		// Pipeline 
 		VkGraphicsPipelineCreateInfo pipeline_info = {};
 		pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1755,7 +1837,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		pipeline_info.pMultisampleState = &multisample_state_info;
 		pipeline_info.pDepthStencilState = &depth_stencil_state_info;
 		pipeline_info.pColorBlendState = &color_blend_state_info;
-		pipeline_info.pDynamicState = NULL;
+		pipeline_info.pDynamicState = &dynamic_state_info;
 		pipeline_info.layout = compose_pipe_layout.pipe_layout;
 		pipeline_info.renderPass = compose_renderpass.renderpass;
 		pipeline_info.subpass = 0;
@@ -1855,8 +1937,8 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
 		shader_stages[0] = {};
 		shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		shader_stages[0].stage = compose_vert_module.stage;
-		shader_stages[0].module = compose_vert_module.sh_module;
+		shader_stages[0].stage = fullscreen_vert_module.stage;
+		shader_stages[0].module = fullscreen_vert_module.sh_module;
 		shader_stages[0].pName = "main";
 
 		shader_stages[1] = {};
@@ -1951,6 +2033,16 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		color_blend_state_info.blendConstants[2] = 0.0f;
 		color_blend_state_info.blendConstants[3] = 0.0f;
 
+		//  Dynamic State
+		std::array<VkDynamicState, 2> dynamic_states = {
+			VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR
+		};
+
+		VkPipelineDynamicStateCreateInfo dynamic_state_info = {};
+		dynamic_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state_info.dynamicStateCount = dynamic_states.size();
+		dynamic_state_info.pDynamicStates = dynamic_states.data();
+
 		// Pipeline 
 		VkGraphicsPipelineCreateInfo pipeline_info = {};
 		pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1964,7 +2056,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		pipeline_info.pMultisampleState = &multisample_state_info;
 		pipeline_info.pDepthStencilState = &depth_stencil_state_info;
 		pipeline_info.pColorBlendState = &color_blend_state_info;
-		pipeline_info.pDynamicState = NULL;
+		pipeline_info.pDynamicState = &dynamic_state_info;
 		pipeline_info.layout = copy_pipe_layout.pipe_layout;
 		pipeline_info.renderPass = copy_renderpass.renderpass;
 		pipeline_info.subpass = 0;
@@ -1979,25 +2071,13 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 	// Buffers
 	{
 		common_staging_buff.logical_dev = &logical_dev;
-		border_rect_staging_buff.logical_dev = &logical_dev;
-		padding_rect_staging_buff.logical_dev = &logical_dev;
-		border_circles_staging_buff.logical_dev = &logical_dev;
-		padding_circles_staging_buff.logical_dev = &logical_dev;
 
 		uniform_buff.create(&logical_dev, &cmd_pool, &common_staging_buff,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		border_rect_vertex_buff.create(&logical_dev, &cmd_pool, &border_rect_staging_buff,
+		vertex_buff.create(&logical_dev, &cmd_pool, &common_staging_buff,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-		padding_rect_vertex_buff.create(&logical_dev, &cmd_pool, &padding_rect_staging_buff,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-
-		border_circles_vertex_buff.create(&logical_dev, &cmd_pool, &border_circles_staging_buff,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-
-		padding_circles_vertex_buff.create(&logical_dev, &cmd_pool, &padding_circles_staging_buff,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 		// Generate GPU Data
 		checkErrStack1(calc(*user_interface));
@@ -2059,7 +2139,7 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 	{
 		uniform_buff.clear();
 
-		BasicElement* root_elem = std::get_if<BasicElement>(&user_interface.elems.front().elem);
+		Flex* root_elem = std::get_if<Flex>(&user_interface.elems.front().elem);
 
 		GPU_Uniform uniform;
 		uniform.screen_width = root_elem->_contentbox_width;
@@ -2068,11 +2148,10 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 		checkErrStack1(uniform_buff.push(&uniform, sizeof(GPU_Uniform)));
 		checkErrStack1(uniform_buff.flush());
 	}
-	
 
 	auto createChamferedRectangle = [&](glm::vec2 origin, float width, float height,
 		float tl_radius, float tr_radius, float br_radius, float bl_radius,
-		std::array<GPU_Rects_Vertex, 18>& rect_verts)
+		std::vector<GPU_Rects_Vertex>& rect_verts, size_t idx)
 	{
 		glm::vec2 vec2_origin{ origin.x, origin.y };
 
@@ -2106,33 +2185,33 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 		bot_left_down.y += height;
 
 		// Box triangles
-		rect_verts[0].pos = top_left_up;
-		rect_verts[1].pos = top_right_up;
-		rect_verts[2].pos = top_right_down;
+		rect_verts[idx + 0].pos = top_left_up;
+		rect_verts[idx + 1].pos = top_right_up;
+		rect_verts[idx + 2].pos = top_right_down;
 
-		rect_verts[3].pos = top_left_up;
-		rect_verts[4].pos = top_right_down;
-		rect_verts[5].pos = bot_right_up;
+		rect_verts[idx + 3].pos = top_left_up;
+		rect_verts[idx + 4].pos = top_right_down;
+		rect_verts[idx + 5].pos = bot_right_up;
 
-		rect_verts[6].pos = top_left_up;
-		rect_verts[7].pos = bot_right_up;
-		rect_verts[8].pos = bot_right_down;
+		rect_verts[idx + 6].pos = top_left_up;
+		rect_verts[idx + 7].pos = bot_right_up;
+		rect_verts[idx + 8].pos = bot_right_down;
 
-		rect_verts[9].pos = top_left_up;
-		rect_verts[10].pos = bot_right_down;
-		rect_verts[11].pos = bot_left_down;
+		rect_verts[idx + 9].pos = top_left_up;
+		rect_verts[idx + 10].pos = bot_right_down;
+		rect_verts[idx + 11].pos = bot_left_down;
 
-		rect_verts[12].pos = top_left_up;
-		rect_verts[13].pos = bot_left_down;
-		rect_verts[14].pos = bot_left_up;
+		rect_verts[idx + 12].pos = top_left_up;
+		rect_verts[idx + 13].pos = bot_left_down;
+		rect_verts[idx + 14].pos = bot_left_up;
 
-		rect_verts[15].pos = top_left_up;
-		rect_verts[16].pos = bot_left_up;
-		rect_verts[17].pos = top_left_down;
+		rect_verts[idx + 15].pos = top_left_up;
+		rect_verts[idx + 16].pos = bot_left_up;
+		rect_verts[idx + 17].pos = top_left_down;
 	};
 
 	auto createCircle = [](glm::vec2 origin, float radius,
-		std::array<GPU_Circles_Vertex, 24>& verts, size_t idx)
+		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
 	{
 		glm::vec2 vec2_origin{ origin.x, origin.y };
 
@@ -2169,155 +2248,316 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 	this->layers.resize(user_interface.layers.size());
 	auto ui_it = user_interface.layers.begin();
 
-	border_rect_vertex_buff.clear();
-	border_circles_vertex_buff.clear();
-	padding_rect_vertex_buff.clear();
-	padding_circles_vertex_buff.clear();
+	vertex_buff.clear();
+
+	std::vector<GPU_Rects_Vertex> border_rects;
+	std::vector<GPU_Circles_Vertex> border_tl_circles;
+	std::vector<GPU_Circles_Vertex> border_tr_circles;
+	std::vector<GPU_Circles_Vertex> border_br_circles;
+	std::vector<GPU_Circles_Vertex> border_bl_circles;
+
+	std::vector<GPU_Rects_Vertex> padding_rects;
+	std::vector<GPU_Circles_Vertex> padding_tl_circles;
+	std::vector<GPU_Circles_Vertex> padding_tr_circles;
+	std::vector<GPU_Circles_Vertex> padding_br_circles;
+	std::vector<GPU_Circles_Vertex> padding_bl_circles;
+
+	size_t layer_offset = 0;
 
 	for (auto l = 0; l < user_interface.layers.size(); l++) {
 
 		ElementsLayer& ui_layer = *ui_it;
 		GPU_ElementsLayer& gpu_layer = this->layers[l];
 
-		gpu_layer.border_rect.offset = border_rect_vertex_buff.load_size_;
+		border_rects.clear();
+		border_tl_circles.clear();
+		border_tr_circles.clear();
+		border_br_circles.clear();
+		border_bl_circles.clear();
 
-		gpu_layer.border_circles_offset = border_circles_vertex_buff.load_size_;
-		gpu_layer.border_circles = {};
+		padding_rects.clear();
+		padding_tl_circles.clear();
+		padding_tr_circles.clear();
+		padding_br_circles.clear();
+		padding_bl_circles.clear();
 
-		gpu_layer.padding_rect.offset = padding_rect_vertex_buff.load_size_;
+		gpu_layer.border_rects.offset = layer_offset;
+		gpu_layer.border_tl_circles.offset = layer_offset;
+		gpu_layer.border_tr_circles.offset = layer_offset;
+		gpu_layer.border_br_circles.offset = layer_offset;
+		gpu_layer.border_bl_circles.offset = layer_offset;
 
-		gpu_layer.padding_circles_offset = padding_circles_vertex_buff.load_size_;
-		gpu_layer.padding_circles = {};
+		gpu_layer.padding_rects.offset = layer_offset;
+		gpu_layer.padding_tl_circles.offset = layer_offset;
+		gpu_layer.padding_tr_circles.offset = layer_offset;
+		gpu_layer.padding_br_circles.offset = layer_offset;
+		gpu_layer.padding_bl_circles.offset = layer_offset;
 
 		for (Element* elem : ui_layer.elems) {
 
-			auto* basic = std::get_if<BasicElement>(&elem->elem);
+			auto* basic = std::get_if<Flex>(&elem->elem);
+			
+			glm::vec2 border_origin = basic->_origin;
 
-			// Border Rect
-			std::array<GPU_Rects_Vertex, 18> border_rect;
-			glm::vec2 border_origin = basic->origin_;
+			// If Border Present
+			if (basic->_border_top_thick || basic->_border_right_thick || basic->_border_bot_thick || basic->_border_left_thick) {
 
-			createChamferedRectangle(border_origin, basic->borderbox_width_, basic->borderbox_height_,
-				basic->border_tl_radius, basic->border_tr_radius, basic->border_br_radius, basic->border_bl_radius,
-				border_rect);
+				// Rect
+				{
+					size_t last_idx = border_rects.size();
+					border_rects.resize(border_rects.size() + 18);
 
-			for (GPU_Rects_Vertex& vert : border_rect) {
-				vert.color = basic->border_color;
-			}
+					createChamferedRectangle(border_origin, basic->_borderbox_width, basic->_borderbox_height,
+						basic->_border_tl_radius, basic->_border_tr_radius, basic->_border_br_radius, basic->border_bl_radius,
+						border_rects, last_idx);
 
-			// Border Circles
-			std::array<GPU_Circles_Vertex, 24> border_circles;
-			{
-				if (basic->border_top_thick_ && basic->border_left_thick_) {
-
-					createCircle(border_origin, basic->border_tl_radius, border_circles, 0);
-
-					gpu_layer.border_circles[0].vertex_count += 6;
+					for (size_t i = last_idx; i < border_rects.size(); i++) {
+						border_rects[i].color = basic->border_color;
+					}
 				}
 
-				if (basic->border_top_thick_ && basic->border_right_thick_) {
+				// Top Left Circle
+				if (basic->_border_tl_radius && (basic->_border_top_thick || basic->_border_left_thick)) {
+
+					size_t last_idx = border_tl_circles.size();
+					border_tl_circles.resize(border_tl_circles.size() + 6);
+
+					createCircle(border_origin, basic->_border_tl_radius, 
+						border_tl_circles, last_idx);
+
+					for (size_t i = last_idx; i < border_tl_circles.size(); i++) {
+						border_tl_circles[i].color = basic->border_color;
+					}
+				}
+
+				// Top Right Circle
+				if (basic->_border_tr_radius && (basic->_border_top_thick || basic->_border_right_thick)) {
+
+					size_t last_idx = border_tr_circles.size();
+					border_tr_circles.resize(border_tr_circles.size() + 6);
 
 					glm::vec2 tr_origin = border_origin;
-					tr_origin.x += basic->borderbox_width_ - (basic->border_tr_radius * 2);
-					createCircle(tr_origin, basic->border_tr_radius, border_circles, 6);
+					tr_origin.x += basic->_borderbox_width - (basic->_border_tr_radius * 2);
 
-					gpu_layer.border_circles[1].first_vertex += gpu_layer.border_circles[0].vertex_count;
-					gpu_layer.border_circles[1].vertex_count += 6;
+					createCircle(tr_origin, basic->_border_tr_radius, 
+						border_tr_circles, last_idx);
+
+					for (size_t i = last_idx; i < border_tr_circles.size(); i++) {
+						border_tr_circles[i].color = basic->border_color;
+					}
 				}
 
-				if (basic->border_bot_thick_ && basic->border_right_thick_) {
+				// Bottom Right Circle
+				if (basic->_border_br_radius && (basic->_border_bot_thick || basic->_border_right_thick)) {
+
+					size_t last_idx = border_br_circles.size();
+					border_br_circles.resize(border_br_circles.size() + 6);
 
 					glm::vec2 br_origin = border_origin;
-					br_origin.x += basic->borderbox_width_ - (basic->border_br_radius * 2);
-					br_origin.y += basic->borderbox_height_ - (basic->border_br_radius * 2);
-					createCircle(br_origin, basic->border_br_radius, border_circles, 12);
+					br_origin.x += basic->_borderbox_width - (basic->_border_br_radius * 2);
+					br_origin.y += basic->_borderbox_height - (basic->_border_br_radius * 2);
 
-					gpu_layer.border_circles[2].first_vertex += gpu_layer.border_circles[0].vertex_count + gpu_layer.border_circles[1].vertex_count;
-					gpu_layer.border_circles[2].vertex_count += 6;
+					createCircle(br_origin, basic->_border_br_radius, 
+						border_br_circles, last_idx);
+
+					for (size_t i = last_idx; i < border_br_circles.size(); i++) {
+						border_br_circles[i].color = basic->border_color;
+					}
 				}
 
-				if (basic->border_bot_thick_ && basic->border_left_thick_) {
+				// Bottom Left Circle
+				if (basic->_border_bl_radius && (basic->_border_bot_thick || basic->_border_left_thick)) {
+
+					size_t last_idx = border_bl_circles.size();
+					border_bl_circles.resize(border_bl_circles.size() + 6);
 
 					glm::vec2 bl_origin = border_origin;
-					bl_origin.y += basic->borderbox_height_ - (basic->border_bl_radius * 2);
-					createCircle(bl_origin, basic->border_bl_radius, border_circles, 18);
+					bl_origin.y += basic->_borderbox_height - (basic->_border_bl_radius * 2);
 
-					gpu_layer.border_circles[3].first_vertex += gpu_layer.border_circles[0].vertex_count + gpu_layer.border_circles[1].vertex_count + gpu_layer.border_circles[2].vertex_count;
-					gpu_layer.border_circles[3].vertex_count += 6;
-				}
+					createCircle(bl_origin, basic->_border_bl_radius, 
+						border_bl_circles, last_idx);
 
-				for (auto& vert : border_circles) {
-					vert.color = basic->border_color;
+					for (size_t i = last_idx; i < border_bl_circles.size(); i++) {
+						border_bl_circles[i].color = basic->border_color;
+					}
 				}
 			}
-
-			// Create Padding Box
-			std::array<GPU_Rects_Vertex, 18> padding_rect;
-
+			
 			glm::vec2 padding_origin = border_origin;
-			padding_origin.x += basic->border_left_thick_;
-			padding_origin.y += basic->border_top_thick_;
-			{
-				createChamferedRectangle(padding_origin, basic->paddingbox_width_, basic->paddingbox_height_,
-					basic->padding_tl_radius, basic->padding_tr_radius, basic->padding_br_radius, basic->padding_bl_radius,
-					padding_rect);
 
-				for (auto& vert : padding_rect) {
-					vert.color = basic->background_color;
+			// Padding Box
+			{
+				size_t last_idx = padding_rects.size();
+				padding_rects.resize(padding_rects.size() + 18);
+
+				padding_origin.x += basic->_border_left_thick;
+				padding_origin.y += basic->_border_top_thick;
+
+				createChamferedRectangle(padding_origin, basic->_paddingbox_width, basic->_paddingbox_height,
+					basic->_padding_tl_radius, basic->_padding_tr_radius, basic->_padding_br_radius, basic->_padding_bl_radius,
+					padding_rects, last_idx);
+
+				for (size_t i = last_idx; i < padding_rects.size(); i++) {
+					padding_rects[i].color = basic->background_color;
 				}
 			}
 
-			// Create Padding Circles
-			std::array<GPU_Circles_Vertex, 24> padding_circles;
-			{
+			// Top Left
+			if (basic->_padding_tl_radius) {
+
+				size_t last_idx = padding_tl_circles.size();
+				padding_tl_circles.resize(padding_tl_circles.size() + 6);
+
+				createCircle(padding_origin, basic->_padding_tl_radius, 
+					padding_tl_circles, last_idx);
+
+				for (size_t i = last_idx; i < padding_tl_circles.size(); i++) {
+					padding_tl_circles[i].color = basic->background_color;
+				}
+			}
+
+			// Top Right
+			if (basic->_padding_tr_radius) {
+
+				size_t last_idx = padding_tr_circles.size();
+				padding_tr_circles.resize(padding_tr_circles.size() + 6);
+
 				glm::vec2 tr_origin = padding_origin;
-				glm::vec2 br_origin = padding_origin;
-				glm::vec2 bl_origin = padding_origin;
+				tr_origin.x += basic->_paddingbox_width - (basic->_padding_tr_radius * 2);
 
-				tr_origin.x += basic->paddingbox_width_ - (basic->padding_tr_radius * 2);
-				br_origin.x += basic->paddingbox_width_ - (basic->padding_br_radius * 2);
-				br_origin.y += basic->paddingbox_height_ - (basic->padding_br_radius * 2);
-				bl_origin.y += basic->paddingbox_height_ - (basic->padding_bl_radius * 2);
+				createCircle(tr_origin, basic->_padding_tr_radius, 
+					padding_tr_circles, last_idx);
 
-				createCircle(padding_origin, basic->padding_tl_radius, padding_circles, 0);
-				createCircle(tr_origin, basic->padding_tr_radius, padding_circles, 6);
-				createCircle(br_origin, basic->padding_br_radius, padding_circles, 12);
-				createCircle(bl_origin, basic->padding_bl_radius, padding_circles, 18);
-
-				for (auto& vert : padding_circles) {
-					vert.color = basic->background_color;
+				for (size_t i = last_idx; i < padding_tr_circles.size(); i++) {
+					padding_tr_circles[i].color = basic->background_color;
 				}
-
-				gpu_layer.padding_circles[0].vertex_count += 6;
-
-				gpu_layer.padding_circles[1].first_vertex += gpu_layer.padding_circles[0].vertex_count;
-				gpu_layer.padding_circles[1].vertex_count += 6;
-
-				gpu_layer.padding_circles[2].first_vertex += gpu_layer.padding_circles[0].vertex_count + gpu_layer.padding_circles[1].vertex_count;
-				gpu_layer.padding_circles[2].vertex_count += 6;
-
-				gpu_layer.padding_circles[3].first_vertex += gpu_layer.padding_circles[0].vertex_count + gpu_layer.padding_circles[1].vertex_count + gpu_layer.padding_circles[2].vertex_count;
-				gpu_layer.padding_circles[3].vertex_count += 6;
 			}
 
-			// Load into buffers
-			gpu_layer.border_rect.vertex_count += border_rect.size();
-			gpu_layer.padding_rect.vertex_count += padding_rect.size();
+			// Bot Right
+			if (basic->_padding_br_radius) {
 
+				size_t last_idx = padding_br_circles.size();
+				padding_br_circles.resize(padding_br_circles.size() + 6);
 
-			checkErrStack1(border_rect_vertex_buff.push(border_rect.data(), border_rect.size() * sizeof(GPU_Rects_Vertex)));
-			checkErrStack1(border_circles_vertex_buff.push(border_circles.data(), border_circles.size() * sizeof(GPU_Circles_Vertex)));
-			checkErrStack1(padding_rect_vertex_buff.push(padding_rect.data(), padding_rect.size() * sizeof(GPU_Rects_Vertex)));
-			checkErrStack1(padding_circles_vertex_buff.push(padding_circles.data(), padding_circles.size() * sizeof(GPU_Circles_Vertex)));
+				glm::vec2 br_origin = padding_origin;
+				br_origin.x += basic->_paddingbox_width - (basic->_padding_br_radius * 2);
+				br_origin.y += basic->_paddingbox_height - (basic->_padding_br_radius * 2);
+
+				createCircle(br_origin, basic->_padding_br_radius, 
+					padding_br_circles, last_idx);
+
+				for (size_t i = last_idx; i < padding_br_circles.size(); i++) {
+					padding_br_circles[i].color = basic->background_color;
+				}
+			}
+
+			// Bot Left
+			if (basic->_padding_bl_radius) {
+
+				size_t last_idx = padding_bl_circles.size();
+				padding_bl_circles.resize(padding_bl_circles.size() + 6);
+
+				glm::vec2 bl_origin = padding_origin;
+				bl_origin.y += basic->_paddingbox_height - (basic->_padding_bl_radius * 2);
+
+				createCircle(bl_origin, basic->_padding_bl_radius, 
+					padding_bl_circles, last_idx);
+
+				for (size_t i = last_idx; i < padding_bl_circles.size(); i++) {
+					padding_bl_circles[i].color = basic->background_color;
+				}
+			}
+		}
+
+		size_t border_rects_offset = 0;
+		size_t border_tl_circles_offset = border_rects.size() * sizeof(GPU_Rects_Vertex);
+		size_t border_tr_circles_offset = border_tl_circles_offset + border_tl_circles.size() * sizeof(GPU_Circles_Vertex);
+		size_t border_br_circles_offset = border_tr_circles_offset + border_tr_circles.size() * sizeof(GPU_Circles_Vertex);
+		size_t border_bl_circles_offset = border_br_circles_offset + border_br_circles.size() * sizeof(GPU_Circles_Vertex);
+
+		size_t padding_rects_offset = border_bl_circles_offset + border_bl_circles.size() * sizeof(GPU_Circles_Vertex);
+		size_t padding_tl_circles_offset = padding_rects_offset + padding_rects.size() * sizeof(GPU_Rects_Vertex);
+		size_t padding_tr_circles_offset = padding_tl_circles_offset + padding_tl_circles.size() * sizeof(GPU_Circles_Vertex);
+		size_t padding_br_circles_offset = padding_tr_circles_offset + padding_tr_circles.size() * sizeof(GPU_Circles_Vertex);
+		size_t padding_bl_circles_offset = padding_br_circles_offset + padding_br_circles.size() * sizeof(GPU_Circles_Vertex);
+
+		layer_offset += padding_bl_circles_offset + padding_bl_circles.size() * sizeof(GPU_Circles_Vertex);
+
+		// Border
+		if (border_rects.size()) {
+
+			gpu_layer.border_rects.offset += border_rects_offset;
+			gpu_layer.border_rects.vertex_count = border_rects.size();
+			checkErrStack1(vertex_buff.push(border_rects.data(), border_rects.size() * sizeof(GPU_Rects_Vertex)));
+		}
+
+		if (border_tl_circles.size()) {
+
+			gpu_layer.border_tl_circles.offset += border_tl_circles_offset;
+			gpu_layer.border_tl_circles.vertex_count = border_tl_circles.size();
+			checkErrStack1(vertex_buff.push(border_tl_circles.data(), border_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (border_tr_circles.size()) {
+
+			gpu_layer.border_tr_circles.offset += border_tr_circles_offset;
+			gpu_layer.border_tr_circles.vertex_count = border_tr_circles.size();
+			checkErrStack1(vertex_buff.push(border_tr_circles.data(), border_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (border_br_circles.size()) {
+
+			gpu_layer.border_br_circles.offset += border_br_circles_offset;
+			gpu_layer.border_br_circles.vertex_count = border_br_circles.size();
+			checkErrStack1(vertex_buff.push(border_br_circles.data(), border_br_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (border_bl_circles.size()) {
+
+			gpu_layer.border_bl_circles.offset += border_bl_circles_offset;
+			gpu_layer.border_bl_circles.vertex_count = border_bl_circles.size();
+			checkErrStack1(vertex_buff.push(border_bl_circles.data(), border_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		// Padding
+		{
+			gpu_layer.padding_rects.offset += padding_rects_offset;
+			gpu_layer.padding_rects.vertex_count = padding_rects.size();
+			checkErrStack1(vertex_buff.push(padding_rects.data(), padding_rects.size() * sizeof(GPU_Rects_Vertex)));
+		}
+
+		if (padding_tl_circles.size()) {
+
+			gpu_layer.padding_tl_circles.offset += padding_tl_circles_offset;
+			gpu_layer.padding_tl_circles.vertex_count = padding_tl_circles.size();
+			checkErrStack1(vertex_buff.push(padding_tl_circles.data(), padding_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (padding_tr_circles.size()) {
+
+			gpu_layer.padding_tr_circles.offset += padding_tr_circles_offset;
+			gpu_layer.padding_tr_circles.vertex_count = padding_tr_circles.size();
+			checkErrStack1(vertex_buff.push(padding_tr_circles.data(), padding_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (padding_br_circles.size()) {
+
+			gpu_layer.padding_br_circles.offset += padding_br_circles_offset;
+			gpu_layer.padding_br_circles.vertex_count = padding_br_circles.size();
+			checkErrStack1(vertex_buff.push(padding_br_circles.data(), padding_br_circles.size() * sizeof(GPU_Circles_Vertex)));
+		}
+		
+		if (padding_bl_circles.size()) {
+
+			gpu_layer.padding_bl_circles.offset += padding_bl_circles_offset;
+			gpu_layer.padding_bl_circles.vertex_count = padding_bl_circles.size();
+			checkErrStack1(vertex_buff.push(padding_bl_circles.data(), padding_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
 		}
 
 		++ui_it;
 	}
 
-	checkErrStack1(border_rect_vertex_buff.flush());
-	checkErrStack1(border_circles_vertex_buff.flush());
-	checkErrStack1(padding_rect_vertex_buff.flush());
-	checkErrStack1(padding_circles_vertex_buff.flush());
+	checkErrStack1(vertex_buff.flush());
 
 	return ErrStack();
 }

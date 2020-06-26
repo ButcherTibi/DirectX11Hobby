@@ -23,139 +23,227 @@ void ContentSize::setRelative(float size)
 
 void PropertySize::setAbsolute(float size)
 {
-	this->type = SizeTypes::ABSOLUTE_SIZE;
+	this->type = SizeType::ABSOLUTE_SIZE;
 	this->size = size;
 }
 
 void PropertySize::setRelative(float size)
 {
-	this->type = SizeTypes::RELATIVE_SIZE;
+	this->type = SizeType::RELATIVE_SIZE;
 	this->size = size;
-}
-
-float calcSize(PropertySize size, float size_ref)
-{
-	if (size.type == SizeTypes::RELATIVE_SIZE) {
-		return size_ref * size.size;
-	}
-	return size.size;
-}
-
-void BoxModel::calculateBoxModel()
-{
-	// Content
-	_contentbox_width = width.size;
-	_contentbox_height = height.size;
-
-	// Padding
-	padding_left_thick_ = 0;
-	padding_right_thick_ = 0;
-	padding_top_thick_ = 0;
-	padding_bot_thick_ = 0;
-
-	// Border
-	border_left_thick_ = 0;
-	border_right_thick_ = 0;
-	border_top_thick_ = 0;
-	border_bot_thick_ = 0;
-
-	// Boxes
-	paddingbox_width_ = padding_left_thick_ + _contentbox_width + padding_right_thick_;
-	borderbox_width_ = border_left_thick_ + paddingbox_width_ + border_right_thick_;
-
-	paddingbox_height_ = padding_top_thick_ + _contentbox_height + padding_bot_thick_;
-	borderbox_height_ = border_top_thick_ + paddingbox_height_ + border_bot_thick_;
 }
 
 void BoxModel::calculateBoxModel(float& ancestor_width, float& ancestor_height)
 {
-	// Content
-	switch (width.type) {
-	case ContentSizeType::RELATIVE_SIZE:
-		_contentbox_width = ancestor_width * width.size;
-		break;
+	// Calculate Thicknesses
+	auto calcSize = [](PropertySize size, float size_ref) {
 
-	case ContentSizeType::ABSOLUTE_SIZE:
-		_contentbox_width = width.size;
-		break;
+		if (size.type == SizeType::RELATIVE_SIZE) {
+			return size_ref * size.size;
+		}
+		return size.size;
+	};
 
-	case ContentSizeType::FIT:
-		_contentbox_width = ancestor_width;
-		break;
-	}
+	_padding_left_thick = calcSize(padding_left, ancestor_width);
+	_padding_right_thick = calcSize(padding_right, ancestor_width);
+	_padding_top_thick = calcSize(padding_top, ancestor_height);
+	_padding_bot_thick = calcSize(padding_bot, ancestor_height);
 
-	switch (height.type) {
-	case ContentSizeType::RELATIVE_SIZE:
-		_contentbox_height = ancestor_height * height.size;
-		break;
+	_border_left_thick = calcSize(border_left, ancestor_width);
+	_border_right_thick = calcSize(border_right, ancestor_width);
+	_border_top_thick = calcSize(border_top, ancestor_height);
+	_border_bot_thick = calcSize(border_bot, ancestor_height);
 
-	case ContentSizeType::ABSOLUTE_SIZE:
-		_contentbox_height = height.size;
-		break;
+	// Calculate Boxes
+	switch (box_sizing) {
+	case BoxSizing::CONTENT: {
 
-	case ContentSizeType::FIT:
-		_contentbox_height = ancestor_height;
-		break;
-	}
+		switch (width.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
 
-	// Padding
-	padding_left_thick_ = calcSize(padding_left, ancestor_width);
-	padding_right_thick_ = calcSize(padding_right, ancestor_width);
-	padding_top_thick_ = calcSize(padding_top, ancestor_height);
-	padding_bot_thick_ = calcSize(padding_bot, ancestor_height);
+			_contentbox_width = width.size;
+			_paddingbox_width = _padding_left_thick + _contentbox_width + _padding_right_thick;
+			_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE: {
 
-	// Border
-	border_left_thick_ = calcSize(border_left, ancestor_width);
-	border_right_thick_ = calcSize(border_right, ancestor_width);
-	border_top_thick_ = calcSize(border_top, ancestor_height);
-	border_bot_thick_ = calcSize(border_bot, ancestor_height);
+			_contentbox_width = width.size * ancestor_width;
+			_paddingbox_width = _padding_left_thick + _contentbox_width + _padding_right_thick;
+			_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::FIT:
+			ancestor_width = ancestor_width;
+			break;
+		}
+
+		switch (height.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
+
+			_contentbox_height = height.size;
+			_paddingbox_height = _padding_top_thick + _contentbox_height + _padding_bot_thick;
+			_borderbox_height = _border_top_thick + _paddingbox_height + _border_bot_thick;
+			ancestor_height = _contentbox_height;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE:
 		
-	// New Ancestor Sizes for children
-	switch (width.type) {
-	case ContentSizeType::RELATIVE_SIZE:
-	case ContentSizeType::ABSOLUTE_SIZE:
-		ancestor_width = _contentbox_width;
+			_contentbox_height = height.size * ancestor_height;
+			_paddingbox_height = _padding_top_thick + _contentbox_height + _padding_bot_thick;
+			_borderbox_height = _border_top_thick + _paddingbox_height + _border_bot_thick;
+			ancestor_height = _contentbox_height;
+			break;
 
-		paddingbox_width_ = padding_left_thick_ + _contentbox_width + padding_right_thick_;
-		borderbox_width_ = border_left_thick_ + paddingbox_width_ + border_right_thick_;
+			// Unable to have any boxes
+		case ContentSizeType::FIT:
+			ancestor_height = ancestor_height;
+			break;
+		}
 		break;
+	}
+	
+	case BoxSizing::PADDING: {
+		
+		switch (width.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
 
-	// Unable to have any boxes
-	case ContentSizeType::FIT:
-		ancestor_width = ancestor_width;
+			_paddingbox_width = width.size;
+			_contentbox_width = _paddingbox_width - _padding_left_thick - _padding_right_thick;
+			_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE: {
+
+			_paddingbox_width = width.size * ancestor_width;
+			_contentbox_width = _paddingbox_width - _padding_left_thick - _padding_right_thick;
+			_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::FIT:
+			ancestor_width = ancestor_width;
+			break;
+		}
+
+		switch (height.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
+
+			_paddingbox_height = height.size;
+			_contentbox_height = _paddingbox_height - _padding_left_thick - _padding_right_thick;
+			_borderbox_height = _border_left_thick + _paddingbox_height + _border_right_thick;
+			ancestor_height = _contentbox_height;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE: {
+
+			_paddingbox_height = height.size * ancestor_height;
+			_contentbox_height = _paddingbox_height - _padding_left_thick - _padding_right_thick;
+			_borderbox_height = _border_left_thick + _paddingbox_height + _border_right_thick;
+			ancestor_height = _contentbox_height;
+			break;
+		}
+		case ContentSizeType::FIT:
+			ancestor_height = ancestor_height;
+			break;
+		}
 		break;
 	}
 
-	switch (height.type) {
-	case ContentSizeType::RELATIVE_SIZE:
-	case ContentSizeType::ABSOLUTE_SIZE:
-		ancestor_height = _contentbox_height;
+	case BoxSizing::BORDER: {
 
-		paddingbox_height_ = padding_top_thick_ + _contentbox_height + padding_bot_thick_;
-		borderbox_height_ = border_top_thick_ + paddingbox_height_ + border_bot_thick_;
-		break;
+		switch (width.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
 
-	// Unable to have any boxes
-	case ContentSizeType::FIT:
-		ancestor_height = ancestor_height;
+			_borderbox_width = width.size;
+			_paddingbox_width = _borderbox_width - _border_left_thick - _border_right_thick;
+			_contentbox_width = _paddingbox_width - _padding_left_thick - _padding_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE: {
+
+			_borderbox_width = width.size * ancestor_width;
+			_paddingbox_width = _borderbox_width - _border_left_thick - _border_right_thick;
+			_contentbox_width = _paddingbox_width - _padding_left_thick - _padding_right_thick;
+			ancestor_width = _contentbox_width;
+			break;
+		}
+		case ContentSizeType::FIT:
+			ancestor_width = ancestor_width;
+			break;
+		}
+
+		switch (height.type) {
+		case ContentSizeType::ABSOLUTE_SIZE: {
+
+			_borderbox_height = height.size;
+			_paddingbox_height = _borderbox_height - _border_left_thick - _border_right_thick;
+			_contentbox_height = _paddingbox_height - _padding_left_thick - _padding_right_thick;
+			ancestor_height = _contentbox_height;
+			break;
+		}
+		case ContentSizeType::RELATIVE_SIZE: {
+
+			_borderbox_height = height.size * ancestor_height;
+			_paddingbox_height = _borderbox_height - _border_left_thick - _border_right_thick;
+			_contentbox_height = _paddingbox_height - _padding_left_thick - _padding_right_thick;
+			ancestor_height = _contentbox_height;
+			break;
+		}
+		case ContentSizeType::FIT:
+			ancestor_height = ancestor_height;
+			break;
+		}
 		break;
 	}
+	}
+
+	// Clamp Corner Radiuses
+	auto clampAbove = [](float radius, float size) {
+		if (radius > size) {
+			return size;
+		}
+		return radius;
+	};
+
+	float max_size = _borderbox_width / 2;
+	if (_borderbox_width > _borderbox_height) {
+		max_size = _borderbox_height / 2;
+	}
+
+	// Clamp Radius
+	_border_tl_radius = clampAbove(border_tl_radius, max_size);
+	_border_tr_radius = clampAbove(border_tr_radius, max_size);
+	_border_br_radius = clampAbove(border_br_radius, max_size);
+	_border_bl_radius = clampAbove(border_bl_radius, max_size);
+
+	max_size = _paddingbox_width / 2;
+	if (_paddingbox_width > _paddingbox_height) {
+		max_size = _paddingbox_height / 2;
+	}
+
+	_padding_tl_radius = clampAbove(padding_tl_radius, max_size);
+	_padding_tr_radius = clampAbove(padding_tr_radius, max_size);
+	_padding_br_radius = clampAbove(padding_br_radius, max_size);
+	_padding_bl_radius = clampAbove(padding_bl_radius, max_size);
 }
 
 void BoxModel::recalculateWidthBoxes(float new_content_width)
 {
 	_contentbox_width = new_content_width;
-
-	paddingbox_width_ = padding_left_thick_ + _contentbox_width + padding_right_thick_;
-	borderbox_width_ = border_left_thick_ + paddingbox_width_ + border_right_thick_;
+	_paddingbox_width = _padding_left_thick + _contentbox_width + _padding_right_thick;
+	_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
 }
 
 void BoxModel::recalculateHeightBoxes(float new_content_height)
 {
 	_contentbox_height = new_content_height;
-
-	paddingbox_height_ = padding_top_thick_ + _contentbox_height + padding_bot_thick_;
-	borderbox_height_ = border_top_thick_ + paddingbox_height_ + border_bot_thick_;
+	_paddingbox_height = _padding_top_thick + _contentbox_height + _padding_bot_thick;
+	_borderbox_height = _border_top_thick + _paddingbox_height + _border_bot_thick;
 }
 
 
@@ -718,11 +806,13 @@ void BoxModel::recalculateHeightBoxes(float new_content_height)
 
 void UserInterface::recreateGraph(float screen_width, float screen_height)
 {
-	BasicElement elem = {};
+	Flex elem = {};
 	elem.width.setAbsolute(screen_width);
 	elem.height.setAbsolute(screen_height);
-	elem.origin_ = { 0, 0 };
-	elem.calculateBoxModel();
+	elem._origin = { 0, 0 };
+
+	float stub_0, stub_1;
+	elem.calculateBoxModel(stub_0, stub_1);
 
 	elem.background_color = { 0, 0, 0, 1 };
 	elem.border_color = { 0, 0, 0, 1 };
@@ -745,7 +835,7 @@ Element* UserInterface::addElement(Element* parent, T& new_elem)
 
 	return new_node;
 }
-template Element* UserInterface::addElement(Element* parent, BasicElement& new_elem);
+template Element* UserInterface::addElement(Element* parent, Flex& new_elem);
 
 void UserInterface::deleteElement(Element* node, std::vector<Element*>& detached_nodes)
 {
@@ -776,8 +866,8 @@ void UserInterface::deleteElement(Element* node, std::vector<Element*>& detached
 void UserInterface::calcElementLayout(Element* elem, uint32_t parent_layer_idx, float ancestor_width, float ancestor_height,
 	BoxModel*& r_box)
 {
-	auto basic_elem = std::get_if<BasicElement>(&elem->elem);
-	if (basic_elem != nullptr) {
+	auto flex = std::get_if<Flex>(&elem->elem);
+	if (flex != nullptr) {
 			
 		uint32_t idx = elem->parent != nullptr ? parent_layer_idx + 1 : 0;
 
@@ -793,29 +883,116 @@ void UserInterface::calcElementLayout(Element* elem, uint32_t parent_layer_idx, 
 		}
 		layer->elems.push_back(elem);
 
-		basic_elem->calculateBoxModel(ancestor_width, ancestor_height);
+		flex->calculateBoxModel(ancestor_width, ancestor_height);
 
 		// Child Boxes
-		std::vector<BoxModel*> children_boxes(elem->children.size());
+		std::vector<BoxModel*> child_boxes(elem->children.size());
 		size_t child_idx = 0;
 
 		for (Element* child : elem->children) {
 
 			calcElementLayout(child, idx, ancestor_width, ancestor_height,
-				children_boxes[child_idx]);
+				child_boxes[child_idx]);
 
 			child_idx++;
 		}
 
-		// Layout
-		glm::vec2 origin = basic_elem->origin_;
-		for (BoxModel* child_box : children_boxes) {
+		// Calc Children Layout
+		auto calcRowLayout = [&](size_t start, size_t end, 
+			float used_width, float width, float height) 
+		{
+			auto packChildren = [&](float start_x, float step) {
+				for (uint32_t i = start; i < end; i++) {
 
-			child_box->origin_ = origin;
-			origin.x += child_box->borderbox_width_;
+					BoxModel* child_box = child_boxes[i];
+
+					child_box->_origin.x = start_x;
+
+					switch (child_box->flex_cross_axis_align_self) {
+					case FlexCrossAxisAlign::START:
+						child_box->_origin.y = 0;
+						break;
+					case FlexCrossAxisAlign::END:
+						child_box->_origin.y = height - child_box->_borderbox_height;
+						break;
+					case FlexCrossAxisAlign::CENTER:
+						child_box->_origin.y = (height - child_box->_borderbox_height) / 2;
+						break;
+
+					case FlexCrossAxisAlign::PARENT:
+						switch (flex->cross_axis_align) {
+						case FlexCrossAxisAlign::START:
+							child_box->_origin.y = 0;
+							break;
+						case FlexCrossAxisAlign::END:
+							child_box->_origin.y = height - child_box->_borderbox_height;
+							break;
+						case FlexCrossAxisAlign::CENTER:
+							child_box->_origin.y = (height - child_box->_borderbox_height) / 2;
+							break;
+						}
+						break;
+					}
+
+					start_x += child_box->_borderbox_width + step;
+				}
+			};
+
+			switch (flex->axis_align) {
+			case FlexAxisAlign::START:
+				packChildren(0, 0);
+				break;
+
+			case FlexAxisAlign::END:
+				packChildren(width - used_width, 0);
+				break;
+
+			case FlexAxisAlign::CENTER:
+				packChildren((width - used_width) / 2, 0);
+				break;
+
+			case FlexAxisAlign::SPACE_BETWEEN:
+				packChildren(0, (width - used_width) / ((float)child_boxes.size() - 1));
+			}
+		};
+
+		switch (flex->direction) {
+		case FlexDirection::ROW: {
+
+			switch (flex->wrap) {
+			case FlexWrap::NO_WRAP: {
+
+				float used_width = 0;
+				float row_height = 0;
+
+				for (BoxModel* child_box : child_boxes) {
+
+					used_width += child_box->_borderbox_width;
+
+					if (child_box->_borderbox_height > row_height) {
+						row_height = child_box->_borderbox_height;
+					}
+				}
+
+				calcRowLayout(0, child_boxes.size(),
+					used_width, ancestor_width, row_height);
+
+				if (flex->width.type == ContentSizeType::FIT) {
+					flex->recalculateWidthBoxes(used_width);
+				}
+				if (flex->height.type == ContentSizeType::FIT) {
+					flex->recalculateHeightBoxes(row_height);
+				}
+				break;
+			}
+			// case WRAP
+			}
+			break;
+		}
+		// COLUM
 		}
 
-		r_box = basic_elem;
+		r_box = flex;
 		return;
 	}
 }
@@ -831,7 +1008,7 @@ void UserInterface::calcGraphLayout()
 void UserInterface::changeResolution(float screen_width, float screen_height)
 {
 	Element& elem = this->elems.front();
-	BasicElement* root = std::get_if<BasicElement>(&elem.elem);
+	Flex* root = std::get_if<Flex>(&elem.elem);
 
 	root->width.setAbsolute(screen_width);
 	root->height.setAbsolute(screen_height);

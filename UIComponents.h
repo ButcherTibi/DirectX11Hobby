@@ -19,6 +19,13 @@
 // Forward declare
 struct CharInstance;
 
+
+enum class BoxSizing {
+	CONTENT,
+	PADDING,
+	BORDER,
+};
+
 enum class ContentSizeType {
 	RELATIVE_SIZE,
 	ABSOLUTE_SIZE,
@@ -33,28 +40,29 @@ struct ContentSize {
 	void setRelative(float size);
 };
 
-enum class SizeTypes {
+enum class SizeType {
 	RELATIVE_SIZE,
 	ABSOLUTE_SIZE
 };
 
 struct PropertySize {
-	SizeTypes type = SizeTypes::ABSOLUTE_SIZE;
+	SizeType type = SizeType::ABSOLUTE_SIZE;
 	float size = 0;
 
 	void setAbsolute(float size);
 	void setRelative(float size);
 };
 
-//enum class FlexCrossAxisAlign {
-//	START,
-//	END,
-//	CENTER,
-//	PARENT,
-//};
+enum class FlexCrossAxisAlign {
+	START,
+	END,
+	CENTER,
+	PARENT,
+};
 
 struct BoxModel {
-	// Content Size
+	// Box Size
+	BoxSizing box_sizing = BoxSizing::CONTENT;
 	ContentSize width;
 	ContentSize height;
 
@@ -84,54 +92,73 @@ struct BoxModel {
 	glm::vec4 border_color;
 	glm::vec4 background_color;
 
+	// Children
+	FlexCrossAxisAlign flex_cross_axis_align_self = FlexCrossAxisAlign::PARENT;
+
 	// Computed Content Box (if relative then recompute for rendering)
-	glm::vec2 origin_;
+	glm::vec2 _origin;
 
 	float _contentbox_width;
 	float _contentbox_height;
 
 	// Computed Padding
-	float padding_left_thick_;
-	float padding_right_thick_;
-	float paddingbox_width_;
+	float _padding_left_thick;
+	float _padding_right_thick;
+	float _paddingbox_width;
 
-	float padding_top_thick_;
-	float padding_bot_thick_;
-	float paddingbox_height_;
+	float _padding_top_thick;
+	float _padding_bot_thick;
+	float _paddingbox_height;
+
+	float _padding_tl_radius;
+	float _padding_tr_radius;
+	float _padding_br_radius;
+	float _padding_bl_radius;
 
 	// Computed Border
-	float border_left_thick_;
-	float border_right_thick_;
-	float borderbox_width_;
+	float _border_left_thick;
+	float _border_right_thick;
+	float _borderbox_width;
 
-	float border_top_thick_;
-	float border_bot_thick_;
-	float borderbox_height_;
+	float _border_top_thick;
+	float _border_bot_thick;
+	float _borderbox_height;
+
+	float _border_tl_radius;
+	float _border_tr_radius;
+	float _border_br_radius;
+	float _border_bl_radius;
 
 public:
-	void calculateBoxModel();
 	void calculateBoxModel(float& ancestor_width, float& ancestor_height);
-	void recalculateWidthBoxes(float new_content_width);
-	void recalculateHeightBoxes(float new_content_height);
+	void recalculateWidthBoxes(float new_content_width);  // needs redone
+	void recalculateHeightBoxes(float new_content_height);  // needs redone
 };
 
+// TODO:
+// - layout
+// - image
+// - gradients
+// - CSS styling
+// - interaction
+// - animation
 
-//enum class FlexDirection {
-//	ROW,
-//	COLUMN,
-//};
+enum class FlexDirection {
+	ROW,
+	COLUMN,
+};
 
-//enum class FlexWrap {
-//	NO_WRAP,
-//	WRAP,
-//};
+enum class FlexWrap {
+	NO_WRAP,
+	WRAP,
+};
 
-//enum class FlexAxisAlign {
-//	START,
-//	END,
-//	CENTER,
-//	SPACE_BETWEEN,
-//};
+enum class FlexAxisAlign {
+	START,
+	END,
+	CENTER,
+	SPACE_BETWEEN,
+};
 
 //enum class FlexLinesAlign {
 //	START,
@@ -196,16 +223,17 @@ public:
 //	std::vector<CharInstance*> char_insts;
 //};
 
-struct BasicElement : BoxModel {
-	// test relative border size
-	// clamp padding and border radius
-	// test opacity
+struct Flex : BoxModel {
+	FlexDirection direction = FlexDirection::ROW;
+	FlexWrap wrap = FlexWrap::NO_WRAP;
+	FlexAxisAlign axis_align = FlexAxisAlign::START;
+	FlexCrossAxisAlign cross_axis_align = FlexCrossAxisAlign::START;
 };
 
 
 struct Element {
 	Element* parent;
-	std::variant<BasicElement> elem;
+	std::variant<Flex> elem;
 	std::list<Element*> children;
 };
 

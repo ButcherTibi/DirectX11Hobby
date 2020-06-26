@@ -31,7 +31,7 @@ void main() {
         if (padding_mask_pixel.r != 1) {
 
             outColor = vec4(mix(border_pixel.rgb, padding_pixel.rgb, padding_mask_pixel.r),
-                padding_pixel.a
+                mix(border_pixel.a, padding_pixel.a, padding_mask_pixel.r)
             );
             return;
         }
