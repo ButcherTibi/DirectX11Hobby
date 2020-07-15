@@ -290,7 +290,7 @@ ErrStack InputState::update(const steady_time& time)
 	{
 		POINT point;
 		if (!GetCursorPos(&point)) {
-			return ErrStack(ExtraError::FAILED_TO_GET_CURSOR_SCREEN_POSITION, code_location, "failed to get mouse screen pos", getLastError());
+			return ErrStack(code_location, "failed to get mouse screen pos");
 		}
 		this->screen_pos_x = point.x;
 		this->screen_pos_y = point.y;

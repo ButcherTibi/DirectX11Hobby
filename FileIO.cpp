@@ -77,13 +77,13 @@ void pushPathToEntries(std::vector<std::string> &existing, std::string path)
 	}
 }
 
-void FileSysPath::recreateAbsolute(std::string path)
+void FilePath::recreateAbsolute(std::string path)
 {
 	entries.clear();
 	pushPathToEntries(this->entries, path);
 }
 
-ErrStack FileSysPath::recreateRelative(std::string path)
+ErrStack FilePath::recreateRelative(std::string path)
 {
 	entries.clear();
 
@@ -112,7 +112,28 @@ ErrStack FileSysPath::recreateRelative(std::string path)
 	return ErrStack();
 }
 
-bool FileSysPath::hasExtension(std::string extension)
+ErrStack FilePath::recreateRelativeToSolution(std::string path)
+{
+	entries.clear();
+
+	std::string exe_filename;
+	exe_filename.resize(max_path);
+
+	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
+
+		return ErrStack(code_location, getLastError());
+	}
+
+	pushPathToEntries(this->entries, exe_filename);
+
+	pop_back(3);
+
+	push_back(path);
+
+	return ErrStack();
+}
+
+bool FilePath::hasExtension(std::string extension)
 {
 	std::string last = entries.back();
 	size_t dot_pos = last.find_last_of('.');
@@ -121,34 +142,19 @@ bool FileSysPath::hasExtension(std::string extension)
 	return extension == entry_ext;
 }
 
-void FileSysPath::push_back(std::string path)
+void FilePath::push_back(std::string path)
 {
 	pushPathToEntries(this->entries, path);
 }
 
-void FileSysPath::push_back(FileSysPath path)
-{
-	for (std::string new_entry : path.entries) {
-		this->entries.push_back(new_entry);
-	}
-}
-
-void FileSysPath::pop_back(size_t count)
+void FilePath::pop_back(size_t count)
 {
 	for (size_t i = 0; i < count; i++) {
 		entries.pop_back();
 	}
 }
 
-void FileSysPath::push_front(FileSysPath path)
-{
-	for (std::string entry : this->entries) {
-		path.entries.push_back(entry);
-	}
-	this->entries = path.entries;
-}
-
-void FileSysPath::push_front(std::string path)
+void FilePath::push_front(std::string path)
 {
 	std::vector<std::string> append = this->entries;
 	
@@ -160,17 +166,17 @@ void FileSysPath::push_front(std::string path)
 	}
 }
 
-void FileSysPath::pop_front(size_t count)
+void FilePath::pop_front(size_t count)
 {
 	this->entries.erase(entries.begin(), entries.begin() + count);
 }
 
-void FileSysPath::erase(size_t start, size_t end)
+void FilePath::erase(size_t start, size_t end)
 {
 	this->entries.erase(entries.begin() + start, entries.begin() + end);
 }
 
-std::string FileSysPath::toWindowsPath()
+std::string FilePath::toWindowsPath()
 {
 	std::string path;
 
@@ -192,7 +198,7 @@ std::string FileSysPath::toWindowsPath()
 }
 
 template<typename T>
-ErrStack FileSysPath::read(std::vector<T>& content)
+ErrStack FilePath::read(std::vector<T>& content)
 {
 	// create file handle
 	std::string filename_vec = toWindowsPath();
@@ -207,8 +213,8 @@ ErrStack FileSysPath::read(std::vector<T>& content)
 		NULL);
 
 	if (file_handle == INVALID_HANDLE_VALUE) {
-		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
-			"failed to create file handle for path = " + this->toWindowsPath(), getLastError());
+		return ErrStack(code_location,
+			"failed to create file handle for path = " + this->toWindowsPath());
 	}
 
 	// find file size
@@ -216,8 +222,8 @@ ErrStack FileSysPath::read(std::vector<T>& content)
 	if (!GetFileSizeEx(file_handle, &file_size)) {
 
 		CloseHandle(file_handle);
-		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
-			"failed to find file size for path = " + this->toWindowsPath(), getLastError());
+		return ErrStack(code_location,
+			"failed to find file size for path = " + this->toWindowsPath());
 	}
 	content.resize(file_size.QuadPart);
 
@@ -227,15 +233,15 @@ ErrStack FileSysPath::read(std::vector<T>& content)
 	if (!ReadFile(file_handle, content.data(), (DWORD)file_size.QuadPart, &bytes_read, NULL)) {
 
 		CloseHandle(file_handle);
-		return ErrStack(ExtraError::FAILED_TO_READ_FILE, code_location,
-			"failed to read path = " + this->toWindowsPath(), getLastError());
+		return ErrStack(code_location,
+			"failed to read path = " + this->toWindowsPath());
 	}
 
 	CloseHandle(file_handle);
 	return ErrStack();
 }
-template ErrStack FileSysPath::read(std::vector<char>& content);
-template ErrStack FileSysPath::read(std::vector<uint8_t>& content);
+template ErrStack FilePath::read(std::vector<char>& content);
+template ErrStack FilePath::read(std::vector<uint8_t>& content);
 
 //ErrStack FileSysPath::readLocal(std::vector<char>& content)
 //{

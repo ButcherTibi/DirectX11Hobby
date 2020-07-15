@@ -69,7 +69,7 @@ ErrStack confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keywor
 
 			if (text[i] != keyword[idx]) {
 
-				return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+				return ErrStack(code_location,
 					msgWithPos("failed to parse keyword " + keyword,
 					i, text));
 			}
@@ -78,7 +78,7 @@ ErrStack confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keywor
 			return ErrStack();
 		}
 	}
-	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing keyword " + keyword,
 		i, text));
 }
@@ -102,7 +102,7 @@ ErrStack parseString(uint64_t& i, std::vector<char>& text, std::string& out)
 			out.push_back(c);
 		}
 	}
-	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(code_location,
 		msgWithPos("missing ending '\"' or premature end of characters in file when parsing string",
 		i, text));
 }
@@ -187,7 +187,7 @@ ErrStack JSONGraph::parseNumber(uint64_t& i, std::vector<char>& text, JSONValue&
 			break;;
 		}	
 	}
-	return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing number",
 		i, text));
 }
@@ -318,7 +318,7 @@ ErrStack JSONGraph::parseObject(uint64_t& i, std::vector<char>& text, JSONValue&
 				"failed to parse field name");
 
 			if (new_field->name.empty()) {
-				return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+				return ErrStack(code_location,
 					msgWithPos("expected field name is blank",
 						i - 1, text));
 			}
@@ -371,7 +371,7 @@ ErrStack parseJSON(std::vector<char>& text, uint64_t offset,
 
 	if (!seekSymbol(i, text, '{')) {
 
-		return ErrStack(ExtraError::FAILED_TO_PARSE_JSON, code_location,
+		return ErrStack(code_location,
 			msgWithPos("expected object begin symbol '{' not found",
 			i, text));
 	}

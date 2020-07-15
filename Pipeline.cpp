@@ -9,7 +9,7 @@ ErrStack vks::PipelineLayout::create(LogicalDevice* logical_dev, VkPipelineLayou
 
 	VkResult vk_res = vkCreatePipelineLayout(logical_dev->logical_device, info, NULL, &pipe_layout);
 	if (vk_res != VK_SUCCESS) {
-		return ErrStack(vk_res, code_location, "failed to create pipeline layout");
+		return ErrStack(code_location, "failed to create pipeline layout");
 	}
 	return ErrStack();
 }
@@ -43,7 +43,7 @@ ErrStack vks::ShaderModule::recreate(LogicalDevice* logical_dev, std::vector<cha
 
 	VkResult res = vkCreateShaderModule(logical_dev->logical_device, &shader_module_info, NULL, &this->sh_module);
 	if (res != VK_SUCCESS) {
-		return ErrStack(res, code_location, "failed to create shader module");
+		return ErrStack(code_location, "failed to create shader module");
 	}
 	return ErrStack();
 }
@@ -73,7 +73,7 @@ ErrStack vks::GraphicsPipeline::create(LogicalDevice* logical_dev, VkGraphicsPip
 
 	VkResult vk_res = vkCreateGraphicsPipelines(logical_dev->logical_device, NULL, 1, info, NULL, &pipeline);
 	if (vk_res != VK_SUCCESS) {
-		return ErrStack(vk_res, code_location, "failed to create pipeline");
+		return ErrStack(code_location, "failed to create pipeline");
 	}
 
 	return ErrStack();

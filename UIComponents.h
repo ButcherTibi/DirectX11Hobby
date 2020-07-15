@@ -7,17 +7,12 @@
 #include <variant>
 #include <string>
 
-// GLM
-#include <glm\vec2.hpp>
-#include <glm\vec4.hpp>
+#include "glm\vec2.hpp"
+#include "glm\vec4.hpp"
 
 // Mine
 #include "ErrorStuff.h"
 #include "TextureAtlas.h"
-
-
-// Forward declare
-struct CharInstance;
 
 
 enum class BoxSizing {
@@ -89,8 +84,8 @@ struct BoxModel {
 	float border_bl_radius;
 
 	// Background
-	glm::vec4 border_color;
-	glm::vec4 background_color;
+	glm::vec4 border_color = {0, 0, 0, 1};
+	glm::vec4 background_color = { 0, 0, 0, 1 };
 
 	// Children
 	FlexCrossAxisAlign flex_cross_axis_align_self = FlexCrossAxisAlign::PARENT;
@@ -130,7 +125,7 @@ struct BoxModel {
 	float _border_bl_radius;
 
 public:
-	void calculateBoxModel(float& ancestor_width, float& ancestor_height);
+	void _calculateBoxModel(float& ancestor_width, float& ancestor_height);
 	void recalculateWidthBoxes(float new_content_width);  // needs redone
 	void recalculateHeightBoxes(float new_content_height);  // needs redone
 };
@@ -142,46 +137,6 @@ public:
 // - CSS styling
 // - interaction
 // - animation
-
-enum class FlexDirection {
-	ROW,
-	COLUMN,
-};
-
-enum class FlexWrap {
-	NO_WRAP,
-	WRAP,
-};
-
-enum class FlexAxisAlign {
-	START,
-	END,
-	CENTER,
-	SPACE_BETWEEN,
-};
-
-//enum class FlexLinesAlign {
-//	START,
-//	END,
-//	CENTER,
-//	SPACE_BETWEEN,
-//};
-
-//struct Div {
-//	BoxModel box;
-
-//	FlexDirection flex_direction;
-//	FlexWrap flex_wrap;
-
-//	FlexAxisAlign flex_axis_align;
-//	FlexCrossAxisAlign flex_cross_axis_align;
-
-//	FlexLinesAlign flex_lines_align;
-
-//	// Computed
-//	std::vector<glm::vec2> child_positions;
-//};
-
 
 //enum class Position {
 //	MARGINS,
@@ -205,35 +160,60 @@ enum class FlexAxisAlign {
 //	glm::vec2 child_pos;
 //};
 
+enum class FlexDirection {
+	ROW,
+	COLUMN,
+};
 
-//struct Paragraph {
-//	BoxModel box;
+enum class FlexWrap {
+	NO_WRAP,
+	WRAP,
+};
 
-//	std::vector<uint32_t> chars;
+enum class FlexAxisAlign {
+	START,
+	END,
+	CENTER,
+	SPACE_BETWEEN,
+};
 
-//	glm::vec4 font_color;
-//	std::string font_family;
-//	std::string font_style;
-//	float font_size;
-
-//	float line_height_scale;
-//	bool wrap_text;
-
-//	// Internal
-//	std::vector<CharInstance*> char_insts;
-//};
+enum class FlexLinesAlign {
+	START,
+	END,
+	CENTER,
+	SPACE_BETWEEN,
+};
 
 struct Flex : BoxModel {
 	FlexDirection direction = FlexDirection::ROW;
 	FlexWrap wrap = FlexWrap::NO_WRAP;
 	FlexAxisAlign axis_align = FlexAxisAlign::START;
 	FlexCrossAxisAlign cross_axis_align = FlexCrossAxisAlign::START;
+	FlexLinesAlign lines_align = FlexLinesAlign::START;
+};
+
+
+enum class WordWrap {
+	NONE,
+	LETTER,
+	WORD,
+};
+
+struct Paragraph : BoxModel {
+	std::vector<uint32_t> chars;
+	std::string font_family;
+	std::string font_style;
+	float font_size;
+	glm::vec4 font_color;
+
+	float line_height;
+	WordWrap word_wrap;
 };
 
 
 struct Element {
 	Element* parent;
-	std::variant<Flex> elem;
+	std::variant<Flex, Paragraph> elem;
 	std::list<Element*> children;
 };
 
@@ -304,23 +284,25 @@ public:
 	std::list<Element> elems;
 	std::list<ElementsLayer> layers;
 
-private:
-	FontSize* findBestFitFontSize(std::string font_family, std::string font_style, float font_size);
-
 public:
 	// add bitmaps and set verts
 	ErrStack addFont(std::vector<uint8_t>& font_ttf, FontInfo& info);
 
 	ErrStack rebindToAtlas(uint32_t atlas_size);
 
-	void recreateGraph(float screen_width, float screen_height);
+	FontSize* _findBestFitFontSize(std::string font_family, std::string font_style, float font_size);
+
+	// Layout
+	Element* recreateGraph(float screen_width, float screen_height);
+
+	Flex* getRootElement();
 
 	template<typename T>
 	Element* addElement(Element* parent, T& new_elem);
 
 	void deleteElement(Element* elem, std::vector<Element*>& detached_nodes);
 
-	void calcElementLayout(Element* elem, uint32_t parent_layer_idx, float ancestor_width, float ancestor_height,
+	void _calcElementLayout(Element* elem, uint32_t parent_layer_idx, float ancestor_width, float ancestor_height,
 		BoxModel*& r_box);
 
 	void calcGraphLayout();

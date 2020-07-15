@@ -412,6 +412,8 @@ namespace vks {
 
 	ErrStack Image::recreate(LogicalDevice* logical_dev, VkImageCreateInfo* info, VmaMemoryUsage mem_usage)
 	{
+		VkResult vk_res{};
+
 		if (this->img != VK_NULL_HANDLE) {
 			this->destroy();
 		}
@@ -516,6 +518,8 @@ namespace vks {
 
 	ErrStack ImageView::recreate(LogicalDevice* logical_dev, VkImageViewCreateInfo* info)
 	{
+		VkResult vk_res{};
+
 		this->logical_dev = logical_dev;
 
 		if (this->view != VK_NULL_HANDLE) {

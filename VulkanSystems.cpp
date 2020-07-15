@@ -21,7 +21,7 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrStack(ExtraError::VALIDATION_LAYER_NOT_FOUND, code_location, "validation layer = " + std::string(layer) + " not found");
+				return ErrStack(code_location, "validation layer = " + std::string(layer) + " not found");
 			}
 		}
 		return ErrStack();
@@ -40,7 +40,7 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrStack(ExtraError::EXTENSION_NOT_FOUND, code_location, "instance extension = " + std::string(extension) + " not found");
+				return ErrStack(code_location, "instance extension = " + std::string(extension) + " not found");
 			}
 		}
 		return ErrStack();
@@ -65,14 +65,14 @@ namespace vks {
 
 			vk_res = vkEnumerateInstanceLayerProperties(&layer_props_count, NULL);
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, code_location, "could not retrieve validation layer props count");
+				return ErrStack(code_location, "could not retrieve validation layer props count");
 			}
 
 			std::vector<VkLayerProperties> layer_props(layer_props_count);
 
 			vk_res = vkEnumerateInstanceLayerProperties(&layer_props_count, layer_props.data());
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, code_location, "could not retrieve validation layer props");
+				return ErrStack(code_location, "could not retrieve validation layer props");
 			}
 
 			err = find_layers(layer_props, validation_layers);
@@ -87,14 +87,14 @@ namespace vks {
 
 			vk_res = vkEnumerateInstanceExtensionProperties(NULL, &ext_props_count, NULL);
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props count");
+				return ErrStack(code_location, "could not retrieve instance extension props count");
 			}
 
 			std::vector<VkExtensionProperties> ext_props(ext_props_count);
 
 			vk_res = vkEnumerateInstanceExtensionProperties(NULL, &ext_props_count, ext_props.data());
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, ExtraError::FAILED_ENUMERATE_INSTANCE_EXTENSIONS, code_location, "could not retrieve instance extension props");
+				return ErrStack(code_location, "could not retrieve instance extension props");
 			}
 
 			err = find_extensions(ext_props, instance_extensions);
@@ -126,7 +126,7 @@ namespace vks {
 
 			vk_res = vkCreateInstance(&inst_info, NULL, &instance);
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, ExtraError::INSTANCE_CREATION_FAILURE, code_location, "could not create a Vulkan instance");
+				return ErrStack(code_location, "could not create a Vulkan instance");
 			}
 		}
 
@@ -146,11 +146,11 @@ namespace vks {
 
 				vk_res = func(instance, &createInfo, NULL, &callback);
 				if (vk_res != VK_SUCCESS) {
-					return ErrStack(vk_res, code_location, "debug callback creation failed");
+					return ErrStack(code_location, "debug callback creation failed");
 				}
 			}
 			else {
-				return ErrStack(ExtraError::DEBUG_EXTENSION_NOT_FOUND, code_location, "debug extension not present");
+				return ErrStack(code_location, "debug extension not present");
 			}
 		}
 
@@ -159,7 +159,7 @@ namespace vks {
 			set_vkdbg_name_func = (PFN_vkSetDebugUtilsObjectNameEXT)
 				vkGetInstanceProcAddr(instance, "vkSetDebugUtilsObjectNameEXT");
 			if (set_vkdbg_name_func == NULL) {
-				return ErrStack(ExtraError::FAILED_TO_GET_EXTERNAL_FUNCTION, code_location, 
+				return ErrStack(code_location, 
 					"failed to retrieve function pointer for "
 					"vkSetDebugUtilsObjectNameEXT");
 			}
@@ -205,7 +205,7 @@ namespace vks {
 
 		VkResult vk_res = vkCreateWin32SurfaceKHR(instance->instance, &info, NULL, &this->surface);
 		if (vk_res != VK_SUCCESS) {
-			return ErrStack(vk_res, code_location, "failed to create vulkan surface");
+			return ErrStack(code_location, "failed to create vulkan surface");
 		}
 
 		return ErrStack();
@@ -240,18 +240,18 @@ namespace vks {
 
 		vk_res = vkEnumeratePhysicalDevices(instance->instance, &deviceCount, NULL);
 		if (vk_res != VK_SUCCESS) {
-			return ErrStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
+			return ErrStack(code_location, "failed to enumerate physical devices");
 		}
 
 		if (deviceCount == 0) {
-			return ErrStack(ExtraError::NO_GPU_WITH_VULKAN_SUPPORT_FOUND, code_location, "failed to find GPUs with Vulkan support");
+			return ErrStack(code_location, "failed to find GPUs with Vulkan support");
 		}
 
 		std::vector<VkPhysicalDevice> phys_devices(deviceCount);
 
 		vk_res = vkEnumeratePhysicalDevices(instance->instance, &deviceCount, phys_devices.data());
 		if (vk_res != VK_SUCCESS) {
-			return ErrStack(vk_res, ExtraError::FAILED_TO_ENUMERATE_PHYSICAL_DEVICES, code_location, "failed to enumerate physical devices");
+			return ErrStack(code_location, "failed to enumerate physical devices");
 		}
 
 		for (VkPhysicalDevice phys_dev : phys_devices) {
@@ -273,7 +273,7 @@ namespace vks {
 					VkBool32 supported;
 					vk_res = vkGetPhysicalDeviceSurfaceSupportKHR(phys_dev, i, surface->surface, &supported);
 					if (vk_res != VK_SUCCESS) {
-						return ErrStack(vk_res, code_location, "failed to check if pshysical device can present");
+						return ErrStack(code_location, "failed to check if pshysical device can present");
 					}
 
 					if (family_prop.queueCount > 0 && family_prop.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
@@ -335,7 +335,7 @@ namespace vks {
 		}
 
 		if (physical_device == VK_NULL_HANDLE) {
-			return ErrStack(ExtraError::NO_SUITABLE_GPU_FOUND, code_location, "failed to find a suitable GPU");
+			return ErrStack(code_location, "failed to find a suitable GPU");
 		}
 
 		vkGetPhysicalDeviceProperties(physical_device, &this->phys_dev_props);
@@ -399,7 +399,7 @@ namespace vks {
 
 		VkResult vk_res = vkCreateDevice(phys_dev->physical_device, &device_info, NULL, &logical_device);
 		if (vk_res != VK_SUCCESS) {
-			return ErrStack(vk_res, ExtraError::FAILED_CREATE_LOGICAL_DEVICE, code_location, "failed to create logical device");
+			return ErrStack(code_location, "failed to create logical device");
 		}
 
 		// Queue creation
@@ -415,7 +415,7 @@ namespace vks {
 
 			VkResult vk_res = vmaCreateAllocator(&alloc_info, &this->allocator);
 			if (vk_res != VK_SUCCESS) {
-				return ErrStack(vk_res, code_location, "failed to create allocator");
+				return ErrStack(code_location, "failed to create allocator");
 			}
 		}
 
@@ -459,6 +459,8 @@ namespace vks {
 	{
 		this->logical_device = logical_dev;
 
+		VkResult vk_res{};
+
 		// Surface Formats
 		{
 			std::vector<VkSurfaceFormatKHR> formats;
@@ -485,7 +487,7 @@ namespace vks {
 			}
 
 			if (!found) {
-				return ErrStack(ExtraError::NO_SUITABLE_SURFACE_FORMAT_FOUND, code_location, "failed to find suitable surface format");
+				return ErrStack(code_location, "failed to find suitable surface format");
 			}
 		}
 
@@ -595,6 +597,8 @@ namespace vks {
 
 	ErrStack Sampler::create(LogicalDevice* logical_dev, VkSamplerCreateInfo& info)
 	{
+		VkResult vk_res{};
+
 		this->logical_dev = logical_dev;	
 
 		checkVkRes(vkCreateSampler(logical_dev->logical_device, &info, NULL, &sampler),
@@ -619,6 +623,8 @@ namespace vks {
 	ErrStack Renderpass::create(LogicalDevice* logical_dev, VkRenderPassCreateInfo* info)
 	{
 		this->logical_dev = logical_dev;
+
+		VkResult vk_res{};
 
 		checkVkRes(vkCreateRenderPass(logical_dev->logical_device, info, NULL, &renderpass),
 			"failed to create renderpass");
@@ -650,6 +656,8 @@ namespace vks {
 		std::vector<VkImageView>& attachments, uint32_t width, uint32_t height)
 	{
 		this->logical_dev_ = logical_dev;
+
+		VkResult vk_res{};
 
 		VkFramebufferCreateInfo framebuff_info = {};
 		framebuff_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -690,6 +698,8 @@ namespace vks {
 	{
 		this->logical_dev = logical_dev;
 
+		VkResult vk_res{};
+
 		VkCommandPoolCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		info.queueFamilyIndex = phys_dev->queue_fam_idx;
@@ -727,7 +737,7 @@ namespace vks {
 
 		VkResult vk_res = vkAllocateCommandBuffers(logical_dev->logical_device, &allocInfo, &cmd_buff);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrStack(vk_res, code_location, "failed to create single use command buffer");
+			*err = ErrStack(code_location, "failed to create single use command buffer");
 			return;
 		}
 
@@ -737,7 +747,7 @@ namespace vks {
 
 		vk_res = vkBeginCommandBuffer(cmd_buff, &beginInfo);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrStack(vk_res, code_location, "failed to begin single use command buffer");
+			*err = ErrStack(code_location, "failed to begin single use command buffer");
 			return;
 		}
 	}
@@ -746,7 +756,7 @@ namespace vks {
 	{
 		VkResult vk_res = vkEndCommandBuffer(cmd_buff);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrStack(vk_res, code_location, "failed to end single use command buffer");
+			*err = ErrStack(code_location, "failed to end single use command buffer");
 			return;
 		}
 
@@ -757,13 +767,13 @@ namespace vks {
 
 		vk_res = vkQueueSubmit(logical_dev->queue, 1, &submitInfo, VK_NULL_HANDLE);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrStack(vk_res, code_location, "failed to submit single use command buffer");
+			*err = ErrStack(code_location, "failed to submit single use command buffer");
 			return;
 		}
 
 		vk_res = vkQueueWaitIdle(logical_dev->queue);
 		if (vk_res != VK_SUCCESS) {
-			*err = ErrStack(vk_res, code_location, "");
+			*err = ErrStack(code_location, "");
 			return;
 		}
 
@@ -781,7 +791,7 @@ namespace vks {
 
 		VkResult res = vkCreateDescriptorSetLayout(logical_dev->logical_device, &descp_layout_info, NULL, &descp_layout);
 		if (res != VK_SUCCESS) {
-			return ErrStack(res, code_location, "failed to create descriptor set layout");
+			return ErrStack(code_location, "failed to create descriptor set layout");
 		}
 
 		return ErrStack();
@@ -819,7 +829,7 @@ namespace vks {
 
 		VkResult vk_res = vkCreateDescriptorPool(logical_dev->logical_device, &descp_pool_info, NULL, &descp_pool);
 		if (vk_res != VK_SUCCESS) {
-			return ErrStack(vk_res, code_location, "failed to create descriptor pool");
+			return ErrStack(code_location, "failed to create descriptor pool");
 		}
 
 		return ErrStack();
@@ -857,7 +867,7 @@ namespace vks {
 
 		VkResult res = vkAllocateDescriptorSets(logical_dev->logical_device, &descp_sets_info, &descp_set);
 		if (res != VK_SUCCESS) {
-			return ErrStack(res, code_location, "failed to allocate descriptor sizes");
+			return ErrStack(code_location, "failed to allocate descriptor sizes");
 		}
 
 		return ErrStack();

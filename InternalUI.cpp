@@ -1,12 +1,9 @@
-
 // Header
-#include "UIComponents.h"
+#include "Internals.h"
 
 
-//struct Axis {
-//	uint32_t idx_end;
-//	float cross_axis_size;
-//};
+using namespace nui_int;
+using namespace nui;
 
 
 void ContentSize::setAbsolute(float size)
@@ -90,7 +87,7 @@ void BoxModel::_calculateBoxModel(float& ancestor_width, float& ancestor_height)
 			break;
 		}
 		case ContentSizeType::RELATIVE_SIZE:
-		
+
 			_contentbox_height = height.size * ancestor_height;
 			_paddingbox_height = _padding_top_thick + _contentbox_height + _padding_bot_thick;
 			_borderbox_height = _border_top_thick + _paddingbox_height + _border_bot_thick;
@@ -104,9 +101,9 @@ void BoxModel::_calculateBoxModel(float& ancestor_width, float& ancestor_height)
 		}
 		break;
 	}
-	
+
 	case BoxSizing::PADDING: {
-		
+
 		switch (width.type) {
 		case ContentSizeType::ABSOLUTE_SIZE: {
 
@@ -254,185 +251,43 @@ void BoxModel::_calculateBoxModel(float& ancestor_width, float& ancestor_height)
 	_padding_bl_radius = clampAbove(padding_bl_radius, max_size);
 }
 
-void BoxModel::recalculateWidthBoxes(float new_content_width)
+void BoxModel::_recalculateWidthBoxes(float new_content_width)
 {
 	_contentbox_width = new_content_width;
 	_paddingbox_width = _padding_left_thick + _contentbox_width + _padding_right_thick;
 	_borderbox_width = _border_left_thick + _paddingbox_width + _border_right_thick;
 }
 
-void BoxModel::recalculateHeightBoxes(float new_content_height)
+void BoxModel::_recalculateHeightBoxes(float new_content_height)
 {
 	_contentbox_height = new_content_height;
 	_paddingbox_height = _padding_top_thick + _contentbox_height + _padding_bot_thick;
 	_borderbox_height = _border_top_thick + _paddingbox_height + _border_bot_thick;
 }
 
-//	Paragraph* par = std::get_if<Paragraph>(&elem->elem);
-//	if (par != nullptr) {
-
-//		BoxModel& box = par->box;
-//		box.calculate(parent_box, ancestor_width, ancestor_height);
-
-//		box.content_height = 0;
-//		box.content_width = 0;
-
-//		FontSize* font = findBestFitFontSize(par->font_family, par->font_style, par->font_size);
-
-//		float scale_unit = par->font_size / font->raster_size;
-//		float line_ascender = font->ascender * par->line_height_scale * scale_unit;
-//		float line_descender = font->descender * par->line_height_scale * scale_unit;
-//		float line_height = font->height * par->line_height_scale * scale_unit;
-//		float line_width = 0;
-
-//		float new_content_width = 0;
-
-//		glm::vec2 pen_pos = { 0, line_ascender };
-
-//		if (!par->wrap_text) {
-
-//			for (uint32_t i = 0; i < par->chars.size(); i++) {
-
-//				CharRaster* raster = font->findCharUnicode(par->chars[i]);
-
-//				float advance = raster->advance * scale_unit;
-//				float descender = (raster->height - raster->baseline_height) * scale_unit;
-
-//				// if new line then just change pen position
-//				if (par->chars[i] == '\n') {
-
-//					pen_pos.x = 0;
-//					pen_pos.y += line_height;
-//				}
-//				else {
-//					CharInstance& char_inst = raster->instances.emplace_back();
-//					char_inst.screen_pos = pen_pos;
-//					char_inst.screen_pos.y += descender;  // "ag" g needs to be positioned lower on the line
-//					char_inst.scale = scale_unit;
-
-//					pen_pos.x += advance;
-
-//					if (pen_pos.x > new_content_width) {
-//						new_content_width = pen_pos.x;
-//					}
-//				}
-//			}
-//		}
-//		else {
-//			for (uint32_t i = 0; i < par->chars.size(); i++) {
-
-//				CharRaster* raster = font->findCharUnicode(par->chars[i]);
-
-//				float advance = raster->advance * scale_unit;
-//				float descender = (raster->height - raster->baseline_height) * scale_unit;
-
-//				// if new line then just change pen position
-//				if (par->chars[i] == '\n') {
-
-//					pen_pos.x = 0;
-//					pen_pos.y += line_height;
-//				}
-//				else {
-//					if (pen_pos.x + advance > box.content_width) {
-
-//						pen_pos.x = 0;
-//						pen_pos.y += line_height;
-//					}
-
-//					CharInstance& char_inst = raster->instances.emplace_back();
-//					char_inst.screen_pos = pen_pos;
-//					char_inst.screen_pos.y += descender;  // "ag" g needs to be positioned lower on the line
-//					char_inst.scale = scale_unit;
-
-//					pen_pos.x += advance;
-
-//					if (pen_pos.x > new_content_width) {
-//						new_content_width = pen_pos.x;
-//					}
-//				}
-//			}
-//		}
-//		
-//		if (box.width.type == SizeType::FIT) {
-//			box.recalculateWidthBoxes(new_content_width);
-//		}
-
-//		if (box.height.type == SizeType::FIT) {
-//			box.recalculateHeightBoxes(pen_pos.y + line_descender);
-//		}
-
-//		return ErrStack();
-//	}
-
-//	return ErrStack(code_location, "");
-//}
-
-Element* UserInterface::recreateGraph(float screen_width, float screen_height)
+Element& UserInterface::getRoot()
 {
-	Flex elem = {};
-	elem.width.setAbsolute(screen_width);
-	elem.height.setAbsolute(screen_height);
-	elem._origin = { 0, 0 };
-
-	float stub_0, stub_1;
-	elem._calculateBoxModel(stub_0, stub_1);
-
-	elem.background_color = { 0, 0, 0, 1 };
-	elem.border_color = { 0, 0, 0, 1 };
-
-	// Assign to node
-	this->elems.clear();
-	Element& new_root = this->elems.emplace_back();
-	new_root.parent = nullptr;
-	new_root.elem = elem;
-
-	return &new_root;
+	return this->elems.front();
 }
 
-Flex* UserInterface::getRootElement()
+Flex& UserInterface::getRootElement()
 {
-	Element& root = this->elems.front();
-	return std::get_if<Flex>(&root.elem);
+	nui::Element& elem = this->elems.front();
+	return std::get<Flex>(elem.elem);
 }
 
 template<typename T>
-Element* UserInterface::addElement(Element* parent, T& new_elem)
+Element& UserInterface::addElement(Element& parent, T& new_elem)
 {
-	Element* new_node = &this->elems.emplace_back();
-	new_node->parent = parent;
-	new_node->elem = new_elem;
+	Element& new_node = elems.emplace_back();
+	new_node.parent = &parent;
+	new_node.elem = new_elem;
 
-	parent->children.push_back(new_node);
+	parent.children.push_back(&new_node);
 
 	return new_node;
 }
-template Element* UserInterface::addElement(Element* parent, Flex& new_elem);
-
-void UserInterface::deleteElement(Element* node, std::vector<Element*>& detached_nodes)
-{
-	// parent --X--> node
-	Element* parent = node->parent;
-	parent->children.remove(node);
-
-	// node <--X-- children
-	detached_nodes.resize(node->children.size());
-
-	auto child = node->children.begin();
-	for (uint32_t i = 0; i < node->children.size(); i++) {
-		detached_nodes[i] = *child;
-		detached_nodes[i]->parent = nullptr;
-		child = std::next(child);
-	}
-
-	// delete the node
-	for (auto n = this->elems.begin(); n != this->elems.end(); ++n) {
-		// get the address of the node
-		if (&(*n) == node) {
-			this->elems.erase(n);
-			break;
-		}
-	}
-}
+template Element& UserInterface::addElement(Element& parent, Flex& new_elem);
 
 struct Line {
 	size_t end;
@@ -473,6 +328,11 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 			return;
 		}
 
+		// Child origin
+		xm_float2 child_origin = flex->_origin;
+		child_origin.x += flex->_padding_left_thick +  flex->_border_left_thick;
+		child_origin.y += flex->_padding_top_thick + flex->_border_top_thick;
+
 		// Child Boxes
 		std::vector<BoxModel*> child_boxes(elem->children.size());
 		size_t child_idx = 0;
@@ -482,20 +342,20 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 			_calcElementLayout(child, idx, ancestor_width, ancestor_height,
 				child_boxes[child_idx]);
 
-			child_boxes[child_idx]->_origin = flex->_origin;
+			child_boxes[child_idx]->_origin = child_origin;
 
 			child_idx++;
 		}
 
 		// Calc Children Layout
-		auto calcRowLayout = [&](size_t start, size_t end, 
-			float used_width, float width, float height) 
+		auto calcRowLayout = [&](size_t start, size_t end,
+			float used_width, float width, float height)
 		{
 			auto packChildren = [&](float start_x, float step) {
 				for (size_t i = start; i < end; i++) {
 
 					BoxModel* child_box = child_boxes[i];
-					child_box->_origin.x = start_x;
+					child_box->_origin.x += start_x;
 
 					switch (child_box->flex_cross_axis_align_self) {
 					case FlexCrossAxisAlign::START:
@@ -582,7 +442,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 		};
 
 		auto calcColumLayout = [&](size_t start, size_t end,
-			float used_height, float height, float width) 
+			float used_height, float height, float width)
 		{
 			auto pack = [&](float start_y, float step) {
 				for (size_t i = start; i < end; i++) {
@@ -705,16 +565,16 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 				calcRowLines(row_height, ancestor_height, lines);
 
 				if (flex->width.type == ContentSizeType::FIT) {
-					flex->recalculateWidthBoxes(used_width);
+					flex->_recalculateWidthBoxes(used_width);
 				}
 				if (flex->height.type == ContentSizeType::FIT) {
-					flex->recalculateHeightBoxes(row_height);
+					flex->_recalculateHeightBoxes(row_height);
 				}
 				break;
 			}
-			
+
 			case FlexWrap::WRAP: {
-				
+
 				float lines_width = 0;  // maximum row width
 				float lines_height = 0;  // height of all rows combined
 
@@ -732,7 +592,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 						row_height = box->_borderbox_height;
 					}
 
-					if (i == child_boxes.size() - 1 || 
+					if (i == child_boxes.size() - 1 ||
 						(used_width + child_boxes[i + 1]->_borderbox_width > ancestor_width && i > 0))
 					{
 						calcRowLayout(start, i + 1, used_width, ancestor_width, row_height);
@@ -745,7 +605,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 
 						used_width = 0;
 						row_height = 0;
-						start = i + 1;		
+						start = i + 1;
 					}
 
 					if (used_width > lines_width) {
@@ -756,10 +616,10 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 				calcRowLines(lines_height, ancestor_height, lines);
 
 				if (flex->width.type == ContentSizeType::FIT) {
-					flex->recalculateWidthBoxes(lines_width);
+					flex->_recalculateWidthBoxes(lines_width);
 				}
 				if (flex->height.type == ContentSizeType::FIT) {
-					flex->recalculateHeightBoxes(lines_height);
+					flex->_recalculateHeightBoxes(lines_height);
 				}
 				break;
 			}
@@ -767,7 +627,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 			break;
 		}
 		case FlexDirection::COLUMN: {
-			
+
 			switch (flex->wrap) {
 			case FlexWrap::NO_WRAP: {
 
@@ -793,15 +653,15 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 				calcColumLines(col_width, ancestor_width, lines);
 
 				if (flex->width.type == ContentSizeType::FIT) {
-					flex->recalculateWidthBoxes(col_width);
+					flex->_recalculateWidthBoxes(col_width);
 				}
 				if (flex->height.type == ContentSizeType::FIT) {
-					flex->recalculateHeightBoxes(used_height);
+					flex->_recalculateHeightBoxes(used_height);
 				}
 				break;
 			}
 			case FlexWrap::WRAP: {
-				
+
 				float lines_width = 0;  // maximum row width
 				float lines_height = 0;  // height of all rows combined
 
@@ -843,10 +703,10 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 				calcColumLines(lines_width, ancestor_width, lines);
 
 				if (flex->width.type == ContentSizeType::FIT) {
-					flex->recalculateWidthBoxes(lines_width);
+					flex->_recalculateWidthBoxes(lines_width);
 				}
 				if (flex->height.type == ContentSizeType::FIT) {
-					flex->recalculateHeightBoxes(lines_height);
+					flex->_recalculateHeightBoxes(lines_height);
 				}
 				break;
 			}
@@ -859,127 +719,116 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 		return;
 	}
 
-	auto par = std::get_if<Paragraph>(&elem->elem);
-	if (par != nullptr) {
+	//auto par = std::get_if<Paragraph>(&elem->elem);
+	//if (par != nullptr) {
 
-		par->_calculateBoxModel(ancestor_width, ancestor_height);
+	//	par->_calculateBoxModel(ancestor_width, ancestor_height);
 
-		// Font
-		FontSize* font = _findBestFitFontSize(par->font_family, par->font_style, par->font_size);
-		float scale_unit = par->font_size / font->raster_size;
-		float line_ascender = font->ascender * par->line_height * scale_unit;
-		float line_descender = font->descender * par->line_height * scale_unit;
-		float line_height = font->height * par->line_height * scale_unit;  // ascender + descender
-		float line_width = 0;
+	//	// Font
+	//	FontSize* font = _findBestFitFontSize(par->font_family, par->font_style, par->font_size);
+	//	float scale_unit = par->font_size / font->raster_size;
+	//	float line_ascender = font->ascender * par->line_height * scale_unit;
+	//	float line_descender = font->descender * par->line_height * scale_unit;
+	//	float line_height = font->height * par->line_height * scale_unit;  // ascender + descender
+	//	float line_width = 0;
 
-		float text_width = 0;
+	//	float text_width = 0;
 
-		glm::vec2 pen_pos = par->_origin;
-		pen_pos.y += line_ascender;
+	//	glm::vec2 pen_pos = par->_origin;
+	//	pen_pos.y += line_ascender;
 
-		switch (par->word_wrap) {
-		case WordWrap::NONE: {
+	//	switch (par->word_wrap) {
+	//	case WordWrap::NONE: {
 
-			for (uint32_t i = 0; i < par->chars.size(); i++) {
+	//		for (uint32_t i = 0; i < par->chars.size(); i++) {
 
-				// if char is LF line feed
-				if (par->chars[i] == 0x00A) {
-					pen_pos.x = 0;
-					pen_pos.y += line_height;
-				}
+	//			// if char is LF line feed
+	//			if (par->chars[i] == 0x00A) {
+	//				pen_pos.x = 0;
+	//				pen_pos.y += line_height;
+	//			}
 
-				CharRaster* raster = font->findCharUnicode(par->chars[i]);
+	//			CharRaster* raster = font->findCharUnicode(par->chars[i]);
 
-				float advance = raster->advance * scale_unit;
-				float descender = (raster->height - raster->baseline_height) * scale_unit;
+	//			float advance = raster->advance * scale_unit;
+	//			float descender = (raster->height - raster->baseline_height) * scale_unit;
 
-				CharInstance& char_inst = raster->instances.emplace_back();
-				char_inst.screen_pos = pen_pos;
-				char_inst.screen_pos.y += descender;  // "agf" g needs to be positioned lower on the line
-				char_inst.scale = scale_unit;
+	//			CharInstance& char_inst = raster->instances.emplace_back();
+	//			char_inst.screen_pos = pen_pos;
+	//			char_inst.screen_pos.y += descender;  // "agf" g needs to be positioned lower on the line
+	//			char_inst.scale = scale_unit;
 
-				pen_pos.x += advance;
+	//			pen_pos.x += advance;
 
-				if (pen_pos.x > text_width) {
-					text_width = pen_pos.x;
-				}
-			}
-			break;
-		}
-		}
+	//			if (pen_pos.x > text_width) {
+	//				text_width = pen_pos.x;
+	//			}
+	//		}
+	//		break;
+	//	}
+	//	}
 
-		//// Group Characters into words
-		//std::vector<CharRaster*> char_rasters;
-		//std::vector<Word> words;
-		//{
-		//	char_rasters.resize(par->chars.size());
-		//	words.reserve(par->chars.size() / 3);  // heuristic
+	//	//// Group Characters into words
+	//	//std::vector<CharRaster*> char_rasters;
+	//	//std::vector<Word> words;
+	//	//{
+	//	//	char_rasters.resize(par->chars.size());
+	//	//	words.reserve(par->chars.size() / 3);  // heuristic
 
-		//	Word word = {};
-		//	for (uint32_t i = 0; i < par->chars.size(); i++) {
+	//	//	Word word = {};
+	//	//	for (uint32_t i = 0; i < par->chars.size(); i++) {
 
-		//		CharRaster* raster = font->findCharUnicode(par->chars[i]);
-		//		char_rasters[i] = raster;
+	//	//		CharRaster* raster = font->findCharUnicode(par->chars[i]);
+	//	//		char_rasters[i] = raster;
 
-		//		word.end = i;
+	//	//		word.end = i;
 
-		//		if (par->chars[i] == ' ') {
+	//	//		if (par->chars[i] == ' ') {
 
-		//			words.push_back(word);
-		//			word = {};
-		//		}
-		//		else {
-		//			word.advance += raster->advance * scale_unit;
-		//		}
-		//	}
-		//}
-		//
-		//float line_width = 0;
+	//	//			words.push_back(word);
+	//	//			word = {};
+	//	//		}
+	//	//		else {
+	//	//			word.advance += raster->advance * scale_unit;
+	//	//		}
+	//	//	}
+	//	//}
+	//	//
+	//	//float line_width = 0;
 
-		//size_t start = 0;
-		//for (Word& word : words) {
+	//	//size_t start = 0;
+	//	//for (Word& word : words) {
 
-		//	if (line_width + word.advance > ancestor_width) {
+	//	//	if (line_width + word.advance > ancestor_width) {
 
-		//	}
-		//	else {
-		//		for (size_t i = start; i < word.end; i++) {
+	//	//	}
+	//	//	else {
+	//	//		for (size_t i = start; i < word.end; i++) {
 
-		//			CharRaster* raster = char_rasters[i];
+	//	//			CharRaster* raster = char_rasters[i];
 
-		//			CharInstance& char_inst = raster->instances.emplace_back();
-		//			char_inst.screen_pos = pen_pos;
-		//		}
-		//	}
-		//}
+	//	//			CharInstance& char_inst = raster->instances.emplace_back();
+	//	//			char_inst.screen_pos = pen_pos;
+	//	//		}
+	//	//	}
+	//	//}
 
-		if (par->width.type == ContentSizeType::FIT) {
-			par->recalculateWidthBoxes(text_width);
-		}
-		if (par->height.type == ContentSizeType::FIT) {
-			par->recalculateHeightBoxes(pen_pos.y + line_descender);
-		}
+	//	if (par->width.type == ContentSizeType::FIT) {
+	//		par->recalculateWidthBoxes(text_width);
+	//	}
+	//	if (par->height.type == ContentSizeType::FIT) {
+	//		par->recalculateHeightBoxes(pen_pos.y + line_descender);
+	//	}
 
-		r_box = par;
-		return;
-	}
+	//	r_box = par;
+	//	return;
+	//}
 }
 
 void UserInterface::calcGraphLayout()
-{	
+{
 	this->layers.clear();
 
 	BoxModel* root_box;
 	_calcElementLayout(&elems.front(), 0, 0, 0, root_box);
-}
-
-void UserInterface::changeResolution(float screen_width, float screen_height)
-{
-	Element& elem = this->elems.front();
-	Flex* root = std::get_if<Flex>(&elem.elem);
-
-	root->width.setAbsolute(screen_width);
-	root->height.setAbsolute(screen_height);
-
-	calcGraphLayout();
 }

@@ -5,14 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
     <Filter Include="Source Files\Math">
       <UniqueIdentifier>{53783eda-5290-49bb-ae24-ac4fffa0bb81}</UniqueIdentifier>
     </Filter>
@@ -48,6 +40,15 @@
     </Filter>
     <Filter Include="Source Files\TextureAtlas">
       <UniqueIdentifier>{a17daa4c-fb9d-437f-95cc-188a38c3a23c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\NewUserInterface">
+      <UniqueIdentifier>{a755132e-1fb2-44ea-aa2b-b94efb1bfc2f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\NewUserInterface\DX11Renderer">
+      <UniqueIdentifier>{40aec18c-f127-445c-8184-3ae1b43a054f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\NewUserInterface\DX11Renderer\Shaders">
+      <UniqueIdentifier>{422d0480-18b7-4347-8103-4bef298c0c1a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -114,9 +115,6 @@
     <ClCompile Include="Resources.cpp">
       <Filter>Source Files\VulkanSystems</Filter>
     </ClCompile>
-    <ClCompile Include="FontRasterization.cpp">
-      <Filter>Source Files\UserInterface</Filter>
-    </ClCompile>
     <ClCompile Include="CommonTypes.cpp">
       <Filter>Source Files\Mine</Filter>
     </ClCompile>
@@ -128,6 +126,21 @@
     </ClCompile>
     <ClCompile Include="GPU_ShaderTypes.cpp">
       <Filter>Source Files\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="FontRasterization.cpp">
+      <Filter>Source Files\UserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="InternalRenderer.cpp">
+      <Filter>Source Files\NewUserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="DX11ObjectTypes.cpp">
+      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="InternalUI.cpp">
+      <Filter>Source Files\NewUserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="Nui.cpp">
+      <Filter>Source Files\NewUserInterface</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -158,51 +171,6 @@
     <ClInclude Include="vk_mem_alloc.h">
       <Filter>Source Files\ThirdParty\VulkanMemoryAllocator</Filter>
     </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedFontProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedTextureProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedXamlProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\FileTextureProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalFontProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalTextureProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalXamlProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\ProvidersApi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Src\stb_image.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Application.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncher.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncherApi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\DelegateCommand.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\NotifyPropertyChangedBase.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Window.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ErrorStuff.h">
       <Filter>Source Files\Mine</Filter>
     </ClInclude>
@@ -214,33 +182,6 @@
     </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Source Files\Mine</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imgui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\misc\cpp\imgui_stdlib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\misc\freetype\imgui_freetype.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imconfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imgui_internal.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imstb_rectpack.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imstb_textedit.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\imgui-master\imstb_truetype.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3native.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="VulkanSystems.h">
       <Filter>Source Files\VulkanSystems</Filter>
@@ -260,5 +201,28 @@
     <ClInclude Include="GPU_ShaderTypes.h">
       <Filter>Source Files\VulkanSystems</Filter>
     </ClInclude>
+    <ClInclude Include="DX11ObjectTypes.h">
+      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Internals.h">
+      <Filter>Source Files\NewUserInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="DX11Renderer.h">
+      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Nui.h">
+      <Filter>Source Files\NewUserInterface</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="RectanglePS.hlsl">
+      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="RectangleVS.hlsl">
+      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="CirclePS.hlsl">
+      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

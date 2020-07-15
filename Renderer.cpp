@@ -12,9 +12,6 @@
 #include "Renderer.h"
 
 
-// globals
-VulkanRenderer renderer;
-
 ErrStack VulkanRenderer::recreateSwapchain(uint32_t width, uint32_t height)
 {
 	ErrStack err_stack;
@@ -234,6 +231,24 @@ void VulkanRenderer::updateUniformDescriptorSet()
 	writes[0].pBufferInfo = &uniform_buff_info;
 
 	uniform_descp_set.update(writes);
+}
+
+void VulkanRenderer::updateStorageDescriptorSet()
+{
+	std::vector<VkWriteDescriptorSet> writes(1);
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = storage_descp_set.descp_set;
+	writes[0].dstBinding = 0;
+	writes[0].dstArrayElement = 0;
+	writes[0].descriptorCount = 1;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+	VkDescriptorBufferInfo storage_buff_info = {};
+	storage_buff_info.buffer = storage_buff.buff;
+	storage_buff_info.range = sizeof(GPU_Storage);
+	writes[0].pBufferInfo = &storage_buff_info;
+
+	storage_descp_set.update(writes);
 }
 
 void VulkanRenderer::updateBorderCirclesDescriptorSet()
@@ -531,7 +546,7 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 
 			VkResult vk_res = vkBeginCommandBuffer(task.cmd_buff, &buffer_begin_info);
 			if (vk_res != VK_SUCCESS) {
-				task.err = ErrStack(vk_res, code_location, "failed to begin command buffer");
+				task.err = ErrStack(code_location, "failed to begin command buffer");
 				is_err.store(true);
 				return;
 			}
@@ -965,7 +980,7 @@ ErrStack VulkanRenderer::recreateRenderingCommandBuffers()
 
 			vk_res = vkEndCommandBuffer(task.cmd_buff);
 			if (vk_res != VK_SUCCESS) {
-				task.err = ErrStack(vk_res, code_location, "failed to end command buffer");
+				task.err = ErrStack(code_location, "failed to end command buffer");
 				is_err.store(true);
 				return;
 			}
@@ -1002,7 +1017,7 @@ ErrStack VulkanRenderer::getPhysicalSurfaceResolution(uint32_t& width, uint32_t&
 
 	VkResult vk_res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev.physical_device, surface.surface, &capabilities);
 	if (vk_res != VK_SUCCESS) {
-		return ErrStack(vk_res, code_location, "failed to get physical device surface capabilities");
+		return ErrStack(code_location, "failed to get physical device surface capabilities");
 	}
 
 	VkExtent2D min_img_extent = capabilities.minImageExtent;
@@ -1034,6 +1049,17 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 		checkErrStack1(uniform_descp_layout.create(&logical_dev, bindings));
+	}
+
+	// Storage Descriptor Layout
+	{
+		std::vector<VkDescriptorSetLayoutBinding> bindings(1);
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		checkErrStack1(storage_descp_layout.create(&logical_dev, bindings));
 	}
 
 	// Rect Renderpass
@@ -1094,7 +1120,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Rect Vertex Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Rects/vert.spv"));
 
 		std::vector<char> shader_code;
@@ -1105,7 +1131,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Rect Fragment Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Rects/frag.spv"));
 
 		std::vector<char> shader_code;
@@ -1352,7 +1378,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Circles Vertex Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Circles/vert.spv"));
 
 		std::vector<char> shader_code;
@@ -1363,7 +1389,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Circles Fragment Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Circles/frag.spv"));
 
 		std::vector<char> shader_code;
@@ -1683,7 +1709,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Compose Vertex Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Compose/vert.spv"));
 
 		std::vector<char> shader_code;
@@ -1694,7 +1720,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Compose Fragment Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Compose/frag.spv"));
 
 		std::vector<char> shader_code;
@@ -1913,7 +1939,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	// Copy Fragment Shader Module
 	{
-		FileSysPath path;
+		FilePath path;
 		checkErrStack1(path.recreateRelative("shaders/Copy/frag.spv"));
 
 		std::vector<char> shader_code;
@@ -2078,6 +2104,10 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 		vertex_buff.create(&logical_dev, &cmd_pool, &common_staging_buff,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
+		storage_staging_buff.logical_dev = &logical_dev;
+
+		storage_buff.create(&logical_dev, &cmd_pool, &storage_staging_buff,
+			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 		// Generate GPU Data
 		checkErrStack1(calc(*user_interface));
@@ -2097,17 +2127,22 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 			sizes[1].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 			sizes[1].descriptorCount = 7;
 
+			/*sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			sizes[1].descriptorCount = 1;*/
+
 			checkErrStack1(descp_pool.create(&logical_dev, sizes, 8));
 			checkErrStack1(descp_pool.setDebugName("descp pool"));
 		}
 
 		checkErrStack1(uniform_descp_set.create(&logical_dev, &descp_pool, &uniform_descp_layout));
+		// checkErrStack1(storage_descp_set.create(&logical_dev, &descp_pool, &storage_descp_layout));
 		checkErrStack1(border_circles_descp_set.create(&logical_dev, &descp_pool, &circles_descp_layout));
 		checkErrStack1(padding_circles_descp_set.create(&logical_dev, &descp_pool, &circles_descp_layout));
 		checkErrStack1(compose_descp_set.create(&logical_dev, &descp_pool, &compose_descp_layout));
 		checkErrStack1(copy_descp_set.create(&logical_dev, &descp_pool, &copy_descp_layout));
 
 		updateUniformDescriptorSet();
+		// updateStorageDescriptorSet();
 		updateBorderCirclesDescriptorSet();
 		updatePaddingCirclesDescriptorSet();
 		updateComposeImagesDescriptorSet();
@@ -2210,43 +2245,134 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 		rect_verts[idx + 17].pos = top_left_down;
 	};
 
-	auto createCircle = [](glm::vec2 origin, float radius,
+	auto createTopLeftCircle = [](glm::vec2 origin, float radius,
 		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
 	{
 		glm::vec2 vec2_origin{ origin.x, origin.y };
 
 		glm::vec2 top_left = vec2_origin;
 		glm::vec2 top_right = vec2_origin;
-		glm::vec2 bot_right = vec2_origin;
 		glm::vec2 bot_left = vec2_origin;
 
-		float diameter = radius * 2;
-		top_right.x += diameter;
-		bot_right += diameter;
-		bot_left.y += diameter;
+		top_right.x += radius;
+		bot_left.y += radius;
+
+		// Position
+		verts[idx + 0].pos = top_left;
+		verts[idx + 1].pos = top_right;
+		verts[idx + 2].pos = bot_left;
+
+		// Center and Radius
+		glm::vec2 center = vec2_origin;
+		center += radius;
+
+		for (auto i = idx; i < idx + 3; i++) {
+			verts[i].center = center;
+			verts[i].radius = radius;
+		}
+	};
+
+	auto createTopRightCircle = [](glm::vec2 origin, float radius,
+		std::vector<GPU_Circles_Vertex>& verts, size_t idx) 
+	{
+		glm::vec2 vec2_origin{ origin.x, origin.y };
+
+		glm::vec2 top_left = vec2_origin;
+		glm::vec2 top_right = vec2_origin;
+		glm::vec2 bot_right = vec2_origin;
+
+		top_right.x += radius;
+		bot_right += radius;
 
 		// Position
 		verts[idx + 0].pos = top_left;
 		verts[idx + 1].pos = top_right;
 		verts[idx + 2].pos = bot_right;
 
-		verts[idx + 3].pos = bot_left;
-		verts[idx + 4].pos = top_left;
-		verts[idx + 5].pos = bot_right;
-
 		// Center and Radius
 		glm::vec2 center = vec2_origin;
-		center += radius;
+		center.y += radius;
 
-		for (auto i = idx; i < idx + 6; i++) {
+		for (auto i = idx; i < idx + 3; i++) {
 			verts[i].center = center;
 			verts[i].radius = radius;
 		}
 	};
 
+	auto createBotRightCircle = [](glm::vec2 origin, float radius,
+		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
+	{
+		glm::vec2 vec2_origin{ origin.x, origin.y };
+
+		glm::vec2 top_right = vec2_origin;
+		glm::vec2 bot_right = vec2_origin;
+		glm::vec2 bot_left = vec2_origin;
+
+		top_right.x += radius;
+		bot_right += radius;
+		bot_left.y += radius;
+
+		// Position
+		verts[idx + 0].pos = top_right;
+		verts[idx + 1].pos = bot_right;
+		verts[idx + 2].pos = bot_left;
+
+		// Center and Radius
+		glm::vec2 center = vec2_origin;
+
+		for (auto i = idx; i < idx + 3; i++) {
+			verts[i].center = center;
+			verts[i].radius = radius;
+		}
+	};
+
+	auto createBotLeft = [](glm::vec2 origin, float radius,
+		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
+	{
+		glm::vec2 vec2_origin{ origin.x, origin.y };
+
+		glm::vec2 top_left = vec2_origin;
+		glm::vec2 bot_right = vec2_origin;
+		glm::vec2 bot_left = vec2_origin;
+
+		bot_right += radius;
+		bot_left.y += radius;
+
+		// Position
+		verts[idx + 0].pos = top_left;
+		verts[idx + 1].pos = bot_right;
+		verts[idx + 2].pos = bot_left;
+
+		// Center and Radius
+		glm::vec2 center = vec2_origin;
+		center.x += radius;
+
+		for (auto i = idx; i < idx + 3; i++) {
+			verts[i].center = center;
+			verts[i].radius = radius;
+		}
+	};
+
+	auto getBoxModel = [](Element& elem) -> BoxModel* {
+		
+		auto flex = std::get_if<Flex>(&elem.elem);
+		if (flex != nullptr) {
+			return flex;
+		}
+
+		auto par = std::get_if<Paragraph>(&elem.elem);
+		if (par != nullptr) {
+			return par;
+		}
+		
+		return nullptr;
+	};
+
 	this->layers.clear();
 	this->layers.resize(user_interface.layers.size());
 	auto ui_it = user_interface.layers.begin();
+
+	std::vector<GPU_Storage> elem_props;
 
 	vertex_buff.clear();
 
@@ -2295,90 +2421,118 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 
 		for (Element* elem : ui_layer.elems) {
 
-			auto* basic = std::get_if<Flex>(&elem->elem);
+			Flex* flex;
+			Paragraph* par;
+			BoxModel* box;
 			
-			glm::vec2 border_origin = basic->_origin;
+			switch (elem->elem.index()) {
+			case 0: {
+				flex = std::get_if<Flex>(&elem->elem);
+				box = flex;
+				break;
+			}
+
+			case 1: {
+				par = std::get_if<Paragraph>(&elem->elem);
+				box = par;
+				break;
+			}
+				
+			default:
+				printf(code_location);
+			}
+			
+			// Storage
+			GPU_Storage& elem_prop = elem_props.emplace_back();
+			elem_prop.border_color = box->border_color;
+
+			// Vertex
+			glm::vec2 border_origin = box->_origin;
 
 			// If Border Present
-			if (basic->_border_top_thick || basic->_border_right_thick || basic->_border_bot_thick || basic->_border_left_thick) {
+			if (box->_border_top_thick || box->_border_right_thick || box->_border_bot_thick || box->_border_left_thick) {
 
 				// Rect
 				{
 					size_t last_idx = border_rects.size();
 					border_rects.resize(border_rects.size() + 18);
 
-					createChamferedRectangle(border_origin, basic->_borderbox_width, basic->_borderbox_height,
-						basic->_border_tl_radius, basic->_border_tr_radius, basic->_border_br_radius, basic->border_bl_radius,
+					createChamferedRectangle(border_origin, box->_borderbox_width, box->_borderbox_height,
+						box->_border_tl_radius, box->_border_tr_radius, box->_border_br_radius, box->_border_bl_radius,
 						border_rects, last_idx);
 
 					for (size_t i = last_idx; i < border_rects.size(); i++) {
-						border_rects[i].color = basic->border_color;
+						border_rects[i].color = box->border_color;
+					}
+
+					for (size_t i = last_idx; i < border_rects.size(); i++) {
+						border_rects[i].elem_idx = elem_props.size();
 					}
 				}
 
 				// Top Left Circle
-				if (basic->_border_tl_radius && (basic->_border_top_thick || basic->_border_left_thick)) {
+				if (box->_border_tl_radius && (box->_border_top_thick || box->_border_left_thick)) {
 
 					size_t last_idx = border_tl_circles.size();
-					border_tl_circles.resize(border_tl_circles.size() + 6);
+					border_tl_circles.resize(border_tl_circles.size() + 3);
 
-					createCircle(border_origin, basic->_border_tl_radius, 
+					createTopLeftCircle(border_origin, box->_border_tl_radius, 
 						border_tl_circles, last_idx);
 
 					for (size_t i = last_idx; i < border_tl_circles.size(); i++) {
-						border_tl_circles[i].color = basic->border_color;
+						border_tl_circles[i].color = box->border_color;
 					}
 				}
 
 				// Top Right Circle
-				if (basic->_border_tr_radius && (basic->_border_top_thick || basic->_border_right_thick)) {
+				if (box->_border_tr_radius && (box->_border_top_thick || box->_border_right_thick)) {
 
 					size_t last_idx = border_tr_circles.size();
-					border_tr_circles.resize(border_tr_circles.size() + 6);
+					border_tr_circles.resize(border_tr_circles.size() + 3);
 
 					glm::vec2 tr_origin = border_origin;
-					tr_origin.x += basic->_borderbox_width - (basic->_border_tr_radius * 2);
+					tr_origin.x += box->_borderbox_width - box->_border_tr_radius;
 
-					createCircle(tr_origin, basic->_border_tr_radius, 
+					createTopRightCircle(tr_origin, box->_border_tr_radius, 
 						border_tr_circles, last_idx);
 
 					for (size_t i = last_idx; i < border_tr_circles.size(); i++) {
-						border_tr_circles[i].color = basic->border_color;
+						border_tr_circles[i].color = box->border_color;
 					}
 				}
 
 				// Bottom Right Circle
-				if (basic->_border_br_radius && (basic->_border_bot_thick || basic->_border_right_thick)) {
+				if (box->_border_br_radius && (box->_border_bot_thick || box->_border_right_thick)) {
 
 					size_t last_idx = border_br_circles.size();
-					border_br_circles.resize(border_br_circles.size() + 6);
+					border_br_circles.resize(border_br_circles.size() + 3);
 
 					glm::vec2 br_origin = border_origin;
-					br_origin.x += basic->_borderbox_width - (basic->_border_br_radius * 2);
-					br_origin.y += basic->_borderbox_height - (basic->_border_br_radius * 2);
+					br_origin.x += box->_borderbox_width - box->_border_br_radius;
+					br_origin.y += box->_borderbox_height - box->_border_br_radius;
 
-					createCircle(br_origin, basic->_border_br_radius, 
+					createBotRightCircle(br_origin, box->_border_br_radius, 
 						border_br_circles, last_idx);
 
 					for (size_t i = last_idx; i < border_br_circles.size(); i++) {
-						border_br_circles[i].color = basic->border_color;
+						border_br_circles[i].color = box->border_color;
 					}
 				}
 
 				// Bottom Left Circle
-				if (basic->_border_bl_radius && (basic->_border_bot_thick || basic->_border_left_thick)) {
+				if (box->_border_bl_radius && (box->_border_bot_thick || box->_border_left_thick)) {
 
 					size_t last_idx = border_bl_circles.size();
-					border_bl_circles.resize(border_bl_circles.size() + 6);
+					border_bl_circles.resize(border_bl_circles.size() + 3);
 
 					glm::vec2 bl_origin = border_origin;
-					bl_origin.y += basic->_borderbox_height - (basic->_border_bl_radius * 2);
+					bl_origin.y += box->_borderbox_height - box->_border_bl_radius;
 
-					createCircle(bl_origin, basic->_border_bl_radius, 
+					createBotLeft(bl_origin, box->_border_bl_radius,
 						border_bl_circles, last_idx);
 
 					for (size_t i = last_idx; i < border_bl_circles.size(); i++) {
-						border_bl_circles[i].color = basic->border_color;
+						border_bl_circles[i].color = box->border_color;
 					}
 				}
 			}
@@ -2390,81 +2544,85 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 				size_t last_idx = padding_rects.size();
 				padding_rects.resize(padding_rects.size() + 18);
 
-				padding_origin.x += basic->_border_left_thick;
-				padding_origin.y += basic->_border_top_thick;
+				padding_origin.x += box->_border_left_thick;
+				padding_origin.y += box->_border_top_thick;
 
-				createChamferedRectangle(padding_origin, basic->_paddingbox_width, basic->_paddingbox_height,
-					basic->_padding_tl_radius, basic->_padding_tr_radius, basic->_padding_br_radius, basic->_padding_bl_radius,
+				createChamferedRectangle(padding_origin, box->_paddingbox_width, box->_paddingbox_height,
+					box->_padding_tl_radius, box->_padding_tr_radius, box->_padding_br_radius, box->_padding_bl_radius,
 					padding_rects, last_idx);
 
 				for (size_t i = last_idx; i < padding_rects.size(); i++) {
-					padding_rects[i].color = basic->background_color;
+					padding_rects[i].color = box->background_color;
+				}
+
+				for (size_t i = last_idx; i < padding_rects.size(); i++) {
+					padding_rects[i].elem_idx = elem_props.size();
 				}
 			}
 
 			// Top Left
-			if (basic->_padding_tl_radius) {
+			if (box->_padding_tl_radius) {
 
 				size_t last_idx = padding_tl_circles.size();
-				padding_tl_circles.resize(padding_tl_circles.size() + 6);
+				padding_tl_circles.resize(padding_tl_circles.size() + 3);
 
-				createCircle(padding_origin, basic->_padding_tl_radius, 
+				createTopLeftCircle(padding_origin, box->_padding_tl_radius,
 					padding_tl_circles, last_idx);
 
 				for (size_t i = last_idx; i < padding_tl_circles.size(); i++) {
-					padding_tl_circles[i].color = basic->background_color;
+					padding_tl_circles[i].color = box->background_color;
 				}
 			}
 
 			// Top Right
-			if (basic->_padding_tr_radius) {
+			if (box->_padding_tr_radius) {
 
 				size_t last_idx = padding_tr_circles.size();
-				padding_tr_circles.resize(padding_tr_circles.size() + 6);
+				padding_tr_circles.resize(padding_tr_circles.size() + 3);
 
 				glm::vec2 tr_origin = padding_origin;
-				tr_origin.x += basic->_paddingbox_width - (basic->_padding_tr_radius * 2);
+				tr_origin.x += box->_paddingbox_width - box->_padding_tr_radius;
 
-				createCircle(tr_origin, basic->_padding_tr_radius, 
+				createTopRightCircle(tr_origin, box->_padding_tr_radius, 
 					padding_tr_circles, last_idx);
 
 				for (size_t i = last_idx; i < padding_tr_circles.size(); i++) {
-					padding_tr_circles[i].color = basic->background_color;
+					padding_tr_circles[i].color = box->background_color;
 				}
 			}
 
 			// Bot Right
-			if (basic->_padding_br_radius) {
+			if (box->_padding_br_radius) {
 
 				size_t last_idx = padding_br_circles.size();
-				padding_br_circles.resize(padding_br_circles.size() + 6);
+				padding_br_circles.resize(padding_br_circles.size() + 3);
 
 				glm::vec2 br_origin = padding_origin;
-				br_origin.x += basic->_paddingbox_width - (basic->_padding_br_radius * 2);
-				br_origin.y += basic->_paddingbox_height - (basic->_padding_br_radius * 2);
+				br_origin.x += box->_paddingbox_width - box->_padding_br_radius;
+				br_origin.y += box->_paddingbox_height - box->_padding_br_radius;
 
-				createCircle(br_origin, basic->_padding_br_radius, 
+				createBotRightCircle(br_origin, box->_padding_br_radius,
 					padding_br_circles, last_idx);
 
 				for (size_t i = last_idx; i < padding_br_circles.size(); i++) {
-					padding_br_circles[i].color = basic->background_color;
+					padding_br_circles[i].color = box->background_color;
 				}
 			}
 
 			// Bot Left
-			if (basic->_padding_bl_radius) {
+			if (box->_padding_bl_radius) {
 
 				size_t last_idx = padding_bl_circles.size();
-				padding_bl_circles.resize(padding_bl_circles.size() + 6);
+				padding_bl_circles.resize(padding_bl_circles.size() + 3);
 
 				glm::vec2 bl_origin = padding_origin;
-				bl_origin.y += basic->_paddingbox_height - (basic->_padding_bl_radius * 2);
+				bl_origin.y += box->_paddingbox_height - box->_padding_bl_radius;
 
-				createCircle(bl_origin, basic->_padding_bl_radius, 
+				createBotLeft(bl_origin, box->_padding_bl_radius,
 					padding_bl_circles, last_idx);
 
 				for (size_t i = last_idx; i < padding_bl_circles.size(); i++) {
-					padding_bl_circles[i].color = basic->background_color;
+					padding_bl_circles[i].color = box->background_color;
 				}
 			}
 		}
@@ -2559,6 +2717,9 @@ ErrStack VulkanRenderer::calc(UserInterface& user_interface)
 
 	checkErrStack1(vertex_buff.flush());
 
+	checkErrStack1(storage_buff.push(elem_props.data(), elem_props.size()));
+	checkErrStack1(storage_buff.flush());
+
 	return ErrStack();
 }
 
@@ -2572,6 +2733,7 @@ ErrStack VulkanRenderer::changeResolution(uint32_t new_width, uint32_t new_heigh
 	checkErrStack1(calc(*user_interface));
 
 	updateUniformDescriptorSet();
+	// updateStorageDescriptorSet();
 	updateBorderCirclesDescriptorSet();
 	updatePaddingCirclesDescriptorSet();
 	updateComposeImagesDescriptorSet();
@@ -2585,6 +2747,8 @@ ErrStack VulkanRenderer::changeResolution(uint32_t new_width, uint32_t new_heigh
 
 ErrStack VulkanRenderer::draw()
 {
+	VkResult vk_res{};
+
 	uint32_t image_index;
 
 	checkVkRes(vkAcquireNextImageKHR(logical_dev.logical_device, swapchain.swapchain, UINT64_MAX,
@@ -2627,6 +2791,8 @@ ErrStack VulkanRenderer::draw()
 
 ErrStack VulkanRenderer::waitForRendering()
 {
+	VkResult vk_res{};
+
 	checkVkRes(vkDeviceWaitIdle(logical_dev.logical_device), "");
 	return ErrStack();
 }

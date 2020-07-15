@@ -111,7 +111,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
@@ -119,6 +119,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <CompileAsManaged>false</CompileAsManaged>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -179,6 +180,7 @@
       <DisableSpecificWarnings>%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -199,7 +201,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
+    <ClCompile Include="DX11ObjectTypes.cpp" />
+    <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
+    <ClCompile Include="InternalRenderer.cpp" />
+    <ClCompile Include="Nui.cpp" />
     <ClCompile Include="TextureAtlas.cpp" />
     <ClCompile Include="CommonTypes.cpp" />
     <ClCompile Include="GLTFParser.cpp" />
@@ -215,8 +221,8 @@
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="Resources.cpp" />
     <ClCompile Include="stb_image.cpp" />
-    <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="UIComponents.cpp" />
+    <ClCompile Include="InternalUI.cpp" />
     <ClCompile Include="vma_implementation.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -232,9 +238,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonTypes.h" />
+    <ClInclude Include="DX11ObjectTypes.h" />
+    <ClInclude Include="DX11Renderer.h" />
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="AppLevel.h" />
     <ClInclude Include="GPU_ShaderTypes.h" />
+    <ClInclude Include="Internals.h" />
+    <ClInclude Include="Nui.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Importer.h" />
     <ClInclude Include="Input.h" />
@@ -245,35 +255,37 @@
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MathTypes.h" />
     <ClInclude Include="TextureAtlas.h" />
-    <ClInclude Include="ThirdParty\GLFW\include\GLFW\glfw3native.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imconfig.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imgui.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imgui_internal.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imstb_rectpack.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imstb_textedit.h" />
-    <ClInclude Include="ThirdParty\imgui-master\imstb_truetype.h" />
-    <ClInclude Include="ThirdParty\imgui-master\misc\cpp\imgui_stdlib.h" />
-    <ClInclude Include="ThirdParty\imgui-master\misc\freetype\imgui_freetype.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Application.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncher.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\ApplicationLauncherApi.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\DelegateCommand.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\NotifyPropertyChangedBase.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\ApplicationLauncher\Include\NsApp\Window.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedFontProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedTextureProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\EmbeddedXamlProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\FileTextureProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalFontProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalTextureProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\LocalXamlProvider.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Include\NsApp\ProvidersApi.h" />
-    <ClInclude Include="ThirdParty\NoesisGUI\Providers\Src\stb_image.h" />
     <ClInclude Include="UIComponents.h" />
     <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="VulkanSystems.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="CirclePS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="RectanglePS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="RectangleVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

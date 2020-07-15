@@ -1,7 +1,9 @@
 #pragma once
 
-// mine
-#include "Renderer.h"
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+#include <stdint.h>
 
 
 class AppLevel {

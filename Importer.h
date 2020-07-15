@@ -86,4 +86,4 @@ public:
 /* use @param offset to skip start of file if desired */
 ErrStack parseJSON(std::vector<char>& text, uint64_t offset, JSONGraph& json);
 
-ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes);
+ErrStack importGLTFMeshes(FilePath& path, std::vector<LinkageMesh>& meshes);

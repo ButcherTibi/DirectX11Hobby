@@ -181,7 +181,7 @@ ErrStack UserInterface::rebindToAtlas(uint32_t atlas_size)
 	return ErrStack();
 }
 
-FontSize* UserInterface::findBestFitFontSize(std::string font_family, std::string font_style, float font_size)
+FontSize* UserInterface::_findBestFitFontSize(std::string font_family, std::string font_style, float font_size)
 {
 	auto deltaU32 = [](uint32_t a, uint32_t b) -> float {
 		return a > b ? (float)a - b : (float)b - a;

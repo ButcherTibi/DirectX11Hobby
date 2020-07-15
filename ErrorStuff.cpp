@@ -6,42 +6,6 @@
 #include "ErrorStuff.h"
 
 
-Error::Error(std::string location, std::string msg)
-{
-	this->vk_err = 0;
-	this->err = ExtraError::OK;
-
-	this->location = location;
-	this->msg = msg;
-}
-
-Error::Error(ExtraError res, std::string location, std::string msg)
-{
-	this->vk_err = 0;
-	this->err = res;
-
-	this->location = location;
-	this->msg = msg;
-}
-
-Error::Error(uint32_t res, std::string location, std::string msg)
-{
-	this->vk_err = res;
-	this->err = ExtraError::OK;
-
-	this->location = location;
-	this->msg = msg;
-}
-
-Error::Error(uint32_t res, ExtraError err, std::string location, std::string msg)
-{
-	this->vk_err = res;
-	this->err = err;
-
-	this->location = location;
-	this->msg = msg;
-}
-
 ErrStack::ErrStack()
 {
 	
@@ -54,32 +18,25 @@ ErrStack::ErrStack(Error err)
 
 ErrStack::ErrStack(std::string location, std::string msg)
 {
-	error_stack.push_back(Error(location, msg));
-}
-
-ErrStack::ErrStack(ExtraError res, std::string location, std::string msg)
-{
-	error_stack.push_back(Error(res, location, msg));
-}
-
-ErrStack::ErrStack(ExtraError res, std::string location, std::string msg, std::string win_msg)
-{
-	error_stack.push_back(Error(res, location, msg + " Windows Error: " + win_msg));
-}
-
-ErrStack::ErrStack(uint32_t res, std::string location, std::string msg)
-{
-	error_stack.push_back(Error(res, location, msg));
-}
-
-ErrStack::ErrStack(uint32_t res, ExtraError err, std::string location, std::string msg)
-{
-	error_stack.push_back(Error(res, location, msg));
+	Error& err = this->error_stack.emplace_back();
+	err.location = location;
+	err.msg = msg;
 }
 
 void ErrStack::pushError(std::string location, std::string msg)
 {
-	error_stack.push_back(Error(location, msg));
+	Error& err = this->error_stack.emplace_back();
+	err.location = location;
+	err.msg = msg;
+}
+
+void ErrStack::pushHResultError(std::string location, std::string msg, int32_t hr)
+{	
+	Error& err = this->error_stack.emplace_back();
+	err.location = location;
+	err.msg = msg;
+	err.type = ErrorOrigins::WINDOWS_ERROR_HANDLE;
+	err.err_code = hr;
 }
 
 Error ErrStack::lastError()
@@ -104,6 +61,13 @@ void ErrStack::debugPrint()
 		printf("%I64d. \n", i);
 		printf("  %s \n", error.location.c_str());
 		printf("  msg= %s \n", error.msg.c_str());
+
+		switch (error.type)	{
+		case ErrorOrigins::WINDOWS_ERROR_HANDLE:
+			printf("  type= WINDOWS_ERROR_HANDLE \n");
+			printf("  err_code= %I32d 0x%I32x \n", error.err_code, error.err_code);
+			break;
+		}
 	}
 }
 

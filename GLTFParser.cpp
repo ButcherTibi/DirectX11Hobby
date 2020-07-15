@@ -138,7 +138,7 @@ bool BitVector::pushBase64Char(char c)
 	return true;
 }
 
-ErrStack loadFromURI(std::string& uri, FileSysPath& this_file, BitVector& r_bin)
+ErrStack loadFromURI(std::string& uri, FilePath& this_file, BitVector& r_bin)
 {
 	ErrStack err_stack;
 
@@ -161,7 +161,7 @@ ErrStack loadFromURI(std::string& uri, FileSysPath& this_file, BitVector& r_bin)
 	}
 	// Relative URI path
 	else {
-		FileSysPath bin_file = this_file;
+		FilePath bin_file = this_file;
 		bin_file.pop_back();  // now point to directory containing file
 		bin_file.push_back(uri);  // point to file
 
@@ -186,28 +186,28 @@ ErrStack loadFromURI(std::string& uri, FileSysPath& this_file, BitVector& r_bin)
 #define expectJSONint64(val, int64_num) \
 	int64_t* int64_num = std::get_if<int64_t>(&val->value); \
 	if (int64_num == nullptr) { \
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(code_location, \
 			"expected JSON field " + std::string(#int64_num) + " to be of INT32 type"); \
 	}
 
 #define expectJSONString(val, strg) \
 	std::string* strg = std::get_if<std::string>(&val->value); \
 	if (strg == nullptr) { \
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(code_location, \
 			"expected JSON field " + std::string(#strg) + " to be of STRING type"); \
 	}
 
 #define expectJSONArray(val, arr) \
 	std::vector<JSONValue*>* arr = std::get_if<std::vector<JSONValue*>>(&val->value); \
 	if (arr == nullptr) { \
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(code_location, \
 			"expected JSON field " + std::string(#arr) + " to be of ARRAY type"); \
 	}
 
 #define expectJSONObject(val, obj) \
 	std::vector<JSONField>* obj = std::get_if<std::vector<JSONField>>(&val->value); \
 	if (obj == nullptr) { \
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location, \
+		return ErrStack(code_location, \
 			"expected JSON field " + std::string(#obj) + " to be of OBJECT type"); \
 	}
 
@@ -219,7 +219,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 
 	std::vector<JSONField> gltf_fields = std::get<std::vector<JSONField>>(root.value);
 	if (gltf_fields.empty()) {
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(code_location,
 			"GLTF has no fields");
 	}
 
@@ -240,7 +240,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 			}
 
 			if (!gltf_struct.asset.version.length()) {
-				return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+				return ErrStack(code_location,
 					"required field asset.version could not be found");
 			}
 		}
@@ -342,7 +342,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 									}
 
 									if (prim.atributes.find(atribute_name_position) == prim.atributes.end()) {
-										return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+										return ErrStack(code_location,
 											"required field meshes.primitives.attributes.POSITION could not be found");
 									}
 								}
@@ -355,7 +355,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 							}
 
 							if (!prim.atributes.size()) {
-								return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+								return ErrStack(code_location,
 									"required field meshes.primitives.attributes could not be found");
 							}
 
@@ -365,7 +365,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 				}
 
 				if (!mesh.primitives.size()) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field meshes.primitives could not be found");
 				}
 
@@ -403,7 +403,7 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 				}
 
 				if (!byte_length_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field buffers.byteLength could not be found");
 				}
 
@@ -454,11 +454,11 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 				}
 
 				if (!buffer_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field bufferViews.buffer could not be found");
 				}
 				if (!byte_length_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field bufferViews.byteLength could not be found");
 				}
 
@@ -517,15 +517,15 @@ ErrStack jsonToGLTF(JSONGraph& json_graph, Structure& gltf_struct)
 				}
 
 				if (!component_type_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field accessors.componentType could not be found");
 				}
 				if (!count_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field accessors.count could not be found");
 				}
 				if (!type_found) {
-					return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+					return ErrStack(code_location,
 						"required field accessors.type could not be found");
 				}
 
@@ -544,7 +544,7 @@ ErrStack loadIndexesFromBuffer(Structure& gltf_struct, uint64_t acc_idx,
 	BufferView& buff_view = gltf_struct.buffer_views[acc.buffer_view.value()];
 
 	if (acc.type != "SCALAR") {
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(code_location,
 			"expected indices accessor type to be SCALAR but instead got " + acc.type);
 	}
 
@@ -588,7 +588,7 @@ ErrStack loadIndexesFromBuffer(Structure& gltf_struct, uint64_t acc_idx,
 		break;
 	}
 	default:
-		return ErrStack(ExtraError::FAILED_TO_PARSE_GLTF, code_location,
+		return ErrStack(code_location,
 			"invalid component_type for index buffer allowed types are BYTE, UNSIGNED_SHORT, UNSIGNED_INT");
 	}
 
@@ -647,7 +647,7 @@ ErrStack loadVec3FromBuffer(Structure& gltf_struct, uint64_t acc_idx,
 	return ErrStack();
 }
 
-ErrStack importGLTFMeshes(FileSysPath& path, std::vector<LinkageMesh>& meshes)
+ErrStack importGLTFMeshes(FilePath& path, std::vector<LinkageMesh>& meshes)
 {
 	ErrStack err_stack;
 

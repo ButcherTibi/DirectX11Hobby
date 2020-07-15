@@ -46,7 +46,7 @@ ErrStack vks::RenderingComandBuffers::recreate(LogicalDevice* logical_dev, Physi
 
 		VkResult res = vkAllocateCommandBuffers(logical_dev->logical_device, &command_buffer_info, &task.cmd_buff);
 		if (res != VK_SUCCESS) {
-			task.err = ErrStack(res, code_location, "failed to allocate command buffers");
+			task.err = ErrStack(code_location, "failed to allocate command buffers");
 			is_err.store(true);
 		}
 	});
@@ -82,6 +82,8 @@ vks::RenderingComandBuffers::~RenderingComandBuffers()
 
 ErrStack vks::Fence::create(LogicalDevice* logical_dev, VkFenceCreateFlags flags)
 {
+	VkResult vk_res{};
+
 	this->logical_dev = logical_dev;
 
 	VkFenceCreateInfo fence_info = {};
@@ -95,6 +97,8 @@ ErrStack vks::Fence::create(LogicalDevice* logical_dev, VkFenceCreateFlags flags
 
 ErrStack vks::Fence::waitAndReset(uint64_t max_wait_time)
 {
+	VkResult vk_res{};
+
 	checkVkRes(vkWaitForFences(logical_dev->logical_device, 1, &fence, VK_TRUE, UINT64_MAX),
 		"failed to wait on fence");
 
@@ -119,6 +123,8 @@ vks::Fence::~Fence()
 
 ErrStack vks::Semaphore::recreate(LogicalDevice* logical_dev)
 {
+	VkResult vk_res{};
+
 	this->logical_dev = logical_dev;
 
 	if (this->semaphore != VK_NULL_HANDLE) {
