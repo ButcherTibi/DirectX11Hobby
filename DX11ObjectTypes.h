@@ -90,6 +90,7 @@ namespace nui_int {
 			checkHResult(dev->CreateBuffer(&buff_desc, &subresource_data, buff.GetAddressOf()),
 				"failed to create vector buffer");
 
+			this->count = values.size();
 			recreated = true;
 		}
 		else {

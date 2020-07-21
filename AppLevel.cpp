@@ -95,7 +95,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	ErrStack err;
 
 	nui::Nui ui;
-	err = ui.create(app_level.hwnd);
+	err = ui.create(app_level.hwnd, hinstance);
 	if (err.isBad()) {
 		err.debugPrint();
 		return 1;

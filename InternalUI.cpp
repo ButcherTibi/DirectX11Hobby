@@ -329,7 +329,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 		}
 
 		// Child origin
-		xm_float2 child_origin = flex->_origin;
+		glm::vec2 child_origin = flex->_origin;
 		child_origin.x += flex->_padding_left_thick +  flex->_border_left_thick;
 		child_origin.y += flex->_padding_top_thick + flex->_border_top_thick;
 

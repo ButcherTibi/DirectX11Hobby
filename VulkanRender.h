@@ -8,131 +8,14 @@
 
 // mine
 #include "CommonTypes.h"
-#include "UIComponents.h"
-
-#include "VulkanSystems.h"
-
-
-//UserInterface user_interface = {};
-//{
-//	FileSysPath path = {};
-//	err = path.recreateRelative("UI/Fonts/Roboto/Roboto-Regular.ttf");
-//	if (err.isBad()) {
-//		err.debugPrint();
-//		return 1;
-//	}
-
-//	std::vector<uint8_t> roboto_ttf;
-//	err = path.read(roboto_ttf);
-//	if (err.isBad()) {
-//		err.debugPrint();
-//		return 1;
-//	}
-
-//	FontInfo roboto_info = {};
-//	roboto_info.family_name = "Roboto";
-//	roboto_info.style_name = "normal";
-//	roboto_info.sizes_px = {
-//		50
-//	};
-//	err = user_interface.addFont(roboto_ttf, roboto_info);
-//	if (err.isBad()) {
-//		err.debugPrint();
-//		return 1;
-//	}
-
-//	err = user_interface.rebindToAtlas(1024);
-//	if (err.isBad()) {
-//		err.debugPrint();
-//		return 1;
-//	}
-//}
-
-//user_interface.recreateGraph(1, 1);
-
-//Flex* root = std::get_if<Flex>(&user_interface.elems.front().elem);
-//root->direction = FlexDirection::COLUMN;
-//root->wrap = FlexWrap::WRAP;
-//root->axis_align = FlexAxisAlign::SPACE_BETWEEN;
-//root->cross_axis_align = FlexCrossAxisAlign::START;
-//root->lines_align = FlexLinesAlign::SPACE_BETWEEN;
-//
-//{
-//	Flex basic_elem_0 = {};
-//	basic_elem_0.width.setRelative(0.4);
-//	basic_elem_0.height.setRelative(0.4);
-
-//	basic_elem_0.background_color = { 1, 0, 0, 1 };
-
-//	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
-//}
-//
-//{
-//	Flex basic_elem_0 = {};
-//	basic_elem_0.width.setRelative(0.2);
-//	basic_elem_0.height.setRelative(0.4);
-
-//	basic_elem_0.background_color = { 0, 1, 0, 1 };
-
-//	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
-//}
-
-//{
-//	Flex basic_elem_0 = {};
-//	basic_elem_0.width.setRelative(0.2);
-//	basic_elem_0.height.setRelative(0.4);
-
-//	basic_elem_0.background_color = { 0, 0, 1, 1 };
-
-//	basic_elem_0.flex_cross_axis_align_self = FlexCrossAxisAlign::END;
-
-//	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
-//}
-
-//{
-//	Flex basic_elem_0 = {};
-//	basic_elem_0.width.setRelative(0.4);
-//	basic_elem_0.height.setRelative(0.4);
-
-//	basic_elem_0.background_color = { 1, 0, 1, 1 };
-
-//	user_interface.addElement(&user_interface.elems.front(), basic_elem_0);
-//}
-//
-
-//// Renderer
-//err = renderer.createContext(&hinstance, &app_level.hwnd);
-//if (err.isBad()) {
-//	err.debugPrint();
-//	return 1;
-//}
-
-//uint32_t requested_width = app_level.display_width;
-//uint32_t requested_height = app_level.display_height;
-//uint32_t rendering_width;
-//uint32_t rendering_height;
-//err = renderer.getPhysicalSurfaceResolution(rendering_width, rendering_height);
-//if (err.isBad()) {
-//	err.debugPrint();
-//	return 1;
-//}
-
-//// we now have the actual resolution of the rendering surface so calculate user interface layout
-//user_interface.changeResolution((float)rendering_width, (float)rendering_height);
-//renderer.user_interface = &user_interface;
-
-//err = renderer.recreate(rendering_width, rendering_height);
-//if (err.isBad()) {
-//	err.debugPrint();
-//	return 1;
-//}
+#include "VulkanSystems.hpp"
 
 
 class VulkanRenderer {
 public:
-	UserInterface* user_interface;
+	uint32_t width;
+	uint32_t height;
 
-public:
 	vks::Instance instance;
 	vks::Surface surface;
 
@@ -257,13 +140,9 @@ public:
 
 	ErrStack recreate(uint32_t width, uint32_t height);
 
-	ErrStack calc(UserInterface& user);
-
 	ErrStack changeResolution(uint32_t new_width, uint32_t new_height);
 
 	ErrStack draw();
 
 	ErrStack waitForRendering();
 };
-
-extern VulkanRenderer renderer;

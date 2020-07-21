@@ -8,9 +8,6 @@
     <Filter Include="Source Files\Math">
       <UniqueIdentifier>{53783eda-5290-49bb-ae24-ac4fffa0bb81}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Renderer">
-      <UniqueIdentifier>{49af7614-544f-4745-8cc2-ec256a2a0c2a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Mesh">
       <UniqueIdentifier>{db273801-5239-4134-9a5f-eb598bc972e4}</UniqueIdentifier>
     </Filter>
@@ -26,17 +23,11 @@
     <Filter Include="Source Files\EntryPoint">
       <UniqueIdentifier>{6cac705a-a616-4a81-bd62-ed76c9977ca6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\VulkanSystems">
-      <UniqueIdentifier>{16514fe7-3e9a-409f-8c56-f6c5a9302513}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\ThirdParty\VulkanMemoryAllocator">
       <UniqueIdentifier>{f30f959c-297e-4e22-8e3a-dd03df043b23}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\ThirdParty\stb_image">
       <UniqueIdentifier>{10891787-7a85-4b6e-8a75-da84801afa37}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\UserInterface">
-      <UniqueIdentifier>{c66b86a8-8f33-4af0-8aae-a8e67523627d}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\TextureAtlas">
       <UniqueIdentifier>{a17daa4c-fb9d-437f-95cc-188a38c3a23c}</UniqueIdentifier>
@@ -49,6 +40,12 @@
     </Filter>
     <Filter Include="Source Files\NewUserInterface\DX11Renderer\Shaders">
       <UniqueIdentifier>{422d0480-18b7-4347-8103-4bef298c0c1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\NewUserInterface\VulkanRenderer">
+      <UniqueIdentifier>{49af7614-544f-4745-8cc2-ec256a2a0c2a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\NewUserInterface\VulkanRenderer\VulkanSystems">
+      <UniqueIdentifier>{16514fe7-3e9a-409f-8c56-f6c5a9302513}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -63,9 +60,6 @@
     </ClCompile>
     <ClCompile Include="MeshOps.cpp">
       <Filter>Source Files\Mesh</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer.cpp">
-      <Filter>Source Files\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="LinkageMesh.cpp">
       <Filter>Source Files\Mesh</Filter>
@@ -101,34 +95,25 @@
       <Filter>Source Files\EntryPoint</Filter>
     </ClCompile>
     <ClCompile Include="VulkanSystems.cpp">
-      <Filter>Source Files\VulkanSystems</Filter>
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClCompile>
     <ClCompile Include="Pipeline.cpp">
-      <Filter>Source Files\VulkanSystems</Filter>
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClCompile>
     <ClCompile Include="CommandBuffers.cpp">
-      <Filter>Source Files\VulkanSystems</Filter>
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClCompile>
     <ClCompile Include="Resources.cpp">
-      <Filter>Source Files\VulkanSystems</Filter>
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClCompile>
     <ClCompile Include="CommonTypes.cpp">
       <Filter>Source Files\Mine</Filter>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp">
       <Filter>Source Files\TextureAtlas</Filter>
-    </ClCompile>
-    <ClCompile Include="UIComponents.cpp">
-      <Filter>Source Files\UserInterface</Filter>
-    </ClCompile>
-    <ClCompile Include="GPU_ShaderTypes.cpp">
-      <Filter>Source Files\VulkanSystems</Filter>
-    </ClCompile>
-    <ClCompile Include="FontRasterization.cpp">
-      <Filter>Source Files\UserInterface</Filter>
     </ClCompile>
     <ClCompile Include="InternalRenderer.cpp">
       <Filter>Source Files\NewUserInterface</Filter>
@@ -142,6 +127,15 @@
     <ClCompile Include="Nui.cpp">
       <Filter>Source Files\NewUserInterface</Filter>
     </ClCompile>
+    <ClCompile Include="VulkanRender.cpp">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU_ShaderTypes.cpp">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanContext.cpp">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MathDefinitions.h">
@@ -149,9 +143,6 @@
     </ClInclude>
     <ClInclude Include="MathUtils.h">
       <Filter>Source Files\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderer.h">
-      <Filter>Source Files\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Primitives.h">
       <Filter>Source Files\Mesh</Filter>
@@ -183,9 +174,6 @@
     <ClInclude Include="stdafx.h">
       <Filter>Source Files\Mine</Filter>
     </ClInclude>
-    <ClInclude Include="VulkanSystems.h">
-      <Filter>Source Files\VulkanSystems</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
@@ -194,12 +182,6 @@
     </ClInclude>
     <ClInclude Include="TextureAtlas.h">
       <Filter>Source Files\TextureAtlas</Filter>
-    </ClInclude>
-    <ClInclude Include="UIComponents.h">
-      <Filter>Source Files\UserInterface</Filter>
-    </ClInclude>
-    <ClInclude Include="GPU_ShaderTypes.h">
-      <Filter>Source Files\VulkanSystems</Filter>
     </ClInclude>
     <ClInclude Include="DX11ObjectTypes.h">
       <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
@@ -212,6 +194,15 @@
     </ClInclude>
     <ClInclude Include="Nui.h">
       <Filter>Source Files\NewUserInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanRender.h">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_ShaderTypes.h">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanSystems.hpp">
+      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

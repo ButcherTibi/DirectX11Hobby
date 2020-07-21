@@ -3,7 +3,7 @@
 #include "MathUtils.h"
 
 // Header
-#include "VulkanSystems.h"
+#include "VulkanSystems.hpp"
 
 
 namespace vks {

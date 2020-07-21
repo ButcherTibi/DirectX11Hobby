@@ -11,7 +11,7 @@ namespace nui {
 		nui_int::Internals internals;
 		
 	public:
-		ErrStack create(HWND hwnd);
+		ErrStack create(HWND hwnd, HINSTANCE hinstance);
 
 		Element& getRoot();
 		Flex& getRootElement();

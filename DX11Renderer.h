@@ -48,9 +48,9 @@ namespace nui_int {
 		ComPtr<IDXGISwapChain> swapchain;
 		ComPtr<ID3D11DeviceContext> imediate_ctx;
 		ComPtr<ID3D11Debug> dx11_debug;
-
-		ComPtr<ID3D11CommandList> command_list;
+	
 		ComPtr<ID3D11DeviceContext> deferred_ctx;
+		ComPtr<ID3D11CommandList> command_list;
 
 		ComPtr<ID3D11RenderTargetView> swapchain_view;
 
@@ -63,6 +63,6 @@ namespace nui_int {
 		PixelShader circle_PS;
 
 	public:
-
+		
 	};
 }

@@ -5,11 +5,10 @@
 // mine
 #include "MathTypes.h"
 #include "FileIO.h"
-#include "UIComponents.h"  // has to go
 #include "MathUtils.h"
 
 // Header
-#include "Renderer.h"
+#include "VulkanRender.h"
 
 
 ErrStack VulkanRenderer::recreateSwapchain(uint32_t width, uint32_t height)
@@ -2110,7 +2109,7 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 		// Generate GPU Data
-		checkErrStack1(calc(*user_interface));
+		//checkErrStack1(calc(*user_interface));
 	}
 
 	// Framebuffers
@@ -2165,585 +2164,563 @@ ErrStack VulkanRenderer::recreate(uint32_t width, uint32_t height)
 
 	return ErrStack();
 }
-
-ErrStack VulkanRenderer::calc(UserInterface& user_interface)
-{
-	ErrStack err_stack;
-
-	// Set Screen Size
-	{
-		uniform_buff.clear();
-
-		Flex* root_elem = std::get_if<Flex>(&user_interface.elems.front().elem);
-
-		GPU_Uniform uniform;
-		uniform.screen_width = root_elem->_contentbox_width;
-		uniform.screen_height = root_elem->_contentbox_height;
-
-		checkErrStack1(uniform_buff.push(&uniform, sizeof(GPU_Uniform)));
-		checkErrStack1(uniform_buff.flush());
-	}
-
-	auto createChamferedRectangle = [&](glm::vec2 origin, float width, float height,
-		float tl_radius, float tr_radius, float br_radius, float bl_radius,
-		std::vector<GPU_Rects_Vertex>& rect_verts, size_t idx)
-	{
-		glm::vec2 vec2_origin{ origin.x, origin.y };
-
-		glm::vec2 top_left_up = vec2_origin;
-		glm::vec2 top_left_down = vec2_origin;
-
-		glm::vec2 top_right_up = vec2_origin;
-		glm::vec2 top_right_down = vec2_origin;
-
-		glm::vec2 bot_right_up = vec2_origin;
-		glm::vec2 bot_right_down = vec2_origin;
-
-		glm::vec2 bot_left_up = vec2_origin;
-		glm::vec2 bot_left_down = vec2_origin;
-
-		// Box positions
-		top_left_up.x += tl_radius;
-		top_left_down.y += tl_radius;
-
-		top_right_up.x += width - tr_radius;
-		top_right_down.x += width;
-		top_right_down.y += tr_radius;
-
-		bot_right_up.x += width;
-		bot_right_up.y += height - br_radius;
-		bot_right_down.x += width - br_radius;
-		bot_right_down.y += height;
-
-		bot_left_up.y += height - bl_radius;
-		bot_left_down.x += bl_radius;
-		bot_left_down.y += height;
-
-		// Box triangles
-		rect_verts[idx + 0].pos = top_left_up;
-		rect_verts[idx + 1].pos = top_right_up;
-		rect_verts[idx + 2].pos = top_right_down;
-
-		rect_verts[idx + 3].pos = top_left_up;
-		rect_verts[idx + 4].pos = top_right_down;
-		rect_verts[idx + 5].pos = bot_right_up;
-
-		rect_verts[idx + 6].pos = top_left_up;
-		rect_verts[idx + 7].pos = bot_right_up;
-		rect_verts[idx + 8].pos = bot_right_down;
-
-		rect_verts[idx + 9].pos = top_left_up;
-		rect_verts[idx + 10].pos = bot_right_down;
-		rect_verts[idx + 11].pos = bot_left_down;
-
-		rect_verts[idx + 12].pos = top_left_up;
-		rect_verts[idx + 13].pos = bot_left_down;
-		rect_verts[idx + 14].pos = bot_left_up;
-
-		rect_verts[idx + 15].pos = top_left_up;
-		rect_verts[idx + 16].pos = bot_left_up;
-		rect_verts[idx + 17].pos = top_left_down;
-	};
-
-	auto createTopLeftCircle = [](glm::vec2 origin, float radius,
-		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
-	{
-		glm::vec2 vec2_origin{ origin.x, origin.y };
-
-		glm::vec2 top_left = vec2_origin;
-		glm::vec2 top_right = vec2_origin;
-		glm::vec2 bot_left = vec2_origin;
-
-		top_right.x += radius;
-		bot_left.y += radius;
-
-		// Position
-		verts[idx + 0].pos = top_left;
-		verts[idx + 1].pos = top_right;
-		verts[idx + 2].pos = bot_left;
-
-		// Center and Radius
-		glm::vec2 center = vec2_origin;
-		center += radius;
-
-		for (auto i = idx; i < idx + 3; i++) {
-			verts[i].center = center;
-			verts[i].radius = radius;
-		}
-	};
-
-	auto createTopRightCircle = [](glm::vec2 origin, float radius,
-		std::vector<GPU_Circles_Vertex>& verts, size_t idx) 
-	{
-		glm::vec2 vec2_origin{ origin.x, origin.y };
-
-		glm::vec2 top_left = vec2_origin;
-		glm::vec2 top_right = vec2_origin;
-		glm::vec2 bot_right = vec2_origin;
-
-		top_right.x += radius;
-		bot_right += radius;
-
-		// Position
-		verts[idx + 0].pos = top_left;
-		verts[idx + 1].pos = top_right;
-		verts[idx + 2].pos = bot_right;
-
-		// Center and Radius
-		glm::vec2 center = vec2_origin;
-		center.y += radius;
-
-		for (auto i = idx; i < idx + 3; i++) {
-			verts[i].center = center;
-			verts[i].radius = radius;
-		}
-	};
-
-	auto createBotRightCircle = [](glm::vec2 origin, float radius,
-		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
-	{
-		glm::vec2 vec2_origin{ origin.x, origin.y };
-
-		glm::vec2 top_right = vec2_origin;
-		glm::vec2 bot_right = vec2_origin;
-		glm::vec2 bot_left = vec2_origin;
-
-		top_right.x += radius;
-		bot_right += radius;
-		bot_left.y += radius;
-
-		// Position
-		verts[idx + 0].pos = top_right;
-		verts[idx + 1].pos = bot_right;
-		verts[idx + 2].pos = bot_left;
-
-		// Center and Radius
-		glm::vec2 center = vec2_origin;
-
-		for (auto i = idx; i < idx + 3; i++) {
-			verts[i].center = center;
-			verts[i].radius = radius;
-		}
-	};
-
-	auto createBotLeft = [](glm::vec2 origin, float radius,
-		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
-	{
-		glm::vec2 vec2_origin{ origin.x, origin.y };
-
-		glm::vec2 top_left = vec2_origin;
-		glm::vec2 bot_right = vec2_origin;
-		glm::vec2 bot_left = vec2_origin;
-
-		bot_right += radius;
-		bot_left.y += radius;
-
-		// Position
-		verts[idx + 0].pos = top_left;
-		verts[idx + 1].pos = bot_right;
-		verts[idx + 2].pos = bot_left;
-
-		// Center and Radius
-		glm::vec2 center = vec2_origin;
-		center.x += radius;
-
-		for (auto i = idx; i < idx + 3; i++) {
-			verts[i].center = center;
-			verts[i].radius = radius;
-		}
-	};
-
-	auto getBoxModel = [](Element& elem) -> BoxModel* {
-		
-		auto flex = std::get_if<Flex>(&elem.elem);
-		if (flex != nullptr) {
-			return flex;
-		}
-
-		auto par = std::get_if<Paragraph>(&elem.elem);
-		if (par != nullptr) {
-			return par;
-		}
-		
-		return nullptr;
-	};
-
-	this->layers.clear();
-	this->layers.resize(user_interface.layers.size());
-	auto ui_it = user_interface.layers.begin();
-
-	std::vector<GPU_Storage> elem_props;
-
-	vertex_buff.clear();
-
-	std::vector<GPU_Rects_Vertex> border_rects;
-	std::vector<GPU_Circles_Vertex> border_tl_circles;
-	std::vector<GPU_Circles_Vertex> border_tr_circles;
-	std::vector<GPU_Circles_Vertex> border_br_circles;
-	std::vector<GPU_Circles_Vertex> border_bl_circles;
-
-	std::vector<GPU_Rects_Vertex> padding_rects;
-	std::vector<GPU_Circles_Vertex> padding_tl_circles;
-	std::vector<GPU_Circles_Vertex> padding_tr_circles;
-	std::vector<GPU_Circles_Vertex> padding_br_circles;
-	std::vector<GPU_Circles_Vertex> padding_bl_circles;
-
-	size_t layer_offset = 0;
-
-	for (auto l = 0; l < user_interface.layers.size(); l++) {
-
-		ElementsLayer& ui_layer = *ui_it;
-		GPU_ElementsLayer& gpu_layer = this->layers[l];
-
-		border_rects.clear();
-		border_tl_circles.clear();
-		border_tr_circles.clear();
-		border_br_circles.clear();
-		border_bl_circles.clear();
-
-		padding_rects.clear();
-		padding_tl_circles.clear();
-		padding_tr_circles.clear();
-		padding_br_circles.clear();
-		padding_bl_circles.clear();
-
-		gpu_layer.border_rects.offset = layer_offset;
-		gpu_layer.border_tl_circles.offset = layer_offset;
-		gpu_layer.border_tr_circles.offset = layer_offset;
-		gpu_layer.border_br_circles.offset = layer_offset;
-		gpu_layer.border_bl_circles.offset = layer_offset;
-
-		gpu_layer.padding_rects.offset = layer_offset;
-		gpu_layer.padding_tl_circles.offset = layer_offset;
-		gpu_layer.padding_tr_circles.offset = layer_offset;
-		gpu_layer.padding_br_circles.offset = layer_offset;
-		gpu_layer.padding_bl_circles.offset = layer_offset;
-
-		for (Element* elem : ui_layer.elems) {
-
-			Flex* flex;
-			Paragraph* par;
-			BoxModel* box;
-			
-			switch (elem->elem.index()) {
-			case 0: {
-				flex = std::get_if<Flex>(&elem->elem);
-				box = flex;
-				break;
-			}
-
-			case 1: {
-				par = std::get_if<Paragraph>(&elem->elem);
-				box = par;
-				break;
-			}
-				
-			default:
-				printf(code_location);
-			}
-			
-			// Storage
-			GPU_Storage& elem_prop = elem_props.emplace_back();
-			elem_prop.border_color = box->border_color;
-
-			// Vertex
-			glm::vec2 border_origin = box->_origin;
-
-			// If Border Present
-			if (box->_border_top_thick || box->_border_right_thick || box->_border_bot_thick || box->_border_left_thick) {
-
-				// Rect
-				{
-					size_t last_idx = border_rects.size();
-					border_rects.resize(border_rects.size() + 18);
-
-					createChamferedRectangle(border_origin, box->_borderbox_width, box->_borderbox_height,
-						box->_border_tl_radius, box->_border_tr_radius, box->_border_br_radius, box->_border_bl_radius,
-						border_rects, last_idx);
-
-					for (size_t i = last_idx; i < border_rects.size(); i++) {
-						border_rects[i].color = box->border_color;
-					}
-
-					for (size_t i = last_idx; i < border_rects.size(); i++) {
-						border_rects[i].elem_idx = elem_props.size();
-					}
-				}
-
-				// Top Left Circle
-				if (box->_border_tl_radius && (box->_border_top_thick || box->_border_left_thick)) {
-
-					size_t last_idx = border_tl_circles.size();
-					border_tl_circles.resize(border_tl_circles.size() + 3);
-
-					createTopLeftCircle(border_origin, box->_border_tl_radius, 
-						border_tl_circles, last_idx);
-
-					for (size_t i = last_idx; i < border_tl_circles.size(); i++) {
-						border_tl_circles[i].color = box->border_color;
-					}
-				}
-
-				// Top Right Circle
-				if (box->_border_tr_radius && (box->_border_top_thick || box->_border_right_thick)) {
-
-					size_t last_idx = border_tr_circles.size();
-					border_tr_circles.resize(border_tr_circles.size() + 3);
-
-					glm::vec2 tr_origin = border_origin;
-					tr_origin.x += box->_borderbox_width - box->_border_tr_radius;
-
-					createTopRightCircle(tr_origin, box->_border_tr_radius, 
-						border_tr_circles, last_idx);
-
-					for (size_t i = last_idx; i < border_tr_circles.size(); i++) {
-						border_tr_circles[i].color = box->border_color;
-					}
-				}
-
-				// Bottom Right Circle
-				if (box->_border_br_radius && (box->_border_bot_thick || box->_border_right_thick)) {
-
-					size_t last_idx = border_br_circles.size();
-					border_br_circles.resize(border_br_circles.size() + 3);
-
-					glm::vec2 br_origin = border_origin;
-					br_origin.x += box->_borderbox_width - box->_border_br_radius;
-					br_origin.y += box->_borderbox_height - box->_border_br_radius;
-
-					createBotRightCircle(br_origin, box->_border_br_radius, 
-						border_br_circles, last_idx);
-
-					for (size_t i = last_idx; i < border_br_circles.size(); i++) {
-						border_br_circles[i].color = box->border_color;
-					}
-				}
-
-				// Bottom Left Circle
-				if (box->_border_bl_radius && (box->_border_bot_thick || box->_border_left_thick)) {
-
-					size_t last_idx = border_bl_circles.size();
-					border_bl_circles.resize(border_bl_circles.size() + 3);
-
-					glm::vec2 bl_origin = border_origin;
-					bl_origin.y += box->_borderbox_height - box->_border_bl_radius;
-
-					createBotLeft(bl_origin, box->_border_bl_radius,
-						border_bl_circles, last_idx);
-
-					for (size_t i = last_idx; i < border_bl_circles.size(); i++) {
-						border_bl_circles[i].color = box->border_color;
-					}
-				}
-			}
-			
-			glm::vec2 padding_origin = border_origin;
-
-			// Padding Box
-			{
-				size_t last_idx = padding_rects.size();
-				padding_rects.resize(padding_rects.size() + 18);
-
-				padding_origin.x += box->_border_left_thick;
-				padding_origin.y += box->_border_top_thick;
-
-				createChamferedRectangle(padding_origin, box->_paddingbox_width, box->_paddingbox_height,
-					box->_padding_tl_radius, box->_padding_tr_radius, box->_padding_br_radius, box->_padding_bl_radius,
-					padding_rects, last_idx);
-
-				for (size_t i = last_idx; i < padding_rects.size(); i++) {
-					padding_rects[i].color = box->background_color;
-				}
-
-				for (size_t i = last_idx; i < padding_rects.size(); i++) {
-					padding_rects[i].elem_idx = elem_props.size();
-				}
-			}
-
-			// Top Left
-			if (box->_padding_tl_radius) {
-
-				size_t last_idx = padding_tl_circles.size();
-				padding_tl_circles.resize(padding_tl_circles.size() + 3);
-
-				createTopLeftCircle(padding_origin, box->_padding_tl_radius,
-					padding_tl_circles, last_idx);
-
-				for (size_t i = last_idx; i < padding_tl_circles.size(); i++) {
-					padding_tl_circles[i].color = box->background_color;
-				}
-			}
-
-			// Top Right
-			if (box->_padding_tr_radius) {
-
-				size_t last_idx = padding_tr_circles.size();
-				padding_tr_circles.resize(padding_tr_circles.size() + 3);
-
-				glm::vec2 tr_origin = padding_origin;
-				tr_origin.x += box->_paddingbox_width - box->_padding_tr_radius;
-
-				createTopRightCircle(tr_origin, box->_padding_tr_radius, 
-					padding_tr_circles, last_idx);
-
-				for (size_t i = last_idx; i < padding_tr_circles.size(); i++) {
-					padding_tr_circles[i].color = box->background_color;
-				}
-			}
-
-			// Bot Right
-			if (box->_padding_br_radius) {
-
-				size_t last_idx = padding_br_circles.size();
-				padding_br_circles.resize(padding_br_circles.size() + 3);
-
-				glm::vec2 br_origin = padding_origin;
-				br_origin.x += box->_paddingbox_width - box->_padding_br_radius;
-				br_origin.y += box->_paddingbox_height - box->_padding_br_radius;
-
-				createBotRightCircle(br_origin, box->_padding_br_radius,
-					padding_br_circles, last_idx);
-
-				for (size_t i = last_idx; i < padding_br_circles.size(); i++) {
-					padding_br_circles[i].color = box->background_color;
-				}
-			}
-
-			// Bot Left
-			if (box->_padding_bl_radius) {
-
-				size_t last_idx = padding_bl_circles.size();
-				padding_bl_circles.resize(padding_bl_circles.size() + 3);
-
-				glm::vec2 bl_origin = padding_origin;
-				bl_origin.y += box->_paddingbox_height - box->_padding_bl_radius;
-
-				createBotLeft(bl_origin, box->_padding_bl_radius,
-					padding_bl_circles, last_idx);
-
-				for (size_t i = last_idx; i < padding_bl_circles.size(); i++) {
-					padding_bl_circles[i].color = box->background_color;
-				}
-			}
-		}
-
-		size_t border_rects_offset = 0;
-		size_t border_tl_circles_offset = border_rects.size() * sizeof(GPU_Rects_Vertex);
-		size_t border_tr_circles_offset = border_tl_circles_offset + border_tl_circles.size() * sizeof(GPU_Circles_Vertex);
-		size_t border_br_circles_offset = border_tr_circles_offset + border_tr_circles.size() * sizeof(GPU_Circles_Vertex);
-		size_t border_bl_circles_offset = border_br_circles_offset + border_br_circles.size() * sizeof(GPU_Circles_Vertex);
-
-		size_t padding_rects_offset = border_bl_circles_offset + border_bl_circles.size() * sizeof(GPU_Circles_Vertex);
-		size_t padding_tl_circles_offset = padding_rects_offset + padding_rects.size() * sizeof(GPU_Rects_Vertex);
-		size_t padding_tr_circles_offset = padding_tl_circles_offset + padding_tl_circles.size() * sizeof(GPU_Circles_Vertex);
-		size_t padding_br_circles_offset = padding_tr_circles_offset + padding_tr_circles.size() * sizeof(GPU_Circles_Vertex);
-		size_t padding_bl_circles_offset = padding_br_circles_offset + padding_br_circles.size() * sizeof(GPU_Circles_Vertex);
-
-		layer_offset += padding_bl_circles_offset + padding_bl_circles.size() * sizeof(GPU_Circles_Vertex);
-
-		// Border
-		if (border_rects.size()) {
-
-			gpu_layer.border_rects.offset += border_rects_offset;
-			gpu_layer.border_rects.vertex_count = border_rects.size();
-			checkErrStack1(vertex_buff.push(border_rects.data(), border_rects.size() * sizeof(GPU_Rects_Vertex)));
-		}
-
-		if (border_tl_circles.size()) {
-
-			gpu_layer.border_tl_circles.offset += border_tl_circles_offset;
-			gpu_layer.border_tl_circles.vertex_count = border_tl_circles.size();
-			checkErrStack1(vertex_buff.push(border_tl_circles.data(), border_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (border_tr_circles.size()) {
-
-			gpu_layer.border_tr_circles.offset += border_tr_circles_offset;
-			gpu_layer.border_tr_circles.vertex_count = border_tr_circles.size();
-			checkErrStack1(vertex_buff.push(border_tr_circles.data(), border_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (border_br_circles.size()) {
-
-			gpu_layer.border_br_circles.offset += border_br_circles_offset;
-			gpu_layer.border_br_circles.vertex_count = border_br_circles.size();
-			checkErrStack1(vertex_buff.push(border_br_circles.data(), border_br_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (border_bl_circles.size()) {
-
-			gpu_layer.border_bl_circles.offset += border_bl_circles_offset;
-			gpu_layer.border_bl_circles.vertex_count = border_bl_circles.size();
-			checkErrStack1(vertex_buff.push(border_bl_circles.data(), border_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		// Padding
-		{
-			gpu_layer.padding_rects.offset += padding_rects_offset;
-			gpu_layer.padding_rects.vertex_count = padding_rects.size();
-			checkErrStack1(vertex_buff.push(padding_rects.data(), padding_rects.size() * sizeof(GPU_Rects_Vertex)));
-		}
-
-		if (padding_tl_circles.size()) {
-
-			gpu_layer.padding_tl_circles.offset += padding_tl_circles_offset;
-			gpu_layer.padding_tl_circles.vertex_count = padding_tl_circles.size();
-			checkErrStack1(vertex_buff.push(padding_tl_circles.data(), padding_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (padding_tr_circles.size()) {
-
-			gpu_layer.padding_tr_circles.offset += padding_tr_circles_offset;
-			gpu_layer.padding_tr_circles.vertex_count = padding_tr_circles.size();
-			checkErrStack1(vertex_buff.push(padding_tr_circles.data(), padding_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (padding_br_circles.size()) {
-
-			gpu_layer.padding_br_circles.offset += padding_br_circles_offset;
-			gpu_layer.padding_br_circles.vertex_count = padding_br_circles.size();
-			checkErrStack1(vertex_buff.push(padding_br_circles.data(), padding_br_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-		
-		if (padding_bl_circles.size()) {
-
-			gpu_layer.padding_bl_circles.offset += padding_bl_circles_offset;
-			gpu_layer.padding_bl_circles.vertex_count = padding_bl_circles.size();
-			checkErrStack1(vertex_buff.push(padding_bl_circles.data(), padding_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
-		}
-
-		++ui_it;
-	}
-
-	checkErrStack1(vertex_buff.flush());
-
-	checkErrStack1(storage_buff.push(elem_props.data(), elem_props.size()));
-	checkErrStack1(storage_buff.flush());
-
-	return ErrStack();
-}
-
-ErrStack VulkanRenderer::changeResolution(uint32_t new_width, uint32_t new_height)
-{
-	ErrStack err_stack;
-
-	checkErrStack1(recreateSwapchain(new_width, new_height));
-	checkErrStack1(recreateFrameImagesAndViews(swapchain.resolution.width, swapchain.resolution.height));
-
-	checkErrStack1(calc(*user_interface));
-
-	updateUniformDescriptorSet();
-	// updateStorageDescriptorSet();
-	updateBorderCirclesDescriptorSet();
-	updatePaddingCirclesDescriptorSet();
-	updateComposeImagesDescriptorSet();
-	updateCopyDescriptorSet();
-
-	checkErrStack1(recreateFramebuffers());
-	checkErrStack1(recreateRenderingCommandBuffers());
-
-	return err_stack;
-}
+//
+//ErrStack VulkanRenderer::calc(UserInterface& user_interface)
+//{
+//	ErrStack err_stack;
+//
+//	// Set Screen Size
+//	{
+//		uniform_buff.clear();
+//
+//		Flex* root_elem = std::get_if<Flex>(&user_interface.elems.front().elem);
+//
+//		GPU_Uniform uniform;
+//		uniform.screen_width = root_elem->_contentbox_width;
+//		uniform.screen_height = root_elem->_contentbox_height;
+//
+//		checkErrStack1(uniform_buff.push(&uniform, sizeof(GPU_Uniform)));
+//		checkErrStack1(uniform_buff.flush());
+//	}
+//
+//	auto createChamferedRectangle = [&](glm::vec2 origin, float width, float height,
+//		float tl_radius, float tr_radius, float br_radius, float bl_radius,
+//		std::vector<GPU_Rects_Vertex>& rect_verts, size_t idx)
+//	{
+//		glm::vec2 vec2_origin{ origin.x, origin.y };
+//
+//		glm::vec2 top_left_up = vec2_origin;
+//		glm::vec2 top_left_down = vec2_origin;
+//
+//		glm::vec2 top_right_up = vec2_origin;
+//		glm::vec2 top_right_down = vec2_origin;
+//
+//		glm::vec2 bot_right_up = vec2_origin;
+//		glm::vec2 bot_right_down = vec2_origin;
+//
+//		glm::vec2 bot_left_up = vec2_origin;
+//		glm::vec2 bot_left_down = vec2_origin;
+//
+//		// Box positions
+//		top_left_up.x += tl_radius;
+//		top_left_down.y += tl_radius;
+//
+//		top_right_up.x += width - tr_radius;
+//		top_right_down.x += width;
+//		top_right_down.y += tr_radius;
+//
+//		bot_right_up.x += width;
+//		bot_right_up.y += height - br_radius;
+//		bot_right_down.x += width - br_radius;
+//		bot_right_down.y += height;
+//
+//		bot_left_up.y += height - bl_radius;
+//		bot_left_down.x += bl_radius;
+//		bot_left_down.y += height;
+//
+//		// Box triangles
+//		rect_verts[idx + 0].pos = top_left_up;
+//		rect_verts[idx + 1].pos = top_right_up;
+//		rect_verts[idx + 2].pos = top_right_down;
+//
+//		rect_verts[idx + 3].pos = top_left_up;
+//		rect_verts[idx + 4].pos = top_right_down;
+//		rect_verts[idx + 5].pos = bot_right_up;
+//
+//		rect_verts[idx + 6].pos = top_left_up;
+//		rect_verts[idx + 7].pos = bot_right_up;
+//		rect_verts[idx + 8].pos = bot_right_down;
+//
+//		rect_verts[idx + 9].pos = top_left_up;
+//		rect_verts[idx + 10].pos = bot_right_down;
+//		rect_verts[idx + 11].pos = bot_left_down;
+//
+//		rect_verts[idx + 12].pos = top_left_up;
+//		rect_verts[idx + 13].pos = bot_left_down;
+//		rect_verts[idx + 14].pos = bot_left_up;
+//
+//		rect_verts[idx + 15].pos = top_left_up;
+//		rect_verts[idx + 16].pos = bot_left_up;
+//		rect_verts[idx + 17].pos = top_left_down;
+//	};
+//
+//	auto createTopLeftCircle = [](glm::vec2 origin, float radius,
+//		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
+//	{
+//		glm::vec2 vec2_origin{ origin.x, origin.y };
+//
+//		glm::vec2 top_left = vec2_origin;
+//		glm::vec2 top_right = vec2_origin;
+//		glm::vec2 bot_left = vec2_origin;
+//
+//		top_right.x += radius;
+//		bot_left.y += radius;
+//
+//		// Position
+//		verts[idx + 0].pos = top_left;
+//		verts[idx + 1].pos = top_right;
+//		verts[idx + 2].pos = bot_left;
+//
+//		// Center and Radius
+//		glm::vec2 center = vec2_origin;
+//		center += radius;
+//
+//		for (auto i = idx; i < idx + 3; i++) {
+//			verts[i].center = center;
+//			verts[i].radius = radius;
+//		}
+//	};
+//
+//	auto createTopRightCircle = [](glm::vec2 origin, float radius,
+//		std::vector<GPU_Circles_Vertex>& verts, size_t idx) 
+//	{
+//		glm::vec2 vec2_origin{ origin.x, origin.y };
+//
+//		glm::vec2 top_left = vec2_origin;
+//		glm::vec2 top_right = vec2_origin;
+//		glm::vec2 bot_right = vec2_origin;
+//
+//		top_right.x += radius;
+//		bot_right += radius;
+//
+//		// Position
+//		verts[idx + 0].pos = top_left;
+//		verts[idx + 1].pos = top_right;
+//		verts[idx + 2].pos = bot_right;
+//
+//		// Center and Radius
+//		glm::vec2 center = vec2_origin;
+//		center.y += radius;
+//
+//		for (auto i = idx; i < idx + 3; i++) {
+//			verts[i].center = center;
+//			verts[i].radius = radius;
+//		}
+//	};
+//
+//	auto createBotRightCircle = [](glm::vec2 origin, float radius,
+//		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
+//	{
+//		glm::vec2 vec2_origin{ origin.x, origin.y };
+//
+//		glm::vec2 top_right = vec2_origin;
+//		glm::vec2 bot_right = vec2_origin;
+//		glm::vec2 bot_left = vec2_origin;
+//
+//		top_right.x += radius;
+//		bot_right += radius;
+//		bot_left.y += radius;
+//
+//		// Position
+//		verts[idx + 0].pos = top_right;
+//		verts[idx + 1].pos = bot_right;
+//		verts[idx + 2].pos = bot_left;
+//
+//		// Center and Radius
+//		glm::vec2 center = vec2_origin;
+//
+//		for (auto i = idx; i < idx + 3; i++) {
+//			verts[i].center = center;
+//			verts[i].radius = radius;
+//		}
+//	};
+//
+//	auto createBotLeft = [](glm::vec2 origin, float radius,
+//		std::vector<GPU_Circles_Vertex>& verts, size_t idx)
+//	{
+//		glm::vec2 vec2_origin{ origin.x, origin.y };
+//
+//		glm::vec2 top_left = vec2_origin;
+//		glm::vec2 bot_right = vec2_origin;
+//		glm::vec2 bot_left = vec2_origin;
+//
+//		bot_right += radius;
+//		bot_left.y += radius;
+//
+//		// Position
+//		verts[idx + 0].pos = top_left;
+//		verts[idx + 1].pos = bot_right;
+//		verts[idx + 2].pos = bot_left;
+//
+//		// Center and Radius
+//		glm::vec2 center = vec2_origin;
+//		center.x += radius;
+//
+//		for (auto i = idx; i < idx + 3; i++) {
+//			verts[i].center = center;
+//			verts[i].radius = radius;
+//		}
+//	};
+//
+//	auto getBoxModel = [](Element& elem) -> BoxModel* {
+//		
+//		auto flex = std::get_if<Flex>(&elem.elem);
+//		if (flex != nullptr) {
+//			return flex;
+//		}
+//
+//		auto par = std::get_if<Paragraph>(&elem.elem);
+//		if (par != nullptr) {
+//			return par;
+//		}
+//		
+//		return nullptr;
+//	};
+//
+//	this->layers.clear();
+//	this->layers.resize(user_interface.layers.size());
+//	auto ui_it = user_interface.layers.begin();
+//
+//	std::vector<GPU_Storage> elem_props;
+//
+//	vertex_buff.clear();
+//
+//	std::vector<GPU_Rects_Vertex> border_rects;
+//	std::vector<GPU_Circles_Vertex> border_tl_circles;
+//	std::vector<GPU_Circles_Vertex> border_tr_circles;
+//	std::vector<GPU_Circles_Vertex> border_br_circles;
+//	std::vector<GPU_Circles_Vertex> border_bl_circles;
+//
+//	std::vector<GPU_Rects_Vertex> padding_rects;
+//	std::vector<GPU_Circles_Vertex> padding_tl_circles;
+//	std::vector<GPU_Circles_Vertex> padding_tr_circles;
+//	std::vector<GPU_Circles_Vertex> padding_br_circles;
+//	std::vector<GPU_Circles_Vertex> padding_bl_circles;
+//
+//	size_t layer_offset = 0;
+//
+//	for (auto l = 0; l < user_interface.layers.size(); l++) {
+//
+//		ElementsLayer& ui_layer = *ui_it;
+//		GPU_ElementsLayer& gpu_layer = this->layers[l];
+//
+//		border_rects.clear();
+//		border_tl_circles.clear();
+//		border_tr_circles.clear();
+//		border_br_circles.clear();
+//		border_bl_circles.clear();
+//
+//		padding_rects.clear();
+//		padding_tl_circles.clear();
+//		padding_tr_circles.clear();
+//		padding_br_circles.clear();
+//		padding_bl_circles.clear();
+//
+//		gpu_layer.border_rects.offset = layer_offset;
+//		gpu_layer.border_tl_circles.offset = layer_offset;
+//		gpu_layer.border_tr_circles.offset = layer_offset;
+//		gpu_layer.border_br_circles.offset = layer_offset;
+//		gpu_layer.border_bl_circles.offset = layer_offset;
+//
+//		gpu_layer.padding_rects.offset = layer_offset;
+//		gpu_layer.padding_tl_circles.offset = layer_offset;
+//		gpu_layer.padding_tr_circles.offset = layer_offset;
+//		gpu_layer.padding_br_circles.offset = layer_offset;
+//		gpu_layer.padding_bl_circles.offset = layer_offset;
+//
+//		for (Element* elem : ui_layer.elems) {
+//
+//			Flex* flex;
+//			Paragraph* par;
+//			BoxModel* box;
+//			
+//			switch (elem->elem.index()) {
+//			case 0: {
+//				flex = std::get_if<Flex>(&elem->elem);
+//				box = flex;
+//				break;
+//			}
+//
+//			case 1: {
+//				par = std::get_if<Paragraph>(&elem->elem);
+//				box = par;
+//				break;
+//			}
+//				
+//			default:
+//				printf(code_location);
+//			}
+//			
+//			// Storage
+//			GPU_Storage& elem_prop = elem_props.emplace_back();
+//			elem_prop.border_color = box->border_color;
+//
+//			// Vertex
+//			glm::vec2 border_origin = box->_origin;
+//
+//			// If Border Present
+//			if (box->_border_top_thick || box->_border_right_thick || box->_border_bot_thick || box->_border_left_thick) {
+//
+//				// Rect
+//				{
+//					size_t last_idx = border_rects.size();
+//					border_rects.resize(border_rects.size() + 18);
+//
+//					createChamferedRectangle(border_origin, box->_borderbox_width, box->_borderbox_height,
+//						box->_border_tl_radius, box->_border_tr_radius, box->_border_br_radius, box->_border_bl_radius,
+//						border_rects, last_idx);
+//
+//					for (size_t i = last_idx; i < border_rects.size(); i++) {
+//						border_rects[i].color = box->border_color;
+//					}
+//
+//					for (size_t i = last_idx; i < border_rects.size(); i++) {
+//						border_rects[i].elem_idx = elem_props.size();
+//					}
+//				}
+//
+//				// Top Left Circle
+//				if (box->_border_tl_radius && (box->_border_top_thick || box->_border_left_thick)) {
+//
+//					size_t last_idx = border_tl_circles.size();
+//					border_tl_circles.resize(border_tl_circles.size() + 3);
+//
+//					createTopLeftCircle(border_origin, box->_border_tl_radius, 
+//						border_tl_circles, last_idx);
+//
+//					for (size_t i = last_idx; i < border_tl_circles.size(); i++) {
+//						border_tl_circles[i].color = box->border_color;
+//					}
+//				}
+//
+//				// Top Right Circle
+//				if (box->_border_tr_radius && (box->_border_top_thick || box->_border_right_thick)) {
+//
+//					size_t last_idx = border_tr_circles.size();
+//					border_tr_circles.resize(border_tr_circles.size() + 3);
+//
+//					glm::vec2 tr_origin = border_origin;
+//					tr_origin.x += box->_borderbox_width - box->_border_tr_radius;
+//
+//					createTopRightCircle(tr_origin, box->_border_tr_radius, 
+//						border_tr_circles, last_idx);
+//
+//					for (size_t i = last_idx; i < border_tr_circles.size(); i++) {
+//						border_tr_circles[i].color = box->border_color;
+//					}
+//				}
+//
+//				// Bottom Right Circle
+//				if (box->_border_br_radius && (box->_border_bot_thick || box->_border_right_thick)) {
+//
+//					size_t last_idx = border_br_circles.size();
+//					border_br_circles.resize(border_br_circles.size() + 3);
+//
+//					glm::vec2 br_origin = border_origin;
+//					br_origin.x += box->_borderbox_width - box->_border_br_radius;
+//					br_origin.y += box->_borderbox_height - box->_border_br_radius;
+//
+//					createBotRightCircle(br_origin, box->_border_br_radius, 
+//						border_br_circles, last_idx);
+//
+//					for (size_t i = last_idx; i < border_br_circles.size(); i++) {
+//						border_br_circles[i].color = box->border_color;
+//					}
+//				}
+//
+//				// Bottom Left Circle
+//				if (box->_border_bl_radius && (box->_border_bot_thick || box->_border_left_thick)) {
+//
+//					size_t last_idx = border_bl_circles.size();
+//					border_bl_circles.resize(border_bl_circles.size() + 3);
+//
+//					glm::vec2 bl_origin = border_origin;
+//					bl_origin.y += box->_borderbox_height - box->_border_bl_radius;
+//
+//					createBotLeft(bl_origin, box->_border_bl_radius,
+//						border_bl_circles, last_idx);
+//
+//					for (size_t i = last_idx; i < border_bl_circles.size(); i++) {
+//						border_bl_circles[i].color = box->border_color;
+//					}
+//				}
+//			}
+//			
+//			glm::vec2 padding_origin = border_origin;
+//
+//			// Padding Box
+//			{
+//				size_t last_idx = padding_rects.size();
+//				padding_rects.resize(padding_rects.size() + 18);
+//
+//				padding_origin.x += box->_border_left_thick;
+//				padding_origin.y += box->_border_top_thick;
+//
+//				createChamferedRectangle(padding_origin, box->_paddingbox_width, box->_paddingbox_height,
+//					box->_padding_tl_radius, box->_padding_tr_radius, box->_padding_br_radius, box->_padding_bl_radius,
+//					padding_rects, last_idx);
+//
+//				for (size_t i = last_idx; i < padding_rects.size(); i++) {
+//					padding_rects[i].color = box->background_color;
+//				}
+//
+//				for (size_t i = last_idx; i < padding_rects.size(); i++) {
+//					padding_rects[i].elem_idx = elem_props.size();
+//				}
+//			}
+//
+//			// Top Left
+//			if (box->_padding_tl_radius) {
+//
+//				size_t last_idx = padding_tl_circles.size();
+//				padding_tl_circles.resize(padding_tl_circles.size() + 3);
+//
+//				createTopLeftCircle(padding_origin, box->_padding_tl_radius,
+//					padding_tl_circles, last_idx);
+//
+//				for (size_t i = last_idx; i < padding_tl_circles.size(); i++) {
+//					padding_tl_circles[i].color = box->background_color;
+//				}
+//			}
+//
+//			// Top Right
+//			if (box->_padding_tr_radius) {
+//
+//				size_t last_idx = padding_tr_circles.size();
+//				padding_tr_circles.resize(padding_tr_circles.size() + 3);
+//
+//				glm::vec2 tr_origin = padding_origin;
+//				tr_origin.x += box->_paddingbox_width - box->_padding_tr_radius;
+//
+//				createTopRightCircle(tr_origin, box->_padding_tr_radius, 
+//					padding_tr_circles, last_idx);
+//
+//				for (size_t i = last_idx; i < padding_tr_circles.size(); i++) {
+//					padding_tr_circles[i].color = box->background_color;
+//				}
+//			}
+//
+//			// Bot Right
+//			if (box->_padding_br_radius) {
+//
+//				size_t last_idx = padding_br_circles.size();
+//				padding_br_circles.resize(padding_br_circles.size() + 3);
+//
+//				glm::vec2 br_origin = padding_origin;
+//				br_origin.x += box->_paddingbox_width - box->_padding_br_radius;
+//				br_origin.y += box->_paddingbox_height - box->_padding_br_radius;
+//
+//				createBotRightCircle(br_origin, box->_padding_br_radius,
+//					padding_br_circles, last_idx);
+//
+//				for (size_t i = last_idx; i < padding_br_circles.size(); i++) {
+//					padding_br_circles[i].color = box->background_color;
+//				}
+//			}
+//
+//			// Bot Left
+//			if (box->_padding_bl_radius) {
+//
+//				size_t last_idx = padding_bl_circles.size();
+//				padding_bl_circles.resize(padding_bl_circles.size() + 3);
+//
+//				glm::vec2 bl_origin = padding_origin;
+//				bl_origin.y += box->_paddingbox_height - box->_padding_bl_radius;
+//
+//				createBotLeft(bl_origin, box->_padding_bl_radius,
+//					padding_bl_circles, last_idx);
+//
+//				for (size_t i = last_idx; i < padding_bl_circles.size(); i++) {
+//					padding_bl_circles[i].color = box->background_color;
+//				}
+//			}
+//		}
+//
+//		size_t border_rects_offset = 0;
+//		size_t border_tl_circles_offset = border_rects.size() * sizeof(GPU_Rects_Vertex);
+//		size_t border_tr_circles_offset = border_tl_circles_offset + border_tl_circles.size() * sizeof(GPU_Circles_Vertex);
+//		size_t border_br_circles_offset = border_tr_circles_offset + border_tr_circles.size() * sizeof(GPU_Circles_Vertex);
+//		size_t border_bl_circles_offset = border_br_circles_offset + border_br_circles.size() * sizeof(GPU_Circles_Vertex);
+//
+//		size_t padding_rects_offset = border_bl_circles_offset + border_bl_circles.size() * sizeof(GPU_Circles_Vertex);
+//		size_t padding_tl_circles_offset = padding_rects_offset + padding_rects.size() * sizeof(GPU_Rects_Vertex);
+//		size_t padding_tr_circles_offset = padding_tl_circles_offset + padding_tl_circles.size() * sizeof(GPU_Circles_Vertex);
+//		size_t padding_br_circles_offset = padding_tr_circles_offset + padding_tr_circles.size() * sizeof(GPU_Circles_Vertex);
+//		size_t padding_bl_circles_offset = padding_br_circles_offset + padding_br_circles.size() * sizeof(GPU_Circles_Vertex);
+//
+//		layer_offset += padding_bl_circles_offset + padding_bl_circles.size() * sizeof(GPU_Circles_Vertex);
+//
+//		// Border
+//		if (border_rects.size()) {
+//
+//			gpu_layer.border_rects.offset += border_rects_offset;
+//			gpu_layer.border_rects.vertex_count = border_rects.size();
+//			checkErrStack1(vertex_buff.push(border_rects.data(), border_rects.size() * sizeof(GPU_Rects_Vertex)));
+//		}
+//
+//		if (border_tl_circles.size()) {
+//
+//			gpu_layer.border_tl_circles.offset += border_tl_circles_offset;
+//			gpu_layer.border_tl_circles.vertex_count = border_tl_circles.size();
+//			checkErrStack1(vertex_buff.push(border_tl_circles.data(), border_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (border_tr_circles.size()) {
+//
+//			gpu_layer.border_tr_circles.offset += border_tr_circles_offset;
+//			gpu_layer.border_tr_circles.vertex_count = border_tr_circles.size();
+//			checkErrStack1(vertex_buff.push(border_tr_circles.data(), border_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (border_br_circles.size()) {
+//
+//			gpu_layer.border_br_circles.offset += border_br_circles_offset;
+//			gpu_layer.border_br_circles.vertex_count = border_br_circles.size();
+//			checkErrStack1(vertex_buff.push(border_br_circles.data(), border_br_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (border_bl_circles.size()) {
+//
+//			gpu_layer.border_bl_circles.offset += border_bl_circles_offset;
+//			gpu_layer.border_bl_circles.vertex_count = border_bl_circles.size();
+//			checkErrStack1(vertex_buff.push(border_bl_circles.data(), border_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		// Padding
+//		{
+//			gpu_layer.padding_rects.offset += padding_rects_offset;
+//			gpu_layer.padding_rects.vertex_count = padding_rects.size();
+//			checkErrStack1(vertex_buff.push(padding_rects.data(), padding_rects.size() * sizeof(GPU_Rects_Vertex)));
+//		}
+//
+//		if (padding_tl_circles.size()) {
+//
+//			gpu_layer.padding_tl_circles.offset += padding_tl_circles_offset;
+//			gpu_layer.padding_tl_circles.vertex_count = padding_tl_circles.size();
+//			checkErrStack1(vertex_buff.push(padding_tl_circles.data(), padding_tl_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (padding_tr_circles.size()) {
+//
+//			gpu_layer.padding_tr_circles.offset += padding_tr_circles_offset;
+//			gpu_layer.padding_tr_circles.vertex_count = padding_tr_circles.size();
+//			checkErrStack1(vertex_buff.push(padding_tr_circles.data(), padding_tr_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (padding_br_circles.size()) {
+//
+//			gpu_layer.padding_br_circles.offset += padding_br_circles_offset;
+//			gpu_layer.padding_br_circles.vertex_count = padding_br_circles.size();
+//			checkErrStack1(vertex_buff.push(padding_br_circles.data(), padding_br_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//		
+//		if (padding_bl_circles.size()) {
+//
+//			gpu_layer.padding_bl_circles.offset += padding_bl_circles_offset;
+//			gpu_layer.padding_bl_circles.vertex_count = padding_bl_circles.size();
+//			checkErrStack1(vertex_buff.push(padding_bl_circles.data(), padding_bl_circles.size() * sizeof(GPU_Circles_Vertex)));
+//		}
+//
+//		++ui_it;
+//	}
+//
+//	checkErrStack1(vertex_buff.flush());
+//
+//	checkErrStack1(storage_buff.push(elem_props.data(), elem_props.size()));
+//	checkErrStack1(storage_buff.flush());
+//
+//	return ErrStack();
+//}
 
 ErrStack VulkanRenderer::draw()
 {

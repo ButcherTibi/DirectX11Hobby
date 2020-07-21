@@ -111,7 +111,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(SolutionDir)Sculpt\ThirdParty\FreeType\;$(SolutionDir)Sculpt\ThirdParty\FreeType\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
@@ -202,7 +202,6 @@
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
     <ClCompile Include="DX11ObjectTypes.cpp" />
-    <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
     <ClCompile Include="InternalRenderer.cpp" />
     <ClCompile Include="Nui.cpp" />
@@ -215,13 +214,13 @@
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MathDefinitions.cpp" />
-    <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="VulkanContext.cpp" />
+    <ClCompile Include="VulkanRender.cpp" />
     <ClCompile Include="MathTypes.cpp" />
     <ClCompile Include="MeshOps.cpp" />
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="Resources.cpp" />
     <ClCompile Include="stb_image.cpp" />
-    <ClCompile Include="UIComponents.cpp" />
     <ClCompile Include="InternalUI.cpp" />
     <ClCompile Include="vma_implementation.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -255,11 +254,10 @@
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MathTypes.h" />
     <ClInclude Include="TextureAtlas.h" />
-    <ClInclude Include="UIComponents.h" />
     <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />
-    <ClInclude Include="Renderer.h" />
-    <ClInclude Include="VulkanSystems.h" />
+    <ClInclude Include="VulkanRender.h" />
+    <ClInclude Include="VulkanSystems.hpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="CirclePS.hlsl">

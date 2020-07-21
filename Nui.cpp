@@ -7,9 +7,9 @@ using namespace nui;
 using namespace nui_int;
 
 
-ErrStack Nui::create(HWND hwnd)
+ErrStack Nui::create(HWND hwnd, HINSTANCE hinstance)
 {
-	return this->internals.create(hwnd);
+	return this->internals.create(hwnd, hinstance);
 }
 
 Element& Nui::getRoot()

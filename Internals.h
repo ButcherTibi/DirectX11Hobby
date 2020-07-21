@@ -5,14 +5,8 @@
 #include <list>
 #include <variant>
 
-// Windows
-#define WIN32_LEAN_AND_MEAN
-#include "Windows.h"
-
-// DX11
-#include <DirectXMath.h>
-
-#include "DX11Renderer.h"
+// Vulkan
+#include "VulkanRender.h"
 
 // Mine
 #include "ErrorStuff.h"
@@ -99,7 +93,7 @@ namespace nui {
 		FlexCrossAxisAlign flex_cross_axis_align_self = FlexCrossAxisAlign::PARENT;
 
 		// Computed Content Box (if relative then recompute for rendering)
-		DirectX::XMFLOAT2 _origin;
+		glm::vec2 _origin;
 
 		float _contentbox_width;
 		float _contentbox_height;
@@ -253,10 +247,10 @@ namespace nui_int {
 	class Internals {
 	public:
 		UserInterface user_interface;
-		DX11Renderer dx11_renderer;
+		VulkanRenderer vkr;
 
 	public:
-		ErrStack create(HWND hwnd);
+		ErrStack create(HWND hwnd, HINSTANCE hinstance);
 
 		ErrStack generateGPU_Data();
 
