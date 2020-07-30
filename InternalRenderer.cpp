@@ -11,25 +11,28 @@ ErrStack Internals::create(HWND hwnd, HINSTANCE hinstance)
 {
 	ErrStack err_stack{};
 	
+	// Draw Calls
+	// for each layer in layers
+	//   for each elem in layer
+	//     draw border rect verts
+	//     draw border circle verts, set mask R to used or not, set G to antialising amount
+	//     draw padding rect verts
+	//     draw padding circle verts, set mask R to used or not, set G to antialising amount
+	//     -------------------------
+	//     draw composite: blend/overwrite between border and padding using masks into 
+	//     resulting composite
+
 	return err_stack;
 }
 
 ErrStack Internals::draw()
 {
 	ErrStack err_stack{};
-	HRESULT hr{};
 
-	
-	UserInterface& ui = user_interface;
 
-	ui.calcGraphLayout();
-	checkErrStack1(generateGPU_Data());
-
-	
 
 	return err_stack;
 }
-
 
 ErrStack Internals::generateGPU_Data()
 {

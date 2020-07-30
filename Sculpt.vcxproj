@@ -201,7 +201,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AppLevel.cpp" />
-    <ClCompile Include="DX11ObjectTypes.cpp" />
+    <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
     <ClCompile Include="InternalRenderer.cpp" />
     <ClCompile Include="Nui.cpp" />
@@ -215,11 +215,11 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MathDefinitions.cpp" />
     <ClCompile Include="VulkanContext.cpp" />
+    <ClCompile Include="VulkanNext.cpp" />
     <ClCompile Include="VulkanRender.cpp" />
     <ClCompile Include="MathTypes.cpp" />
     <ClCompile Include="MeshOps.cpp" />
     <ClCompile Include="Primitives.cpp" />
-    <ClCompile Include="Resources.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="InternalUI.cpp" />
     <ClCompile Include="vma_implementation.cpp" />
@@ -230,15 +230,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="MathUtils.cpp" />
-    <ClCompile Include="Pipeline.cpp" />
     <ClCompile Include="ErrorStuff.cpp" />
-    <ClCompile Include="CommandBuffers.cpp" />
-    <ClCompile Include="VulkanSystems.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CommonTypes.h" />
-    <ClInclude Include="DX11ObjectTypes.h" />
-    <ClInclude Include="DX11Renderer.h" />
     <ClInclude Include="FileIO.h" />
     <ClInclude Include="AppLevel.h" />
     <ClInclude Include="GPU_ShaderTypes.h" />
@@ -256,34 +251,9 @@
     <ClInclude Include="TextureAtlas.h" />
     <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />
+    <ClInclude Include="VulkanNext.hpp" />
     <ClInclude Include="VulkanRender.h" />
     <ClInclude Include="VulkanSystems.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="CirclePS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="RectanglePS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="RectangleVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -8,8 +8,6 @@
 
 class AppLevel {
 public:
-	HWND hwnd = NULL;
-
 	uint32_t display_width;
 	uint32_t display_height;
 

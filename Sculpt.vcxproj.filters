@@ -35,17 +35,14 @@
     <Filter Include="Source Files\NewUserInterface">
       <UniqueIdentifier>{a755132e-1fb2-44ea-aa2b-b94efb1bfc2f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\NewUserInterface\DX11Renderer">
-      <UniqueIdentifier>{40aec18c-f127-445c-8184-3ae1b43a054f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\NewUserInterface\DX11Renderer\Shaders">
-      <UniqueIdentifier>{422d0480-18b7-4347-8103-4bef298c0c1a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\NewUserInterface\VulkanRenderer">
       <UniqueIdentifier>{49af7614-544f-4745-8cc2-ec256a2a0c2a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\NewUserInterface\VulkanRenderer\VulkanSystems">
       <UniqueIdentifier>{16514fe7-3e9a-409f-8c56-f6c5a9302513}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\VulkanNext">
+      <UniqueIdentifier>{a086b411-670c-4d63-a810-476b632509b3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -94,20 +91,8 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files\EntryPoint</Filter>
     </ClCompile>
-    <ClCompile Include="VulkanSystems.cpp">
-      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
-    </ClCompile>
-    <ClCompile Include="Pipeline.cpp">
-      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
-    </ClCompile>
-    <ClCompile Include="CommandBuffers.cpp">
-      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
-    </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
-    </ClCompile>
-    <ClCompile Include="Resources.cpp">
-      <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClCompile>
     <ClCompile Include="CommonTypes.cpp">
       <Filter>Source Files\Mine</Filter>
@@ -117,9 +102,6 @@
     </ClCompile>
     <ClCompile Include="InternalRenderer.cpp">
       <Filter>Source Files\NewUserInterface</Filter>
-    </ClCompile>
-    <ClCompile Include="DX11ObjectTypes.cpp">
-      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
     </ClCompile>
     <ClCompile Include="InternalUI.cpp">
       <Filter>Source Files\NewUserInterface</Filter>
@@ -135,6 +117,12 @@
     </ClCompile>
     <ClCompile Include="VulkanContext.cpp">
       <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanNext.cpp">
+      <Filter>Source Files\VulkanNext</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandList.cpp">
+      <Filter>Source Files\VulkanNext</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -183,14 +171,8 @@
     <ClInclude Include="TextureAtlas.h">
       <Filter>Source Files\TextureAtlas</Filter>
     </ClInclude>
-    <ClInclude Include="DX11ObjectTypes.h">
-      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
-    </ClInclude>
     <ClInclude Include="Internals.h">
       <Filter>Source Files\NewUserInterface</Filter>
-    </ClInclude>
-    <ClInclude Include="DX11Renderer.h">
-      <Filter>Source Files\NewUserInterface\DX11Renderer</Filter>
     </ClInclude>
     <ClInclude Include="Nui.h">
       <Filter>Source Files\NewUserInterface</Filter>
@@ -204,16 +186,8 @@
     <ClInclude Include="VulkanSystems.hpp">
       <Filter>Source Files\NewUserInterface\VulkanRenderer\VulkanSystems</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="RectanglePS.hlsl">
-      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="RectangleVS.hlsl">
-      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="CirclePS.hlsl">
-      <Filter>Source Files\NewUserInterface\DX11Renderer\Shaders</Filter>
-    </FxCompile>
+    <ClInclude Include="VulkanNext.hpp">
+      <Filter>Source Files\VulkanNext</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

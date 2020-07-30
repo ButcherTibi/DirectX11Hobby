@@ -246,8 +246,8 @@ namespace nui_int {
 
 	class Internals {
 	public:
-		UserInterface user_interface;
-		VulkanRenderer vkr;
+		UserInterface ui;
+		VNX_Renderer vnr;
 
 	public:
 		ErrStack create(HWND hwnd, HINSTANCE hinstance);

@@ -17,6 +17,7 @@
 
 enum class ErrorOrigins {
 	NOT_SPECIFIED,
+	VULKAN_ERROR_CODE,
 	WINDOWS_ERROR_HANDLE
 };
 
@@ -36,12 +37,10 @@ struct [[nodiscard]] ErrStack {
 	std::vector<Error> error_stack;
 
 	ErrStack();
-	ErrStack(Error err);
 	ErrStack(std::string location, std::string msg);
-	ErrStack(std::string location, std::string msg, int32_t err_code);
+	ErrStack(std::string location, std::string msg, int32_t err_code, ErrorOrigins origin);
 
 	void pushError(std::string location, std::string msg);
-	void pushHResultError(std::string location, std::string msg, int32_t hr);
 
 	Error lastError();
 
@@ -73,14 +72,7 @@ std::string asIs(char c);
 #define checkVkRes(vk_func, msg) \
 	vk_res = vk_func; \
 	if (vk_res != VK_SUCCESS) { \
-		return ErrStack(code_location, msg); \
-	}
-
-#define checkHResult(hr_func, msg) \
-	hr = hr_func; \
-	if (FAILED(hr)) { \
-		err_stack.pushHResultError(code_location, msg, hr); \
-		return err_stack; \
+		return ErrStack(code_location, msg, vk_res, ErrorOrigins::VULKAN_ERROR_CODE); \
 	}
 
 // prints a message, if condition is false

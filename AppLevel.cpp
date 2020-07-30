@@ -1,7 +1,6 @@
 
 // Mine
 #include "FileIO.h"
-#include "DX11Renderer.h"
 
 // new
 #include "Nui.h"
@@ -49,6 +48,8 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	app_level.display_width = 1024;
 	app_level.display_height = 720;
 
+	HWND hwnd;
+
 	// Window
 	WNDCLASSEXA window_class = {};
 	{
@@ -69,7 +70,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		}
 
 		// Create the window.
-		app_level.hwnd = CreateWindowExA(
+		hwnd = CreateWindowExA(
 			WS_EX_LEFT,
 			win_class_name,
 			"Vulkan aplication",
@@ -84,7 +85,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 			NULL        // Additional application data
 		);
 
-		if (app_level.hwnd == NULL) {
+		if (hwnd == NULL) {
 			printf("Error: \n"
 				"failed to create window \n"
 				"Windows error: %s \n", getLastError().c_str());
@@ -94,40 +95,19 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
 	ErrStack err;
 
-	nui::Nui ui;
-	err = ui.create(app_level.hwnd, hinstance);
-	if (err.isBad()) {
-		err.debugPrint();
-		return 1;
-	}
-
-	nui::Element& root = ui.getRoot();
-	{
-		nui::Flex& root_elem = ui.getRootElement();
-
-		nui::Flex f0 = {};
-		f0.background_color = { 1, 0, 0, 1 };
-		f0.box_sizing = nui::BoxSizing::BORDER;
-		f0.width.setRelative(0.5);
-		f0.height.setRelative(0.5);
-		f0.padding_tl_radius = 50;
-		f0.padding_tr_radius = 50;
-		f0.padding_br_radius = 50;
-		f0.padding_bl_radius = 50;
-		nui::Element& f0_elem = ui.addElement(root, f0);
-	}
+	
 
 	// Message loop
 	while (app_level.run_app_loop)
 	{
 		// Get Window Messages
 		MSG msg = { };
-		while (PeekMessageA(&msg, app_level.hwnd, 0, 0, PM_REMOVE)) {
+		while (PeekMessageA(&msg, hwnd, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageA(&msg);
 		}
 
-		err = ui.draw();
+		
 		if (err.isBad()) break;
 	}
 
@@ -136,7 +116,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		return 1;
 	}
 
-	DestroyWindow(app_level.hwnd);
+	DestroyWindow(hwnd);
 
 	return 0;
 }

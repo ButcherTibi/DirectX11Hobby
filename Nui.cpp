@@ -14,18 +14,18 @@ ErrStack Nui::create(HWND hwnd, HINSTANCE hinstance)
 
 Element& Nui::getRoot()
 {
-	return this->internals.user_interface.getRoot();
+	return this->internals.ui.getRoot();
 }
 
 Flex& Nui::getRootElement()
 {
-	return this->internals.user_interface.getRootElement();
+	return this->internals.ui.getRootElement();
 }
 
 template<typename T>
 Element& Nui::addElement(Element& parent, T& new_elem)
 {
-	return this->internals.user_interface.addElement(parent, new_elem);
+	return this->internals.ui.addElement(parent, new_elem);
 }
 template Element& Nui::addElement(Element& parent, Flex& new_elem);
 

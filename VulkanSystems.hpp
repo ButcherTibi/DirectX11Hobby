@@ -28,501 +28,127 @@
 // attempt number 3 to domesticate Vulkan 
 namespace vks {
 
-	class Instance {
-	public:
-		std::vector<const char*> validation_layers = {
-			"VK_LAYER_LUNARG_standard_validation" 
-		};
-		std::vector<const char*> instance_extensions = { 
-			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-		};
-
-		VkInstance instance = VK_NULL_HANDLE;
-
-		VkDebugUtilsMessageSeverityFlagsEXT debug_msg_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		VkDebugUtilsMessengerEXT callback = VK_NULL_HANDLE;
-
-		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func;
-
-	public:
-		ErrStack create();
-
-		void destroy();
-
-		~Instance();
+	enum class LoadType {
+		STAGING,
+		MEMCPY,
 	};
 
+	//////////////////////////////// New APi //////////////////////////////////////
 
-	class Surface {
-		Instance const* instance = nullptr;
+	class Instance2;
+	class PhysicalDevice2;
+	class LogicalDevice2;
+	class Swapchain2;
+	class Fence2;
+	class Semaphore2;
+	class CommandPool2;
+	class Texture;
+	class RawBuffer;
+
+
+	struct SurfaceCreateInfo {
+		const void* pNext = NULL;
+		VkWin32SurfaceCreateFlagsKHR flags = 0;
+		HINSTANCE hinstance;
+		HWND hwnd;
+	};
+
+	class Surface2 {
 	public:
+		Instance2* instance;
+
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
-	
-	public:
-		ErrStack create(Instance* instance, HINSTANCE hinstance, HWND hwnd);
 
+	public:
 		void destroy();
 
-		~Surface();
+		~Surface2();
 	};
 
 
-	class PhysicalDevice {
-	public:
-		VkPhysicalDeviceFeatures phys_dev_features = {};
-		std::vector<const char*> device_extensions = { 
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			VK_EXT_MEMORY_BUDGET_EXTENSION_NAME };
-
-		VkPhysicalDevice physical_device;
-
-		uint32_t queue_fam_idx;
-		VkPhysicalDeviceProperties phys_dev_props;
-		VkPhysicalDeviceMemoryProperties mem_props;
-
-		VkSampleCountFlagBits max_MSAA;
-
-	public:
-		PhysicalDevice();
-		ErrStack create(Instance* instance, Surface* surface);
+	struct SwapchainCreateInfo {
+		const void* pNext = NULL;
+		VkSwapchainCreateFlagsKHR flags = 0;
+		uint32_t minImageCount = 0;
+		VkFormat imageFormat = VK_FORMAT_MAX_ENUM;
+		VkColorSpaceKHR imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+		uint32_t width = 0;
+		uint32_t height = 0;
+		uint32_t imageArrayLayers = 1;
+		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		VkSharingMode imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		std::vector<uint32_t> queue_family_indices;
+		VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+		VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+		VkBool32 clipped = VK_TRUE;
+		VkSwapchainKHR oldSwapchain = NULL;
 	};
 
-
-	class LogicalDevice {
-		Instance* instance = nullptr;
+	class Swapchain2 {
 	public:
-		float queue_priority = 1.0f;
+		LogicalDevice2* dev;
 
-		VkDevice logical_device = VK_NULL_HANDLE;
-
-		VkQueue queue;
-
-		VmaAllocator allocator;
-
-	public:
-		ErrStack create(Instance* instance, PhysicalDevice* phys_dev);
-
-		ErrStack setDebugName(uint64_t obj, VkObjectType obj_type, std::string name);
-
-		void destroy();
-
-		~LogicalDevice();
-	};
-
-
-	class Swapchain {
-		LogicalDevice* logical_device = nullptr;
-
-	public:
-		//VkSurfaceCapabilitiesKHR capabilities;
-		VkExtent2D resolution = {800, 600};
-
-		VkSurfaceTransformFlagBitsKHR pre_transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-		VkCompositeAlphaFlagBitsKHR composite_alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		VkPresentModeKHR presentation_mode = VK_PRESENT_MODE_FIFO_KHR;
-		VkSurfaceFormatKHR surface_format;
-
+		SwapchainCreateInfo info;
 		VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
 		std::vector<VkImage> images;
 		std::vector<VkImageView> views;
 
 	public:
-		ErrStack create(Surface* surface, PhysicalDevice* phys_dev, LogicalDevice* logical_dev,
-			uint32_t width, uint32_t height);
-
-		ErrStack setDebugName(std::string name);
-
 		void destroy();
 
-		~Swapchain();
+		~Swapchain2();
 	};
 
 
-	class CommandPool {
-		LogicalDevice* logical_dev = nullptr;
-	public:
-
-		VkCommandPool cmd_pool = VK_NULL_HANDLE;
-	public:
-		ErrStack create(LogicalDevice* logical_dev, PhysicalDevice* phys_dev);
-
-		void destroy();
-
-		~CommandPool();
+	struct FenceCreateInfo {
+		const void* pNext = NULL;
+		VkFenceCreateFlags flags = 0;
 	};
 
-	
-	class SingleCommandBuffer {
-		LogicalDevice* logical_dev = nullptr;
-		CommandPool* cmd_pool;
-
-		ErrStack* err;
+	class Fence2 {
 	public:
-		VkCommandBuffer cmd_buff;
-	public:
-		SingleCommandBuffer(LogicalDevice* logical_dev, CommandPool* cmd_pool, ErrStack* r_err);
-		~SingleCommandBuffer();
-	};
+		LogicalDevice2* dev;
 
-
-	class StagingBuffer {
-	public:
-		LogicalDevice* logical_dev = nullptr;
-
-		VkBuffer buff = VK_NULL_HANDLE;
-		VmaAllocation buff_alloc;
-		VmaAllocationInfo vma_r_info = {};
-		void* mem;	
-		size_t load_size = 0;
-
-	public:
-		ErrStack create_(size_t buff_size,
-			VkBuffer& new_buff, VmaAllocation& new_alloc, void*& new_mem);
-
-		ErrStack reserve(size_t size);
-
-		ErrStack push(void* data, size_t size);
-
-		void clear();
-
-		void destroy();
-
-		~StagingBuffer();
-
-		ErrStack setDebugName(std::string name);
-	};
-
-
-	enum class LoadType {
-		STAGING,
-		MEMCPY,
-	};
-
-
-	class Buffer {
-	public:
-		LogicalDevice* logical_dev_ = nullptr;
-		CommandPool* cmd_pool_ = nullptr;
-		StagingBuffer* staging_ = nullptr;
-		VkBufferUsageFlags usage_;
-		VmaMemoryUsage mem_usage_;
-		LoadType load_type_;
-		size_t load_size_;
-
-		VkBuffer buff = VK_NULL_HANDLE;
-		void* mem;
-		VmaAllocation buff_alloc;
-		VmaAllocationInfo vma_r_info = {};
-
-	public:
-		ErrStack create_(size_t size, VkBuffer& new_buff, VmaAllocation& new_alloc, void*& new_mem);
-
-		void create(LogicalDevice* logical_dev, CommandPool* cmd_pool, StagingBuffer* staging,
-			VkBufferUsageFlags usage, VmaMemoryUsage mem_usage);
-
-		ErrStack push(void* data, size_t size);
-
-		ErrStack flush();
-
-		void clear();
-
-		void destroy();
-
-		~Buffer();
-
-		ErrStack setDebugName(std::string name);
-	};
-
-
-	void cmdChangeImageLayout(VkCommandBuffer cmd_buff, VkImage img, VkImageLayout old_layout,
-		VkImageLayout new_layout);
-
-
-	class Image {
-		LogicalDevice* logical_dev = nullptr;
-
-	public:
-		VkImage img = VK_NULL_HANDLE;
-		void* mem;
-
-		VmaAllocation alloc;
-		VmaAllocationInfo alloc_info;
-		LoadType load_type;
-
-		// Image Properties
-		uint32_t width;
-		uint32_t height;
-		VkFormat format;
-		VkImageLayout layout;
-		uint32_t mip_lvl;
-		uint32_t samples;
-
-	private:
-		ErrStack copyBufferToImage(CommandPool* cmd_pool, Buffer* buff);
-
-	public:
-		ErrStack recreate(LogicalDevice* logical_dev, VkImageCreateInfo* info, VmaMemoryUsage mem_usage);
-
-		ErrStack setDebugName(std::string name);
-
-		ErrStack changeImageLayout(CommandPool* cmd_pool, VkImageLayout new_layout);
-
-		ErrStack load(void* colors, size_t size, CommandPool* cmd_pool, Buffer* staging_buff,
-			VkImageLayout layout_after_load);
-
-		void destroy();
-
-		~Image();	
-	};
-
-
-	class ImageView {
-		LogicalDevice* logical_dev = nullptr;
-
-	public:
-		VkImageView view;
-
-	public:
-		ErrStack recreate(LogicalDevice* logical_dev, VkImageViewCreateInfo* info);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~ImageView();
-	};
-
-
-	class Sampler {
-		LogicalDevice const* logical_dev = nullptr;
-	public:
-		VkSampler sampler = VK_NULL_HANDLE;
-	public:
-		ErrStack create(LogicalDevice* logical_dev, VkSamplerCreateInfo& info);
-
-		void destroy();
-
-		~Sampler();
-	};
-
-
-	class Renderpass {
-		LogicalDevice* logical_dev = nullptr;
-	public:
-
-		VkRenderPass renderpass = VK_NULL_HANDLE;
-	public:
-		ErrStack create(LogicalDevice* logical_dev, VkRenderPassCreateInfo* info);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~Renderpass();
-	};
-
-
-	class Framebuffer {
-	public:
-		LogicalDevice* logical_dev_ = nullptr;
-
-		VkFramebuffer frame_buff;
-	public:
-		ErrStack create(LogicalDevice* logical_dev, Renderpass* renderpass,
-			std::vector<VkImageView>& attachments, uint32_t width, uint32_t height);
-
-		void destroy();
-
-		ErrStack setDebugName(std::string name);
-
-		~Framebuffer();
-	};
-
-
-	class DescriptorSetLayout {
-		LogicalDevice* logical_dev = nullptr;
-
-	public:
-		VkDescriptorSetLayout descp_layout = VK_NULL_HANDLE;
-
-	public:
-		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorSetLayoutBinding>& bindings);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~DescriptorSetLayout();
-	};
-
-
-	class DescriptorPool {
-		LogicalDevice* logical_dev = nullptr;
-
-	public:
-		VkDescriptorPool descp_pool = VK_NULL_HANDLE;
-
-	public:
-		ErrStack create(LogicalDevice* logical_dev, std::vector<VkDescriptorPoolSize>& pools, uint32_t max_sets);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~DescriptorPool();
-	};
-
-
-	class DescriptorSet {
-		LogicalDevice* logical_dev = nullptr;
-
-	public:
-		VkDescriptorSet descp_set = VK_NULL_HANDLE;
-
-	public:
-		ErrStack create(LogicalDevice* logical_dev, DescriptorPool* pool, DescriptorSetLayout* layout);
-
-		ErrStack setDebugName(std::string name);
-
-		void update(std::vector<VkWriteDescriptorSet>& writes);
-	};
-
-
-	class PipelineLayout {
-		LogicalDevice const* logical_dev = nullptr;
-	public:
-
-		VkPipelineLayout pipe_layout = VK_NULL_HANDLE;
-
-	public:
-		ErrStack create(LogicalDevice* logical_dev, VkPipelineLayoutCreateInfo* info);
-
-		void destroy();
-
-		~PipelineLayout();
-	};
-
-
-	// shove the code back inside it
-	class ShaderModule {
-		LogicalDevice* logical_dev = nullptr;
-	public:
-
-		VkShaderStageFlagBits stage = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
-		VkShaderModule sh_module = VK_NULL_HANDLE;
-
-	public:
-		ErrStack recreate(LogicalDevice* logical_dev, std::vector<char>& code, VkShaderStageFlagBits stage);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~ShaderModule();
-	};
-
-	class GraphicsPipeline {
-		LogicalDevice* logical_dev = nullptr;
-	public:	
-		
-		VkPipeline pipeline = VK_NULL_HANDLE;
-
-	public:
-		ErrStack create(LogicalDevice* logical_dev, VkGraphicsPipelineCreateInfo* info);
-
-		ErrStack setDebugName(std::string name);
-
-		void destroy();
-
-		~GraphicsPipeline();
-	};
-
-
-	struct CmdBufferTask
-	{
-		uint32_t idx;
-		VkCommandPool cmd_pool;
-		VkCommandBuffer cmd_buff;
-		ErrStack err;
-	};
-
-	class RenderingComandBuffers {
-		LogicalDevice const* logical_dev = nullptr;
-	public:
-		std::vector<CmdBufferTask> cmd_buff_tasks;
-
-	public:
-		ErrStack recreate(LogicalDevice* logical_dev, PhysicalDevice* phys_dev, uint32_t count);
-
-		void destroy();
-
-		~RenderingComandBuffers();
-	};
-
-
-	class Fence {
-		LogicalDevice const* logical_dev = nullptr;
-	public:
 		VkFence fence = VK_NULL_HANDLE;
 
 	public:
-		ErrStack create(LogicalDevice* logical_dev, VkFenceCreateFlags flags = 0);
-
 		ErrStack waitAndReset(uint64_t max_wait_time = UINT64_MAX);
 
 		void destroy();
-
-		~Fence();
+		~Fence2();
 	};
 
 
-	class Semaphore {
-		LogicalDevice const* logical_dev = nullptr;
+	struct SemaphoreCreateInfo {
+		const void* pNext = NULL;
+		VkSemaphoreCreateFlags flags = 0;
+	};
+
+	class Semaphore2 {
 	public:
+		LogicalDevice2* dev;
+
 		VkSemaphore semaphore = VK_NULL_HANDLE;
-	
-	public:
-		ErrStack recreate(LogicalDevice* logical_dev);
 
+	public:
 		void destroy();
 
-		~Semaphore();
+		~Semaphore2();
 	};
 
 
-	//////////////////////////////// New APi //////////////////////////////////////
-
-	class Context;
-	class RawBuffer;
-	class Texture;
-
-
-	class VulkanFence {
-	public:
-		Context* context;
-
-		VkFence fence = VK_NULL_HANDLE;
-
-	public:
-		ErrStack waitAndReset(uint64_t max_wait_time = UINT64_MAX);
-
-		void destroy();
-		~VulkanFence();
+	struct CommandBufferCreateInfo {
+		VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	};
-
 
 	class CommandBuffer {
 	public:
-		Context* context = nullptr;
+		CommandPool2* pool;
 
 		VkCommandBuffer cmd_buff;
-		VulkanFence fence;
+		Fence2 fence;
 
 	public:
 		ErrStack beginRecording(VkCommandBufferUsageFlags flags);
@@ -530,27 +156,81 @@ namespace vks {
 		void copyBuffer(RawBuffer* src, RawBuffer* dst);
 		void changeTextureLayout(Texture* texture, VkImageLayout new_layout);
 
-		ErrStack finishRecording();
+		ErrStack finishRecording(VkQueue queue);
+	};
+
+
+	struct CommandPoolCreateInfo {
+		VkCommandPoolCreateFlags flags = 0;
+		int32_t queueFamilyIndex = -1;
+	};
+
+	class CommandPool2 {
+	public:
+		LogicalDevice2* dev;
+
+		VkCommandPool pool = VK_NULL_HANDLE;
+
+	public:
+		ErrStack createCommandBuffer(CommandBufferCreateInfo& info, CommandBuffer& command_buffer);
+
+		void destroy();
+		~CommandPool2();
+	};
+
+
+	struct ImageSubresourceRangeCreateInfo {
+		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		uint32_t baseMipLevel = 0;
+		uint32_t levelCount = 1;
+		uint32_t baseArrayLayer = 0;
+		uint32_t layerCount = 1;
+	};
+
+	struct TextureViewCreateInfo {
+		const void* pNext = NULL;
+		VkImageViewCreateFlags     flags = 0;
+		VkImageViewType            viewType = VK_IMAGE_VIEW_TYPE_2D;
+		VkComponentMapping         components = {};
+		ImageSubresourceRangeCreateInfo sub_res = {};
+	};
+
+	class TextureView {
+	public:
+		Texture* texture;
+
+		VkImageView view = VK_NULL_HANDLE;
+
+	public:
+		void destroy();
+
+		~TextureView();
 	};
 
 
 	struct TextureCreateInfo {
-		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		VkImageCreateFlags flags = 0;
+		VkImageType imageType = VK_IMAGE_TYPE_2D;
+		VkFormat format = VK_FORMAT_MAX_ENUM;
 		uint32_t width = 0;
 		uint32_t height = 0;
+		uint32_t depth = 1;
+		uint32_t mipLevels = 1;
+		uint32_t arrayLayers = 1;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 		VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		uint32_t queueFamilyIndexCount = 0;
+		const uint32_t* pQueueFamilyIndices = NULL;
+		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		VmaMemoryUsage mem_usage = VMA_MEMORY_USAGE_GPU_ONLY;
 	};
 
-	struct TextureViewCreateInfo {
-		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-	};
-
 	class Texture {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		VkImage img = VK_NULL_HANDLE;
 		void* mem;
@@ -560,15 +240,13 @@ namespace vks {
 		LoadType load_type;
 
 		// Image Properties
-		VkFormat format;
-		uint32_t width;
-		uint32_t height;
-		VkImageLayout layout;
-
-		VkImageView view = VK_NULL_HANDLE;
+		TextureCreateInfo info;
+		VkImageLayout current_layout;
 
 	public:
-		ErrStack addView(const TextureViewCreateInfo& info);
+		ErrStack createView(TextureViewCreateInfo& info, TextureView& view);
+
+		ErrStack setDebugName(std::string name);
 
 		void destroy();
 		~Texture();
@@ -587,21 +265,28 @@ namespace vks {
 
 	class RawBuffer {
 	public:
-		Context* context;
+		LogicalDevice2* dev;
 
 		VkBuffer buff = VK_NULL_HANDLE;
 		VmaAllocation buff_alloc;
 		void* mem;
 
 		// Props
+		size_t size;
 		BufferCreateInfo info;
 		VmaAllocationInfo vma_r_info = {};
 		LoadType load_type;
 
+	public:
 		ErrStack create(size_t size, BufferCreateInfo& info);
 		ErrStack resize(size_t new_size);
+
 		ErrStack loadStagedWait(size_t size, void* data, CommandBuffer& cmd_buff, RawBuffer& staging_buff);
+
 		void loadMemcpy(size_t size, void* data);
+
+		size_t getRequestedSize();
+		size_t getAllocatedSize();
 
 		void destroy();
 		~RawBuffer();
@@ -609,7 +294,7 @@ namespace vks {
 
 
 	template<typename T>
-	class ConstBuffer : RawBuffer {
+	class ConstBuffer : public RawBuffer {
 	public:
 		ErrStack load(T& value, RawBuffer& staging_buffer, CommandBuffer* cmd_buff = nullptr);
 	};
@@ -643,13 +328,25 @@ namespace vks {
 
 
 	template<typename T>
-	class ArrayBuffer : RawBuffer {
+	class VectorBuffer : public RawBuffer {
 	public:
+		ErrStack resize(size_t count);
 		ErrStack load(std::vector<T>& values, RawBuffer& staging_buffer, CommandBuffer* cmd_buff = nullptr);
+		size_t getCount();
 	};
 
 	template<typename T>
-	ErrStack ArrayBuffer<T>::load(std::vector<T>& values, RawBuffer& staging_buffer, CommandBuffer* cmd_buff)
+	ErrStack VectorBuffer<T>::resize(size_t count)
+	{
+		ErrStack err_stack{};
+
+		checkErrStack1(RawBuffer::resize(sizeof(T) * count));
+
+		return err_stack;
+	}
+
+	template<typename T>
+	ErrStack VectorBuffer<T>::load(std::vector<T>& values, RawBuffer& staging_buffer, CommandBuffer* cmd_buff)
 	{
 		ErrStack err_stack{};
 
@@ -657,15 +354,11 @@ namespace vks {
 
 		if (load_type == LoadType::STAGING) {
 
-			if (load_size > staging_buffer.vma_r_info.size) {
-				checkErrStack1(staging_buffer.resize(load_size));
-			}
-
 			if (cmd_buff == nullptr) {
-				checkErrStack1(loadStagedWait(load_size, values.data(), context->command_buff, staging_buffer));
+				checkErrStack1(RawBuffer::loadStagedWait(load_size, values.data(), context->command_buff, staging_buffer));
 			}
 			else {
-				checkErrStack1(loadStagedWait(load_size, values.data(), cmd_buff, staging_buffer));
+				checkErrStack1(RawBuffer::loadStagedWait(load_size, values.data(), cmd_buff, staging_buffer));
 			}
 		}
 		else {
@@ -675,16 +368,26 @@ namespace vks {
 		return err_stack;
 	}
 
+	template<typename T>
+	size_t VectorBuffer<T>::getCount()
+	{
+		return RawBuffer::size / sizeof(T);
+	}
+
 
 	struct FramebuffersCreateInfo {
+		uint32_t size = 0;
+		uint32_t width = 0;
+		uint32_t height = 0;
+
 		VkFramebufferCreateFlags flags = 0;
-		std::vector<VkImageView> atachments;
-		uint32_t layers = 0;
+		std::vector<TextureView*> atachments;
+		uint32_t layers = 1;
 	};
 
 	class Framebuffers {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		std::vector<VkFramebuffer> framebuffs;
 
@@ -694,14 +397,14 @@ namespace vks {
 
 
 	struct AtachmentCreateInfo {
-		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		VkFormat format = VK_FORMAT_UNDEFINED;
 		VkAttachmentDescriptionFlags flags = 0;
 		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		VkAttachmentStoreOp storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		VkAttachmentLoadOp stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		VkAttachmentStoreOp stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkImageLayout finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	};
 
@@ -733,7 +436,7 @@ namespace vks {
 
 	class Renderpass2 {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		VkRenderPass renderpass = VK_NULL_HANDLE;
 
@@ -760,7 +463,7 @@ namespace vks {
 
 	class DescriptorSetLayout2 {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		std::vector<DescriptorSetLayoutBinding> bindings;
 		VkDescriptorSetLayout layout = VK_NULL_HANDLE;
@@ -784,7 +487,7 @@ namespace vks {
 
 	class PipelineLayout2 {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		VkPipelineLayout layout = VK_NULL_HANDLE;
 
@@ -795,7 +498,7 @@ namespace vks {
 
 	class Shader {
 	public:
-		Context* context;
+		LogicalDevice2* dev;
 
 		VkShaderStageFlagBits stage;
 		VkShaderModule shader = VK_NULL_HANDLE;
@@ -904,7 +607,7 @@ namespace vks {
 		VkBool32 logicOpEnable = false;
 		VkLogicOp logicOp = VK_LOGIC_OP_CLEAR;
 		std::vector<ColorBlendAtachmentCreateInfo> attachments;
-		float blendConstants[4] = { 0, 0, 0, 0};
+		float blendConstants[4] = { 0, 0, 0, 0 };
 	};
 
 	struct DynamicStateCreateInfo {
@@ -933,7 +636,7 @@ namespace vks {
 
 	class GraphicsPipeline2 {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 	public:
 		VkPipeline pipeline = VK_NULL_HANDLE;
@@ -986,7 +689,7 @@ namespace vks {
 
 	class DescriptorPool2 {
 	public:
-		Context* context = nullptr;
+		LogicalDevice2* dev;
 
 		VkDescriptorPoolCreateFlags flags;
 		std::vector<DescriptorSetLayout2*> layouts;
@@ -1005,41 +708,195 @@ namespace vks {
 	};
 
 
-	class Context {
+	struct RenderingCommandBuffersCreateInfo {
+		uint32_t size = 0;
+		CommandPoolCreateInfo pool_info = {};
+		CommandBufferCreateInfo buff_info = {};
+	};
+
+	struct RenderingCommandTask {
+		uint32_t idx;
+		CommandPool2 pool;
+		CommandBuffer buff;
+		ErrStack err_stack;
+	};
+
+	class RenderingCommandBuffers2 {
 	public:
-		Instance instance;
-		Surface surface;
-		PhysicalDevice phys_dev;
-		LogicalDevice logical_dev;
+		LogicalDevice2* dev;
 
-		CommandPool command_pool;
-		CommandBuffer command_buff;
+		std::vector<RenderingCommandTask> tasks;
+	};
 
-		uint32_t width;
-		uint32_t height;
-		Swapchain swapchain;
+
+	struct DeviceQueueCreateInfo {
+		const void* pNext = NULL;
+		VkDeviceQueueCreateFlags flags = 0;
+		uint32_t queueFamilyIndex;
+		std::vector<float> queue_priorities = {
+			1
+		};
+	};
+
+	struct ExtensionsSupportInfo {
+		std::vector<char*> extensions = {
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_EXT_MEMORY_BUDGET_EXTENSION_NAME
+		};
+	};
+
+	struct FeaturesSupportInfo {
+		VkPhysicalDeviceFeatures features = {};
+	};
+
+	struct LogicalDeviceCreateInfo {
+		const void* pNext = NULL;
+		VkDeviceCreateFlags flags = 0;
+		std::vector<DeviceQueueCreateInfo> queue_infos;
+		std::vector<char*> layers = {
+			"VK_LAYER_LUNARG_standard_validation"
+		};
+		ExtensionsSupportInfo extensions = {};
+		FeaturesSupportInfo features = {};
+	};
+
+	class LogicalDevice2 {
+	public:
+		PhysicalDevice2* phys_dev;
+
+		VkDevice logical_device = VK_NULL_HANDLE;
+		VmaAllocator allocator;
+
+		// Default
+		uint32_t default_queue_family;
+		VkQueue default_queue;
+		Swapchain2* default_swapchain = nullptr;
 
 	public:
-		ErrStack create(HWND hwnd, HINSTANCE hinstance);
+		ErrStack setDebugName(uint64_t obj, VkObjectType obj_type, std::string name);
 
-		ErrStack getPhysicalSurfaceResolution(uint32_t& width, uint32_t& height);
+		ErrStack createSwapchain(SwapchainCreateInfo& info, Swapchain2& swapchain);
 
-		ErrStack createFence(VulkanFence& fence, VkFenceCreateFlags flags = 0);
-		ErrStack createCommandBuffer(CommandBuffer& command_buffer);
+		ErrStack createFence(FenceCreateInfo& info, Fence2& fence);
+		ErrStack createSemaphore(SemaphoreCreateInfo& info, Semaphore2& semaphore);
+		ErrStack createCommandPool(CommandPoolCreateInfo& info, CommandPool2& command_pool);
 
 		ErrStack createTexture(TextureCreateInfo& info, Texture& texture);
-		ErrStack createRawBuffer();
-		ErrStack createArrayBuffer();
-		ErrStack createConstBuffer();
+		ErrStack createRawBuffer(size_t size, BufferCreateInfo& info, RawBuffer& raw_buffer);
 
+		template<typename T>
+		ErrStack createConstBuffer(T& value, BufferCreateInfo& info, ConstBuffer<T>& const_buffer);
+
+		template<typename T>
+		ErrStack createArrayBuffer(size_t count, BufferCreateInfo& info, VectorBuffer<T>& array_buffer);
+	
 		ErrStack createRenderpass(RenderpassCreateInfo& info, Renderpass2& renderpass);
-
 		ErrStack createDescriptorSetLayout(DescriptorSetLayoutCreateInfo& info, DescriptorSetLayout2& descp_set_layout);
 		ErrStack createPipelineLayout(PipelineLayoutCreateInfo& info, PipelineLayout2& pipe_layout);
 		ErrStack createVertexShader(std::vector<char>& code, Shader& vertex_shader);
 		ErrStack createFragmentShader(std::vector<char>& code, Shader& fragment_shader);
 		ErrStack createGraphicsPipeline(GraphicsPipelineCreateInfo& info, GraphicsPipeline2& graphics_pipe);
-
 		void createDescriptorPool(DescriptorPoolCreateInfo& info, DescriptorPool2& descp_pool);
+		
+		ErrStack createRenderingCommandBuffers(RenderingCommandBuffersCreateInfo& info, RenderingCommandBuffers2& rendering_cmd_buffers);
+	
+		void destroy();
+
+		~LogicalDevice2();
+	};
+
+	template<typename T>
+	ErrStack LogicalDevice2::createConstBuffer(T& value, BufferCreateInfo& info, ConstBuffer<T>& const_buffer)
+	{
+		ErrStack err_stack{};
+
+		const_buffer = {};
+		const_buffer.context = this;
+		checkErrStack1(const_buffer.create(sizeof(T), info));
+
+		return err_stack;
+	}
+
+	template<typename T>
+	ErrStack LogicalDevice2::createArrayBuffer(size_t count, BufferCreateInfo& info, VectorBuffer<T>& array_buffer)
+	{
+		ErrStack err_stack{};
+
+		array_buffer = {};
+		array_buffer.context = this;
+		checkErrStack1(array_buffer.create(sizeof(T) * count, info));
+
+		return err_stack;
+	}
+
+
+	class PhysicalDevice2 {
+	public:
+		Instance2* instance;
+
+		VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+
+	public:
+		ErrStack getQueueFamilyIdxWithSurfaceSupport(Surface2& surface, uint32_t& r_found_idx);
+		ErrStack checkForExtensions(ExtensionsSupportInfo& info);
+		ErrStack checkForFeatures(FeaturesSupportInfo& info);
+		ErrStack getSurfaceCapabilities(Surface2& surface, VkSurfaceCapabilitiesKHR& capabilities);
+
+		ErrStack createLogicalDevice(LogicalDeviceCreateInfo& info, LogicalDevice2& logical_device);
+	};
+
+
+	struct VulkanApplicationInfo {
+		const void* pNext = NULL;
+		const char* pApplicationName = "Vulkan aplication name";
+		uint32_t applicationVersion = VK_MAKE_VERSION(1, 0, 0);;
+		const char* pEngineName = "Vulkan engine name";
+		uint32_t engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		uint32_t apiVersion = VK_API_VERSION_1_0;
+	};
+
+	struct CreateInstanceInfo {
+		std::vector<const char*> validation_layers = {
+			"VK_LAYER_LUNARG_standard_validation"
+		};
+		std::vector<const char*> instance_extensions = {
+			VK_KHR_SURFACE_EXTENSION_NAME,
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+		};
+
+		const void* pNext = NULL;
+		VkInstanceCreateFlags flags = 0;
+		VulkanApplicationInfo app_info = {};
+
+		// Debug
+		const void* debug_pnext = NULL;
+		VkDebugUtilsMessengerCreateFlagsEXT debug_flags = 0;
+		VkDebugUtilsMessageSeverityFlagsEXT debug_msg_severity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		VkDebugUtilsMessageTypeFlagsEXT debug_msg_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	};
+
+	class Instance2 {
+	public:
+		VkInstance instance = VK_NULL_HANDLE;
+
+		VkDebugUtilsMessengerEXT callback = VK_NULL_HANDLE;
+		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func;
+
+		Surface2* default_surface = nullptr;
+
+	public:
+		ErrStack create(CreateInstanceInfo& info);
+
+		ErrStack createWin32Surface(SurfaceCreateInfo& info, Surface2& surface);
+		ErrStack getPhysicalDevices(std::vector<PhysicalDevice2>& phys_devs);
+
+		void destroy();
+		~Instance2();
 	};
 }
