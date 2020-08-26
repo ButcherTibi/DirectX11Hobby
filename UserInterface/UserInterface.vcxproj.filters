@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Error">
+      <UniqueIdentifier>{5d9b2bf5-4668-4ce7-a121-ca6befefd590}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Precompiled Headers">
+      <UniqueIdentifier>{73dafea9-e986-44e7-bf35-748c72a1a77f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ThirdParty">
+      <UniqueIdentifier>{62509fc3-797f-4b30-98ae-a681c0666234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\UI">
+      <UniqueIdentifier>{6134d0c4-d5ac-4112-ba45-c93e3d40e981}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\FileIO">
+      <UniqueIdentifier>{88a39a18-e860-46ff-82f9-a1440c6986ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\VulkanWrapper">
+      <UniqueIdentifier>{f80d927a-aca7-47e9-9dd6-0bf96303e711}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\GPU_Types">
+      <UniqueIdentifier>{da9988bf-e7a5-4508-a961-c5455f319d63}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\FontRasterization">
+      <UniqueIdentifier>{f57a30c7-5ee3-4e46-a968-673ee7040140}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\TextureAtlas">
+      <UniqueIdentifier>{7f3ce26e-1a9c-47fd-8b8f-aa0fc1a51854}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ErrorStack.hpp">
+      <Filter>Source Files\Error</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Source Files\Precompiled Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="NuiLibrary.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileIO.hpp">
+      <Filter>Source Files\FileIO</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanWrapper.hpp">
+      <Filter>Source Files\VulkanWrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="FontRasterization.hpp">
+      <Filter>Source Files\FontRasterization</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureAtlas.hpp">
+      <Filter>Source Files\TextureAtlas</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_Types.hpp">
+      <Filter>Source Files\GPU_Types</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ErrorStack.cpp">
+      <Filter>Source Files\Error</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files\Precompiled Headers</Filter>
+    </ClCompile>
+    <ClCompile Include="Implementation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI.cpp">
+      <Filter>Source Files\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="FileIO.cpp">
+      <Filter>Source Files\FileIO</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandList.cpp">
+      <Filter>Source Files\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Drawpass.cpp">
+      <Filter>Source Files\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="VulkanWrapper.cpp">
+      <Filter>Source Files\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory.cpp">
+      <Filter>Source Files\VulkanWrapper</Filter>
+    </ClCompile>
+    <ClCompile Include="FontRasterization.cpp">
+      <Filter>Source Files\FontRasterization</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureAtlas.cpp">
+      <Filter>Source Files\TextureAtlas</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

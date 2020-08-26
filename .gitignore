@@ -1,15 +1,16 @@
 # stuff to ignore
 
 # folders
+.vs
 x64
-meshes
-textures
-ThirdParty
 
-# stb_image
-stb_image.cpp
-stb_image.h
+# Sculpt
+Sculpt/meshes
+Sculpt/UI
+Sculpt/ThirdParty
+Sculpt/x64
 
-# VMA
-vk_mem_alloc.h
-vma_implementation.cpp
+# Library
+UserInterface/Fonts
+UserInterface/ThirdParty
+UserInterface/x64
