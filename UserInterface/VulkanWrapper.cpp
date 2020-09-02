@@ -7,20 +7,19 @@
 using namespace vkw;
 using namespace nui;
 
-nui::ErrStack Image::create(VulkanDevice* dev, ImageCreateInfo& info)
+nui::ErrStack Image::create(VulkanDevice* device, ImageCreateInfo& info)
 {
 	VkResult vk_res{};
 	nui::ErrStack err_stack{};
 
-	this->dev = dev;
+	this->dev = device;
 	this->mem_props = info.mem_props;
 
 	this->format = info.format;
 	this->width = info.width;
 	this->height = info.height;
 	this->depth = info.depth;
-	this->samples = info.samples;
-	this->current_layout = info.initialLayout;
+	this->samples = info.samples;	
 
 	VkImageCreateInfo vk_info = {};
 	vk_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -36,37 +35,86 @@ nui::ErrStack Image::create(VulkanDevice* dev, ImageCreateInfo& info)
 	vk_info.tiling = info.tiling;
 	vk_info.usage = info.usage;
 	vk_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	vk_info.initialLayout = info.initialLayout;
+
+	if (info.initialLayout == VK_IMAGE_LAYOUT_UNDEFINED ||
+		info.initialLayout == VK_IMAGE_LAYOUT_PREINITIALIZED)
+	{
+		vk_info.initialLayout = info.initialLayout;
+		this->current_layout = info.initialLayout;
+	}
+	else {
+		vk_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		this->current_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	}
 
 	checkVkRes(vkCreateImage(dev->logical_dev, &vk_info, NULL, &img),
 		"failed to create image");
 
-	VkMemoryRequirements mem_req;
-	vkGetImageMemoryRequirements(dev->logical_dev, img, &mem_req);
+	// Allocate Memory
+	{
+		VkMemoryRequirements mem_req;
+		vkGetImageMemoryRequirements(dev->logical_dev, img, &mem_req);
 
-	this->alloc_size = mem_req.size;
+		this->alloc_size = mem_req.size;
 
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = mem_req.size;
-	checkErrStack1(dev->findMemoryType(mem_req.memoryTypeBits, mem_props, alloc_info.memoryTypeIndex));
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		checkErrStack1(dev->findMemoryType(mem_req.memoryTypeBits, mem_props, alloc_info.memoryTypeIndex));
 
-	checkVkRes(vkAllocateMemory(dev->logical_dev, &alloc_info, NULL, &mem),
-		"failed to allocate image memory");
+		checkVkRes(vkAllocateMemory(dev->logical_dev, &alloc_info, NULL, &mem),
+			"failed to allocate image memory");
 
-	checkVkRes(vkBindImageMemory(dev->logical_dev, img, mem, 0),
-		"failed to bind memory to buffer");
+		checkVkRes(vkBindImageMemory(dev->logical_dev, img, mem, 0),
+			"failed to bind memory to buffer");
 
-	if (mem_props & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) {
+		if (mem_props & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) {
 
-		this->load_type = LoadType::MEMCPY;
+			this->load_type = LoadType::MEMCPY;
 
-		checkVkRes(vkMapMemory(dev->logical_dev, mem, 0, alloc_size, 0, &mapped_mem),
-			"failed to map buffer memory");
+			checkVkRes(vkMapMemory(dev->logical_dev, mem, 0, alloc_size, 0, &mapped_mem),
+				"failed to map buffer memory");
+		}
+		else {
+			this->load_type = LoadType::STAGING;
+			this->mapped_mem = nullptr;
+		}
 	}
-	else {
-		this->load_type = LoadType::STAGING;
-		this->mapped_mem = nullptr;
+
+	// Transition the image
+	if (info.initialLayout != VK_IMAGE_LAYOUT_UNDEFINED &&
+		info.initialLayout != VK_IMAGE_LAYOUT_PREINITIALIZED)
+	{
+		auto& cmd_list = dev->cmd_list;
+
+		checkErrStack1(cmd_list->beginRecording());
+		{
+			CustomImageBarrier bar;
+			bar.img = this;
+			bar.new_layout = info.initialLayout;
+			bar.wait_for_access = 0;
+			bar.wait_at_access = 0;		
+
+			switch (info.initialLayout) {
+			case VK_IMAGE_LAYOUT_GENERAL:
+				bar.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				break;
+
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+				bar.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				break;
+			}
+
+			bar.baseMipLevel = 0;
+			bar.levelCount = 1;
+			bar.baseArrayLayer = 0;
+			bar.layerCount = 1;
+
+			cmd_list->cmdPipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				bar);
+			
+		}
+		checkErrStack1(cmd_list->finish());
 	}
 
 	return err_stack;
@@ -121,7 +169,7 @@ Image::~Image()
 	}
 }
 
-ErrStack ImageView::load(void* data, size_t size)
+ErrStack ImageView::load(void* data, size_t size, VkImageLayout final_layout)
 {
 	ErrStack err_stack;
 
@@ -133,8 +181,7 @@ ErrStack ImageView::load(void* data, size_t size)
 	checkErrStack1(cmd_list.beginRecording());
 	{
 		// if image not in right layout then transition
-		if (image->current_layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL ||
-			image->current_layout != VK_IMAGE_LAYOUT_GENERAL)
+		if (image->current_layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
 		{
 			ImageBarrier to_transfer;
 			to_transfer.view = this;
@@ -146,12 +193,22 @@ ErrStack ImageView::load(void* data, size_t size)
 				to_transfer);
 		}
 
-		cmd_list.cmdCopyBufferToImage(image->dev->staging_buff, size, *this);
-	}
-	checkErrStack1(cmd_list.endRecording());
+		cmd_list.cmdCopyBufferToImage(image->dev->staging_buff, *this);
 
-	checkErrStack1(cmd_list.run());
-	checkErrStack1(cmd_list.waitForExecution());
+		if (final_layout != VK_IMAGE_LAYOUT_MAX_ENUM) {
+
+			ImageBarrier to_transfer;
+			to_transfer.view = this;
+			to_transfer.new_layout = final_layout;
+			to_transfer.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+			to_transfer.wait_at_access = 0;
+
+			cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				to_transfer);
+		}
+		
+	}
+	checkErrStack1(cmd_list.finish());
 
 	return ErrStack();
 }
@@ -163,13 +220,14 @@ ImageView::~ImageView()
 	}
 }
 
-nui::ErrStack Buffer::load(void* data, size_t size)
+nui::ErrStack Buffer::load(void* data, size_t load_size)
 {
 	ErrStack err_stack;
 
-	auto create = [&](size_t new_size) -> ErrStack {
+	auto create = [this](size_t new_size) -> ErrStack {
 
 		VkResult vk_res{};
+		ErrStack err_stack;
 
 		VkBufferCreateInfo buff_info = {};
 		buff_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -183,8 +241,6 @@ nui::ErrStack Buffer::load(void* data, size_t size)
 
 		VkMemoryRequirements mem_req;
 		vkGetBufferMemoryRequirements(dev->logical_dev, buff, &mem_req);
-
-		this->alloc_size = mem_req.size;
 
 		VkMemoryAllocateInfo alloc_info = {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -201,7 +257,7 @@ nui::ErrStack Buffer::load(void* data, size_t size)
 
 			this->load_type = LoadType::MEMCPY;
 
-			checkVkRes(vkMapMemory(dev->logical_dev, mem, 0, alloc_size, 0, &mapped_mem),
+			checkVkRes(vkMapMemory(dev->logical_dev, mem, 0, new_size, 0, &mapped_mem),
 				"failed to map buffer memory");
 		}
 		else {
@@ -209,38 +265,36 @@ nui::ErrStack Buffer::load(void* data, size_t size)
 			this->mapped_mem = nullptr;
 		}
 
-		this->size = size;
+		this->size = new_size;
 
 		return ErrStack();
 	};
 
 	if (buff == VK_NULL_HANDLE) {
 
-		checkErrStack(create(size),
+		checkErrStack(create(load_size),
 			"failed to create vulkan buffer");
 	}
-	else if (this->size < size) {
+	else if (this->size < load_size) {
 
 		destroy();
-		checkErrStack(create(size),
+		checkErrStack(create(load_size),
 			"failed to create vulkan buffer");
 	}
 
 	if (this->load_type == LoadType::STAGING) {
 
-		checkErrStack1(dev->staging_buff.load(data, size));
+		checkErrStack1(dev->staging_buff.load(data, load_size));
 
 		checkErrStack1(dev->cmd_list->beginRecording());
 		{
-			dev->cmd_list->cmdCopyBuffer(dev->staging_buff, *this);
+			dev->cmd_list->cmdCopyBuffer(dev->staging_buff, *this, load_size);
 		}
-		checkErrStack1(dev->cmd_list->endRecording());
-
-		checkErrStack1(dev->cmd_list->run());
-		checkErrStack1(dev->cmd_list->waitForExecution());
+		checkErrStack1(dev->cmd_list->finish());
 	}
 	else if (this->load_type == LoadType::MEMCPY) {
-		std::memcpy(this->mapped_mem, data, size);
+		assert_cond(this->size >= load_size, "");
+		std::memcpy(this->mapped_mem, data, load_size);
 	}
 
 	return err_stack;
@@ -322,7 +376,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
 	printf("Vulkan Debug: %s \n\n", pCallbackData->pMessage);
-
+	messageSeverity;
+	messageType;
+	pUserData;
 	return VK_FALSE;
 }
 
@@ -693,6 +749,8 @@ ErrStack Instance::createDevice(DeviceCreateInfo& info, VulkanDevice& device)
 
 Instance::~Instance()
 {
+	//printf("Instance destroy \n");
+
 	if (this->callback != VK_NULL_HANDLE) {
 
 		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -730,12 +788,12 @@ ErrStack Surface::getSurfaceCapabilities(VkSurfaceCapabilitiesKHR& capabilities)
 	return ErrStack();
 }
 
-ErrStack Shader::create(VulkanDevice* dev, std::vector<char>& spirv, VkShaderStageFlagBits stage)
+ErrStack Shader::create(VulkanDevice* device, std::vector<char>& spirv, VkShaderStageFlagBits shader_stage)
 {
 	VkResult vk_res{};
 
-	this->dev = dev;
-	this->stage = stage;
+	this->dev = device;
+	this->stage = shader_stage;
 
 	VkShaderModuleCreateInfo shader_module_info = {};
 	shader_module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -750,7 +808,27 @@ ErrStack Shader::create(VulkanDevice* dev, std::vector<char>& spirv, VkShaderSta
 
 Shader::~Shader()
 {
-	vkDestroyShaderModule(dev->logical_dev, shader, NULL);
+	if (dev != nullptr) {
+		vkDestroyShaderModule(dev->logical_dev, shader, NULL);
+	}
+}
+
+void vkw::clearColorFloatValue(VkClearValue& clear_value,
+	float r, float g, float b, float a)
+{
+	clear_value.color.float32[0] = r;
+	clear_value.color.float32[1] = g;
+	clear_value.color.float32[2] = b;
+	clear_value.color.float32[3] = a;
+}
+
+void vkw::clearColorUIntValue(VkClearValue& clear_value,
+	uint32_t r, uint32_t g, uint32_t b, uint32_t a)
+{
+	clear_value.color.uint32[0] = r;
+	clear_value.color.uint32[1] = g;
+	clear_value.color.uint32[2] = b;
+	clear_value.color.uint32[3] = a;
 }
 
 Semaphore::~Semaphore()
@@ -771,12 +849,21 @@ ErrStack VulkanDevice::createImage(ImageCreateInfo& info, Image& texture)
 {
 	ErrStack err_stack{};
 
-	ImageCreateInfo img_info = {};
+	ImageCreateInfo img_info;
+	
 	img_info.flags = info.flags;
 	img_info.imageType = info.imageType;
 	img_info.format = info.format;
-	img_info.width = info.width;
-	img_info.height = info.height;
+
+	if (!info.width) {
+		img_info.width = surface.width;
+		img_info.height = surface.height;
+	}
+	else {
+		img_info.width = info.width;
+		img_info.height = info.height;
+	}
+
 	img_info.depth = info.depth;
 	img_info.mipLevels = info.mipLevels;
 	img_info.arrayLayers = info.arrayLayers;
@@ -837,36 +924,36 @@ ErrStack VulkanDevice::createShader(std::vector<char>& spirv, VkShaderStageFlagB
 	return shader.create(this, spirv, stage);
 }
 
-void VulkanDevice::createDrawpass(DrawpassCreateInfo& info, Drawpass& drawpass)
+void VulkanDevice::createDrawpass(Drawpass& drawpass)
 {
 	drawpass.dev = this;
 	drawpass.surface = &surface;
 }
 
-ErrStack VulkanDevice::createCommandList(CommandListCreateInfo& info, CommandList& cmd_list)
+ErrStack VulkanDevice::createCommandList(CommandListCreateInfo& info, CommandList& command_list)
 {
 	VkResult vk_res;
 	ErrStack err_stack;
 
-	cmd_list.dev = this;
-	cmd_list.surface = info.surface;
+	command_list.dev = this;
+	command_list.surface = info.surface;
 
 	if (info.surface != nullptr) {
-		cmd_list.tasks.resize(info.surface->minImageCount);
+		command_list.tasks.resize(info.surface->minImageCount);
 
-		checkErrStack1(createSemaphore(cmd_list.swapchain_img_acquired));
-		checkErrStack1(createSemaphore(cmd_list.execution_finished));
-		checkErrStack1(createFence(0, cmd_list.execution_finished_fence));
+		checkErrStack1(createSemaphore(command_list.swapchain_img_acquired));
+		checkErrStack1(createSemaphore(command_list.execution_finished));
+		checkErrStack1(createFence(0, command_list.execution_finished_fence));
 	}
 	else {
-		cmd_list.tasks.resize(1);
+		command_list.tasks.resize(1);
 
-		checkErrStack1(createFence(0, cmd_list.execution_finished_fence));
+		checkErrStack1(createFence(0, command_list.execution_finished_fence));
 	}
 
-	for (uint32_t i = 0; i < cmd_list.tasks.size(); i++) {
+	for (uint32_t i = 0; i < command_list.tasks.size(); i++) {
 
-		CommandTask& task = cmd_list.tasks[i];
+		CommandTask& task = command_list.tasks[i];
 		task.idx = i;
 
 		VkCommandPoolCreateInfo pool_info = {};
@@ -923,20 +1010,25 @@ nui::ErrStack VulkanDevice::createFence(VkFenceCreateFlags flags, Fence& fence)
 
 VulkanDevice::~VulkanDevice()
 {
-	// Surface
-	{
-		for (VkImageView& view : surface.swapchain_views) {
-			vkDestroyImageView(logical_dev, view, NULL);
+	//printf("VulkanDevice destroy \n");
+
+	if (logical_dev != VK_NULL_HANDLE) {
+
+		// Surface
+		{
+			for (VkImageView& view : surface.swapchain_views) {
+				vkDestroyImageView(logical_dev, view, NULL);
+			}
+
+			vkDestroySwapchainKHR(logical_dev, surface.swapchain, NULL);
+
+			vkDestroySurfaceKHR(inst->instance, surface.surface, NULL);
 		}
 
-		vkDestroySwapchainKHR(logical_dev, surface.swapchain, NULL);
+		staging_buff.destroy();
+		delete cmd_list;
 
-		vkDestroySurfaceKHR(inst->instance, surface.surface, NULL);
+		vkDeviceWaitIdle(logical_dev);
+		vkDestroyDevice(logical_dev, NULL);
 	}
-	
-	staging_buff.destroy();
-	delete cmd_list;
-
-	vkDeviceWaitIdle(logical_dev);
-	vkDestroyDevice(logical_dev, NULL);
 }

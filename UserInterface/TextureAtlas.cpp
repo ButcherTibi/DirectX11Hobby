@@ -8,10 +8,10 @@
 using namespace nui;
 
 
-void TextureAtlas::create(uint32_t tex_size)
+void TextureAtlas::create(uint32_t new_tex_size)
 {
-	this->colors.resize(tex_size * tex_size);
-	this->tex_size = tex_size;
+	this->colors.resize(new_tex_size * new_tex_size);
+	this->tex_size = new_tex_size;
 }
 
 void TextureAtlas::copyPixels(uint32_t x0, uint32_t y0, uint32_t width, uint32_t height,
@@ -29,7 +29,7 @@ void TextureAtlas::copyPixels(uint32_t x0, uint32_t y0, uint32_t width, uint32_t
 	}
 }
 
-bool TextureAtlas::addBitmap(std::vector<uint8_t>& colors, uint32_t width, uint32_t height, AtlasRegion*& r_zone_used)
+bool TextureAtlas::addBitmap(std::vector<uint8_t>& bitmap, uint32_t width, uint32_t height, AtlasRegion*& r_zone_used)
 {
 	while (tex_size - pen_y >= height) {
 
@@ -65,7 +65,7 @@ bool TextureAtlas::addBitmap(std::vector<uint8_t>& colors, uint32_t width, uint3
 
 		copyPixels(pen_x, pen_y,
 			width, height,
-			colors);
+			bitmap);
 
 		pen_x += width;
 

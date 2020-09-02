@@ -4,11 +4,11 @@
 // Inputs
 layout(location = 0) in vec2 uv_in;
 layout(location = 1) in flat vec4 inst_color_in;
-layout(location = 2) in flat vec2 inst_pos_in;
-layout(location = 3) in flat float inst_size_in;
+layout(location = 2) in flat uint inst_elem_id_in;
 
 // Outputs
 layout(location = 0) out vec4 color_out;
+layout(location = 1) out uint mask_out;
 
 //Bindings
 layout(binding = 0) uniform sampler2D atlas_sampler;
@@ -20,4 +20,5 @@ void main() {
     color.a *= tex.r;
 
     color_out = color;
+    mask_out = inst_elem_id_in;
 }

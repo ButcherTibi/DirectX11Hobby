@@ -270,10 +270,10 @@ Element& UserInterface::getRoot()
 	return this->elems.front();
 }
 
-Flex& UserInterface::getRootElement()
+Wrap& UserInterface::getRootElement()
 {
 	nui::Element& elem = this->elems.front();
-	return std::get<Flex>(elem.elem);
+	return std::get<Wrap>(elem.elem);
 }
 
 template<typename T>
@@ -287,7 +287,7 @@ Element& UserInterface::addElement(Element& parent, T& new_elem)
 
 	return new_node;
 }
-template Element& UserInterface::addElement(Element& parent, Flex& new_elem);
+template Element& UserInterface::addElement(Element& parent, Wrap& new_elem);
 
 struct Line {
 	size_t end;
@@ -317,7 +317,7 @@ void UserInterface::_calcElementLayout(Element* elem, uint32_t parent_layer_idx,
 	layer->elems.push_back(elem);
 
 	// Distinct properties
-	auto flex = std::get_if<Flex>(&elem->elem);
+	auto flex = std::get_if<Wrap>(&elem->elem);
 	if (flex != nullptr) {
 
 		flex->_calculateBoxModel(ancestor_width, ancestor_height);

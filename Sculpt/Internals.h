@@ -155,7 +155,7 @@ namespace nui {
 		SPACE_BETWEEN,
 	};
 
-	struct Flex : BoxModel {
+	struct Wrap : BoxModel {
 		FlexDirection direction = FlexDirection::ROW;
 		FlexWrap wrap = FlexWrap::NO_WRAP;
 		FlexAxisAlign axis_align = FlexAxisAlign::START;
@@ -183,7 +183,7 @@ namespace nui {
 
 	struct Element {
 		Element* parent;
-		std::variant<Flex, Paragraph> elem;
+		std::variant<Wrap, Paragraph> elem;
 		std::list<Element*> children;
 	};
 }
@@ -201,7 +201,7 @@ namespace nui_int {
 
 	public:
 		nui::Element& getRoot();
-		nui::Flex& getRootElement();
+		nui::Wrap& getRootElement();
 
 		template<typename T>
 		nui::Element& addElement(nui::Element& parent, T& new_elem);

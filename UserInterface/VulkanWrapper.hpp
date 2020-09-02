@@ -41,7 +41,7 @@ namespace vkw {
 		VkImageView view = VK_NULL_HANDLE;
 
 	public:
-		nui::ErrStack load(void* data, size_t size);
+		nui::ErrStack load(void* data, size_t size, VkImageLayout final_layout = VK_IMAGE_LAYOUT_MAX_ENUM);
 
 		~ImageView();
 	};
@@ -51,8 +51,8 @@ namespace vkw {
 		VkImageCreateFlags flags = 0;
 		VkImageType imageType = VK_IMAGE_TYPE_2D;
 		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-		uint32_t width;
-		uint32_t height;
+		uint32_t width = 0;
+		uint32_t height = 0;
 		uint32_t depth = 1;
 		uint32_t mipLevels = 1;
 		uint32_t arrayLayers = 1;
@@ -102,7 +102,7 @@ namespace vkw {
 
 		VkSwapchainCreateFlagsKHR swapchain_flags = 0;
 		uint32_t imageArrayLayers = 1;
-		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 		VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -124,6 +124,7 @@ namespace vkw {
 
 		std::vector<VkImage> swapchain_images;
 		std::vector<VkImageView> swapchain_views;
+		VkImageLayout swapchain_img_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	public:
 		nui::ErrStack getSurfaceCapabilities(VkSurfaceCapabilitiesKHR& capabilities);
@@ -149,7 +150,6 @@ namespace vkw {
 		VkBufferUsageFlags usage;
 		VkMemoryPropertyFlags mem_props;
 		VkDeviceSize size;
-		VkDeviceSize alloc_size;
 
 		LoadType load_type;
 
@@ -217,13 +217,20 @@ namespace vkw {
 	};
 
 
+	void clearColorFloatValue(VkClearValue& clear_value,
+		float r = 0, float g = 0, float b = 0, float a = 0);
+
+	void clearColorUIntValue(VkClearValue& clear_value,
+		uint32_t r = 0, uint32_t g = 0, uint32_t b = 0, uint32_t a = 0);
+
+
 	struct ReadAttachmentInfo {
 		ImageView* view;
 
 		// Renderpass
-		VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
 		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout final_fayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageLayout final_fayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkClearValue clear_value = {};
 
 		// Descriptor Layout
@@ -239,8 +246,8 @@ namespace vkw {
 
 		// Renderpass
 		VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout final_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		VkImageLayout final_layout = VK_IMAGE_LAYOUT_GENERAL;
 		VkClearValue clear_value = {};
 
 		// Color Blend Atachment
@@ -277,7 +284,7 @@ namespace vkw {
 		ImageView* view;
 
 		// Renderpass
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkImageLayout final_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkClearValue clear_value = {};
 
@@ -329,6 +336,7 @@ namespace vkw {
 	struct CombinedImageSamplerBinding {
 		Sampler* sampler;
 		ImageView* tex_view;
+		VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
 
 		// Descriptor Layout
 		uint32_t set = 0;
@@ -413,10 +421,6 @@ namespace vkw {
 
 		std::vector<DescriptorWriteResource> resources;
 		std::vector<VkWriteDescriptorSet> writes;
-	};
-
-	struct DrawpassCreateInfo {
-
 	};
 
 	class Drawpass {
@@ -533,9 +537,29 @@ namespace vkw {
 	struct ImageBarrier {
 		ImageView* view;
 
+		VkImageLayout new_layout = VK_IMAGE_LAYOUT_MAX_ENUM;
 		VkAccessFlags wait_for_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		VkAccessFlags wait_at_access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+	};
+
+	struct CustomImageBarrier {
+		Image* img;
+
 		VkImageLayout new_layout = VK_IMAGE_LAYOUT_MAX_ENUM;
+		VkAccessFlags wait_for_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		VkAccessFlags wait_at_access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+
+		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		uint32_t baseMipLevel = 0;
+		uint32_t levelCount = 1;
+		uint32_t baseArrayLayer = 0;
+		uint32_t layerCount = 1;
+	};
+
+	struct SurfaceBarrier {
+		VkImageLayout new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		VkAccessFlags wait_for_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		VkAccessFlags wait_at_access = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 	};
 
 	struct CommandTask {
@@ -564,10 +588,11 @@ namespace vkw {
 	public:
 		nui::ErrStack beginRecording();
 
-		void cmdCopyBuffer(Buffer& src_buff, Buffer& dst_buff);
+		void cmdCopyBuffer(Buffer& src_buff, Buffer& dst_buff, size_t copy_size);
 
-		void cmdCopyBufferToImage(Buffer& src_buff, size_t src_size, ImageView& dst_view);
+		void cmdCopyBufferToImage(Buffer& src_buff, ImageView& dst_view);
 
+		// Pipeline Barriers where same subresource is assumed
 		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
 			size_t image_barriers_count, ImageBarrier* image_barriers);
 
@@ -577,11 +602,31 @@ namespace vkw {
 		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
 			ImageBarrier& image_barrier);
 
-		void cmdClearImage(ImageView& view, float r, float g, float b, float a);
+		// Custom Pipeline Barriers
+		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+			size_t image_barriers_count, CustomImageBarrier* image_barriers);
+
+		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+			std::vector<CustomImageBarrier>& image_barriers);
+
+		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+			CustomImageBarrier& image_barrier);
+
+		// Pipeline Barrier for surface
+		void cmdSurfacePipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+			SurfaceBarrier& barrier);
+
+		void cmdClearFloatImage(ImageView& view, float r = 0, float g = 0, float b = 0, float a = 0);
+
+		void cmdClearUIntImage(ImageView& view, uint32_t rgba);
+
+		void cmdClearSurface(float r = 0, float g = 0, float b = 0, float a = 0);
+
+		void cmdCopyImageToSurface(ImageView& view);
 
 		void cmdBeginRenderpass(Drawpass& pass);
 
-		void cmdEndRenderpass(Drawpass& pass);
+		void cmdEndRenderpass();
 
 		void cmdBindVertexBuffer(Buffer& vertex_buff);
 		void cmdBindVertexBuffers(Buffer& vertex_buff_0, Buffer& vertex_buff_1);
@@ -616,7 +661,7 @@ namespace vkw {
 
 		VkSwapchainCreateFlagsKHR swapchain_flags = 0;
 		uint32_t imageArrayLayers = 1;
-		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 		VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -660,7 +705,7 @@ namespace vkw {
 		nui::ErrStack createSampler(SamplerCreateInfo& info, Sampler& sampler);
 		nui::ErrStack createShader(std::vector<char>& spirv, VkShaderStageFlagBits stage, Shader& shader);
 
-		void createDrawpass(DrawpassCreateInfo& info, Drawpass& drawpass);
+		void createDrawpass(Drawpass& drawpass);
 		nui::ErrStack createCommandList(CommandListCreateInfo& info, CommandList& cmd_list);
 		
 		// Internal
@@ -711,7 +756,7 @@ namespace vkw {
 		VkInstance instance = VK_NULL_HANDLE;
 
 		VkDebugUtilsMessengerEXT callback = VK_NULL_HANDLE;
-		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func;
+		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func = VK_NULL_HANDLE;
 
 	public:
 		nui::ErrStack create(InstanceCreateInfo& info);

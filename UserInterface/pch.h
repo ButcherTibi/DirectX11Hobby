@@ -21,6 +21,7 @@
 #include <array>
 #include <list>
 #include <variant>
+#include <cmath>
 
 // GLM
 #include "glm\vec2.hpp"

@@ -30,6 +30,7 @@ namespace nui {
 		glm::vec2 pos;
 		float rasterized_size;
 		float size;
+		uint32_t elem_id;
 
 		static vkw::VertexInput getVertexInput(uint32_t binding = 0)
 		{
@@ -42,13 +43,53 @@ namespace nui {
 			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_CharacterInstance, pos));
 			vi.addAtribute(VK_FORMAT_R32_SFLOAT, offsetof(GPU_CharacterInstance, rasterized_size));
 			vi.addAtribute(VK_FORMAT_R32_SFLOAT, offsetof(GPU_CharacterInstance, size));
+			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_CharacterInstance, elem_id));
 
 			return vi;
 		}
 	};
 
 
-	struct GPU_TextUniform {
+	struct GPU_CommonsUniform {
 		glm::vec4 screen_size;
+	};
+
+
+	struct GPU_WrapVertex {
+		glm::vec2 pos;
+
+		static vkw::VertexInput getVertexInput(uint32_t binding = 0)
+		{
+			vkw::VertexInput vi;
+			vi.binding.binding = binding;
+			vi.binding.stride = sizeof(GPU_WrapVertex);
+
+			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_CharacterVertex, pos));
+
+			return vi;
+		}
+	};
+
+
+	struct GPU_WrapInstance {
+		glm::vec2 pos;
+		glm::vec2 size;
+		glm::vec4 color;
+		uint32_t elem_id;
+
+		static vkw::VertexInput getVertexInput(uint32_t binding = 0)
+		{
+			vkw::VertexInput vi;
+			vi.binding.binding = binding;
+			vi.binding.stride = sizeof(GPU_WrapInstance);
+			vi.binding.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_WrapInstance, pos));
+			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_WrapInstance, size));
+			vi.addAtribute(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(GPU_WrapInstance, color));
+			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_WrapInstance, elem_id));
+
+			return vi;
+		}
 	};
 }

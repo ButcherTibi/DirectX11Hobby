@@ -46,7 +46,8 @@ ErrStack CharacterAtlas::addFont(FilePath& path, std::vector<uint32_t>& sizes, F
 
 		FontSize& font_size = font.sizes.emplace_back();
 		font_size.size = size;
-		font_size.chars.resize(unicode_count);
+		font_size.line_spacing = face->size->metrics.height / 64;
+		font_size.chars.resize(unicode_count + 1);
 
 		if (!atlas.colors.size()) {
 			atlas.create(2048);
@@ -80,6 +81,28 @@ ErrStack CharacterAtlas::addFont(FilePath& path, std::vector<uint32_t>& sizes, F
 				return ErrStack(code_location, "failed to find space to store character in atlas");
 			}
 		}
+
+		// White Space
+		uint32_t space_unicode = 0x0020;
+		uint32_t glyph_idx = FT_Get_Char_Index(face, space_unicode);
+
+		err = FT_Load_Glyph(face, glyph_idx, FT_LOAD_RENDER);
+		if (err) {
+			return ErrStack(code_location, "failed to load and render glyph");
+		}
+
+		auto& glyph = face->glyph;
+
+		Character& chara = font_size.chars[i];
+		chara.unicode = space_unicode;
+		chara.bitmap_left = glyph->bitmap_left;
+		chara.bitmap_top = glyph->bitmap_top;
+		chara.hori_bearing_X = glyph->metrics.horiBearingX / 64;
+		chara.hori_bearing_Y = glyph->metrics.horiBearingY / 64;
+		chara.advance_X = glyph->advance.x / 64;
+		chara.advance_Y = glyph->advance.y / 64;
+
+		chara.zone = nullptr;
 	}
 
 	r_font = &font;

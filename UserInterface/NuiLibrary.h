@@ -14,16 +14,62 @@ namespace nui {
 	class Instance;
 	class Window;
 	class Root;
+	class Wrap;
 	class Flex;
 	class Text;
 	class Node;
 
 
-	class Root {
+	enum class Overflow {
+		OVERFLOw,
+		CLIP
+	};
+
+
+	class NodeComponent {
 	public:
 		Window* window;
 
-		Node* node;
+		uint32_t elem_id;
+		Node* this_elem;
+
+	public:
+		Text* addText();
+		Wrap* addWrap();
+		Flex* addFlex();
+	};
+
+
+	class Root {
+	public:
+		// Internal
+		NodeComponent node_comp;
+
+	public:
+
+	public:
+		Text* addText();
+		Wrap* addWrap();
+		Flex* addFlex();
+	};
+
+
+	struct WrapDrawcall {
+		uint32_t instance_idx;
+	};
+
+	class Wrap {
+	public:
+		// Internal
+		NodeComponent node_comp;
+		WrapDrawcall drawcall;
+
+	public:
+		glm::vec2 pos;
+		uint32_t width;
+		uint32_t height;
+		Overflow overflow;  // CURSED: assigning a default value causes undefined behaviour, memory coruption
+		glm::vec4 background_color;
 
 	public:
 		Text* addText();
@@ -32,10 +78,14 @@ namespace nui {
 
 	class Flex {
 	public:
-		
+		// Internal
+		NodeComponent node_comp;
 
 	public:
-		//Text* addText();
+		Overflow overflow;
+
+	public:
+
 	};
 
 
@@ -49,29 +99,43 @@ namespace nui {
 
 	class Text {
 	public:
-		std::vector<uint32_t> text;
-		glm::vec2 pos;
-		float size = 14;
-		glm::vec4 color = { 1, 1, 1, 1 };
-
 		// Internal
-		Window* window;
-		Node* node;
+		NodeComponent node_comp;
 		std::vector<CharacterDrawcall> drawcalls;
 
 	public:
-		void generateDrawcalls();
+		std::u32string text;
+		glm::vec2 pos;
+		float size;
+		float line_height;
+		glm::vec4 color;
 
 	public:
+
 	};
 
 
+	enum class NodeType {
+		ROOT,
+		WRAP,
+		FLEX,
+		TEXT
+	};
+
 	class Node {
 	public:
-		std::variant<Root, Flex, Text> elem;
+		NodeType type;
+		void* elem = nullptr;
 
-		Node* parent;
 		std::list<Node*> children;
+
+	public:
+		Root* createRoot();
+		Wrap* createWrap();
+		Flex* createFlex();
+		Text* createText();
+
+		~Node();
 	};
 
 
@@ -85,62 +149,80 @@ namespace nui {
 		Instance* instance;
 
 		HINSTANCE hinstance;
-
-		WNDCLASSEXA window_class;
-		std::string class_name;
-
-		std::string window_name;
-		HWND hwnd = NULL;
+		HWND hwnd;
 
 		// Properties
 		uint32_t width;
 		uint32_t height;
 		
 		// Messages
+		bool minimized;
 		bool close;
 
 		// UI
+		uint32_t node_unique_id;
 		std::list<Node> nodes;
 
 		// Rendering
-		bool rendering_configured = false;
+		bool rendering_configured;
 
 		vkw::VulkanDevice dev;
 	
 		std::vector<GPU_CharacterVertex> char_verts;
 		std::vector<uint32_t> char_idxs;
 		std::vector<GPU_CharacterInstance> char_instances;
-		GPU_TextUniform text_uniform;
+		GPU_CommonsUniform common_uniform;
+		std::array<GPU_WrapVertex, 4> wrap_verts;
+		std::array<uint32_t, 6> wrap_idxs;
+		std::vector<GPU_WrapInstance> wrap_instances;
 
 		vkw::Buffer chars_vbuff;
 		vkw::Buffer chars_idxbuff;
 		vkw::Buffer chars_instabuff;
 		vkw::Buffer text_ubuff;
+		vkw::Buffer wrap_vbuff;
+		vkw::Buffer wrap_idxbuff;
+		vkw::Buffer wrap_instabuff;
 
+		vkw::Image composition_img;
+		vkw::Image elem_img;
+		vkw::Image elem_mask_img;
+		vkw::Image parents_id_img;
+		vkw::Image next_parents_id_img;
 		vkw::Image char_atlas_tex;
+
+		vkw::ImageView composition_view;
+		vkw::ImageView elem_view;
+		vkw::ImageView elem_mask_view;
+		vkw::ImageView parents_id_view;
+		vkw::ImageView next_parents_id_view;
 		vkw::ImageView char_atlas_view;
-		vkw::Sampler sampler;
+
+		vkw::Sampler text_sampler;
 
 		vkw::Shader text_vs;
 		vkw::Shader text_fs;
+		vkw::Shader wrap_vs;
+		vkw::Shader wrap_fs;
 
 		vkw::Drawpass text_pass;
+		vkw::Drawpass wrap_pass;
 
 		vkw::CommandList cmd_list;
 
 	public:
-		ErrStack generateGPU_CharacterVertexData();
+		ErrStack generateGPU_CharacterData();
+		ErrStack generateGPU_WrapData();
 
+		//ErrStack resize();
 		ErrStack draw();
 
 	public:
 		Root* getRoot();
-
-		~Window();
 	};
 
 	 
-	extern std::vector<Window> windows;
+	extern std::list<Window> windows;
 
 
 	class Instance {

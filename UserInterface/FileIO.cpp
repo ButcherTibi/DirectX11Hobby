@@ -204,7 +204,7 @@ ErrStack FilePath::read(std::vector<T>& content)
 	std::string filename_vec = toWindowsPath();
 	LPCSTR filename_win = filename_vec.data();
 
-	HANDLE file_handle = CreateFileA(filename_win,
+	HANDLE file_handle = CreateFile(filename_win,
 		GENERIC_READ, // desired acces
 		0,  // share mode
 		NULL,  // security atributes

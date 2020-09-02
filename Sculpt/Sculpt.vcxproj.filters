@@ -20,12 +20,6 @@
     <Filter Include="Source Files\ThirdParty">
       <UniqueIdentifier>{a262b940-e443-4e56-b65a-7e9d9126f61f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\EntryPoint">
-      <UniqueIdentifier>{6cac705a-a616-4a81-bd62-ed76c9977ca6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\ThirdParty\VulkanMemoryAllocator">
-      <UniqueIdentifier>{f30f959c-297e-4e22-8e3a-dd03df043b23}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\ThirdParty\stb_image">
       <UniqueIdentifier>{10891787-7a85-4b6e-8a75-da84801afa37}</UniqueIdentifier>
     </Filter>
@@ -52,9 +46,6 @@
     <ClCompile Include="LinkageMesh.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="AppLevel.cpp">
-      <Filter>Source Files\EntryPoint</Filter>
-    </ClCompile>
     <ClCompile Include="MathTypes.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
@@ -63,9 +54,6 @@
     </ClCompile>
     <ClCompile Include="GLTFParser.cpp">
       <Filter>Source Files\Importer</Filter>
-    </ClCompile>
-    <ClCompile Include="vma_implementation.cpp">
-      <Filter>Source Files\ThirdParty\VulkanMemoryAllocator</Filter>
     </ClCompile>
     <ClCompile Include="ErrorStuff.cpp">
       <Filter>Source Files\Mine</Filter>
@@ -79,9 +67,6 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files\Mine</Filter>
     </ClCompile>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files\EntryPoint</Filter>
-    </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClCompile>
@@ -93,6 +78,9 @@
     </ClCompile>
     <ClCompile Include="InternalUI.cpp">
       <Filter>Source Files\NewUserInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -111,14 +99,8 @@
     <ClInclude Include="MathTypes.h">
       <Filter>Source Files\Math</Filter>
     </ClInclude>
-    <ClInclude Include="AppLevel.h">
-      <Filter>Source Files\EntryPoint</Filter>
-    </ClInclude>
     <ClInclude Include="Importer.h">
       <Filter>Source Files\Importer</Filter>
-    </ClInclude>
-    <ClInclude Include="vk_mem_alloc.h">
-      <Filter>Source Files\ThirdParty\VulkanMemoryAllocator</Filter>
     </ClInclude>
     <ClInclude Include="ErrorStuff.h">
       <Filter>Source Files\Mine</Filter>

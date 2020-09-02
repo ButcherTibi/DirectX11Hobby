@@ -69,6 +69,9 @@
       <AdditionalDependencies>vulkan-1.lib;freetype.lib;UserInterface.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(VULKAN_SDK)\Third-Party\Bin;$(SolutionDir)\Sculpt\ThirdParty\FreeType\libs;E:\my_work\Vulkan\Sculpt\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <OptimizeReferences>false</OptimizeReferences>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
     <PostBuildEvent>
       <Command>XCOPY </Command>
@@ -91,17 +94,18 @@
       <ForcedIncludeFiles>stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <DisableSpecificWarnings>%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
       <EnableModules>true</EnableModules>
       <CompileAsManaged>false</CompileAsManaged>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <OptimizeReferences>false</OptimizeReferences>
       <AdditionalDependencies>vulkan-1.lib;freetype.lib;UserInterface.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(VULKAN_SDK)\Third-Party\Bin;$(SolutionDir)\Sculpt\ThirdParty\FreeType\libs;E:\my_work\Vulkan\Sculpt\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(VULKAN_SDK)\Third-Party\Bin;$(SolutionDir)\Sculpt\ThirdParty\FreeType\libs;E:\my_work\Vulkan\Sculpt\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
@@ -113,7 +117,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AppLevel.cpp" />
     <ClCompile Include="TextureAtlas.cpp" />
     <ClCompile Include="CommonTypes.cpp" />
     <ClCompile Include="GLTFParser.cpp" />
@@ -128,7 +131,6 @@
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="InternalUI.cpp" />
-    <ClCompile Include="vma_implementation.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -139,7 +141,6 @@
   <ItemGroup>
     <ClInclude Include="CommonTypes.h" />
     <ClInclude Include="FileIO.h" />
-    <ClInclude Include="AppLevel.h" />
     <ClInclude Include="Internals.h" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Importer.h" />
@@ -151,7 +152,6 @@
     <ClInclude Include="Meshes.h" />
     <ClInclude Include="MathTypes.h" />
     <ClInclude Include="TextureAtlas.h" />
-    <ClInclude Include="vk_mem_alloc.h" />
     <ClInclude Include="ErrorStuff.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

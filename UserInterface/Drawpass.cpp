@@ -401,7 +401,7 @@ nui::ErrStack Drawpass::bindCombinedImageSampler(CombinedImageSamplerBinding& in
 	VkDescriptorImageInfo sampler_info = {};
 	sampler_info.sampler = info.sampler->sampler;
 	sampler_info.imageView = info.tex_view->view;
-	sampler_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	sampler_info.imageLayout = info.layout;
 
 	DescriptorWriteResource& resource = layout->resources.emplace_back();
 	resource.value = sampler_info;

@@ -45,7 +45,7 @@ namespace nui {
 	public:
 		std::vector<uint8_t> colors;
 
-		uint32_t tex_size;
+		uint32_t tex_size = 0;
 
 		uint32_t pen_x = 0;
 		uint32_t pen_y = 0;

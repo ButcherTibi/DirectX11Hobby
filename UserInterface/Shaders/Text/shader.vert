@@ -4,17 +4,18 @@
 // Vertex
 layout(location = 0) in vec2 pos;
 layout(location = 1) in vec2 uv;
+
 // Instance
 layout(location = 2) in vec4 inst_color;
 layout(location = 3) in vec2 inst_pos;
 layout(location = 4) in float inst_raster_size;
 layout(location = 5) in float inst_size;
+layout(location = 6) in uint inst_elem_id;
 
 // Outputs
 layout(location = 0) out vec2 uv_out;
 layout(location = 1) out vec4 inst_color_out;
-layout(location = 2) out vec2 inst_pos_out;
-layout(location = 3) out float inst_size_out;
+layout(location = 2) out uint inst_elem_id_out;
 
 layout(set = 1, binding = 0) uniform stub {
     vec4 screen_size;
@@ -41,6 +42,5 @@ void main()
 
     uv_out = uv;
     inst_color_out = inst_color;
-    inst_pos_out = inst_pos;
-    inst_size_out = inst_size;
+    inst_elem_id_out = inst_elem_id;
 }
