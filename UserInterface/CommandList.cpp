@@ -25,7 +25,7 @@ ErrStack CommandList::beginRecording()
 	return ErrStack();
 }
 
-void CommandList::cmdCopyBuffer(Buffer& src_buff, Buffer& dst_buff, size_t copy_size)
+void CommandList::cmdCopyBufferToBuffer(Buffer& src_buff, Buffer& dst_buff, size_t copy_size)
 {
 	assert_cond(copy_size <= dst_buff.size, "");
 
@@ -66,6 +66,35 @@ void CommandList::cmdCopyBufferToImage(Buffer& src_buff, ImageView& dst_view)
 	}
 }
 
+void CommandList::cmdCopyImageToImage(ImageView& src_view, ImageView& dst_view)
+{
+	for (auto& task : tasks) {
+
+		ImageSubResourceRange& src_res = src_view.info.subres_range;
+		ImageSubResourceRange& dst_res = dst_view.info.subres_range;
+
+		VkImageCopy copy = {};
+		copy.srcSubresource.aspectMask = src_res.aspectMask;
+		copy.srcSubresource.mipLevel = src_res.baseMipLevel;
+		copy.srcSubresource.baseArrayLayer = src_res.baseArrayLayer;
+		copy.srcSubresource.layerCount = src_res.layerCount;
+
+		copy.dstSubresource.aspectMask = dst_res.aspectMask;
+		copy.dstSubresource.mipLevel = dst_res.baseMipLevel;
+		copy.dstSubresource.baseArrayLayer = dst_res.baseArrayLayer;
+		copy.dstSubresource.layerCount = dst_res.layerCount;
+
+		copy.extent.width = src_view.image->width;
+		copy.extent.height = src_view.image->height;
+		copy.extent.depth = src_view.image->depth;
+
+		vkCmdCopyImage(task.buff,
+			src_view.image->img, src_view.image->current_layout,
+			dst_view.image->img, dst_view.image->current_layout,
+			1, &copy);
+	}
+}
+
 void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
 	size_t image_barriers_count, ImageBarrier* image_barriers)
 {
@@ -97,9 +126,6 @@ void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipe
 		vk_bar.subresourceRange.levelCount = subres.levelCount;
 		vk_bar.subresourceRange.baseArrayLayer = subres.baseArrayLayer;
 		vk_bar.subresourceRange.layerCount = subres.layerCount;
-
-		// Remember the layout change
-		bar.view->image->current_layout = bar.new_layout;
 	}
 
 	for (auto& task : tasks) {
@@ -109,6 +135,11 @@ void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipe
 			0, NULL,  // Buffer Memory Barrier
 			(uint32_t)vk_barriers.size(), vk_barriers.data()  // Image Memory Barrier
 		);
+	}
+
+	// Remember the layout change
+	for (uint32_t i = 0; i < image_barriers_count; i++) {
+		image_barriers[i].view->image->current_layout = vk_barriers[i].newLayout;
 	}
 }
 
@@ -122,6 +153,56 @@ void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipe
 	ImageBarrier& image_barrier)
 {
 	this->cmdPipelineBarrier(wait_for_stage, wait_at_stage, 1, &image_barrier);
+}
+
+void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+	ImageBarrier& image_barrier_0, ImageBarrier& image_barrier_1)
+{
+	std::array<ImageBarrier, 2> bars = {
+		image_barrier_0, image_barrier_1
+	};
+	this->cmdPipelineBarrier(wait_for_stage, wait_at_stage, bars.size(), bars.data());
+}
+
+void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkAccessFlags wait_for_access,
+	VkPipelineStageFlags wait_at_stage, VkAccessFlags wait_at_access,
+	size_t images_count, ImageView** images)
+{
+	std::vector<VkImageMemoryBarrier> vk_barriers(images_count);
+	for (uint32_t i = 0; i < vk_barriers.size(); i++) {
+
+		VkImageMemoryBarrier& vk_bar = vk_barriers[i];
+
+		vk_bar.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		vk_bar.srcAccessMask = wait_for_access;
+		vk_bar.dstAccessMask = wait_at_access;
+		vk_bar.oldLayout = images[i]->image->current_layout;
+		vk_bar.newLayout = images[i]->image->current_layout;
+		vk_bar.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		vk_bar.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		vk_bar.image = images[i]->image->img;
+
+		auto& subres = images[i]->info.subres_range;
+		vk_bar.subresourceRange.aspectMask = subres.aspectMask;
+		vk_bar.subresourceRange.baseMipLevel = subres.baseMipLevel;
+		vk_bar.subresourceRange.levelCount = subres.levelCount;
+		vk_bar.subresourceRange.baseArrayLayer = subres.baseArrayLayer;
+		vk_bar.subresourceRange.layerCount = subres.layerCount;
+	}
+
+	for (auto& task : tasks) {
+
+		vkCmdPipelineBarrier(task.buff, wait_for_stage, wait_at_stage, 0,
+			0, NULL,  // Memory Barriers
+			0, NULL,  // Buffer Memory Barrier
+			(uint32_t)vk_barriers.size(), vk_barriers.data()  // Image Memory Barrier
+		);
+	}
+
+	// Remember the layout change
+	for (uint32_t i = 0; i < images_count; i++) {
+		images[i]->image->current_layout = vk_barriers[i].newLayout;
+	}
 }
 
 void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
@@ -153,9 +234,6 @@ void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipe
 		vk_bar.subresourceRange.levelCount = bar.levelCount;
 		vk_bar.subresourceRange.baseArrayLayer = bar.baseArrayLayer;
 		vk_bar.subresourceRange.layerCount = bar.layerCount;
-
-		// Remember the layout change
-		bar.img->current_layout = bar.new_layout;
 	}
 
 	for (auto& task : tasks) {
@@ -165,6 +243,11 @@ void CommandList::cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipe
 			0, NULL,  // Buffer Memory Barrier
 			(uint32_t)vk_barriers.size(), vk_barriers.data()  // Image Memory Barrier
 		);
+	}
+
+	// Remember the layout change
+	for (uint32_t i = 0; i < image_barriers_count; i++) {
+		image_barriers[i].img->current_layout = vk_barriers[i].newLayout;
 	}
 }
 
@@ -306,7 +389,7 @@ void CommandList::cmdCopyImageToSurface(ImageView& view)
 		cpy.extent.depth = 1;
 
 		vkCmdCopyImage(tasks[i].buff,
-			view.image->img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			view.image->img, view.image->current_layout,
 			surface->swapchain_images[i], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			1, &cpy);
 	}

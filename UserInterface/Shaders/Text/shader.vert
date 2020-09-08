@@ -10,12 +10,12 @@ layout(location = 2) in vec4 inst_color;
 layout(location = 3) in vec2 inst_pos;
 layout(location = 4) in float inst_raster_size;
 layout(location = 5) in float inst_size;
-layout(location = 6) in uint inst_elem_id;
+layout(location = 6) in uint inst_parent_clip_id;
 
 // Outputs
 layout(location = 0) out vec2 uv_out;
 layout(location = 1) out vec4 inst_color_out;
-layout(location = 2) out uint inst_elem_id_out;
+layout(location = 2) out uint inst_parent_clip_id_out;
 
 layout(set = 1, binding = 0) uniform stub {
     vec4 screen_size;
@@ -42,5 +42,5 @@ void main()
 
     uv_out = uv;
     inst_color_out = inst_color;
-    inst_elem_id_out = inst_elem_id;
+    inst_parent_clip_id_out = inst_parent_clip_id;
 }

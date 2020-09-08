@@ -3,7 +3,7 @@
 
 
 using namespace nui_int;
-using namespace nui;
+using namespace nui_old;
 
 
 void ContentSize::setAbsolute(float size)
@@ -272,7 +272,7 @@ Element& UserInterface::getRoot()
 
 Wrap& UserInterface::getRootElement()
 {
-	nui::Element& elem = this->elems.front();
+	Element& elem = this->elems.front();
 	return std::get<Wrap>(elem.elem);
 }
 

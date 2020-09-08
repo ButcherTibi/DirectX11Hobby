@@ -13,6 +13,18 @@ using namespace nui;
 std::list<Window> nui::windows;
 
 
+void ContentSize::setAbsolute(float new_size)
+{
+	this->type = ContentSizeType::ABSOLUTE_SIZE;
+	this->size = new_size;
+}
+
+void ContentSize::setRelative(float new_size)
+{
+	this->type = ContentSizeType::RELATIVE_SIZE;
+	this->size = new_size;
+}
+
 Text* NodeComponent::addText()
 {
 	Node& child_node = window->nodes.emplace_back();
@@ -20,8 +32,6 @@ Text* NodeComponent::addText()
 	Text* new_text = child_node.createText();
 	new_text->node_comp.window = this->window;
 	new_text->node_comp.this_elem = &child_node;
-	new_text->node_comp.elem_id = window->node_unique_id;
-	window->node_unique_id++;
 
 	new_text->size = 14.0f;
 	new_text->line_height = 1.15f;
@@ -29,6 +39,9 @@ Text* NodeComponent::addText()
 
 	// Parent ---> Child
 	this->this_elem->children.push_back(&child_node);
+
+	// Parent <--- Child
+	child_node.parent = this->this_elem;
 
 	return new_text;
 }
@@ -40,16 +53,15 @@ Wrap* NodeComponent::addWrap()
 	Wrap* child_wrap = child_node.createWrap();
 	child_wrap->node_comp.window = this->window;
 	child_wrap->node_comp.this_elem = &child_node;
-	child_wrap->node_comp.elem_id = window->node_unique_id;
-	window->node_unique_id++;
 
-	child_wrap->width = 100;
-	child_wrap->height = 100;
 	child_wrap->overflow = Overflow::OVERFLOw;
 	child_wrap->background_color = { 0, 0, 0, 0 };
 
 	// Parent ---> Child
 	this->this_elem->children.push_back(&child_node);
+
+	// Parent <--- Child
+	child_node.parent = this->this_elem;
 
 	return child_wrap;
 }
@@ -64,25 +76,14 @@ Flex* NodeComponent::addFlex()
 	return child_flex;
 }
 
-
-Text* Root::addText()
-{
-	return node_comp.addText();
-}
-
-Wrap* Root::addWrap()
-{
-	return node_comp.addWrap();
-}
-
-Flex* Root::addFlex()
-{
-	return node_comp.addFlex();
-}
-
 Text* Wrap::addText()
 {
 	return node_comp.addText();
+}
+
+Wrap* Wrap::addWrap()
+{
+	return node_comp.addWrap();
 }
 
 LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -124,13 +125,6 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
 }
 
-Root* Node::createRoot()
-{
-	this->type = NodeType::ROOT;
-	this->elem = new Root();
-	return static_cast<Root*>(elem);
-}
-
 Wrap* Node::createWrap()
 {
 	this->type = NodeType::WRAP;
@@ -156,10 +150,6 @@ Node::~Node()
 {
 	if (elem != nullptr) {
 		switch (type) {
-		case nui::NodeType::ROOT:
-			delete (Root*)elem;
-			break;
-
 		case nui::NodeType::WRAP:
 			delete (Wrap*)elem;
 			break;
@@ -179,78 +169,17 @@ Node::~Node()
 	}
 }
 
-ErrStack Window::generateGPU_CharacterData()
+void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
+	DescendantProps& r_descendant)
 {
-	ErrStack err_stack;
+	switch (node->type) {
+	case NodeType::TEXT:{
 
-	Font& font = instance->char_atlas.fonts[0];
+		Text* text = (Text*)node->elem;
+		Node* parent = text->node_comp.this_elem->parent;
 
-	uint32_t vertex_count = 0;
-	uint32_t index_count = 0;
-
-	for (FontSize& font_size : font.sizes) {
-		vertex_count += font_size.chars.size() * 4;
-		index_count += font_size.chars.size() * 6;
-	}
-
-	this->char_verts.resize(vertex_count);
-	this->char_idxs.resize(index_count);
-
-	uint32_t vertex_idx = 0;
-	uint32_t index_idx = 0;
-	for (FontSize& font_size : font.sizes) {
-		for (Character& chara: font_size.chars) {
-
-			if (chara.zone == nullptr) {
-				continue;
-			}
-
-			float w = (float)chara.zone->bb_pix.getWidth();
-			float h = (float)chara.zone->bb_pix.getHeight();
-
-			chara.vertex_start_idx = vertex_idx;
-			chara.index_start_idx = index_idx;
-
-			// Character origin is bottom left
-			char_verts[vertex_idx + 0].pos = { 0, 0 };
-			char_verts[vertex_idx + 0].uv = chara.zone->bb_uv.getBotLeft();
-
-			char_verts[vertex_idx + 1].pos = { 0, -h };
-			char_verts[vertex_idx + 1].uv = chara.zone->bb_uv.getTopLeft();
-
-			char_verts[vertex_idx + 2].pos = { w, -h };
-			char_verts[vertex_idx + 2].uv = chara.zone->bb_uv.getTopRight();
-
-			char_verts[vertex_idx + 3].pos = { w, 0 };
-			char_verts[vertex_idx + 3].uv = chara.zone->bb_uv.getBotRight();
-
-			char_idxs[index_idx + 0] = vertex_idx + 0;
-			char_idxs[index_idx + 1] = vertex_idx + 1;
-			char_idxs[index_idx + 2] = vertex_idx + 2;
-
-			char_idxs[index_idx + 3] = vertex_idx + 2;
-			char_idxs[index_idx + 4] = vertex_idx + 3;
-			char_idxs[index_idx + 5] = vertex_idx + 0;
-
-			vertex_idx += 4;
-			index_idx += 6;
-		}
-	}
-
-	checkErrStack1(chars_vbuff.load(char_verts.data(), char_verts.size() * sizeof(GPU_CharacterVertex)));
-	checkErrStack1(chars_idxbuff.load(char_idxs.data(), char_idxs.size() * sizeof(uint32_t)));
-
-	uint32_t instance_count = 0;
-	
-	for (Node& node : nodes) {
-
-		switch (node.type) {
-		case NodeType::TEXT: {
-			Text* text = (Text*)node.elem;
-
-			//text->generateDrawcalls();
-
-			FontSize* font_size = nullptr;
+		FontSize* font_size = nullptr;
+		{
 			float min_diff = 9999;
 
 			// Choose most similar font size
@@ -263,148 +192,325 @@ ErrStack Window::generateGPU_CharacterData()
 					min_diff = diff;
 				}
 			}
+		}
 
-			glm::vec2 pen = text->pos;
+		glm::vec2 pen = { 0, 0 };
+		if (parent->type == NodeType::WRAP) {
+			Wrap* parent_wrap = (Wrap*)parent->elem;
+			pen = text->pos + parent_wrap->pos;
+		}
 
-			for (uint32_t unicode : text->text) {
+		float text_width = 0;
 
-				float scale = text->size / font_size->size;
+		for (uint32_t unicode : text->text) {
 
-				switch (unicode) {
-				case 0x000A:  // newline
-					pen.x = text->pos.x;
-					pen.y += font_size->line_spacing * text->line_height * scale;
-					break;
+			float scale = text->size / font_size->size;
 
-				case 0x0020:  // white space
+			switch (unicode) {
+			case 0x000A:  // newline
+				pen.x = text->pos.x;
+				pen.y += font_size->line_spacing * text->line_height * scale;
+				break;
 
+			case 0x0020:  // white space
+
+				for (Character& chara : font_size->chars) {
+
+					if (chara.unicode == unicode) {
+
+						pen.x += chara.advance_X * scale;
+						break;
+					}
+				}
+				break;
+
+			default:  // regular character
+
+				// add instance to existing or new drawcall
+				CharacterDrawcall* drawcall = [&]() -> CharacterDrawcall* {
+
+					for (CharacterDrawcall& d : text->drawcalls) {
+						if (d.chara->unicode == unicode) {
+							return &d;
+						}
+					}
+
+					CharacterDrawcall& new_drawcall = text->drawcalls.emplace_back();
 					for (Character& chara : font_size->chars) {
 
 						if (chara.unicode == unicode) {
-
-							pen.x += chara.advance_X * scale;
-							break;
+							new_drawcall.chara = &chara;
+							return &new_drawcall;
 						}
 					}
-					break;
+					return nullptr;
+				}();
 
-				default:  // regular character
+				int32_t char_height = drawcall->chara->zone->bb_pix.getHeight();
+				int32_t char_top = drawcall->chara->bitmap_top;
 
-					// add instance to existing or new drawcall
-					CharacterDrawcall* drawcall = [&]() -> CharacterDrawcall* {
+				glm::vec2 new_pos = pen;
+				new_pos.x += (float)drawcall->chara->bitmap_left * scale;
+				new_pos.y += (char_height - char_top) * scale;
 
-						for (CharacterDrawcall& d : text->drawcalls) {
-							if (d.chara->unicode == unicode) {
-								return &d;
-							}
-						}
+				GPU_CharacterInstance& new_instance = drawcall->instances.emplace_back();
+				new_instance.color = text->color;
+				new_instance.pos = new_pos;
+				new_instance.rasterized_size = (float)font_size->size;
+				new_instance.size = text->size;
+				new_instance.parent_clip_mask = ancestor.clip_mask;
 
-						CharacterDrawcall& new_drawcall = text->drawcalls.emplace_back();
-						for (Character& chara : font_size->chars) {
+				pen.x += drawcall->chara->advance_X * scale;
+			}
 
-							if (chara.unicode == unicode) {
-								new_drawcall.chara = &chara;
-								return &new_drawcall;
-							}
-						}
-						return nullptr;
-					}();
+			float new_text_width = pen.x - ancestor.pos.x;
+			if (new_text_width > text_width) {
+				text_width = new_text_width;
+			}
+		}
 
-					int32_t char_height = drawcall->chara->zone->bb_pix.getHeight();
-					int32_t char_top = drawcall->chara->bitmap_top;
+		r_descendant.pos = text->pos;
+		r_descendant.width = text_width;
+		r_descendant.height = (pen.y - ancestor.pos.y);// + font_size->line_spacing;  // TODO: should be font descender
 
-					glm::vec2 new_pos = pen;
-					new_pos.x += (float)drawcall->chara->bitmap_left * scale;
-					new_pos.y += (char_height - char_top) * scale;
+		this->char_instance_count += text->text.size();
+		break;
+	}
 
-					GPU_CharacterInstance& new_instance = drawcall->instances.emplace_back();
-					new_instance.color = text->color;
-					new_instance.pos = new_pos;
-					new_instance.rasterized_size = (float)font_size->size;
-					new_instance.size = text->size;
-					new_instance.elem_id = text->node_comp.elem_id;
+	case NodeType::WRAP: {
 
-					pen.x += drawcall->chara->advance_X * scale;
+		Wrap* wrap = (Wrap*)node->elem;
+		Node* parent = wrap->node_comp.this_elem->parent;
+
+		AncestorProps child_ancs;
+
+		// Position
+		child_ancs.pos = wrap->pos;
+
+		if (parent != nullptr) {
+			if (parent->type == NodeType::WRAP) {
+				child_ancs.pos += ancestor.pos;
+			}
+		}	
+
+		// Size
+		auto calcSize = [](ContentSize size, float ancestor_size) -> float {
+			switch (size.type) {
+			case ContentSizeType::ABSOLUTE_SIZE:
+				return size.size;
+			case ContentSizeType::RELATIVE_SIZE:
+				return size.size * ancestor_size;
+			}
+			// FIT
+			return ancestor_size;
+		};
+
+		child_ancs.width = calcSize(wrap->width, ancestor.width);
+		child_ancs.height = calcSize(wrap->height, ancestor.height);
+
+		// Child Clip Mask
+		if (wrap->overflow == Overflow::CLIP) {
+			child_ancs.clip_mask = this->clip_mask_id;
+			this->clip_mask_id++;
+		}
+		else {
+			child_ancs.clip_mask = ancestor.clip_mask;
+		}
+
+		std::vector<DescendantProps> child_props(node->children.size());
+		auto child_it = node->children.begin();			
+
+		for (uint32_t i = 0; i < node->children.size(); i++, child_it++) {
+
+			DescendantProps& child_prop = child_props[i];
+			generateDrawcalls(*child_it, child_ancs, child_prop);
+		}
+
+		if (wrap->width.type == ContentSizeType::FIT) {
+
+			float right_most = 0;
+			for (DescendantProps& child_prop : child_props) {
+				float right = child_prop.pos.x + child_prop.width;
+				if (right_most < right) {
+					right_most = right;
 				}
 			}
 
-			instance_count += text->text.size();
-			break;
+			r_descendant.width = right_most;
 		}
-		}
-	}
 
-	this->char_instances.resize(instance_count);
-	uint32_t instance_idx = 0;
+		if (wrap->height.type == ContentSizeType::FIT) {
 
-	for (Node& node : nodes) {
-
-		switch (node.type) {
-		case NodeType::TEXT: {
-			Text* text = (Text*)node.elem;
-
-			for (CharacterDrawcall& drawcall : text->drawcalls) {
-
-				drawcall.instance_start_idx = instance_idx;
-
-				std::memcpy(char_instances.data() + instance_idx, drawcall.instances.data(),
-					drawcall.instances.size() * sizeof(GPU_CharacterInstance));
-
-				instance_idx += drawcall.instances.size();
+			float bottom_most = 0;
+			for (DescendantProps& child_prop : child_props) {
+				float bottom = child_prop.pos.y + child_prop.height;
+				if (bottom_most < bottom) {
+					bottom_most = bottom;
+				}
 			}
-			break;
+
+			r_descendant.height = bottom_most;
 		}
+
+		auto& inst = wrap->drawcall.instance;
+		inst.color = wrap->background_color;
+
+		if (parent != nullptr) {	
+			inst.pos = child_ancs.pos;
+			inst.size.x = r_descendant.width;
+			inst.size.y = r_descendant.height;
+			inst.parent_clip_id = ancestor.clip_mask;
+			inst.child_clip_id = child_ancs.clip_mask;
 		}
+		else {
+			inst.pos = { 0, 0 };
+			inst.size.x = wrap->width.size;
+			inst.size.y = wrap->height.size;
+			inst.parent_clip_id = 0;
+			inst.child_clip_id = 0;
+		}
+
+		r_descendant.pos = child_ancs.pos;
+
+		this->wrap_instance_count += 1;
+		break;
 	}
 
-	if (instance_count) {
-		checkErrStack1(chars_instabuff.load(char_instances.data(), char_instances.size() * sizeof(GPU_CharacterInstance)));
+	case NodeType::FLEX: {
+		// Flex* flex = (Flex*)node->elem;
+		break;
 	}
 
-	return ErrStack();
+	default:
+		break;
+	}
 }
 
-ErrStack Window::generateGPU_WrapData()
+ErrStack Window::generateGPU_Data()
 {
 	ErrStack err_stack;
-	checkErrStack1(wrap_vbuff.load(wrap_verts.data(), wrap_verts.size() * sizeof(GPU_WrapVertex)));
-	checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), wrap_idxs.size() * sizeof(uint32_t)));
 
-	uint32_t instance_count = 0;
-	for (Node& node : nodes) {
+	// Create Character Meshes
+	{
+		Font& font = instance->char_atlas.fonts[0];
 
-		switch (node.type) {
-		case NodeType::WRAP: {
-			instance_count++;
-			break;
+		uint32_t vertex_count = 0;
+		uint32_t index_count = 0;
+
+		for (FontSize& font_size : font.sizes) {
+			vertex_count += font_size.chars.size() * 4;
+			index_count += font_size.chars.size() * 6;
 		}
+
+		this->char_verts.resize(vertex_count);
+		this->char_idxs.resize(index_count);
+
+		uint32_t vertex_idx = 0;
+		uint32_t index_idx = 0;
+		for (FontSize& font_size : font.sizes) {
+			for (Character& chara : font_size.chars) {
+
+				if (chara.zone == nullptr) {
+					continue;
+				}
+
+				float w = (float)chara.zone->bb_pix.getWidth();
+				float h = (float)chara.zone->bb_pix.getHeight();
+
+				chara.vertex_start_idx = vertex_idx;
+				chara.index_start_idx = index_idx;
+
+				// Character origin is bottom left
+				char_verts[vertex_idx + 0].pos = { 0, 0 };
+				char_verts[vertex_idx + 0].uv = chara.zone->bb_uv.getBotLeft();
+
+				char_verts[vertex_idx + 1].pos = { 0, -h };
+				char_verts[vertex_idx + 1].uv = chara.zone->bb_uv.getTopLeft();
+
+				char_verts[vertex_idx + 2].pos = { w, -h };
+				char_verts[vertex_idx + 2].uv = chara.zone->bb_uv.getTopRight();
+
+				char_verts[vertex_idx + 3].pos = { w, 0 };
+				char_verts[vertex_idx + 3].uv = chara.zone->bb_uv.getBotRight();
+
+				char_idxs[index_idx + 0] = vertex_idx + 0;
+				char_idxs[index_idx + 1] = vertex_idx + 1;
+				char_idxs[index_idx + 2] = vertex_idx + 2;
+
+				char_idxs[index_idx + 3] = vertex_idx + 2;
+				char_idxs[index_idx + 4] = vertex_idx + 3;
+				char_idxs[index_idx + 5] = vertex_idx + 0;
+
+				vertex_idx += 4;
+				index_idx += 6;
+			}
 		}
+
+		checkErrStack1(chars_vbuff.load(char_verts.data(), char_verts.size() * sizeof(GPU_CharacterVertex)));
+		checkErrStack1(chars_idxbuff.load(char_idxs.data(), char_idxs.size() * sizeof(uint32_t)));
 	}
 
-	this->wrap_instances.resize(instance_count);
-	uint32_t instance_idx = 0;
-	for (Node& node : nodes) {
-
-		switch (node.type) {
-		case NodeType::WRAP: {
-			
-			Wrap* wrap = (Wrap*)node.elem;
-			wrap->drawcall.instance_idx = instance_idx;
-
-			auto& wrap_instance = wrap_instances[instance_idx];
-			wrap_instance.pos = wrap->pos;
-			wrap_instance.size = {wrap->width, wrap->height};
-			wrap_instance.color = wrap->background_color;
-			wrap_instance.elem_id = wrap->node_comp.elem_id;
-
-			instance_idx++;
-			break;
-		}
-		}
+	// Create Wrap Mesh
+	{
+		checkErrStack1(wrap_vbuff.load(wrap_verts.data(), wrap_verts.size() * sizeof(GPU_WrapVertex)));
+		checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), wrap_idxs.size() * sizeof(uint32_t)));
 	}
 
-	if (instance_count) {
-		checkErrStack1(wrap_instabuff.load(wrap_instances.data(), wrap_instances.size() * sizeof(GPU_WrapInstance)));
+	// Create Node Instances
+	{
+		this->char_instance_count = 0;
+		this->wrap_instance_count = 0;
+
+		AncestorProps ancestor;
+		DescendantProps descendant;
+		generateDrawcalls(&nodes.front(), ancestor, descendant);
+	}
+
+	// Index and Load Instances
+	{
+		this->char_instances.resize(this->char_instance_count);
+		this->wrap_instances.resize(this->wrap_instance_count);
+
+		uint32_t char_instance_idx = 0;
+		uint32_t wrap_instance_idx = 0;
+
+		for (Node& node : nodes) {
+
+			switch (node.type) {
+			case NodeType::TEXT: {
+				Text* text = (Text*)node.elem;
+
+				for (CharacterDrawcall& drawcall : text->drawcalls) {
+
+					drawcall.instance_start_idx = char_instance_idx;
+
+					std::memcpy(char_instances.data() + char_instance_idx, drawcall.instances.data(),
+						drawcall.instances.size() * sizeof(GPU_CharacterInstance));
+
+					char_instance_idx += drawcall.instances.size();
+				}
+				break;
+			}
+
+			case NodeType::WRAP: {
+				Wrap* wrap = (Wrap*)node.elem;
+
+				wrap->drawcall.instance_idx = wrap_instance_idx;
+
+				wrap_instances[wrap_instance_idx] = wrap->drawcall.instance;
+
+				wrap_instance_idx++;
+				break;
+			}
+			}
+		}
+
+		if (this->char_instance_count) {
+			checkErrStack1(chars_instabuff.load(char_instances.data(), char_instances.size() * sizeof(GPU_CharacterInstance)));
+		}
+		if (this->wrap_instance_count) {
+			checkErrStack1(wrap_instabuff.load(wrap_instances.data(), wrap_instances.size() * sizeof(GPU_WrapInstance)));
+		}
 	}
 
 	return err_stack;
@@ -439,8 +545,6 @@ ErrStack Window::draw()
 			dev.createBuffer(info, chars_instabuff);
 		}
 
-		checkErrStack1(generateGPU_CharacterData());
-
 		// Wrap Vertex Buffer
 		{
 			vkw::BufferCreateInfo info;
@@ -461,8 +565,6 @@ ErrStack Window::draw()
 			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			dev.createBuffer(info, wrap_instabuff);
 		}
-
-		checkErrStack1(generateGPU_WrapData());
 
 		// Character Uniform Buffer
 		{
@@ -485,56 +587,30 @@ ErrStack Window::draw()
 				"failed to create composition image");
 		}
 
-		// Elem Image
-		{
-			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R8G8B8A8_UNORM;
-			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, elem_img));
-
-			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(elem_img.createView(view_info, elem_view));
-		}
-
-		// Elem Mask Image
+		// Parents Clip Image
 		{
 			vkw::ImageCreateInfo info;
 			info.format = VK_FORMAT_R32_UINT;
 			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, elem_mask_img));
+			checkErrStack1(dev.createImage(info, parents_clip_mask_img));
 
 			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(elem_mask_img.createView(view_info, elem_mask_view));
+			checkErrStack1(parents_clip_mask_img.createView(view_info, parents_clip_mask_view));
 		}
 
-		// Parents Id Image
+		// Next Parents Clip Image
 		{
 			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R8G8B8A8_UINT;
+			info.format = VK_FORMAT_R32_UINT;
 			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, parents_id_img));
+			checkErrStack1(dev.createImage(info, next_parents_clip_mask_img));
 
 			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(parents_id_img.createView(view_info, parents_id_view));
-		}
-
-		// Next Parents Id Image
-		{
-			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R8G8B8A8_UINT;
-			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, next_parents_id_img));
-
-			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(next_parents_id_img.createView(view_info, next_parents_id_view));
+			checkErrStack1(next_parents_clip_mask_img.createView(view_info, next_parents_clip_mask_view));
 		}
 
 		// Character Atlas Texture
@@ -569,6 +645,8 @@ ErrStack Window::draw()
 			checkErrStack(dev.createSampler(info, text_sampler),
 				"failed to create sampler");
 		}
+
+		checkErrStack1(generateGPU_Data());
 
 		std::vector<char> spirv;
 
@@ -630,17 +708,16 @@ ErrStack Window::draw()
 			ubuff_info.set = 1;
 			text_pass.bindUniformBuffer(ubuff_info);
 
-			vkw::WriteAttachmentInfo elem_info;
-			elem_info.view = &elem_view;
-			elem_info.load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vkw::clearColorFloatValue(elem_info.clear_value);
-			text_pass.addWriteColorAttachment(elem_info);
+			vkw::ReadAttachmentInfo parents_clip_info;
+			parents_clip_info.view = &parents_clip_mask_view;
+			parents_clip_info.set = 2;
+			text_pass.addReadColorAttachment(parents_clip_info);
 
-			vkw::WriteAttachmentInfo elem_mask_info;
-			elem_mask_info.view = &elem_mask_view;
-			elem_mask_info.load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vkw::clearColorUIntValue(elem_mask_info.clear_value);
-			text_pass.addWriteColorAttachment(elem_mask_info);
+			vkw::WriteAttachmentInfo compose_info;
+			compose_info.view = &composition_view;
+			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+			compose_info.blendEnable = true;
+			text_pass.addWriteColorAttachment(compose_info);
 
 			text_pass.vertex_inputs.push_back(GPU_CharacterVertex::getVertexInput());
 			text_pass.vertex_inputs.push_back(GPU_CharacterInstance::getVertexInput(1));
@@ -660,17 +737,20 @@ ErrStack Window::draw()
 			ubuff_info.buff = &text_ubuff;
 			wrap_pass.bindUniformBuffer(ubuff_info);
 
-			vkw::WriteAttachmentInfo elem_info;
-			elem_info.view = &elem_view;
-			elem_info.load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vkw::clearColorFloatValue(elem_info.clear_value);
-			wrap_pass.addWriteColorAttachment(elem_info);
+			vkw::ReadAttachmentInfo parents_clip_info;
+			parents_clip_info.view = &parents_clip_mask_view;
+			parents_clip_info.set = 1;
+			wrap_pass.addReadColorAttachment(parents_clip_info);
 
-			vkw::WriteAttachmentInfo elem_mask_info;
-			elem_mask_info.view = &elem_mask_view;
-			elem_mask_info.load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vkw::clearColorUIntValue(elem_mask_info.clear_value);
-			wrap_pass.addWriteColorAttachment(elem_mask_info);
+			vkw::WriteAttachmentInfo compose_info;
+			compose_info.view = &composition_view;
+			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+			wrap_pass.addWriteColorAttachment(compose_info);
+
+			vkw::WriteAttachmentInfo next_parents_clip_info;
+			next_parents_clip_info.view = &next_parents_clip_mask_view;
+			next_parents_clip_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+			wrap_pass.addWriteColorAttachment(next_parents_clip_info);
 
 			wrap_pass.vertex_inputs.push_back(GPU_WrapVertex::getVertexInput());
 			wrap_pass.vertex_inputs.push_back(GPU_WrapInstance::getVertexInput(1));
@@ -690,93 +770,21 @@ ErrStack Window::draw()
 			checkErrStack1(dev.createCommandList(info, cmd_list));
 			checkErrStack1(cmd_list.beginRecording());
 
-			// Clear Compose Image
+			cmd_list.cmdClearFloatImage(composition_view);
+			cmd_list.cmdClearUIntImage(parents_clip_mask_view);
+			cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
 			{
-				vkw::ImageBarrier bar;
-				bar.view = &composition_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				bar.wait_for_access = 0;
-				bar.wait_at_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, bar);
-
-				cmd_list.cmdClearFloatImage(composition_view);
-
-				bar = {};
-				bar.view = &composition_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_GENERAL;
-				bar.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				bar.wait_at_access = 0;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, bar);
+				std::array<vkw::ImageView*, 3> views = {
+					&composition_view, &parents_clip_mask_view, &next_parents_clip_mask_view
+				};
+				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, (VkAccessFlagBits)0, views.size(), views.data());
 			}
 
-			//  Clear Parents Id Image
-			{
-				vkw::ImageBarrier bar;
-				bar.view = &parents_id_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				bar.wait_for_access = 0;
-				bar.wait_at_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, bar);
-
-				cmd_list.cmdClearUIntImage(parents_id_view, 0);
-
-				bar = {};
-				bar.view = &parents_id_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_GENERAL;
-				bar.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				bar.wait_at_access = 0;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, bar);
-			}
-
-			// Clear Next Parents Id Image
-			{
-				vkw::ImageBarrier bar;
-				bar.view = &next_parents_id_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				bar.wait_for_access = 0;
-				bar.wait_at_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, bar);
-
-				cmd_list.cmdClearUIntImage(next_parents_id_view, 0);
-
-				bar = {};
-				bar.view = &next_parents_id_view;
-				bar.new_layout = VK_IMAGE_LAYOUT_GENERAL;
-				bar.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				bar.wait_at_access = 0;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, bar);
-			}
-
-			// render root
-			// elem mask image clear to root
-
-			// Text/Wrap/XXX Pass
-			// draw elem -> elem img
-			//           -> elem_mask img
-
-			// Clip Pass
-			// in: elem img, elem_mask img, parents_mask img, next_parents_mask
-			// out: compose img
-			// if (elem_mask == parents_mask) then
-			//   compose img = elem_mask(elem_img)
-			//   next_parents_mask = elem_mask
-
-			// at end of layer parents_mask img = next_parents_mask img,
-			// next_parents_mask clear to blank
-
-			std::vector<Node*> now_nodes;
+			std::vector<Node*> now_nodes = {
+				&nodes.front()
+			};
 			std::vector<Node*> next_nodes;
-
-			// Render the root
-			{
-				// Root* root = reinterpret_cast<Root*>(&nodes.front().elem);
-
-				// nothing yet to render maybe background color
-
-				for (Node* child : nodes.front().children) {
-					now_nodes.push_back(child);
-				}
-			}
 
 			while (now_nodes.size()) {
 
@@ -816,25 +824,22 @@ ErrStack Window::draw()
 					}
 					}
 
+					// TODO: barrier, wait for writes to complete for composition, and next parents
+
 					for (Node* child : node->children) {
 						next_nodes.push_back(child);
 					}
 				}
 
-				now_nodes.clear();
 				now_nodes = next_nodes;
 				next_nodes.clear();
+
+				cmd_list.cmdCopyImageToImage(next_parents_clip_mask_view, parents_clip_mask_view);
+				cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
 			}	
 
 			// Copy Compose Image to Surface
 			{
-				vkw::ImageBarrier src;
-				src.view = &composition_view;
-				src.new_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-				src.wait_for_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				src.wait_at_access = VK_ACCESS_TRANSFER_READ_BIT;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, src);
-
 				vkw::SurfaceBarrier dst;
 				dst.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 				dst.wait_for_access = 0;
@@ -842,13 +847,6 @@ ErrStack Window::draw()
 				cmd_list.cmdSurfacePipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, dst);
 
 				cmd_list.cmdCopyImageToSurface(composition_view);
-
-				src = {};
-				src.view = &composition_view;
-				src.new_layout = VK_IMAGE_LAYOUT_GENERAL;
-				src.wait_for_access = VK_ACCESS_TRANSFER_READ_BIT;
-				src.wait_at_access = 0;
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, src);
 
 				dst = {};
 				dst.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -868,11 +866,11 @@ ErrStack Window::draw()
 	return ErrStack();
 }
 
-Root* Window::getRoot()
+Wrap* Window::getRoot()
 {
-	assert_cond(nodes.front().type == NodeType::ROOT, "");
+	assert_cond(nodes.front().type == NodeType::WRAP, "");
 
-	return (Root*)nodes.front().elem;
+	return (Wrap*)nodes.front().elem;
 }
 
 ErrStack Instance::create()
@@ -942,7 +940,7 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 
 	window.minimized = false;
 	window.close = false;
-	window.node_unique_id = 0;
+	window.clip_mask_id = 0;
 	window.rendering_configured = false;
 
 	window.wrap_verts[0].pos = { 0, 0 };
@@ -960,6 +958,7 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 		vkw::DeviceCreateInfo dev_info;
 		dev_info.hinstance = window.hinstance;
 		dev_info.hwnd = window.hwnd;
+		dev_info.features.independentBlend = VK_TRUE;
 
 		checkErrStack(inst.createDevice(dev_info, window.dev),
 			"failed to create device");
@@ -968,13 +967,18 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 	// Root UI Element
 	{
 		Node& new_node = window.nodes.emplace_back();
+		new_node.parent = nullptr;
 
-		Root* root = new_node.createRoot();
+		Wrap* root = new_node.createWrap();
 		root->node_comp.window = &window;
-		root->node_comp.elem_id = window.node_unique_id;
 		root->node_comp.this_elem = &new_node;
 
-		window.node_unique_id++;
+		// Default Values
+		root->pos = { 0, 0 };
+		root->width.setAbsolute((float)window.dev.surface.width);
+		root->height.setAbsolute((float)window.dev.surface.height);
+		root->overflow = Overflow::CLIP;
+		root->background_color = { 0, 0, 0, 1 };
 	}
 
 	r_window = &window;

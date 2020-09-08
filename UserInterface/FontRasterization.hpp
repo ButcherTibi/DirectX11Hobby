@@ -29,6 +29,7 @@ namespace nui {
 	struct FontSize {
 		uint32_t size;
 
+		//uint32_t 
 		uint32_t line_spacing;
 
 		std::vector<Character> chars;

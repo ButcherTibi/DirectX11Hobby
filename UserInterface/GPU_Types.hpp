@@ -30,7 +30,7 @@ namespace nui {
 		glm::vec2 pos;
 		float rasterized_size;
 		float size;
-		uint32_t elem_id;
+		uint32_t parent_clip_mask;
 
 		static vkw::VertexInput getVertexInput(uint32_t binding = 0)
 		{
@@ -43,7 +43,7 @@ namespace nui {
 			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_CharacterInstance, pos));
 			vi.addAtribute(VK_FORMAT_R32_SFLOAT, offsetof(GPU_CharacterInstance, rasterized_size));
 			vi.addAtribute(VK_FORMAT_R32_SFLOAT, offsetof(GPU_CharacterInstance, size));
-			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_CharacterInstance, elem_id));
+			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_CharacterInstance, parent_clip_mask));
 
 			return vi;
 		}
@@ -75,7 +75,8 @@ namespace nui {
 		glm::vec2 pos;
 		glm::vec2 size;
 		glm::vec4 color;
-		uint32_t elem_id;
+		uint32_t parent_clip_id;
+		uint32_t child_clip_id;
 
 		static vkw::VertexInput getVertexInput(uint32_t binding = 0)
 		{
@@ -87,7 +88,8 @@ namespace nui {
 			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_WrapInstance, pos));
 			vi.addAtribute(VK_FORMAT_R32G32_SFLOAT, offsetof(GPU_WrapInstance, size));
 			vi.addAtribute(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(GPU_WrapInstance, color));
-			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_WrapInstance, elem_id));
+			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_WrapInstance, parent_clip_id));
+			vi.addAtribute(VK_FORMAT_R32_UINT, offsetof(GPU_WrapInstance, child_clip_id));
 
 			return vi;
 		}

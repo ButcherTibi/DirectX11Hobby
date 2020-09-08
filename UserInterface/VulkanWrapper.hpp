@@ -229,8 +229,8 @@ namespace vkw {
 
 		// Renderpass
 		VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout final_fayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
+		VkImageLayout final_fayout = VK_IMAGE_LAYOUT_GENERAL;
 		VkClearValue clear_value = {};
 
 		// Descriptor Layout
@@ -238,7 +238,9 @@ namespace vkw {
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
 		uint32_t dst_array_element = 0;
-		VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT;
+		VkShaderStageFlags stages = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		std::string name;
 	};
 
 	struct WriteAttachmentInfo {
@@ -421,12 +423,15 @@ namespace vkw {
 
 		std::vector<DescriptorWriteResource> resources;
 		std::vector<VkWriteDescriptorSet> writes;
+
+		std::string name;
 	};
 
 	class Drawpass {
 	public:
 		VulkanDevice* dev;
 		Surface* surface;
+		std::string name;
 
 		// Renderpass
 		std::vector<VkAttachmentDescription> atach_descps;
@@ -588,9 +593,11 @@ namespace vkw {
 	public:
 		nui::ErrStack beginRecording();
 
-		void cmdCopyBuffer(Buffer& src_buff, Buffer& dst_buff, size_t copy_size);
+		void cmdCopyBufferToBuffer(Buffer& src_buff, Buffer& dst_buff, size_t copy_size);
 
 		void cmdCopyBufferToImage(Buffer& src_buff, ImageView& dst_view);
+
+		void cmdCopyImageToImage(ImageView& src_view, ImageView& dst_view);
 
 		// Pipeline Barriers where same subresource is assumed
 		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
@@ -601,6 +608,13 @@ namespace vkw {
 
 		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
 			ImageBarrier& image_barrier);
+
+		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
+			ImageBarrier& image_barrier_0, ImageBarrier& image_barrier_1);
+
+		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkAccessFlags wait_for_access,
+			VkPipelineStageFlags wait_at_stage, VkAccessFlags wait_at_access,
+			size_t images_count, ImageView** images);
 
 		// Custom Pipeline Barriers
 		void cmdPipelineBarrier(VkPipelineStageFlags wait_for_stage, VkPipelineStageFlags wait_at_stage,
@@ -618,7 +632,7 @@ namespace vkw {
 
 		void cmdClearFloatImage(ImageView& view, float r = 0, float g = 0, float b = 0, float a = 0);
 
-		void cmdClearUIntImage(ImageView& view, uint32_t rgba);
+		void cmdClearUIntImage(ImageView& view, uint32_t rgba = 0);
 
 		void cmdClearSurface(float r = 0, float g = 0, float b = 0, float a = 0);
 
@@ -690,6 +704,8 @@ namespace vkw {
 		VkPhysicalDevice phys_dev = VK_NULL_HANDLE;
 		VkDevice logical_dev = VK_NULL_HANDLE;
 
+		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func = VK_NULL_HANDLE;
+
 		VkPhysicalDeviceMemoryProperties phys_mem_props;
 		int32_t queue_fam_idx = -1;
 		VkQueue queue;
@@ -712,6 +728,8 @@ namespace vkw {
 		nui::ErrStack findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t& mem_type);
 		nui::ErrStack createSemaphore(Semaphore& semaphore);
 		nui::ErrStack createFence(VkFenceCreateFlags flags, Fence& fence);
+
+		nui::ErrStack setDebugName(uint64_t vulkan_obj_handle, VkObjectType vulkan_obj_type, std::string& name);
 
 		~VulkanDevice();
 	};
@@ -747,8 +765,7 @@ namespace vkw {
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
 			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		VkDebugUtilsMessageTypeFlagsEXT debug_msg_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
 	};
 
 	class Instance {
@@ -756,7 +773,6 @@ namespace vkw {
 		VkInstance instance = VK_NULL_HANDLE;
 
 		VkDebugUtilsMessengerEXT callback = VK_NULL_HANDLE;
-		PFN_vkSetDebugUtilsObjectNameEXT set_vkdbg_name_func = VK_NULL_HANDLE;
 
 	public:
 		nui::ErrStack create(InstanceCreateInfo& info);

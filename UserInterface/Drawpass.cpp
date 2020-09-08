@@ -94,6 +94,9 @@ ErrStack Drawpass::addReadColorAttachment(ReadAttachmentInfo& info)
 	VkClearValue& clear_value = clear_values.emplace_back();
 	clear_value = info.clear_value;
 
+	// Set Debug Name
+	layout->name = info.name;
+
 	return ErrStack();
 }
 
@@ -573,6 +576,10 @@ ErrStack Drawpass::build()
 
 				vkUpdateDescriptorSets(dev->logical_dev, (uint32_t)layout.writes.size(), layout.writes.data(),
 					0, NULL);
+
+				if (layout.name.length()) {
+					checkErrStack1(dev->setDebugName(reinterpret_cast<uint64_t>(set), VK_OBJECT_TYPE_DESCRIPTOR_SET, layout.name));
+				}
 			}
 		}
 

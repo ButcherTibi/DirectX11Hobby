@@ -11,7 +11,7 @@
 #include "ErrorStuff.h"
 
 
-namespace nui {
+namespace nui_old {
 	struct Color {
 		float r, g, b, a;
 	};
@@ -191,23 +191,23 @@ namespace nui {
 namespace nui_int {
 
 	struct ElementsLayer {
-		std::list<nui::Element*> elems;
+		std::list<nui_old::Element*> elems;
 	};
 
 	class UserInterface {
 	public:
-		std::list<nui::Element> elems;
+		std::list<nui_old::Element> elems;
 		std::list<ElementsLayer> layers;
 
 	public:
-		nui::Element& getRoot();
-		nui::Wrap& getRootElement();
+		nui_old::Element& getRoot();
+		nui_old::Wrap& getRootElement();
 
 		template<typename T>
-		nui::Element& addElement(nui::Element& parent, T& new_elem);
+		nui_old::Element& addElement(nui_old::Element& parent, T& new_elem);
 
-		void _calcElementLayout(nui::Element* elem, uint32_t parent_layer_idx, float ancestor_width, float ancestor_height,
-			nui::BoxModel*& r_box);
+		void _calcElementLayout(nui_old::Element* elem, uint32_t parent_layer_idx, float ancestor_width, float ancestor_height,
+			nui_old::BoxModel*& r_box);
 
 		void calcGraphLayout();
 	};

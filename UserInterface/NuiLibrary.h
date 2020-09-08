@@ -13,7 +13,6 @@ namespace nui {
 	// Forward declarations
 	class Instance;
 	class Window;
-	class Root;
 	class Wrap;
 	class Flex;
 	class Text;
@@ -26,26 +25,29 @@ namespace nui {
 	};
 
 
+	enum class ContentSizeType {
+		RELATIVE_SIZE,
+		ABSOLUTE_SIZE,
+		FIT
+	};
+
+	struct ContentSize {
+		ContentSizeType type = ContentSizeType::FIT;
+		float size;
+
+		void setAbsolute(float size);
+		void setRelative(float size);
+	};
+
+	// wrap coordinate origin
+	// Wrap self anchor
+
+
 	class NodeComponent {
 	public:
 		Window* window;
 
-		uint32_t elem_id;
-		Node* this_elem;
-
-	public:
-		Text* addText();
-		Wrap* addWrap();
-		Flex* addFlex();
-	};
-
-
-	class Root {
-	public:
-		// Internal
-		NodeComponent node_comp;
-
-	public:
+		Node* this_elem;	
 
 	public:
 		Text* addText();
@@ -55,6 +57,8 @@ namespace nui {
 
 
 	struct WrapDrawcall {
+		GPU_WrapInstance instance;
+
 		uint32_t instance_idx;
 	};
 
@@ -66,13 +70,14 @@ namespace nui {
 
 	public:
 		glm::vec2 pos;
-		uint32_t width;
-		uint32_t height;
+		ContentSize width;
+		ContentSize height;
 		Overflow overflow;  // CURSED: assigning a default value causes undefined behaviour, memory coruption
 		glm::vec4 background_color;
 
 	public:
 		Text* addText();
+		Wrap* addWrap();
 	};
 
 
@@ -82,7 +87,7 @@ namespace nui {
 		NodeComponent node_comp;
 
 	public:
-		Overflow overflow;
+		
 
 	public:
 
@@ -90,7 +95,7 @@ namespace nui {
 
 
 	struct CharacterDrawcall {
-		Character* chara;	
+		Character* chara;
 
 		std::vector<GPU_CharacterInstance> instances;
 
@@ -116,7 +121,6 @@ namespace nui {
 
 
 	enum class NodeType {
-		ROOT,
 		WRAP,
 		FLEX,
 		TEXT
@@ -127,10 +131,10 @@ namespace nui {
 		NodeType type;
 		void* elem = nullptr;
 
+		Node* parent;
 		std::list<Node*> children;
 
 	public:
-		Root* createRoot();
 		Wrap* createWrap();
 		Flex* createFlex();
 		Text* createText();
@@ -142,6 +146,19 @@ namespace nui {
 	struct WindowCrateInfo {
 		uint32_t width = 1024;
 		uint32_t height = 720;
+	};
+
+	struct AncestorProps {
+		glm::vec2 pos;
+		float width;
+		float height;
+		uint32_t clip_mask;
+	};
+
+	struct DescendantProps {
+		glm::vec2 pos;
+		float width;
+		float height;
 	};
 
 	class Window {
@@ -160,14 +177,17 @@ namespace nui {
 		bool close;
 
 		// UI
-		uint32_t node_unique_id;
+		uint32_t clip_mask_id;
 		std::list<Node> nodes;
 
 		// Rendering
 		bool rendering_configured;
 
 		vkw::VulkanDevice dev;
-	
+		
+		uint32_t char_instance_count;
+		uint32_t wrap_instance_count;
+		
 		std::vector<GPU_CharacterVertex> char_verts;
 		std::vector<uint32_t> char_idxs;
 		std::vector<GPU_CharacterInstance> char_instances;
@@ -185,17 +205,13 @@ namespace nui {
 		vkw::Buffer wrap_instabuff;
 
 		vkw::Image composition_img;
-		vkw::Image elem_img;
-		vkw::Image elem_mask_img;
-		vkw::Image parents_id_img;
-		vkw::Image next_parents_id_img;
+		vkw::Image parents_clip_mask_img;
+		vkw::Image next_parents_clip_mask_img;
 		vkw::Image char_atlas_tex;
 
 		vkw::ImageView composition_view;
-		vkw::ImageView elem_view;
-		vkw::ImageView elem_mask_view;
-		vkw::ImageView parents_id_view;
-		vkw::ImageView next_parents_id_view;
+		vkw::ImageView parents_clip_mask_view;
+		vkw::ImageView next_parents_clip_mask_view;
 		vkw::ImageView char_atlas_view;
 
 		vkw::Sampler text_sampler;
@@ -211,14 +227,16 @@ namespace nui {
 		vkw::CommandList cmd_list;
 
 	public:
-		ErrStack generateGPU_CharacterData();
-		ErrStack generateGPU_WrapData();
+		void generateDrawcalls(Node* node, AncestorProps& ancestor,
+			DescendantProps& r_descendant);
+
+		ErrStack generateGPU_Data();
 
 		//ErrStack resize();
 		ErrStack draw();
 
 	public:
-		Root* getRoot();
+		Wrap* getRoot();
 	};
 
 	 

@@ -288,7 +288,7 @@ nui::ErrStack Buffer::load(void* data, size_t load_size)
 
 		checkErrStack1(dev->cmd_list->beginRecording());
 		{
-			dev->cmd_list->cmdCopyBuffer(dev->staging_buff, *this, load_size);
+			dev->cmd_list->cmdCopyBufferToBuffer(dev->staging_buff, *this, load_size);
 		}
 		checkErrStack1(dev->cmd_list->finish());
 	}
@@ -375,7 +375,15 @@ static ErrStack find_extensions(std::vector<VkExtensionProperties>& ext_props, s
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
-	printf("Vulkan Debug: %s \n\n", pCallbackData->pMessage);
+	printf("Vulkan Debug: %s \n", pCallbackData->pMessage);
+
+	for (uint32_t i = 0; i < pCallbackData->objectCount; i++) {
+		auto& obj = pCallbackData->pObjects[i];
+		printf("  obj handle = %#I64x \n", obj.objectHandle);
+		printf("  obj name = %s \n", obj.pObjectName);
+	}
+	printf("\n");
+
 	messageSeverity;
 	messageType;
 	pUserData;
@@ -463,17 +471,6 @@ ErrStack Instance::create(InstanceCreateInfo& info)
 		}
 		else {
 			return ErrStack(code_location, "debug extension not present");
-		}
-	}
-
-	// External Functions
-	{
-		set_vkdbg_name_func = (PFN_vkSetDebugUtilsObjectNameEXT)
-			vkGetInstanceProcAddr(this->instance, "vkSetDebugUtilsObjectNameEXT");
-		if (set_vkdbg_name_func == NULL) {
-			return ErrStack(code_location,
-				"failed to retrieve function pointer for "
-				"vkSetDebugUtilsObjectNameEXT");
 		}
 	}
 
@@ -627,6 +624,17 @@ ErrStack Instance::createDevice(DeviceCreateInfo& info, VulkanDevice& device)
 		checkVkRes(vkCreateDevice(device.phys_dev, &device_info, NULL, &device.logical_dev),
 			"failed to create logical device");
 	}
+
+	// External Functions
+	{
+		device.set_vkdbg_name_func = (PFN_vkSetDebugUtilsObjectNameEXT)
+			vkGetInstanceProcAddr(this->instance, "vkSetDebugUtilsObjectNameEXT");
+		if (device.set_vkdbg_name_func == NULL) {
+			return ErrStack(code_location,
+				"failed to retrieve function pointer for "
+				"vkSetDebugUtilsObjectNameEXT");
+		}
+	}
 	
 	// Swapchain
 	{	
@@ -747,7 +755,7 @@ ErrStack Instance::createDevice(DeviceCreateInfo& info, VulkanDevice& device)
 	return err_stack;
 }
 
-Instance::~Instance()
+vkw::Instance::~Instance()
 {
 	//printf("Instance destroy \n");
 
@@ -1004,6 +1012,22 @@ nui::ErrStack VulkanDevice::createFence(VkFenceCreateFlags flags, Fence& fence)
 
 	checkVkRes(vkCreateFence(logical_dev, &vk_info, NULL, &fence.fence),
 		"failed to create fence");
+
+	return ErrStack();
+}
+
+nui::ErrStack VulkanDevice::setDebugName(uint64_t vulkan_obj_handle, VkObjectType vulkan_obj_type, std::string& name)
+{
+	VkResult vk_res{};
+
+	VkDebugUtilsObjectNameInfoEXT info = {};
+	info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+	info.objectType = vulkan_obj_type;
+	info.objectHandle = vulkan_obj_handle;
+	info.pObjectName = name.c_str();
+
+	checkVkRes(this->set_vkdbg_name_func(logical_dev, &info),
+		"failed to set debug name for object");
 
 	return ErrStack();
 }

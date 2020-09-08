@@ -8,11 +8,13 @@ layout(location = 0) in vec2 pos;
 layout(location = 1) in vec2 inst_pos;
 layout(location = 2) in vec2 inst_size;
 layout(location = 3) in vec4 inst_color;
-layout(location = 4) in uint inst_elem_id;
+layout(location = 4) in uint inst_parent_clip_id;
+layout(location = 5) in uint inst_child_clip_id;
 
 // Outputs
 layout(location = 0) out vec4 inst_color_out;
-layout(location = 1) out uint inst_elem_id_out;
+layout(location = 1) out uint inst_parent_clip_id_out;
+layout(location = 2) out uint inst_child_clip_id_out;
 
 layout(set = 0, binding = 0) uniform stub {
     vec4 screen_size;
@@ -38,5 +40,6 @@ void main()
     gl_Position = vk_pos;
 
     inst_color_out = inst_color;
-    inst_elem_id_out = inst_elem_id;
+    inst_parent_clip_id_out = inst_parent_clip_id;
+    inst_child_clip_id_out = inst_child_clip_id;
 }
