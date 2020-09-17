@@ -1,16 +1,8 @@
-# stuff to ignore
-
-# folders
+# Solution
 .vs
-x64
 
 # Sculpt
-Sculpt/meshes
-Sculpt/UI
-Sculpt/ThirdParty
 Sculpt/x64
 
 # Library
-UserInterface/Fonts
-UserInterface/ThirdParty
 UserInterface/x64

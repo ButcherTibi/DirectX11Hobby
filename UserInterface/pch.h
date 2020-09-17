@@ -19,10 +19,6 @@
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "DXGI.lib")
 
-// FreeType
-#include "ft2build.h"
-#include FT_FREETYPE_H
-
 // Standard
 #include <string>
 #include <vector>
