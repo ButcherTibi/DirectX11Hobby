@@ -3,19 +3,13 @@
   <ItemGroup>
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
     <Filter Include="Source Files\Error">
       <UniqueIdentifier>{5d9b2bf5-4668-4ce7-a121-ca6befefd590}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Precompiled Headers">
       <UniqueIdentifier>{73dafea9-e986-44e7-bf35-748c72a1a77f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\ThirdParty">
-      <UniqueIdentifier>{62509fc3-797f-4b30-98ae-a681c0666234}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\UI">
-      <UniqueIdentifier>{6134d0c4-d5ac-4112-ba45-c93e3d40e981}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\FileIO">
       <UniqueIdentifier>{88a39a18-e860-46ff-82f9-a1440c6986ea}</UniqueIdentifier>
@@ -32,6 +26,15 @@
     <Filter Include="Source Files\TextureAtlas">
       <UniqueIdentifier>{7f3ce26e-1a9c-47fd-8b8f-aa0fc1a51854}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\DX11Wrapper">
+      <UniqueIdentifier>{82e32baa-7480-46fd-a483-80a26e0545f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\GPU_DX11_Shaders">
+      <UniqueIdentifier>{99d9a32f-5e39-481c-bec7-ebcd2bdf3974}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\GPU_DX11_Shaders\Pass">
+      <UniqueIdentifier>{b98445e5-2983-4445-a73c-32ad25460538}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
@@ -39,9 +42,6 @@
     </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>Source Files\Precompiled Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="NuiLibrary.h">
-      <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="FileIO.hpp">
       <Filter>Source Files\FileIO</Filter>
@@ -58,6 +58,15 @@
     <ClInclude Include="GPU_Types.hpp">
       <Filter>Source Files\GPU_Types</Filter>
     </ClInclude>
+    <ClInclude Include="NuiLibrary.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DX11Wrapper.hpp">
+      <Filter>Source Files\DX11Wrapper</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_ShaderTypes.hpp">
+      <Filter>Source Files\GPU_DX11_Shaders</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ErrorStack.cpp">
@@ -68,9 +77,6 @@
     </ClCompile>
     <ClCompile Include="Implementation.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="UI.cpp">
-      <Filter>Source Files\UI</Filter>
     </ClCompile>
     <ClCompile Include="FileIO.cpp">
       <Filter>Source Files\FileIO</Filter>
@@ -84,14 +90,22 @@
     <ClCompile Include="VulkanWrapper.cpp">
       <Filter>Source Files\VulkanWrapper</Filter>
     </ClCompile>
-    <ClCompile Include="Memory.cpp">
-      <Filter>Source Files\VulkanWrapper</Filter>
-    </ClCompile>
     <ClCompile Include="FontRasterization.cpp">
       <Filter>Source Files\FontRasterization</Filter>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp">
       <Filter>Source Files\TextureAtlas</Filter>
     </ClCompile>
+    <ClCompile Include="DX11Wrapper.cpp">
+      <Filter>Source Files\DX11Wrapper</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="VertexShader.hlsl">
+      <Filter>Source Files\GPU_DX11_Shaders\Pass</Filter>
+    </FxCompile>
+    <FxCompile Include="PixelShader.hlsl">
+      <Filter>Source Files\GPU_DX11_Shaders\Pass</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

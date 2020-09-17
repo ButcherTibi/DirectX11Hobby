@@ -59,7 +59,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\SDL2\include;$(ProjectDir)ThirdParty\glew\include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4703;4267;4201;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <CompileAsManaged>false</CompileAsManaged>
       <CompileAsWinRT>false</CompileAsWinRT>
@@ -75,6 +75,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -82,7 +83,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs;$(ProjectDir)ThirdParty\SDL2\lib\x64;$(ProjectDir)ThirdParty\glew\lib\Release\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
@@ -98,7 +99,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\SDL2\include;$(ProjectDir)ThirdParty\glew\include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4703;4267;4201;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <CompileAsManaged>false</CompileAsManaged>
@@ -114,6 +115,8 @@
       <EnableModules>false</EnableModules>
       <CompileAs>CompileAsCpp</CompileAs>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -123,16 +126,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs;$(ProjectDir)ThirdParty\SDL2\lib\x64;$(ProjectDir)ThirdParty\glew\lib\Release\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DX11Wrapper.hpp" />
     <ClInclude Include="ErrorStack.hpp" />
     <ClInclude Include="FileIO.hpp" />
     <ClInclude Include="FontRasterization.hpp" />
-    <ClInclude Include="NuiLibrary.h" />
+    <ClInclude Include="GPU_ShaderTypes.hpp" />
+    <ClInclude Include="NuiLibrary.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="GPU_Types.hpp" />
     <ClInclude Include="TextureAtlas.hpp" />
@@ -141,18 +146,31 @@
   <ItemGroup>
     <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="Drawpass.cpp" />
+    <ClCompile Include="DX11Wrapper.cpp" />
     <ClCompile Include="ErrorStack.cpp" />
     <ClCompile Include="FileIO.cpp" />
     <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="Implementation.cpp" />
-    <ClCompile Include="Memory.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp" />
-    <ClCompile Include="UI.cpp" />
     <ClCompile Include="VulkanWrapper.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="PixelShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="VertexShader.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

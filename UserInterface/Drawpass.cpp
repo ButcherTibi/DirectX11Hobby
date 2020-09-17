@@ -8,6 +8,13 @@ using namespace nui;
 using namespace vkw;
 
 
+Framebuffer::~Framebuffer()
+{
+	for (auto& framebuff : framebuffs) {
+		vkDestroyFramebuffer(dev->logical_dev, framebuff, NULL);
+	}
+}
+
 void Drawpass::addDescriptorTypeToPool(VkDescriptorType type, uint32_t count)
 {
 	for (auto& size : descp_sizes) {
@@ -24,14 +31,21 @@ void Drawpass::addDescriptorTypeToPool(VkDescriptorType type, uint32_t count)
 
 ErrStack Drawpass::addReadColorAttachment(ReadAttachmentInfo& info)
 {
-	Image* img = info.view->image;
-
 	// Renderpass
 	uint32_t atach_idx = (uint32_t)atach_descps.size();
 	VkAttachmentDescription& atach_descp = atach_descps.emplace_back();
 	atach_descp.flags = 0;
-	atach_descp.format = img->format;
-	atach_descp.samples = img->samples;
+
+	if (info.example_view != nullptr) {
+		Image* img = info.example_view->image;
+		atach_descp.format = img->format;
+		atach_descp.samples = img->samples;
+	}
+	else {
+		atach_descp.format = info.format;
+		atach_descp.samples = info.samples;
+	}
+
 	atach_descp.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	atach_descp.storeOp = info.store_op;
 	atach_descp.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -44,12 +58,6 @@ ErrStack Drawpass::addReadColorAttachment(ReadAttachmentInfo& info)
 	atach_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	input_atachs.push_back(atach_ref);
-
-	// Framebuffs
-	if (img_views.size() != atach_idx) {
-		return ErrStack(code_location, "renderpass atach to framebuffs atach indexing missmatch");
-	}
-	img_views.push_back(info.view->view);
 
 	// Descriptor Layout
 	DescriptorLayout* layout;
@@ -74,26 +82,6 @@ ErrStack Drawpass::addReadColorAttachment(ReadAttachmentInfo& info)
 	// Descriptor Pool
 	addDescriptorTypeToPool(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, info.descriptor_count);
 
-	// Write Descriptor
-	VkDescriptorImageInfo img_info = {};
-	img_info.imageView = info.view->view;
-	img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	DescriptorWriteResource& resource = layout->resources.emplace_back();
-	resource.value = img_info;
-
-	VkWriteDescriptorSet& write = layout->writes.emplace_back();
-	write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstBinding = info.binding;
-	write.dstArrayElement = info.dst_array_element;
-	write.descriptorCount = info.descriptor_count;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
-	// Command Renderpass
-	VkClearValue& clear_value = clear_values.emplace_back();
-	clear_value = info.clear_value;
-
 	// Set Debug Name
 	layout->name = info.name;
 
@@ -102,14 +90,21 @@ ErrStack Drawpass::addReadColorAttachment(ReadAttachmentInfo& info)
 
 ErrStack Drawpass::addWriteColorAttachment(WriteAttachmentInfo& info)
 {
-	Image* img = info.view->image;
-
 	// Renderpass
 	uint32_t atach_idx = (uint32_t)atach_descps.size();
 	VkAttachmentDescription& atach_descp = atach_descps.emplace_back();
 	atach_descp.flags = 0;
-	atach_descp.format = img->format;
-	atach_descp.samples = img->samples;
+
+	if (info.example_view != nullptr) {
+		Image* img = info.example_view->image;
+		atach_descp.format = img->format;
+		atach_descp.samples = img->samples;
+	}
+	else {
+		atach_descp.format = info.format;
+		atach_descp.samples = info.samples;
+	}
+
 	atach_descp.loadOp = info.load_op;
 	atach_descp.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	atach_descp.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -123,12 +118,6 @@ ErrStack Drawpass::addWriteColorAttachment(WriteAttachmentInfo& info)
 
 	color_atachs.push_back(atach_ref);
 
-	// Framebuffs
-	if (img_views.size() != atach_idx) {
-		return ErrStack(code_location, "renderpass atach to framebuffs atach indexing missmatch");
-	}
-	img_views.push_back(info.view->view);
-
 	// Color Blending
 	auto& blend = blend_atachs.emplace_back();
 	blend.blendEnable = info.blendEnable;
@@ -140,10 +129,6 @@ ErrStack Drawpass::addWriteColorAttachment(WriteAttachmentInfo& info)
 	blend.alphaBlendOp = info.alphaBlendOp;
 	blend.colorWriteMask = info.colorWriteMask;
 
-	// Command Renderpass
-	VkClearValue& clear_value = clear_values.emplace_back();
-	clear_value = info.clear_value;
-
 	return ErrStack();
 }
 
@@ -153,7 +138,7 @@ nui::ErrStack Drawpass::addPresentAttachment(PresentAttachmentInfo& info)
 	uint32_t atach_idx = (uint32_t)atach_descps.size();
 	VkAttachmentDescription& atach_descp = atach_descps.emplace_back();
 	atach_descp.flags = 0;
-	atach_descp.format = surface->imageFormat;
+	atach_descp.format = dev->surface.imageFormat;
 	atach_descp.samples = VK_SAMPLE_COUNT_1_BIT;
 	atach_descp.loadOp = info.load_op;
 	atach_descp.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -168,12 +153,6 @@ nui::ErrStack Drawpass::addPresentAttachment(PresentAttachmentInfo& info)
 
 	color_atachs.push_back(atach_ref);
 
-	// Framebuffs
-	if (img_views.size() != atach_idx) {
-		return ErrStack(code_location, "renderpass atach to framebuffs atach indexing missmatch");
-	}
-	img_views.push_back(VK_NULL_HANDLE);
-
 	// Color Blending
 	auto& blend = blend_atachs.emplace_back();
 	blend.blendEnable = info.blendEnable;
@@ -185,23 +164,26 @@ nui::ErrStack Drawpass::addPresentAttachment(PresentAttachmentInfo& info)
 	blend.alphaBlendOp = info.alphaBlendOp;
 	blend.colorWriteMask = info.colorWriteMask;
 
-	// Command Renderpass
-	VkClearValue& clear_value = clear_values.emplace_back();
-	clear_value = info.clear_value;
-
 	return ErrStack();
 }
 
 ErrStack Drawpass::addReadWriteColorAttachment(ReadWriteAttachment& info)
 {
-	Image* img = info.view->image;
-
 	// Renderpass
 	uint32_t atach_idx = (uint32_t)atach_descps.size();
 	VkAttachmentDescription& atach_descp = atach_descps.emplace_back();
 	atach_descp.flags = 0;
-	atach_descp.format = img->format;
-	atach_descp.samples = img->samples;
+
+	if (info.example_view != nullptr) {
+		Image* img = info.example_view->image;
+		atach_descp.format = img->format;
+		atach_descp.samples = img->samples;
+	}
+	else {
+		atach_descp.format = info.format;
+		atach_descp.samples = info.samples;
+	}
+
 	atach_descp.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 	atach_descp.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	atach_descp.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -220,12 +202,6 @@ ErrStack Drawpass::addReadWriteColorAttachment(ReadWriteAttachment& info)
 	input_atachs.push_back(read_ref);
 	color_atachs.push_back(write_ref);
 
-	// Framebuffs
-	if (img_views.size() != atach_idx) {
-		return ErrStack(code_location, "renderpass atach to framebuffs atach indexing missmatch");
-	}
-	img_views.push_back(info.view->view);
-
 	// Descriptor Layout
 	DescriptorLayout* layout;
 
@@ -249,23 +225,6 @@ ErrStack Drawpass::addReadWriteColorAttachment(ReadWriteAttachment& info)
 	// Descriptor Pool
 	addDescriptorTypeToPool(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, info.descriptor_count);
 
-	// Write Descriptor
-	VkDescriptorImageInfo img_info = {};
-	img_info.imageView = info.view->view;
-	img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	DescriptorWriteResource& resource = layout->resources.emplace_back();
-	resource.value = img_info;
-
-	VkWriteDescriptorSet& write = layout->writes.emplace_back();
-	write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.pNext = NULL;
-	write.dstBinding = info.binding;
-	write.dstArrayElement = info.dst_array_element;
-	write.descriptorCount = info.descriptor_count;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-
 	// Color Blending
 	auto& blend = blend_atachs.emplace_back();
 	blend.blendEnable = info.blendEnable;
@@ -276,10 +235,6 @@ ErrStack Drawpass::addReadWriteColorAttachment(ReadWriteAttachment& info)
 	blend.dstAlphaBlendFactor = info.dstAlphaBlendFactor;
 	blend.alphaBlendOp = info.alphaBlendOp;
 	blend.colorWriteMask = info.colorWriteMask;
-
-	// Command Renderpass
-	VkClearValue& clear_value = clear_values.emplace_back();
-	clear_value = info.clear_value;
 
 	return ErrStack();
 }
@@ -309,24 +264,6 @@ ErrStack Drawpass::bindStorageBuffer(StorageBufferBinding& info)
 	// Descriptor Pool
 	addDescriptorTypeToPool(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, info.descriptor_count);
 
-	// Write Descriptor
-	VkDescriptorBufferInfo buff_info = {};
-	buff_info.buffer = info.buff->buff;
-	buff_info.offset = info.offset;
-	buff_info.range = info.range;
-
-	DescriptorWriteResource& resource = layout->resources.emplace_back();
-	resource.value = buff_info;
-
-	VkWriteDescriptorSet& write = layout->writes.emplace_back();
-	write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.pNext = NULL;
-	write.dstBinding = info.binding;
-	write.dstArrayElement = info.dst_array_element;
-	write.descriptorCount = info.descriptor_count;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-
 	return ErrStack();
 }
 
@@ -355,23 +292,6 @@ ErrStack Drawpass::bindUniformBuffer(UniformBufferBinding& info)
 	// Descriptor Pool
 	addDescriptorTypeToPool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, info.descriptor_count);
 
-	// Write Descriptor
-	VkDescriptorBufferInfo buff_info = {};
-	buff_info.buffer = info.buff->buff;
-	buff_info.offset = info.offset;
-	buff_info.range = info.range;
-
-	DescriptorWriteResource& resource = layout->resources.emplace_back();
-	resource.value = buff_info;
-
-	VkWriteDescriptorSet& write = layout->writes.emplace_back();
-	write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstBinding = info.binding;
-	write.dstArrayElement = info.dst_array_element;
-	write.descriptorCount = info.descriptor_count;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
 	return ErrStack();
 }
 
@@ -399,23 +319,6 @@ nui::ErrStack Drawpass::bindCombinedImageSampler(CombinedImageSamplerBinding& in
 
 	// Descriptor Pool
 	addDescriptorTypeToPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, info.descriptor_count);
-
-	// Write Descriptor
-	VkDescriptorImageInfo sampler_info = {};
-	sampler_info.sampler = info.sampler->sampler;
-	sampler_info.imageView = info.tex_view->view;
-	sampler_info.imageLayout = info.layout;
-
-	DescriptorWriteResource& resource = layout->resources.emplace_back();
-	resource.value = sampler_info;
-
-	VkWriteDescriptorSet& write = layout->writes.emplace_back();
-	write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstBinding = info.binding;
-	write.dstArrayElement = info.dst_array_element;
-	write.descriptorCount = info.descriptor_count;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
 	return ErrStack();
 }
@@ -468,33 +371,6 @@ ErrStack Drawpass::build()
 			"failed to create renderpass");
 	}
 
-	// Framebuffs
-	{
-		framebuffs.resize(surface->minImageCount);
-
-		for (uint32_t i = 0; i < framebuffs.size(); i++) {
-
-			for (VkImageView& img_view : img_views) {
-				if (img_view == VK_NULL_HANDLE) {
-					img_view = surface->swapchain_views[i];
-				}
-			}
-
-			VkFramebufferCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			info.flags = 0;
-			info.renderPass = renderpass;
-			info.attachmentCount = (uint32_t)img_views.size();
-			info.pAttachments = img_views.data();
-			info.width = surface->width;
-			info.height = surface->height;
-			info.layers = 1;
-
-			checkVkRes(vkCreateFramebuffer(dev->logical_dev, &info, NULL, &framebuffs[i]),
-				"failed to create framebuffer");
-		}
-	}
-
 	if (layouts.size()) {
 
 		// Descriptor Layout
@@ -545,40 +421,12 @@ ErrStack Drawpass::build()
 
 			checkVkRes(vkAllocateDescriptorSets(dev->logical_dev, &alloc_info, descp_sets.data()),
 				"failed to allocate descriptor sets");
-		}
 
-		// Write Descriptor Sets
-		{
-			for (uint32_t i = 0; i < layouts.size(); i++) {
-
-				VkDescriptorSet& set = descp_sets[i];
-				DescriptorLayout& layout = layouts[i];
-
-				for (uint32_t w = 0; w < layout.writes.size(); w++) {
-					
-					VkWriteDescriptorSet& write = layout.writes[w];
-					DescriptorWriteResource& resource = layout.resources[w];
-
-					switch (resource.value.index()) {
-					case 0:
-						write.pImageInfo = std::get_if<VkDescriptorImageInfo>(&resource.value);
-						break;
-					case 1:
-						write.pBufferInfo = std::get_if<VkDescriptorBufferInfo>(&resource.value);
-						break;
-					case 2:
-						// texel
-						break;
-					}
-
-					write.dstSet = set;
-				}
-
-				vkUpdateDescriptorSets(dev->logical_dev, (uint32_t)layout.writes.size(), layout.writes.data(),
-					0, NULL);
-
-				if (layout.name.length()) {
-					checkErrStack1(dev->setDebugName(reinterpret_cast<uint64_t>(set), VK_OBJECT_TYPE_DESCRIPTOR_SET, layout.name));
+			// Debug Name
+			for (uint32_t i = 0; i < descp_layouts.size(); i++) {
+				if (layouts[i].name.length()) {
+					dev->setDebugName(reinterpret_cast<uint64_t>(descp_sets[i]), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+						layouts[i].name);
 				}
 			}
 		}
@@ -671,8 +519,8 @@ ErrStack Drawpass::build()
 				vk_viewports[i].y = viewport.y;
 
 				if (!viewport.width) {
-					vk_viewports[i].width = (float)surface->width;
-					vk_viewports[i].height = (float)surface->height;
+					vk_viewports[i].width = (float)dev->surface.width;
+					vk_viewports[i].height = (float)dev->surface.height;
 				}
 				else {
 					vk_viewports[i].width = viewport.width;
@@ -687,8 +535,8 @@ ErrStack Drawpass::build()
 			auto& viewport = vk_viewports.emplace_back();
 			viewport.x = 0;
 			viewport.y = 0;
-			viewport.width = (float)surface->width;
-			viewport.height = (float)surface->height;
+			viewport.width = (float)dev->surface.width;
+			viewport.height = (float)dev->surface.height;
 			viewport.minDepth = 0;
 			viewport.maxDepth = 1;
 		}
@@ -703,8 +551,8 @@ ErrStack Drawpass::build()
 				vk_scissors[i].offset = scissor.offset;
 
 				if (!scissor.extent.width) {
-					vk_scissors[i].extent.width = surface->width;
-					vk_scissors[i].extent.height = surface->height;
+					vk_scissors[i].extent.width = dev->surface.width;
+					vk_scissors[i].extent.height = dev->surface.height;
 				}
 				else {
 					vk_scissors[i].extent = scissor.extent;
@@ -714,8 +562,8 @@ ErrStack Drawpass::build()
 		else {
 			auto& scissor = vk_scissors.emplace_back();
 			scissor.offset = { 0, 0 };
-			scissor.extent.width = surface->width;
-			scissor.extent.height = surface->height;
+			scissor.extent.width = dev->surface.width;
+			scissor.extent.height = dev->surface.height;
 		}
 		
 		vp_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -822,14 +670,153 @@ ErrStack Drawpass::build()
 	return err_stack;
 }
 
+nui::ErrStack Drawpass::createFramebuffer(FramebufferCreateInfo& info, Framebuffer& frame)
+{
+	VkResult vk_res{};
+
+	frame.dev = this->dev;
+
+	if (info.width) {
+		frame.width = info.width;
+		frame.height = info.height;
+	}
+	else {
+		frame.width = dev->surface.width;
+		frame.height = dev->surface.height;
+	}
+
+	if (info.framebuffer_count) {
+		frame.framebuffs.resize(info.framebuffer_count);
+	}
+	else {
+		frame.framebuffs.resize(dev->surface.minImageCount);
+	}
+	
+	std::vector<VkImageView> views(info.attachments.size());
+
+	for (uint32_t i = 0; i < frame.framebuffs.size(); i++) {
+
+		for (uint32_t j = 0; j < info.attachments.size(); j++) {
+			ImageView* img_view = info.attachments[j];
+
+			if (img_view == nullptr) {
+				views[j] = dev->surface.swapchain_views[i];
+			}
+			else {
+				views[j] = img_view->view;
+			}
+		}
+
+		VkFramebufferCreateInfo vk_info = {};
+		vk_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		vk_info.renderPass = renderpass;
+		vk_info.attachmentCount = (uint32_t)views.size();
+		vk_info.pAttachments = views.data();
+		vk_info.width = frame.width;
+		vk_info.height = frame.height;
+		vk_info.layers = info.layers;
+
+		checkVkRes(vkCreateFramebuffer(dev->logical_dev, &vk_info, NULL, &frame.framebuffs[i]),
+			"failed to create framebuffer");
+	}
+
+	return ErrStack();
+}
+
+void Drawpass::updateStorageBufferDescriptor(uint32_t set_idx, uint32_t binding, UpdateBufferDescriptor& info)
+{
+	VkDescriptorBufferInfo resource = {};
+	resource.buffer = info.buffer->buff;
+	resource.offset = info.offset;
+	resource.range = info.range;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descp_sets[set_idx];
+	write.dstBinding = binding;
+	write.dstArrayElement = info.dst_array_element;
+	write.descriptorCount = info.descriptor_count;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	write.pBufferInfo = &resource;
+
+	vkUpdateDescriptorSets(dev->logical_dev,
+		1, &write,
+		0, NULL);
+
+	if (layouts[set_idx].name.length()) {
+		dev->setDebugName(reinterpret_cast<uint64_t>(descp_sets[set_idx]), VK_OBJECT_TYPE_DESCRIPTOR_SET,
+			layouts[set_idx].name);
+	}
+}
+
+void Drawpass::updateUniformBufferDescriptor(uint32_t set_idx, uint32_t binding, UpdateBufferDescriptor& info)
+{
+	VkDescriptorBufferInfo resource = {};
+	resource.buffer = info.buffer->buff;
+	resource.offset = info.offset;
+	resource.range = info.range;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descp_sets[set_idx];
+	write.dstBinding = binding;
+	write.dstArrayElement = info.dst_array_element;
+	write.descriptorCount = info.descriptor_count;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	write.pBufferInfo = &resource;
+
+	vkUpdateDescriptorSets(dev->logical_dev,
+		1, &write,
+		0, NULL);
+}
+
+void Drawpass::updateInputAttachmentDescriptor(uint32_t set_idx, uint32_t binding, InputAttachmentDescriptor& info)
+{
+	VkDescriptorImageInfo resource = {};
+	resource.sampler = NULL;
+	resource.imageView = info.view->view;
+	resource.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descp_sets[set_idx];
+	write.dstBinding = binding;
+	write.dstArrayElement = info.dst_array_element;
+	write.descriptorCount = info.descriptor_count;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+	write.pImageInfo = &resource;
+
+	vkUpdateDescriptorSets(dev->logical_dev,
+		1, &write,
+		0, NULL);
+}
+
+void Drawpass::updateCombinedImageSamplerDescriptor(uint32_t set_idx, uint32_t binding,
+	CombinedImageSamplerDescriptor& info)
+{
+	VkDescriptorImageInfo resource = {};
+	resource.sampler = info.sampler->sampler;
+	resource.imageView = info.view->view;
+	resource.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = descp_sets[set_idx];
+	write.dstBinding = binding;
+	write.dstArrayElement = info.dst_array_element;
+	write.descriptorCount = info.descriptor_count;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.pImageInfo = &resource;
+
+	vkUpdateDescriptorSets(dev->logical_dev,
+		1, &write,
+		0, NULL);
+}
+
 Drawpass::~Drawpass()
 {
 	if (dev != nullptr) {
 		vkDestroyRenderPass(dev->logical_dev, renderpass, NULL);
-
-		for (auto& framebuff : framebuffs) {
-			vkDestroyFramebuffer(dev->logical_dev, framebuff, NULL);
-		}
 		
 		vkDestroyPipelineLayout(dev->logical_dev, pipe_layout, NULL);
 

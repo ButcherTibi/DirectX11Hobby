@@ -637,96 +637,17 @@ ErrStack Instance::createDevice(DeviceCreateInfo& info, VulkanDevice& device)
 	}
 	
 	// Swapchain
-	{	
-		VkSurfaceCapabilitiesKHR capabilities;
-		checkErrStack1(surface.getSurfaceCapabilities(capabilities));
-
-		surface.minImageCount = capabilities.minImageCount;
-
-		uint32_t format_counts;
-		checkVkRes(vkGetPhysicalDeviceSurfaceFormatsKHR(device.phys_dev, surface.surface, &format_counts, NULL),
-			"failed to find physical surface format count");
-
-		std::vector<VkSurfaceFormatKHR> formats(format_counts);
-		checkVkRes(vkGetPhysicalDeviceSurfaceFormatsKHR(device.phys_dev, surface.surface, &format_counts, formats.data()),
-			"failed to find physical surface format");
-
-		bool found = false;
-		for (VkSurfaceFormatKHR format : formats) {
-			if (format.format == VK_FORMAT_R8G8B8A8_UNORM ||
-				format.format == VK_FORMAT_B8G8R8A8_UNORM)
-			{
-				surface.imageFormat = format.format;
-				found = true;
-				break;
-			}
-		}
-
-		if (!found) {
-			return ErrStack(code_location, "failed to find suitable surface format");
-		}
-
-		surface.width = capabilities.currentExtent.width;
-		surface.height = capabilities.currentExtent.height;
-
-		VkSwapchainCreateInfoKHR swapchain_info = {};
-		swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		swapchain_info.pNext = NULL;
-		swapchain_info.flags = info.swapchain_flags;
-		swapchain_info.surface = surface.surface;
-		swapchain_info.minImageCount = surface.minImageCount;
-		swapchain_info.imageFormat = surface.imageFormat;
-		swapchain_info.imageColorSpace = surface.imageColorSpace;
-		swapchain_info.imageExtent.width = surface.width;
-		swapchain_info.imageExtent.height = surface.height;
-		swapchain_info.imageArrayLayers = info.imageArrayLayers;
-		swapchain_info.imageUsage = info.imageUsage;
-		swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		swapchain_info.preTransform = info.preTransform;
-		swapchain_info.compositeAlpha = info.compositeAlpha;
-		swapchain_info.presentMode = info.presentMode;
-		swapchain_info.clipped = info.clipped;
-		swapchain_info.oldSwapchain = NULL;
-
-		checkVkRes(vkCreateSwapchainKHR(device.logical_dev, &swapchain_info, NULL, &surface.swapchain),
+	{
+		surface.info.swapchain_flags = info.swapchain_flags;
+		surface.info.imageArrayLayers = info.imageArrayLayers;
+		surface.info.imageUsage = info.imageUsage;
+		surface.info.preTransform = info.preTransform;
+		surface.info.compositeAlpha = info.compositeAlpha;
+		surface.info.presentMode = info.presentMode;
+		surface.info.clipped = info.clipped;
+		
+		checkErrStack(surface.createSwapchain(),
 			"failed to create swapchain");
-
-		// Image and Image View of the swapchain
-		uint32_t image_count = 0;
-		checkVkRes(vkGetSwapchainImagesKHR(device.logical_dev, surface.swapchain, &image_count, NULL),
-			"failed to retrieve swapchain image count");
-
-		surface.swapchain_images.resize(image_count);
-		checkVkRes(vkGetSwapchainImagesKHR(device.logical_dev, surface.swapchain, &image_count, surface.swapchain_images.data()),
-			"failed to retrieve swapchain images");
-
-		VkComponentMapping component_mapping = {};
-		component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		VkImageSubresourceRange res_range = {};
-		res_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		res_range.baseMipLevel = 0;
-		res_range.levelCount = 1;
-		res_range.baseArrayLayer = 0;
-		res_range.layerCount = 1;;
-
-		surface.swapchain_views.resize(image_count);
-		for (uint32_t i = 0; i < image_count; i++) {
-
-			VkImageViewCreateInfo view_info = {};
-			view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			view_info.image = surface.swapchain_images[i];
-			view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			view_info.format = surface.imageFormat;
-			view_info.components = component_mapping;
-			view_info.subresourceRange = res_range;
-
-			checkVkRes(vkCreateImageView(device.logical_dev, &view_info, NULL, &surface.swapchain_views[i]),
-				"failed to create swapchain image views");
-		}
 	}
 
 	// Device Queue
@@ -796,6 +717,120 @@ ErrStack Surface::getSurfaceCapabilities(VkSurfaceCapabilitiesKHR& capabilities)
 	return ErrStack();
 }
 
+nui::ErrStack Surface::createSwapchain()
+{
+	ErrStack err_stack;
+	VkResult vk_res{};
+
+	VkSurfaceCapabilitiesKHR capabilities;
+	checkErrStack1(getSurfaceCapabilities(capabilities));
+
+	this->minImageCount = capabilities.minImageCount;
+
+	uint32_t format_counts;
+	checkVkRes(vkGetPhysicalDeviceSurfaceFormatsKHR(dev->phys_dev, surface, &format_counts, NULL),
+		"failed to find physical surface format count");
+
+	std::vector<VkSurfaceFormatKHR> formats(format_counts);
+	checkVkRes(vkGetPhysicalDeviceSurfaceFormatsKHR(dev->phys_dev, surface, &format_counts, formats.data()),
+		"failed to find physical surface format");
+
+	bool found = false;
+	for (VkSurfaceFormatKHR format : formats) {
+		if (format.format == VK_FORMAT_R8G8B8A8_UNORM ||
+			format.format == VK_FORMAT_B8G8R8A8_UNORM)
+		{
+			this->imageFormat = format.format;
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		return ErrStack(code_location, "failed to find suitable surface format");
+	}
+
+	this->width = capabilities.currentExtent.width;
+	this->height = capabilities.currentExtent.height;
+
+	VkSwapchainCreateInfoKHR swapchain_info = {};
+	swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchain_info.pNext = NULL;
+	swapchain_info.flags = info.swapchain_flags;
+	swapchain_info.surface = this->surface;
+	swapchain_info.minImageCount = this->minImageCount;
+	swapchain_info.imageFormat = this->imageFormat;
+	swapchain_info.imageColorSpace = this->imageColorSpace;
+	swapchain_info.imageExtent.width = this->width;
+	swapchain_info.imageExtent.height = this->height;
+	swapchain_info.imageArrayLayers = info.imageArrayLayers;
+	swapchain_info.imageUsage = info.imageUsage;
+	swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	swapchain_info.preTransform = info.preTransform;
+	swapchain_info.compositeAlpha = info.compositeAlpha;
+	swapchain_info.presentMode = info.presentMode;
+	swapchain_info.clipped = info.clipped;
+	swapchain_info.oldSwapchain = NULL;
+
+	checkVkRes(vkCreateSwapchainKHR(dev->logical_dev, &swapchain_info, NULL, &swapchain),
+		"failed to create swapchain");
+
+	// Image and Image View of the swapchain
+	uint32_t image_count = 0;
+	checkVkRes(vkGetSwapchainImagesKHR(dev->logical_dev, swapchain, &image_count, NULL),
+		"failed to retrieve swapchain image count");
+
+	this->swapchain_images.resize(image_count);
+	checkVkRes(vkGetSwapchainImagesKHR(dev->logical_dev, swapchain, &image_count, swapchain_images.data()),
+		"failed to retrieve swapchain images");
+
+	VkComponentMapping component_mapping = {};
+	component_mapping.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	component_mapping.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	component_mapping.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	component_mapping.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+	VkImageSubresourceRange res_range = {};
+	res_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	res_range.baseMipLevel = 0;
+	res_range.levelCount = 1;
+	res_range.baseArrayLayer = 0;
+	res_range.layerCount = 1;;
+
+	swapchain_views.resize(image_count);
+	for (uint32_t i = 0; i < image_count; i++) {
+
+		VkImageViewCreateInfo view_info = {};
+		view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		view_info.image = swapchain_images[i];
+		view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		view_info.format = imageFormat;
+		view_info.components = component_mapping;
+		view_info.subresourceRange = res_range;
+
+		checkVkRes(vkCreateImageView(dev->logical_dev, &view_info, NULL, &swapchain_views[i]),
+			"failed to create swapchain image views");
+	}
+
+	return err_stack;
+}
+
+nui::ErrStack Surface::recreateSwapchain()
+{
+	destroySwapchain();
+	return createSwapchain();
+}
+
+void Surface::destroySwapchain()
+{
+	// Destroy Image Views
+	for (VkImageView& view : swapchain_views) {
+		vkDestroyImageView(dev->logical_dev, view, NULL);
+	}
+
+	vkDestroySwapchainKHR(dev->logical_dev, swapchain, NULL);
+}
+
 ErrStack Shader::create(VulkanDevice* device, std::vector<char>& spirv, VkShaderStageFlagBits shader_stage)
 {
 	VkResult vk_res{};
@@ -851,6 +886,11 @@ Fence::~Fence()
 	if (dev != nullptr) {
 		vkDestroyFence(dev->logical_dev, fence, NULL);
 	}
+}
+
+ErrStack VulkanDevice::recreateSwapchain()
+{
+	return surface.recreateSwapchain();
 }
 
 ErrStack VulkanDevice::createImage(ImageCreateInfo& info, Image& texture)
@@ -935,7 +975,6 @@ ErrStack VulkanDevice::createShader(std::vector<char>& spirv, VkShaderStageFlagB
 void VulkanDevice::createDrawpass(Drawpass& drawpass)
 {
 	drawpass.dev = this;
-	drawpass.surface = &surface;
 }
 
 ErrStack VulkanDevice::createCommandList(CommandListCreateInfo& info, CommandList& command_list)
@@ -1039,15 +1078,8 @@ VulkanDevice::~VulkanDevice()
 	if (logical_dev != VK_NULL_HANDLE) {
 
 		// Surface
-		{
-			for (VkImageView& view : surface.swapchain_views) {
-				vkDestroyImageView(logical_dev, view, NULL);
-			}
-
-			vkDestroySwapchainKHR(logical_dev, surface.swapchain, NULL);
-
-			vkDestroySurfaceKHR(inst->instance, surface.surface, NULL);
-		}
+		surface.destroySwapchain();
+		vkDestroySurfaceKHR(inst->instance, surface.surface, NULL);
 
 		staging_buff.destroy();
 		delete cmd_list;

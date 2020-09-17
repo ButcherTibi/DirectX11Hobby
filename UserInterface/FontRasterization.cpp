@@ -46,6 +46,8 @@ ErrStack CharacterAtlas::addFont(FilePath& path, std::vector<uint32_t>& sizes, F
 
 		FontSize& font_size = font.sizes.emplace_back();
 		font_size.size = size;
+		font_size.ascender = face->size->metrics.ascender / 64;
+		font_size.descender = (-face->size->metrics.descender) / 64;
 		font_size.line_spacing = face->size->metrics.height / 64;
 		font_size.chars.resize(unicode_count + 1);
 

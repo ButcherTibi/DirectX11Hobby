@@ -4,6 +4,7 @@
 
 
 #include "VulkanWrapper.hpp"
+#include "DX11Wrapper.hpp"
 #include "GPU_Types.hpp"
 #include "FontRasterization.hpp"
 
@@ -39,9 +40,45 @@ namespace nui {
 		void setRelative(float size);
 	};
 
-	// wrap coordinate origin
-	// Wrap self anchor
 
+	enum class FlexDirection {
+		ROW,
+		COLUMN,
+	};
+
+	enum class FlexWrap {
+		NO_WRAP,
+		WRAP,
+	};
+
+	enum class FlexAxisAlign {
+		START,
+		END,
+		CENTER,
+		SPACE_BETWEEN,
+	};
+
+	enum class FlexCrossAxisAlign {
+		START,
+		END,
+		CENTER,
+		PARENT,
+	};
+
+	enum class FlexLinesAlign {
+		START,
+		END,
+		CENTER,
+		SPACE_BETWEEN,
+	};
+
+	// Wrap Ideas:
+	// - self origin, child pos can refer to center of child
+	// Flex
+
+	// Dynamic:
+	// - collider check
+	// - redraw
 
 	class NodeComponent {
 	public:
@@ -87,7 +124,10 @@ namespace nui {
 		NodeComponent node_comp;
 
 	public:
-		
+		FlexDirection direction;
+		FlexWrap wrap;
+		FlexAxisAlign axis_align;
+		FlexLinesAlign lines_align;
 
 	public:
 
@@ -114,9 +154,6 @@ namespace nui {
 		float size;
 		float line_height;
 		glm::vec4 color;
-
-	public:
-
 	};
 
 
@@ -149,14 +186,13 @@ namespace nui {
 	};
 
 	struct AncestorProps {
-		glm::vec2 pos;
 		float width;
 		float height;
 		uint32_t clip_mask;
 	};
 
 	struct DescendantProps {
-		glm::vec2 pos;
+		glm::vec2* pos;
 		float width;
 		float height;
 	};
@@ -181,9 +217,8 @@ namespace nui {
 		std::list<Node> nodes;
 
 		// Rendering
-		bool rendering_configured;
 
-		vkw::VulkanDevice dev;
+		bool rendering_configured;	
 		
 		uint32_t char_instance_count;
 		uint32_t wrap_instance_count;
@@ -196,6 +231,28 @@ namespace nui {
 		std::array<uint32_t, 6> wrap_idxs;
 		std::vector<GPU_WrapInstance> wrap_instances;
 
+		// DirectX 11
+		ComPtr<IDXGIFactory2> factory;
+		IDXGIAdapter* adapter;
+		ComPtr<ID3D11Device> device;
+		ComPtr<ID3D11Device5> dev5;
+		ComPtr<ID3D11DeviceContext> im_ctx;
+		ComPtr<ID3D11DeviceContext4> im_ctx4;
+		ComPtr<IDXGISwapChain1> swapchain;
+
+		ComPtr<ID3D11Texture2D> present_img;
+		ComPtr<ID3D11RenderTargetView> present_rtv;
+
+		ComPtr<ID3D11InputLayout> vertex_il;
+
+		std::vector<char> vertex_shader_cso;
+		ComPtr<ID3D11VertexShader> vertex_shader;
+
+		std::vector<char> pixel_shader_cso;
+		ComPtr<ID3D11PixelShader> pixel_shader;
+
+		// Vulkan
+		vkw::VulkanDevice dev;
 		vkw::Buffer chars_vbuff;
 		vkw::Buffer chars_idxbuff;
 		vkw::Buffer chars_instabuff;
@@ -224,16 +281,21 @@ namespace nui {
 		vkw::Drawpass text_pass;
 		vkw::Drawpass wrap_pass;
 
+		vkw::Framebuffer text_framebuff;
+		vkw::Framebuffer wrap_framebuff;
+
 		vkw::CommandList cmd_list;
 
 	public:
 		void generateDrawcalls(Node* node, AncestorProps& ancestor,
 			DescendantProps& r_descendant);
 
+		void calcGlobalPositions(Node* node, glm::vec2 pos);
+
 		ErrStack generateGPU_Data();
 
-		//ErrStack resize();
 		ErrStack draw();
+		ErrStack draw2();
 
 	public:
 		Wrap* getRoot();

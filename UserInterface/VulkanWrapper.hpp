@@ -95,11 +95,6 @@ namespace vkw {
 
 
 	struct SurfaceCreateInfo {
-		void* surface_pNext = NULL;
-		VkWin32SurfaceCreateFlagsKHR surface_flags = 0;
-		HINSTANCE hinstance;
-		HWND hwnd;
-
 		VkSwapchainCreateFlagsKHR swapchain_flags = 0;
 		uint32_t imageArrayLayers = 1;
 		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -112,6 +107,9 @@ namespace vkw {
 	class Surface {
 	public:
 		VulkanDevice* dev = nullptr;
+
+		// Info
+		SurfaceCreateInfo info;
 
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 
@@ -128,6 +126,10 @@ namespace vkw {
 
 	public:
 		nui::ErrStack getSurfaceCapabilities(VkSurfaceCapabilitiesKHR& capabilities);
+
+		nui::ErrStack createSwapchain();
+		nui::ErrStack recreateSwapchain();
+		void destroySwapchain();
 	};
 
 
@@ -224,33 +226,57 @@ namespace vkw {
 		uint32_t r = 0, uint32_t g = 0, uint32_t b = 0, uint32_t a = 0);
 
 
+	struct FramebufferCreateInfo {
+		std::vector<ImageView*> attachments;
+		uint32_t framebuffer_count = 0;
+		uint32_t width = 0;
+		uint32_t height = 0;
+		uint32_t layers = 1;
+	};
+
+	class Framebuffer {
+	public:
+		VulkanDevice* dev;
+
+		uint32_t width;
+		uint32_t height;
+
+		std::vector<VkFramebuffer> framebuffs;
+
+	public:
+
+		~Framebuffer();
+	};
+
+
 	struct ReadAttachmentInfo {
-		ImageView* view;
+		ImageView* example_view = nullptr;
 
 		// Renderpass
+		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 		VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE;
 		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 		VkImageLayout final_fayout = VK_IMAGE_LAYOUT_GENERAL;
-		VkClearValue clear_value = {};
 
 		// Descriptor Layout
 		uint32_t set = 0;
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
-		uint32_t dst_array_element = 0;
 		VkShaderStageFlags stages = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		std::string name;
 	};
 
 	struct WriteAttachmentInfo {
-		ImageView* view;
+		ImageView* example_view = nullptr;
 
 		// Renderpass
+		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 		VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_GENERAL;
 		VkImageLayout final_layout = VK_IMAGE_LAYOUT_GENERAL;
-		VkClearValue clear_value = {};
 
 		// Color Blend Atachment
 		bool blendEnable = false;
@@ -268,7 +294,6 @@ namespace vkw {
 		// Renderpass
 		VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkClearValue clear_value = {};
 
 		// Color Blend Atachment
 		bool blendEnable = false;
@@ -283,18 +308,18 @@ namespace vkw {
 	};
 
 	struct ReadWriteAttachment {
-		ImageView* view;
+		ImageView* example_view = nullptr;
 
 		// Renderpass
+		VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		VkImageLayout final_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		VkClearValue clear_value = {};
 
 		// Descriptor Layout
 		uint32_t set = 0;
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
-		uint32_t dst_array_element = 0;
 		VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT;
 
 		// Color Blend Atachment
@@ -310,41 +335,23 @@ namespace vkw {
 	};
 
 	struct StorageBufferBinding {
-		Buffer* buff;
-		uint64_t offset = 0;
-		uint64_t range = VK_WHOLE_SIZE;
-
-		// Descriptor Layout
 		uint32_t set = 0;
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
-		uint32_t dst_array_element = 0;
 		VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT;
 	};
 
 	struct UniformBufferBinding {
-		Buffer* buff;
-		uint64_t offset = 0;
-		uint64_t range = VK_WHOLE_SIZE;
-
-		// Descriptor Layout
 		uint32_t set = 0;
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
-		uint32_t dst_array_element = 0;
 		VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT;
 	};
 
 	struct CombinedImageSamplerBinding {
-		Sampler* sampler;
-		ImageView* tex_view;
-		VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
-
-		// Descriptor Layout
 		uint32_t set = 0;
 		uint32_t binding = 0;
 		uint32_t descriptor_count = 1;
-		uint32_t dst_array_element = 0;
 		VkShaderStageFlags stages = VK_SHADER_STAGE_FRAGMENT_BIT;
 	};
 
@@ -412,26 +419,43 @@ namespace vkw {
 		float blendConstants[4] = { 0, 0, 0, 0 };
 	};
 
-
-	struct DescriptorWriteResource {
-		std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> value;
-	};
-
 	struct DescriptorLayout {
 		std::vector<VkDescriptorSetLayoutBinding> bindings;
 		VkDescriptorSetLayout layout;
 
-		std::vector<DescriptorWriteResource> resources;
-		std::vector<VkWriteDescriptorSet> writes;
-
 		std::string name;
+	};
+
+	struct UpdateBufferDescriptor {
+		uint32_t dst_array_element = 0;
+		uint32_t descriptor_count = 1;
+
+		// Resource
+		Buffer* buffer;
+		VkDeviceSize offset = 0;
+		VkDeviceSize range = VK_WHOLE_SIZE;
+	};
+
+	struct InputAttachmentDescriptor {
+		uint32_t dst_array_element = 0;
+		uint32_t descriptor_count = 1;
+
+		// Resource
+		ImageView* view;
+	};
+
+	struct CombinedImageSamplerDescriptor {
+		uint32_t dst_array_element = 0;
+		uint32_t descriptor_count = 1;
+
+		// Resource
+		ImageView* view;
+		Sampler* sampler;
 	};
 
 	class Drawpass {
 	public:
 		VulkanDevice* dev;
-		Surface* surface;
-		std::string name;
 
 		// Renderpass
 		std::vector<VkAttachmentDescription> atach_descps;
@@ -439,10 +463,6 @@ namespace vkw {
 		std::vector<VkAttachmentReference> input_atachs;
 		std::vector<VkAttachmentReference> color_atachs;
 		VkRenderPass renderpass = VK_NULL_HANDLE;
-
-		// Framebuffs
-		std::vector<VkImageView> img_views;
-		std::vector<VkFramebuffer> framebuffs;
 
 		// Descriptor Set Layout
 		std::vector<DescriptorLayout> layouts;
@@ -512,6 +532,13 @@ namespace vkw {
 
 	public:
 		nui::ErrStack build();
+
+		nui::ErrStack createFramebuffer(FramebufferCreateInfo& info, Framebuffer& frame_buff);
+
+		void updateStorageBufferDescriptor(uint32_t set, uint32_t binding, UpdateBufferDescriptor& info);
+		void updateUniformBufferDescriptor(uint32_t set, uint32_t binding, UpdateBufferDescriptor& info);
+		void updateInputAttachmentDescriptor(uint32_t set, uint32_t binding, InputAttachmentDescriptor& info);
+		void updateCombinedImageSamplerDescriptor(uint32_t set, uint32_t binding, CombinedImageSamplerDescriptor& info);
 
 		~Drawpass();
 	};
@@ -638,7 +665,7 @@ namespace vkw {
 
 		void cmdCopyImageToSurface(ImageView& view);
 
-		void cmdBeginRenderpass(Drawpass& pass);
+		void cmdBeginRenderpass(Drawpass& drawpass, Framebuffer& frame_buffer);
 
 		void cmdEndRenderpass();
 
@@ -716,6 +743,8 @@ namespace vkw {
 		CommandList* cmd_list;
 
 	public:
+		nui::ErrStack recreateSwapchain();
+
 		nui::ErrStack createImage(ImageCreateInfo& info, Image& texture);
 		void createBuffer(BufferCreateInfo& info, Buffer& buffer);
 		nui::ErrStack createSampler(SamplerCreateInfo& info, Sampler& sampler);
@@ -782,120 +811,3 @@ namespace vkw {
 		~Instance();
 	};
 }
-
-
-//vkw::VulkanDevice& dev = window.dev;
-//
-//// Rendering
-//{
-//	vkw::DeviceCreateInfo info;
-//	info.hinstance = window.hinstance;
-//	info.hwnd = window.hwnd;
-//
-//	checkErrStack(inst.createDevice(info, window.dev),
-//		"failed to create device");
-//}
-//
-//// Root UI Element
-//{
-//	Root root{};
-//	root.width = dev.surface.width;
-//	root.height = dev.surface.height;
-//
-//	Node& root_node = window.nodes.emplace_back();
-//	root_node.parent = nullptr;
-//	root_node.element = root;
-//}
-//
-//// Characters Vertex Buffer
-//{
-//	vkw::BufferCreateInfo info;
-//	info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-//	dev.createBuffer(info, window.chars_vbuff);
-//
-//	std::vector<GPU_CharacterVertex> verts(3);
-//	verts.resize(3);
-//	verts[0].pos = { -1, -1 };
-//	verts[0].idx = 0;
-//
-//	verts[1].pos = { 1, -1 };
-//	verts[1].idx = 0;
-//
-//	verts[2].pos = { -1, 1 };
-//	verts[2].idx = 0;
-//
-//	checkErrStack1(window.chars_vbuff.load(verts.data(), verts.size() * sizeof(GPU_CharacterVertex)));
-//}
-//
-//// Characters Storage Buff
-//{
-//	vkw::BufferCreateInfo info;
-//	info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-//	dev.createBuffer(info, window.chars_sbuff);
-//
-//	//std::vector<>
-//}
-//
-//// Vertex Shader
-//{
-//	FilePath path;
-//	checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Test/vert.spv"));
-//
-//	std::vector<char> spirv;
-//	checkErrStack1(path.read(spirv));
-//
-//	checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_VERTEX_BIT, window.vertex_shader));
-//}
-//
-//// Fragment Shader
-//{
-//	FilePath path;
-//	checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Test/frag.spv"));
-//
-//	std::vector<char> spirv;
-//	checkErrStack1(path.read(spirv));
-//
-//	checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_FRAGMENT_BIT, window.fragment_shader));
-//}
-//
-//// Text Pass
-//{
-//	vkw::DrawpassCreateInfo draw_info = {};
-//	dev.createDrawpass(draw_info, window.text_pass);
-//
-//	vkw::StorageBufferBinding sbuff_info;
-//	sbuff_info;
-//
-//	vkw::PresentAttachmentInfo present_info;
-//	present_info.clear_value.color.float32[0] = 0;
-//	present_info.clear_value.color.float32[1] = 0;
-//	present_info.clear_value.color.float32[2] = 0;
-//	present_info.clear_value.color.float32[3] = 0;
-//	window.text_pass.addPresentAttachment(present_info);
-//
-//	window.text_pass.vertex_input_state = GPU_CharacterVertex::getVertexInput();
-//	window.text_pass.setVertexShader(window.vertex_shader);
-//
-//	window.text_pass.setFragmentShader(window.fragment_shader);
-//
-//	checkErrStack1(window.text_pass.build());
-//}
-//
-//// Command List
-//{
-//	vkw::CommandListCreateInfo info = {};
-//	info.surface = &dev.surface;
-//
-//	checkErrStack1(dev.createCommandList(info, window.cmd_list));
-//
-//	auto& cmd_list = window.cmd_list;
-//
-//	cmd_list.beginRecording();
-//
-//	cmd_list.cmdBeginRenderpass(window.text_pass);
-//	cmd_list.cmdBindVertexBuffer(window.chars_vbuff);
-//	cmd_list.cmdDraw(3);
-//	cmd_list.cmdEndRenderpass(window.text_pass);
-//
-//	cmd_list.endRecording();
-//}

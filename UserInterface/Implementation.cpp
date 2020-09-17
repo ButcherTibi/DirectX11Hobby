@@ -3,9 +3,10 @@
 
 // Mine
 #include "FileIO.hpp"
+#include "GPU_ShaderTypes.hpp"
 
 // Header
-#include "NuiLibrary.h"
+#include "NuiLibrary.hpp"
 
 
 using namespace nui;
@@ -176,7 +177,6 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 	case NodeType::TEXT:{
 
 		Text* text = (Text*)node->elem;
-		Node* parent = text->node_comp.this_elem->parent;
 
 		FontSize* font_size = nullptr;
 		{
@@ -194,21 +194,17 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 			}
 		}
 
-		glm::vec2 pen = { 0, 0 };
-		if (parent->type == NodeType::WRAP) {
-			Wrap* parent_wrap = (Wrap*)parent->elem;
-			pen = text->pos + parent_wrap->pos;
-		}
-
+		float scale = text->size / font_size->size;
 		float text_width = 0;
 
-		for (uint32_t unicode : text->text) {
+		glm::vec2 pen = text->pos;
+		pen.y += font_size->ascender * scale;
 
-			float scale = text->size / font_size->size;
+		for (uint32_t unicode : text->text) {	
 
 			switch (unicode) {
 			case 0x000A:  // newline
-				pen.x = text->pos.x;
+				pen.x = 0;
 				pen.y += font_size->line_spacing * text->line_height * scale;
 				break;
 
@@ -263,15 +259,14 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 				pen.x += drawcall->chara->advance_X * scale;
 			}
 
-			float new_text_width = pen.x - ancestor.pos.x;
-			if (new_text_width > text_width) {
-				text_width = new_text_width;
+			if (pen.x > text_width) {
+				text_width = pen.x;
 			}
 		}
 
-		r_descendant.pos = text->pos;
-		r_descendant.width = text_width;
-		r_descendant.height = (pen.y - ancestor.pos.y);// + font_size->line_spacing;  // TODO: should be font descender
+		r_descendant.pos = &text->pos;
+		r_descendant.width = text_width - text->pos.x;
+		r_descendant.height = pen.y - text->pos.y + (font_size->descender * scale);
 
 		this->char_instance_count += text->text.size();
 		break;
@@ -283,15 +278,6 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		Node* parent = wrap->node_comp.this_elem->parent;
 
 		AncestorProps child_ancs;
-
-		// Position
-		child_ancs.pos = wrap->pos;
-
-		if (parent != nullptr) {
-			if (parent->type == NodeType::WRAP) {
-				child_ancs.pos += ancestor.pos;
-			}
-		}	
 
 		// Size
 		auto calcSize = [](ContentSize size, float ancestor_size) -> float {
@@ -318,7 +304,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		}
 
 		std::vector<DescendantProps> child_props(node->children.size());
-		auto child_it = node->children.begin();			
+		auto child_it = node->children.begin();
 
 		for (uint32_t i = 0; i < node->children.size(); i++, child_it++) {
 
@@ -330,7 +316,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 
 			float right_most = 0;
 			for (DescendantProps& child_prop : child_props) {
-				float right = child_prop.pos.x + child_prop.width;
+				float right = child_prop.pos->x + child_prop.width;
 				if (right_most < right) {
 					right_most = right;
 				}
@@ -338,12 +324,15 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 
 			r_descendant.width = right_most;
 		}
+		else {
+			r_descendant.width = child_ancs.width;
+		}
 
 		if (wrap->height.type == ContentSizeType::FIT) {
 
 			float bottom_most = 0;
 			for (DescendantProps& child_prop : child_props) {
-				float bottom = child_prop.pos.y + child_prop.height;
+				float bottom = child_prop.pos->y + child_prop.height;
 				if (bottom_most < bottom) {
 					bottom_most = bottom;
 				}
@@ -351,12 +340,15 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 
 			r_descendant.height = bottom_most;
 		}
+		else {
+			r_descendant.height = child_ancs.height;
+		}
 
 		auto& inst = wrap->drawcall.instance;
 		inst.color = wrap->background_color;
 
 		if (parent != nullptr) {	
-			inst.pos = child_ancs.pos;
+			inst.pos = wrap->pos;
 			inst.size.x = r_descendant.width;
 			inst.size.y = r_descendant.height;
 			inst.parent_clip_id = ancestor.clip_mask;
@@ -370,7 +362,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 			inst.child_clip_id = 0;
 		}
 
-		r_descendant.pos = child_ancs.pos;
+		r_descendant.pos = &wrap->pos;
 
 		this->wrap_instance_count += 1;
 		break;
@@ -380,9 +372,37 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		// Flex* flex = (Flex*)node->elem;
 		break;
 	}
+	}
+}
 
-	default:
+void Window::calcGlobalPositions(Node* node, glm::vec2 pos)
+{
+	switch (node->type) {
+	case NodeType::TEXT: {
+		Text* text = (Text*)node->elem;
+
+		for (CharacterDrawcall& drawcall : text->drawcalls) {
+			for (GPU_CharacterInstance& inst : drawcall.instances) {
+				inst.pos += pos;
+			}
+		}
 		break;
+	}
+
+	case NodeType::WRAP: {
+		Wrap* wrap = (Wrap*)node->elem;
+
+		wrap->drawcall.instance.pos += pos;
+		for (Node* child : node->children) {
+			calcGlobalPositions(child, wrap->drawcall.instance.pos);
+		}
+		break;
+	}
+
+	case NodeType::FLEX: {
+		// Flex* flex = (Flex*)node->elem;
+		break;
+	}
 	}
 }
 
@@ -464,6 +484,8 @@ ErrStack Window::generateGPU_Data()
 		AncestorProps ancestor;
 		DescendantProps descendant;
 		generateDrawcalls(&nodes.front(), ancestor, descendant);
+
+		calcGlobalPositions(&nodes.front(), { 0, 0 });
 	}
 
 	// Index and Load Instances
@@ -699,22 +721,19 @@ ErrStack Window::draw()
 			dev.createDrawpass(text_pass);
 
 			vkw::CombinedImageSamplerBinding sampler_info;
-			sampler_info.sampler = &text_sampler;
-			sampler_info.tex_view = &char_atlas_view;
 			text_pass.bindCombinedImageSampler(sampler_info);
 
 			vkw::UniformBufferBinding ubuff_info;
-			ubuff_info.buff = &text_ubuff;
 			ubuff_info.set = 1;
 			text_pass.bindUniformBuffer(ubuff_info);
 
 			vkw::ReadAttachmentInfo parents_clip_info;
-			parents_clip_info.view = &parents_clip_mask_view;
+			parents_clip_info.format = parents_clip_mask_img.format;
 			parents_clip_info.set = 2;
 			text_pass.addReadColorAttachment(parents_clip_info);
 
 			vkw::WriteAttachmentInfo compose_info;
-			compose_info.view = &composition_view;
+			compose_info.format = composition_img.format;
 			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 			compose_info.blendEnable = true;
 			text_pass.addWriteColorAttachment(compose_info);
@@ -729,26 +748,51 @@ ErrStack Window::draw()
 			checkErrStack1(text_pass.build());
 		}
 
+		// Text Pass Descriptors
+		{
+			vkw::CombinedImageSamplerDescriptor sampler_info;
+			sampler_info.sampler = &text_sampler;
+			sampler_info.view = &char_atlas_view;
+			text_pass.updateCombinedImageSamplerDescriptor(0, 0, sampler_info);
+
+			vkw::UpdateBufferDescriptor ubuff_info;
+			ubuff_info.buffer = &text_ubuff;
+			text_pass.updateUniformBufferDescriptor(1, 0, ubuff_info);
+
+			vkw::InputAttachmentDescriptor parents_clip_info;
+			parents_clip_info.view = &parents_clip_mask_view;
+			text_pass.updateInputAttachmentDescriptor(2, 0, parents_clip_info);
+		}
+
+		// Text Framebuffer
+		{
+			vkw::FramebufferCreateInfo info;
+			info.attachments = {
+				&parents_clip_mask_view,
+				&composition_view
+			};
+			checkErrStack1(text_pass.createFramebuffer(info, text_framebuff));
+		}
+
 		// Wrap Pass
 		{
 			dev.createDrawpass(wrap_pass);
 
 			vkw::UniformBufferBinding ubuff_info;
-			ubuff_info.buff = &text_ubuff;
 			wrap_pass.bindUniformBuffer(ubuff_info);
 
 			vkw::ReadAttachmentInfo parents_clip_info;
-			parents_clip_info.view = &parents_clip_mask_view;
+			parents_clip_info.format = parents_clip_mask_img.format;
 			parents_clip_info.set = 1;
 			wrap_pass.addReadColorAttachment(parents_clip_info);
 
 			vkw::WriteAttachmentInfo compose_info;
-			compose_info.view = &composition_view;
+			compose_info.format = composition_img.format;
 			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 			wrap_pass.addWriteColorAttachment(compose_info);
 
 			vkw::WriteAttachmentInfo next_parents_clip_info;
-			next_parents_clip_info.view = &next_parents_clip_mask_view;
+			next_parents_clip_info.format = next_parents_clip_mask_img.format;
 			next_parents_clip_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
 			wrap_pass.addWriteColorAttachment(next_parents_clip_info);
 
@@ -760,6 +804,28 @@ ErrStack Window::draw()
 			wrap_pass.setFragmentShader(wrap_fs);
 
 			checkErrStack1(wrap_pass.build());
+		}
+
+		// Wrap Pass Descriptors
+		{
+			vkw::UpdateBufferDescriptor ubuff_info;
+			ubuff_info.buffer = &text_ubuff;
+			wrap_pass.updateUniformBufferDescriptor(0, 0, ubuff_info);
+
+			vkw::InputAttachmentDescriptor parents_clip_info;
+			parents_clip_info.view = &parents_clip_mask_view;
+			wrap_pass.updateInputAttachmentDescriptor(1, 0, parents_clip_info);
+		}
+
+		// Wrap Pass Framebuffer
+		{
+			vkw::FramebufferCreateInfo info;
+			info.attachments = {
+				&parents_clip_mask_view,
+				&composition_view,
+				&next_parents_clip_mask_view
+			};
+			checkErrStack1(wrap_pass.createFramebuffer(info, wrap_framebuff));
 		}
 
 		// Command List
@@ -794,7 +860,11 @@ ErrStack Window::draw()
 					case NodeType::TEXT: {
 						Text* text = (Text*)node->elem;
 
-						cmd_list.cmdBeginRenderpass(text_pass);
+						if (!text->drawcalls.size()) {
+							break;
+						}
+
+						cmd_list.cmdBeginRenderpass(text_pass, text_framebuff);
 						{
 							cmd_list.cmdBindVertexBuffers(chars_vbuff, chars_instabuff);
 							cmd_list.cmdBindIndexBuffer(chars_idxbuff);
@@ -812,7 +882,7 @@ ErrStack Window::draw()
 					case NodeType::WRAP: {
 						Wrap* wrap = (Wrap*)node->elem;
 
-						cmd_list.cmdBeginRenderpass(wrap_pass);
+						cmd_list.cmdBeginRenderpass(wrap_pass, wrap_framebuff);
 						{
 							cmd_list.cmdBindVertexBuffers(wrap_vbuff, wrap_instabuff);
 							cmd_list.cmdBindIndexBuffer(wrap_idxbuff);
@@ -859,11 +929,194 @@ ErrStack Window::draw()
 			checkErrStack1(cmd_list.endRecording());
 		}
 	}
+	else {
+		if (width != dev.surface.width || height != dev.surface.height) {
+
+			// resize images and their views
+			// resize renderpass
+			// recreate c
+		}
+	}
 
 	checkErrStack1(cmd_list.run());
 	checkErrStack1(cmd_list.waitForExecution());
 
 	return ErrStack();
+}
+
+ErrStack Window::draw2()
+{
+	ErrStack err_stack;
+	HRESULT hr = 0;
+
+	if (!rendering_configured) {
+
+		rendering_configured = true;
+
+		// Factory
+		{
+			checkHResult(CreateDXGIFactory2(0, IID_PPV_ARGS(factory.GetAddressOf())),
+				"failed to create DXGI factory");
+		}
+
+		// Choose Adapter with most VRAM
+		{
+			uint32_t adapter_idx = 0;
+			IDXGIAdapter* found_adapter;
+			size_t adapter_vram = 0;
+
+			while (SUCCEEDED(factory.Get()->EnumAdapters(adapter_idx, &found_adapter))) {
+
+				DXGI_ADAPTER_DESC desc;
+				checkHResult(found_adapter->GetDesc(&desc),
+					"failed to get adapter description");
+
+				if (desc.DedicatedVideoMemory > adapter_vram) {
+					adapter = found_adapter;
+				}
+				adapter_idx++;
+			}
+		}
+
+		// Device
+		{
+			std::array<D3D_FEATURE_LEVEL, 1> features = {
+				D3D_FEATURE_LEVEL_11_1
+			};
+
+			checkHResult(D3D11CreateDevice(adapter,
+				D3D_DRIVER_TYPE_UNKNOWN,
+				NULL,
+				D3D11_CREATE_DEVICE_DEBUG,// | D3D11_CREATE_DEVICE_DEBUGGABLE,
+				features.data(), (uint32_t)features.size(),
+				D3D11_SDK_VERSION,
+				device.GetAddressOf(),
+				NULL,
+				im_ctx.GetAddressOf()),
+				"failed to create device");
+
+				checkHResult(device->QueryInterface<ID3D11Device5>(dev5.GetAddressOf()),
+					"failed to obtain ID3D11Device5");
+
+				checkHResult(im_ctx->QueryInterface<ID3D11DeviceContext4>(im_ctx4.GetAddressOf()),
+					"failed to obtain ID3D11DeviceContext4");
+		}
+
+		// Swapchain
+		{
+		DXGI_SWAP_CHAIN_DESC1 desc = {};
+		desc.Width = 0;
+		desc.Height = 0;
+		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.Stereo = false;
+		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Quality = 0;
+		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		desc.BufferCount = 2;
+		desc.Scaling = DXGI_SCALING_NONE;
+		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+		desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+		DXGI_SWAP_CHAIN_FULLSCREEN_DESC full_desc = {};
+		full_desc.RefreshRate.Numerator = 60;
+		full_desc.RefreshRate.Denominator = 1;
+		full_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+		full_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+		full_desc.Windowed = true;
+
+		checkHResult(factory->CreateSwapChainForHwnd(dev5.Get(), hwnd,
+			&desc, &full_desc, NULL, swapchain.GetAddressOf()),
+			"failed to create swapchain");
+		}
+
+		// Present Target View
+		{
+			checkHResult(swapchain->GetBuffer(0, IID_PPV_ARGS(present_img.GetAddressOf())),
+				"failed to get swapchain back buffer");
+
+			checkHResult(dev5->CreateRenderTargetView(present_img.Get(), NULL, present_rtv.GetAddressOf()),
+				"failed to create present RTV");
+		}
+
+		// Vertex Shader
+		{
+			FilePath path;
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/VertexShader.cso"));
+			checkErrStack(path.read(vertex_shader_cso),
+				"failed to read shader code");
+
+			checkHResult(dev5->CreateVertexShader(vertex_shader_cso.data(), vertex_shader_cso.size(),
+				NULL, vertex_shader.GetAddressOf()),
+				"failed to create shader");
+		}
+
+		// Pixel Shader
+		{
+			FilePath path;
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/PixelShader.cso"));
+			checkErrStack(path.read(pixel_shader_cso),
+				"failed to read shader code");
+
+			checkHResult(dev5->CreatePixelShader(pixel_shader_cso.data(), pixel_shader_cso.size(),
+				NULL, pixel_shader.GetAddressOf()),
+				"failed to create shader");
+		}
+
+		// Input Layout
+		{
+			auto input_elems = GPU_Vertex::getInputLayout();
+			checkHResult(dev5->CreateInputLayout(input_elems.data(), input_elems.size(),
+				vertex_shader_cso.data(), vertex_shader_cso.size(), vertex_il.GetAddressOf()),
+				"failed to create input layout");
+		}
+
+		// Vertex Buffer
+		{
+			//D3D11_BUFFER_DESC desc = {};
+			//desc.ByteWidth;
+			//desc.Usage;
+
+			//UINT ByteWidth;
+			//D3D11_USAGE Usage;
+			//UINT BindFlags;
+			//UINT CPUAccessFlags;
+			//UINT MiscFlags;
+			//UINT StructureByteStride;
+
+			//dev5->CreateBuffer()
+		}
+	}
+
+	// Commands
+	{
+		float present_clear_color[4] = {
+				1, 0, 0, 1
+		};
+		im_ctx4->ClearRenderTargetView(present_rtv.Get(), present_clear_color);
+	}
+	
+	/*{
+		DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
+		swapchain->GetDesc1(&swapchain_desc);
+
+		D3D11_VIEWPORT viewport = {};
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = (float)swapchain_desc.Width;
+		viewport.Height = (float)swapchain_desc.Height;
+		viewport.MinDepth = 0;
+		viewport.MaxDepth = 1;
+
+
+	}*/
+
+	im_ctx4->OMSetRenderTargets(1, present_rtv.GetAddressOf(), NULL);
+
+	checkHResult(swapchain->Present(0, 0),
+		"failed to present swapchain");
+
+	return err_stack;
 }
 
 Wrap* Window::getRoot()
@@ -875,7 +1128,7 @@ Wrap* Window::getRoot()
 
 ErrStack Instance::create()
 {
-	ErrStack err_stack{};
+	ErrStack err_stack;
 
 	// Create Character Atlas
 	{
@@ -890,9 +1143,12 @@ ErrStack Instance::create()
 		checkErrStack1(char_atlas.addFont(path, sizes, font));
 	}
 
+	// Vulkan
 	vkw::InstanceCreateInfo info;
 	checkErrStack(inst.create(info),
 		"failed to create vulkan instance");
+
+	// DirectX 11
 
 	return err_stack;
 }
@@ -921,11 +1177,8 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 		0,                              // Optional window styles.
 		CLASS_NAME,                     // Window class
 		"Window",                       // Window text
-		WS_OVERLAPPEDWINDOW | WS_VISIBLE,            // Window style
-
-		// Size and position
-		CW_USEDEFAULT, CW_USEDEFAULT, info.width, info.height,
-
+		WS_OVERLAPPEDWINDOW | WS_VISIBLE,            // Window style		
+		CW_USEDEFAULT, CW_USEDEFAULT, info.width, info.height, // Position and Size
 		NULL,       // Parent window    
 		NULL,       // Menu
 		window.hinstance,  // Instance handle
@@ -935,8 +1188,6 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 	if (window.hwnd == NULL) {
 		return ErrStack(code_location, "failed to create window");
 	}
-
-	//ShowWindow(window.hwnd, 0);
 
 	window.minimized = false;
 	window.close = false;
@@ -998,9 +1249,11 @@ ErrStack Instance::update()
 			DispatchMessage(&msg);
 		}
 
-		if (!window.minimized) {
+		/*if (!window.minimized) {
 			checkErrStack1(window.draw());
-		}
+		}*/
+
+		checkErrStack1(window.draw2());
 	}
 	
 	return err_stack;

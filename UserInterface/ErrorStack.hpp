@@ -8,6 +8,8 @@ namespace nui {
 	" fn = " + __func__ + \
 	" in file " + __FILE__).c_str()
 
+#define varName(variabile) \
+	#variabile
 
 	enum class ErrorOrigins {
 		NOT_SPECIFIED,
@@ -66,6 +68,12 @@ namespace nui {
 	vk_res = vk_func; \
 	if (vk_res != VK_SUCCESS) { \
 		return nui::ErrStack(code_location, msg, vk_res, nui::ErrorOrigins::VULKAN_ERROR_CODE); \
+	}
+
+#define checkHResult(hr_func, msg) \
+	hr = hr_func; \
+	if (hr != S_OK) { \
+		return nui::ErrStack(code_location, msg, hr, nui::ErrorOrigins::WINDOWS_ERROR_HANDLE); \
 	}
 
 #define assert_cond(param, msg) \

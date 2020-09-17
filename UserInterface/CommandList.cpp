@@ -395,34 +395,31 @@ void CommandList::cmdCopyImageToSurface(ImageView& view)
 	}
 }
 
-void CommandList::cmdBeginRenderpass(Drawpass& pass)
+void CommandList::cmdBeginRenderpass(Drawpass& pass, Framebuffer& frame_buffer)
 {
 	for (auto& task : tasks) {
+
+		std::vector<VkClearValue> clear_values(frame_buffer.framebuffs.size());
+		std::memset(clear_values.data(), 0x00,
+			clear_values.size() * sizeof(VkClearValue));
 
 		VkRenderPassBeginInfo vk_info = {};
 		vk_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		vk_info.renderPass = pass.renderpass;
-		vk_info.framebuffer = pass.framebuffs[task.idx];
-
-		auto& scissors = pass.viewport_state.scissors;
-		if (scissors.size()) {
-			vk_info.renderArea.offset = scissors[0].offset;
-			vk_info.renderArea.extent = scissors[0].extent;
-		}
-		else {
-			vk_info.renderArea.offset = { 0, 0 };
-			vk_info.renderArea.extent.width = surface->width;
-			vk_info.renderArea.extent.height = surface->height;
-		}
-
-		vk_info.clearValueCount = (uint32_t)pass.clear_values.size();
-		vk_info.pClearValues = pass.clear_values.data();
+		vk_info.framebuffer = frame_buffer.framebuffs[task.idx];
+		vk_info.renderArea.offset = { 0, 0 };
+		vk_info.renderArea.extent = { frame_buffer.width, frame_buffer.height };
+		vk_info.clearValueCount = (uint32_t)clear_values.size();
+		vk_info.pClearValues = clear_values.data();
 
 		vkCmdBeginRenderPass(task.buff, &vk_info, VK_SUBPASS_CONTENTS_INLINE);
 
 		if (pass.descp_sets.size()) {
-			vkCmdBindDescriptorSets(task.buff, VK_PIPELINE_BIND_POINT_GRAPHICS, pass.pipe_layout,
-				0, (uint32_t)pass.descp_sets.size(), pass.descp_sets.data(), 0, NULL);
+
+			vkCmdBindDescriptorSets(task.buff, 
+				VK_PIPELINE_BIND_POINT_GRAPHICS, pass.pipe_layout,
+				0, (uint32_t)pass.descp_sets.size(), pass.descp_sets.data(),
+				0, NULL);
 		}
 
 		vkCmdBindPipeline(task.buff, VK_PIPELINE_BIND_POINT_GRAPHICS, pass.pipeline);
