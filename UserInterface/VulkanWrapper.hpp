@@ -811,3 +811,410 @@ namespace vkw {
 		~Instance();
 	};
 }
+
+//
+//ErrStack Window::draw()
+//{
+//	ErrStack err_stack;
+//
+//	if (!rendering_configured) {
+//
+//		rendering_configured = true;
+//
+//		// Characters Vertex Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, chars_vbuff);
+//		}
+//
+//		// Characters Index Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, chars_idxbuff);
+//		}
+//
+//		// Character Instance Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, chars_instabuff);
+//		}
+//
+//		// Wrap Vertex Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, wrap_vbuff);
+//		}
+//
+//		// Wrap Index Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, wrap_idxbuff);
+//		}
+//
+//		// Wrap Instance Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, wrap_instabuff);
+//		}
+//
+//		// Character Uniform Buffer
+//		{
+//			vkw::BufferCreateInfo info;
+//			info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//			dev.createBuffer(info, text_ubuff);
+//
+//			common_uniform.screen_size.x = (float)dev.surface.width;
+//			common_uniform.screen_size.y = (float)dev.surface.height;
+//			checkErrStack1(text_ubuff.load(&common_uniform, sizeof(GPU_CommonsUniform)));
+//		}
+//
+//		// Composition Image
+//		{
+//			vkw::ImageCreateInfo info;
+//			info.format = dev.surface.imageFormat;
+//			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+//			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+//			checkErrStack(dev.createImage(info, composition_img),
+//				"failed to create composition image");
+//		}
+//
+//		// Parents Clip Image
+//		{
+//			vkw::ImageCreateInfo info;
+//			info.format = VK_FORMAT_R32_UINT;
+//			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+//				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+//			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+//			checkErrStack1(dev.createImage(info, parents_clip_mask_img));
+//
+//			vkw::ImageViewCreateInfo view_info;
+//			checkErrStack1(parents_clip_mask_img.createView(view_info, parents_clip_mask_view));
+//		}
+//
+//		// Next Parents Clip Image
+//		{
+//			vkw::ImageCreateInfo info;
+//			info.format = VK_FORMAT_R32_UINT;
+//			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
+//				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+//			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+//			checkErrStack1(dev.createImage(info, next_parents_clip_mask_img));
+//
+//			vkw::ImageViewCreateInfo view_info;
+//			checkErrStack1(next_parents_clip_mask_img.createView(view_info, next_parents_clip_mask_view));
+//		}
+//
+//		// Character Atlas Texture
+//		{
+//			vkw::ImageCreateInfo info;
+//			info.format = VK_FORMAT_R8_UNORM;
+//			info.width = instance->char_atlas.atlas.tex_size;
+//			info.height = instance->char_atlas.atlas.tex_size;
+//			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+//			checkErrStack(dev.createImage(info, char_atlas_tex),
+//				"failed to create character atlas texture");
+//
+//			vkw::ImageViewCreateInfo view_info;
+//			checkErrStack(char_atlas_tex.createView(view_info, char_atlas_view),
+//				"failed to create character atlas view");
+//
+//			TextureAtlas& char_atlas = instance->char_atlas.atlas;
+//			checkErrStack(char_atlas_view.load(char_atlas.colors.data(), char_atlas.colors.size(), VK_IMAGE_LAYOUT_GENERAL),
+//				"failed to load character atlas data into texture");
+//		}
+//
+//		// Composition Image View
+//		{
+//			vkw::ImageViewCreateInfo info;
+//			checkErrStack(composition_img.createView(info, composition_view),
+//				"failed to create composition view");
+//		}
+//
+//		// Sampler
+//		{
+//			vkw::SamplerCreateInfo info;
+//			checkErrStack(dev.createSampler(info, text_sampler),
+//				"failed to create sampler");
+//		}
+//
+//		checkErrStack1(generateGPU_Data());
+//
+//		std::vector<char> spirv;
+//
+//		// Character Vertex Shader
+//		{
+//			FilePath path;
+//			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Text/vert.spv"));
+//
+//			spirv.clear();
+//			checkErrStack1(path.read(spirv));
+//
+//			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_VERTEX_BIT, text_vs));
+//		}
+//
+//		// Character Fragment Shader
+//		{
+//			FilePath path;
+//			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Text/frag.spv"));
+//
+//			spirv.clear();
+//			checkErrStack1(path.read(spirv));
+//
+//			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_FRAGMENT_BIT, text_fs));
+//		}
+//
+//		// Wrap Vertex Shader
+//		{
+//			FilePath path;
+//			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Wrap/vert.spv"));
+//
+//			spirv.clear();
+//			checkErrStack1(path.read(spirv));
+//
+//			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_VERTEX_BIT, wrap_vs));
+//		}
+//
+//		// Wrap Fragment Shader
+//		{
+//			FilePath path;
+//			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Wrap/frag.spv"));
+//
+//			spirv.clear();
+//			checkErrStack1(path.read(spirv));
+//
+//			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_FRAGMENT_BIT, wrap_fs));
+//		}
+//
+//		// Text Pass
+//		{
+//			dev.createDrawpass(text_pass);
+//
+//			vkw::CombinedImageSamplerBinding sampler_info;
+//			text_pass.bindCombinedImageSampler(sampler_info);
+//
+//			vkw::UniformBufferBinding ubuff_info;
+//			ubuff_info.set = 1;
+//			text_pass.bindUniformBuffer(ubuff_info);
+//
+//			vkw::ReadAttachmentInfo parents_clip_info;
+//			parents_clip_info.format = parents_clip_mask_img.format;
+//			parents_clip_info.set = 2;
+//			text_pass.addReadColorAttachment(parents_clip_info);
+//
+//			vkw::WriteAttachmentInfo compose_info;
+//			compose_info.format = composition_img.format;
+//			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+//			compose_info.blendEnable = true;
+//			text_pass.addWriteColorAttachment(compose_info);
+//
+//			text_pass.vertex_inputs.push_back(GPU_CharacterVertex::getVertexInput());
+//			text_pass.vertex_inputs.push_back(GPU_CharacterInstance::getVertexInput(1));
+//
+//			text_pass.setVertexShader(text_vs);
+//
+//			text_pass.setFragmentShader(text_fs);
+//
+//			checkErrStack1(text_pass.build());
+//		}
+//
+//		// Text Pass Descriptors
+//		{
+//			vkw::CombinedImageSamplerDescriptor sampler_info;
+//			sampler_info.sampler = &text_sampler;
+//			sampler_info.view = &char_atlas_view;
+//			text_pass.updateCombinedImageSamplerDescriptor(0, 0, sampler_info);
+//
+//			vkw::UpdateBufferDescriptor ubuff_info;
+//			ubuff_info.buffer = &text_ubuff;
+//			text_pass.updateUniformBufferDescriptor(1, 0, ubuff_info);
+//
+//			vkw::InputAttachmentDescriptor parents_clip_info;
+//			parents_clip_info.view = &parents_clip_mask_view;
+//			text_pass.updateInputAttachmentDescriptor(2, 0, parents_clip_info);
+//		}
+//
+//		// Text Framebuffer
+//		{
+//			vkw::FramebufferCreateInfo info;
+//			info.attachments = {
+//				&parents_clip_mask_view,
+//				&composition_view
+//			};
+//			checkErrStack1(text_pass.createFramebuffer(info, text_framebuff));
+//		}
+//
+//		// Wrap Pass
+//		{
+//			dev.createDrawpass(wrap_pass);
+//
+//			vkw::UniformBufferBinding ubuff_info;
+//			wrap_pass.bindUniformBuffer(ubuff_info);
+//
+//			vkw::ReadAttachmentInfo parents_clip_info;
+//			parents_clip_info.format = parents_clip_mask_img.format;
+//			parents_clip_info.set = 1;
+//			wrap_pass.addReadColorAttachment(parents_clip_info);
+//
+//			vkw::WriteAttachmentInfo compose_info;
+//			compose_info.format = composition_img.format;
+//			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+//			wrap_pass.addWriteColorAttachment(compose_info);
+//
+//			vkw::WriteAttachmentInfo next_parents_clip_info;
+//			next_parents_clip_info.format = next_parents_clip_mask_img.format;
+//			next_parents_clip_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+//			wrap_pass.addWriteColorAttachment(next_parents_clip_info);
+//
+//			wrap_pass.vertex_inputs.push_back(GPU_WrapVertex::getVertexInput());
+//			wrap_pass.vertex_inputs.push_back(GPU_WrapInstance::getVertexInput(1));
+//
+//			wrap_pass.setVertexShader(wrap_vs);
+//
+//			wrap_pass.setFragmentShader(wrap_fs);
+//
+//			checkErrStack1(wrap_pass.build());
+//		}
+//
+//		// Wrap Pass Descriptors
+//		{
+//			vkw::UpdateBufferDescriptor ubuff_info;
+//			ubuff_info.buffer = &text_ubuff;
+//			wrap_pass.updateUniformBufferDescriptor(0, 0, ubuff_info);
+//
+//			vkw::InputAttachmentDescriptor parents_clip_info;
+//			parents_clip_info.view = &parents_clip_mask_view;
+//			wrap_pass.updateInputAttachmentDescriptor(1, 0, parents_clip_info);
+//		}
+//
+//		// Wrap Pass Framebuffer
+//		{
+//			vkw::FramebufferCreateInfo info;
+//			info.attachments = {
+//				&parents_clip_mask_view,
+//				&composition_view,
+//				&next_parents_clip_mask_view
+//			};
+//			checkErrStack1(wrap_pass.createFramebuffer(info, wrap_framebuff));
+//		}
+//
+//		// Command List
+//		{
+//			vkw::CommandListCreateInfo info = {};
+//			info.surface = &dev.surface;
+//
+//			checkErrStack1(dev.createCommandList(info, cmd_list));
+//			checkErrStack1(cmd_list.beginRecording());
+//
+//			cmd_list.cmdClearFloatImage(composition_view);
+//			cmd_list.cmdClearUIntImage(parents_clip_mask_view);
+//			cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
+//			{
+//				std::array<vkw::ImageView*, 3> views = {
+//					&composition_view, &parents_clip_mask_view, &next_parents_clip_mask_view
+//				};
+//				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+//					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, (VkAccessFlagBits)0, views.size(), views.data());
+//			}
+//
+//			std::vector<Node*> now_nodes = {
+//				&nodes.front()
+//			};
+//			std::vector<Node*> next_nodes;
+//
+//			while (now_nodes.size()) {
+//
+//				for (Node* node : now_nodes) {
+//
+//					switch (node->type) {
+//					case NodeType::TEXT: {
+//						Text* text = (Text*)node->elem;
+//
+//						if (!text->drawcalls.size()) {
+//							break;
+//						}
+//
+//						cmd_list.cmdBeginRenderpass(text_pass, text_framebuff);
+//						{
+//							cmd_list.cmdBindVertexBuffers(chars_vbuff, chars_instabuff);
+//							cmd_list.cmdBindIndexBuffer(chars_idxbuff);
+//
+//							for (CharacterDrawcall& drawcall : text->drawcalls) {
+//								cmd_list.cmdDrawIndexedInstanced(6, (uint32_t)drawcall.instances.size(),
+//									drawcall.chara->index_start_idx, drawcall.instance_start_idx);
+//
+//							}
+//						}
+//						cmd_list.cmdEndRenderpass();
+//						break;
+//					}
+//
+//					case NodeType::WRAP: {
+//						Wrap* wrap = (Wrap*)node->elem;
+//
+//						cmd_list.cmdBeginRenderpass(wrap_pass, wrap_framebuff);
+//						{
+//							cmd_list.cmdBindVertexBuffers(wrap_vbuff, wrap_instabuff);
+//							cmd_list.cmdBindIndexBuffer(wrap_idxbuff);
+//
+//							cmd_list.cmdDrawIndexedInstanced(6, 1, 0, wrap->drawcall.instance_idx);
+//						}
+//						cmd_list.cmdEndRenderpass();
+//						break;
+//					}
+//					}
+//
+//					// TODO: barrier, wait for writes to complete for composition, and next parents
+//
+//					for (Node* child : node->children) {
+//						next_nodes.push_back(child);
+//					}
+//				}
+//
+//				now_nodes = next_nodes;
+//				next_nodes.clear();
+//
+//				cmd_list.cmdCopyImageToImage(next_parents_clip_mask_view, parents_clip_mask_view);
+//				cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
+//			}	
+//
+//			// Copy Compose Image to Surface
+//			{
+//				vkw::SurfaceBarrier dst;
+//				dst.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+//				dst.wait_for_access = 0;
+//				dst.wait_at_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+//				cmd_list.cmdSurfacePipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, dst);
+//
+//				cmd_list.cmdCopyImageToSurface(composition_view);
+//
+//				dst = {};
+//				dst.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+//				dst.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+//				dst.wait_at_access = 0;
+//				cmd_list.cmdSurfacePipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+//					dst);
+//			}
+//
+//			checkErrStack1(cmd_list.endRecording());
+//		}
+//	}
+//	else {
+//		if (width != dev.surface.width || height != dev.surface.height) {
+//
+//			// resize images and their views
+//			// resize renderpass
+//			// recreate c
+//		}
+//	}
+//
+//	checkErrStack1(cmd_list.run());
+//	checkErrStack1(cmd_list.waitForExecution());
+//
+//	return ErrStack();
+//}

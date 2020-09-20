@@ -3,7 +3,6 @@
 
 // Mine
 #include "FileIO.hpp"
-#include "GPU_ShaderTypes.hpp"
 
 // Header
 #include "NuiLibrary.hpp"
@@ -34,6 +33,7 @@ Text* NodeComponent::addText()
 	new_text->node_comp.window = this->window;
 	new_text->node_comp.this_elem = &child_node;
 
+	new_text->pos = { 0, 0 };
 	new_text->size = 14.0f;
 	new_text->line_height = 1.15f;
 	new_text->color = { 1, 1, 1, 1 };
@@ -55,6 +55,7 @@ Wrap* NodeComponent::addWrap()
 	child_wrap->node_comp.window = this->window;
 	child_wrap->node_comp.this_elem = &child_node;
 
+	child_wrap->pos = { 0, 0 };
 	child_wrap->overflow = Overflow::OVERFLOw;
 	child_wrap->background_color = { 0, 0, 0, 0 };
 
@@ -103,6 +104,12 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					uint32_t l_param = static_cast<uint32_t>(lParam);
 					wnd.width = l_param & 0xFFFF;
 					wnd.height = l_param >> 16;
+
+					RECT rect;
+					GetClientRect(hwnd, &rect);
+
+					wnd.surface_width = rect.right - rect.left;
+					wnd.surface_height = rect.bottom - rect.top;
 					break;
 				}				
 
@@ -177,6 +184,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 	case NodeType::TEXT:{
 
 		Text* text = (Text*)node->elem;
+		text->drawcalls.clear();
 
 		FontSize* font_size = nullptr;
 		{
@@ -250,8 +258,14 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 				new_pos.y += (char_height - char_top) * scale;
 
 				GPU_CharacterInstance& new_instance = drawcall->instances.emplace_back();
-				new_instance.color = text->color;
-				new_instance.pos = new_pos;
+				new_instance.color.x = text->color.r;
+				new_instance.color.y = text->color.g;
+				new_instance.color.z = text->color.b;
+				new_instance.color.w = text->color.a;
+
+				new_instance.pos.x = new_pos.x;
+				new_instance.pos.y = new_pos.y;
+
 				new_instance.rasterized_size = (float)font_size->size;
 				new_instance.size = text->size;
 				new_instance.parent_clip_mask = ancestor.clip_mask;
@@ -345,10 +359,14 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		}
 
 		auto& inst = wrap->drawcall.instance;
-		inst.color = wrap->background_color;
+		inst.color.x = wrap->background_color.r;
+		inst.color.y = wrap->background_color.g;
+		inst.color.z = wrap->background_color.b;
+		inst.color.w = wrap->background_color.a;
 
 		if (parent != nullptr) {	
-			inst.pos = wrap->pos;
+			inst.pos.x = wrap->pos.x;
+			inst.pos.y = wrap->pos.y;
 			inst.size.x = r_descendant.width;
 			inst.size.y = r_descendant.height;
 			inst.parent_clip_id = ancestor.clip_mask;
@@ -383,7 +401,8 @@ void Window::calcGlobalPositions(Node* node, glm::vec2 pos)
 
 		for (CharacterDrawcall& drawcall : text->drawcalls) {
 			for (GPU_CharacterInstance& inst : drawcall.instances) {
-				inst.pos += pos;
+				inst.pos.x += pos.x;
+				inst.pos.y += pos.y;
 			}
 		}
 		break;
@@ -392,9 +411,11 @@ void Window::calcGlobalPositions(Node* node, glm::vec2 pos)
 	case NodeType::WRAP: {
 		Wrap* wrap = (Wrap*)node->elem;
 
-		wrap->drawcall.instance.pos += pos;
+		wrap->drawcall.instance.pos.x += pos.x;
+		wrap->drawcall.instance.pos.y += pos.y;
+
 		for (Node* child : node->children) {
-			calcGlobalPositions(child, wrap->drawcall.instance.pos);
+			calcGlobalPositions(child, { wrap->drawcall.instance.pos.x, wrap->drawcall.instance.pos.y });
 		}
 		break;
 	}
@@ -423,7 +444,7 @@ ErrStack Window::generateGPU_Data()
 		}
 
 		this->char_verts.resize(vertex_count);
-		this->char_idxs.resize(index_count);
+		this->chars_idxs.resize(index_count);
 
 		uint32_t vertex_idx = 0;
 		uint32_t index_idx = 0;
@@ -453,13 +474,13 @@ ErrStack Window::generateGPU_Data()
 				char_verts[vertex_idx + 3].pos = { w, 0 };
 				char_verts[vertex_idx + 3].uv = chara.zone->bb_uv.getBotRight();
 
-				char_idxs[index_idx + 0] = vertex_idx + 0;
-				char_idxs[index_idx + 1] = vertex_idx + 1;
-				char_idxs[index_idx + 2] = vertex_idx + 2;
+				chars_idxs[index_idx + 0] = vertex_idx + 0;
+				chars_idxs[index_idx + 1] = vertex_idx + 1;
+				chars_idxs[index_idx + 2] = vertex_idx + 2;
 
-				char_idxs[index_idx + 3] = vertex_idx + 2;
-				char_idxs[index_idx + 4] = vertex_idx + 3;
-				char_idxs[index_idx + 5] = vertex_idx + 0;
+				chars_idxs[index_idx + 3] = vertex_idx + 2;
+				chars_idxs[index_idx + 4] = vertex_idx + 3;
+				chars_idxs[index_idx + 5] = vertex_idx + 0;
 
 				vertex_idx += 4;
 				index_idx += 6;
@@ -467,17 +488,12 @@ ErrStack Window::generateGPU_Data()
 		}
 
 		checkErrStack1(chars_vbuff.load(char_verts.data(), char_verts.size() * sizeof(GPU_CharacterVertex)));
-		checkErrStack1(chars_idxbuff.load(char_idxs.data(), char_idxs.size() * sizeof(uint32_t)));
-	}
-
-	// Create Wrap Mesh
-	{
-		checkErrStack1(wrap_vbuff.load(wrap_verts.data(), wrap_verts.size() * sizeof(GPU_WrapVertex)));
-		checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), wrap_idxs.size() * sizeof(uint32_t)));
+		checkErrStack1(chars_idxbuff.load(chars_idxs.data(), chars_idxs.size() * sizeof(uint32_t)));
 	}
 
 	// Create Node Instances
 	{
+		this->clip_mask_id = 0;
 		this->char_instance_count = 0;
 		this->wrap_instance_count = 0;
 
@@ -538,412 +554,6 @@ ErrStack Window::generateGPU_Data()
 	return err_stack;
 }
 
-ErrStack Window::draw()
-{
-	ErrStack err_stack;
-
-	if (!rendering_configured) {
-
-		rendering_configured = true;
-
-		// Characters Vertex Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, chars_vbuff);
-		}
-
-		// Characters Index Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, chars_idxbuff);
-		}
-
-		// Character Instance Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, chars_instabuff);
-		}
-
-		// Wrap Vertex Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, wrap_vbuff);
-		}
-
-		// Wrap Index Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, wrap_idxbuff);
-		}
-
-		// Wrap Instance Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, wrap_instabuff);
-		}
-
-		// Character Uniform Buffer
-		{
-			vkw::BufferCreateInfo info;
-			info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			dev.createBuffer(info, text_ubuff);
-
-			common_uniform.screen_size.x = (float)dev.surface.width;
-			common_uniform.screen_size.y = (float)dev.surface.height;
-			checkErrStack1(text_ubuff.load(&common_uniform, sizeof(GPU_CommonsUniform)));
-		}
-
-		// Composition Image
-		{
-			vkw::ImageCreateInfo info;
-			info.format = dev.surface.imageFormat;
-			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack(dev.createImage(info, composition_img),
-				"failed to create composition image");
-		}
-
-		// Parents Clip Image
-		{
-			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R32_UINT;
-			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, parents_clip_mask_img));
-
-			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(parents_clip_mask_img.createView(view_info, parents_clip_mask_view));
-		}
-
-		// Next Parents Clip Image
-		{
-			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R32_UINT;
-			info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			info.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-			checkErrStack1(dev.createImage(info, next_parents_clip_mask_img));
-
-			vkw::ImageViewCreateInfo view_info;
-			checkErrStack1(next_parents_clip_mask_img.createView(view_info, next_parents_clip_mask_view));
-		}
-
-		// Character Atlas Texture
-		{
-			vkw::ImageCreateInfo info;
-			info.format = VK_FORMAT_R8_UNORM;
-			info.width = instance->char_atlas.atlas.tex_size;
-			info.height = instance->char_atlas.atlas.tex_size;
-			info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-			checkErrStack(dev.createImage(info, char_atlas_tex),
-				"failed to create character atlas texture");
-
-			vkw::ImageViewCreateInfo view_info;
-			checkErrStack(char_atlas_tex.createView(view_info, char_atlas_view),
-				"failed to create character atlas view");
-
-			TextureAtlas& char_atlas = instance->char_atlas.atlas;
-			checkErrStack(char_atlas_view.load(char_atlas.colors.data(), char_atlas.colors.size(), VK_IMAGE_LAYOUT_GENERAL),
-				"failed to load character atlas data into texture");
-		}
-
-		// Composition Image View
-		{
-			vkw::ImageViewCreateInfo info;
-			checkErrStack(composition_img.createView(info, composition_view),
-				"failed to create composition view");
-		}
-
-		// Sampler
-		{
-			vkw::SamplerCreateInfo info;
-			checkErrStack(dev.createSampler(info, text_sampler),
-				"failed to create sampler");
-		}
-
-		checkErrStack1(generateGPU_Data());
-
-		std::vector<char> spirv;
-
-		// Character Vertex Shader
-		{
-			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Text/vert.spv"));
-
-			spirv.clear();
-			checkErrStack1(path.read(spirv));
-
-			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_VERTEX_BIT, text_vs));
-		}
-
-		// Character Fragment Shader
-		{
-			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Text/frag.spv"));
-
-			spirv.clear();
-			checkErrStack1(path.read(spirv));
-
-			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_FRAGMENT_BIT, text_fs));
-		}
-
-		// Wrap Vertex Shader
-		{
-			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Wrap/vert.spv"));
-
-			spirv.clear();
-			checkErrStack1(path.read(spirv));
-
-			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_VERTEX_BIT, wrap_vs));
-		}
-
-		// Wrap Fragment Shader
-		{
-			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/Shaders/Wrap/frag.spv"));
-
-			spirv.clear();
-			checkErrStack1(path.read(spirv));
-
-			checkErrStack1(dev.createShader(spirv, VK_SHADER_STAGE_FRAGMENT_BIT, wrap_fs));
-		}
-
-		// Text Pass
-		{
-			dev.createDrawpass(text_pass);
-
-			vkw::CombinedImageSamplerBinding sampler_info;
-			text_pass.bindCombinedImageSampler(sampler_info);
-
-			vkw::UniformBufferBinding ubuff_info;
-			ubuff_info.set = 1;
-			text_pass.bindUniformBuffer(ubuff_info);
-
-			vkw::ReadAttachmentInfo parents_clip_info;
-			parents_clip_info.format = parents_clip_mask_img.format;
-			parents_clip_info.set = 2;
-			text_pass.addReadColorAttachment(parents_clip_info);
-
-			vkw::WriteAttachmentInfo compose_info;
-			compose_info.format = composition_img.format;
-			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-			compose_info.blendEnable = true;
-			text_pass.addWriteColorAttachment(compose_info);
-
-			text_pass.vertex_inputs.push_back(GPU_CharacterVertex::getVertexInput());
-			text_pass.vertex_inputs.push_back(GPU_CharacterInstance::getVertexInput(1));
-
-			text_pass.setVertexShader(text_vs);
-
-			text_pass.setFragmentShader(text_fs);
-
-			checkErrStack1(text_pass.build());
-		}
-
-		// Text Pass Descriptors
-		{
-			vkw::CombinedImageSamplerDescriptor sampler_info;
-			sampler_info.sampler = &text_sampler;
-			sampler_info.view = &char_atlas_view;
-			text_pass.updateCombinedImageSamplerDescriptor(0, 0, sampler_info);
-
-			vkw::UpdateBufferDescriptor ubuff_info;
-			ubuff_info.buffer = &text_ubuff;
-			text_pass.updateUniformBufferDescriptor(1, 0, ubuff_info);
-
-			vkw::InputAttachmentDescriptor parents_clip_info;
-			parents_clip_info.view = &parents_clip_mask_view;
-			text_pass.updateInputAttachmentDescriptor(2, 0, parents_clip_info);
-		}
-
-		// Text Framebuffer
-		{
-			vkw::FramebufferCreateInfo info;
-			info.attachments = {
-				&parents_clip_mask_view,
-				&composition_view
-			};
-			checkErrStack1(text_pass.createFramebuffer(info, text_framebuff));
-		}
-
-		// Wrap Pass
-		{
-			dev.createDrawpass(wrap_pass);
-
-			vkw::UniformBufferBinding ubuff_info;
-			wrap_pass.bindUniformBuffer(ubuff_info);
-
-			vkw::ReadAttachmentInfo parents_clip_info;
-			parents_clip_info.format = parents_clip_mask_img.format;
-			parents_clip_info.set = 1;
-			wrap_pass.addReadColorAttachment(parents_clip_info);
-
-			vkw::WriteAttachmentInfo compose_info;
-			compose_info.format = composition_img.format;
-			compose_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-			wrap_pass.addWriteColorAttachment(compose_info);
-
-			vkw::WriteAttachmentInfo next_parents_clip_info;
-			next_parents_clip_info.format = next_parents_clip_mask_img.format;
-			next_parents_clip_info.load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-			wrap_pass.addWriteColorAttachment(next_parents_clip_info);
-
-			wrap_pass.vertex_inputs.push_back(GPU_WrapVertex::getVertexInput());
-			wrap_pass.vertex_inputs.push_back(GPU_WrapInstance::getVertexInput(1));
-
-			wrap_pass.setVertexShader(wrap_vs);
-
-			wrap_pass.setFragmentShader(wrap_fs);
-
-			checkErrStack1(wrap_pass.build());
-		}
-
-		// Wrap Pass Descriptors
-		{
-			vkw::UpdateBufferDescriptor ubuff_info;
-			ubuff_info.buffer = &text_ubuff;
-			wrap_pass.updateUniformBufferDescriptor(0, 0, ubuff_info);
-
-			vkw::InputAttachmentDescriptor parents_clip_info;
-			parents_clip_info.view = &parents_clip_mask_view;
-			wrap_pass.updateInputAttachmentDescriptor(1, 0, parents_clip_info);
-		}
-
-		// Wrap Pass Framebuffer
-		{
-			vkw::FramebufferCreateInfo info;
-			info.attachments = {
-				&parents_clip_mask_view,
-				&composition_view,
-				&next_parents_clip_mask_view
-			};
-			checkErrStack1(wrap_pass.createFramebuffer(info, wrap_framebuff));
-		}
-
-		// Command List
-		{
-			vkw::CommandListCreateInfo info = {};
-			info.surface = &dev.surface;
-
-			checkErrStack1(dev.createCommandList(info, cmd_list));
-			checkErrStack1(cmd_list.beginRecording());
-
-			cmd_list.cmdClearFloatImage(composition_view);
-			cmd_list.cmdClearUIntImage(parents_clip_mask_view);
-			cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
-			{
-				std::array<vkw::ImageView*, 3> views = {
-					&composition_view, &parents_clip_mask_view, &next_parents_clip_mask_view
-				};
-				cmd_list.cmdPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, (VkAccessFlagBits)0, views.size(), views.data());
-			}
-
-			std::vector<Node*> now_nodes = {
-				&nodes.front()
-			};
-			std::vector<Node*> next_nodes;
-
-			while (now_nodes.size()) {
-
-				for (Node* node : now_nodes) {
-
-					switch (node->type) {
-					case NodeType::TEXT: {
-						Text* text = (Text*)node->elem;
-
-						if (!text->drawcalls.size()) {
-							break;
-						}
-
-						cmd_list.cmdBeginRenderpass(text_pass, text_framebuff);
-						{
-							cmd_list.cmdBindVertexBuffers(chars_vbuff, chars_instabuff);
-							cmd_list.cmdBindIndexBuffer(chars_idxbuff);
-
-							for (CharacterDrawcall& drawcall : text->drawcalls) {
-								cmd_list.cmdDrawIndexedInstanced(6, (uint32_t)drawcall.instances.size(),
-									drawcall.chara->index_start_idx, drawcall.instance_start_idx);
-
-							}
-						}
-						cmd_list.cmdEndRenderpass();
-						break;
-					}
-
-					case NodeType::WRAP: {
-						Wrap* wrap = (Wrap*)node->elem;
-
-						cmd_list.cmdBeginRenderpass(wrap_pass, wrap_framebuff);
-						{
-							cmd_list.cmdBindVertexBuffers(wrap_vbuff, wrap_instabuff);
-							cmd_list.cmdBindIndexBuffer(wrap_idxbuff);
-
-							cmd_list.cmdDrawIndexedInstanced(6, 1, 0, wrap->drawcall.instance_idx);
-						}
-						cmd_list.cmdEndRenderpass();
-						break;
-					}
-					}
-
-					// TODO: barrier, wait for writes to complete for composition, and next parents
-
-					for (Node* child : node->children) {
-						next_nodes.push_back(child);
-					}
-				}
-
-				now_nodes = next_nodes;
-				next_nodes.clear();
-
-				cmd_list.cmdCopyImageToImage(next_parents_clip_mask_view, parents_clip_mask_view);
-				cmd_list.cmdClearUIntImage(next_parents_clip_mask_view);
-			}	
-
-			// Copy Compose Image to Surface
-			{
-				vkw::SurfaceBarrier dst;
-				dst.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-				dst.wait_for_access = 0;
-				dst.wait_at_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				cmd_list.cmdSurfacePipelineBarrier(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, dst);
-
-				cmd_list.cmdCopyImageToSurface(composition_view);
-
-				dst = {};
-				dst.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-				dst.wait_for_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-				dst.wait_at_access = 0;
-				cmd_list.cmdSurfacePipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-					dst);
-			}
-
-			checkErrStack1(cmd_list.endRecording());
-		}
-	}
-	else {
-		if (width != dev.surface.width || height != dev.surface.height) {
-
-			// resize images and their views
-			// resize renderpass
-			// recreate c
-		}
-	}
-
-	checkErrStack1(cmd_list.run());
-	checkErrStack1(cmd_list.waitForExecution());
-
-	return ErrStack();
-}
-
 ErrStack Window::draw2()
 {
 	ErrStack err_stack;
@@ -953,165 +563,506 @@ ErrStack Window::draw2()
 
 		rendering_configured = true;
 
-		// Factory
+		// Parents Clip Mask Images
 		{
-			checkHResult(CreateDXGIFactory2(0, IID_PPV_ARGS(factory.GetAddressOf())),
-				"failed to create DXGI factory");
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = surface_width;
+			desc.Height = surface_height;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R32_UINT;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+			checkHResult(dev5->CreateTexture2D(&desc, NULL, parents_clip_mask_img.GetAddressOf()),
+				"failed to create parents clip mask image");
+
+			desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+			checkHResult(dev5->CreateTexture2D(&desc, NULL, next_parents_clip_mask_img.GetAddressOf()),
+				"failed to create next parents clip mask image");
 		}
 
-		// Choose Adapter with most VRAM
+		// Character Atlas
 		{
-			uint32_t adapter_idx = 0;
-			IDXGIAdapter* found_adapter;
-			size_t adapter_vram = 0;
+			TextureAtlas& atlas = instance->char_atlas.atlas;
 
-			while (SUCCEEDED(factory.Get()->EnumAdapters(adapter_idx, &found_adapter))) {
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = atlas.tex_size;
+			desc.Height = atlas.tex_size;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8_UNORM;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
 
-				DXGI_ADAPTER_DESC desc;
-				checkHResult(found_adapter->GetDesc(&desc),
-					"failed to get adapter description");
+			checkHResult(dev5->CreateTexture2D(&desc, NULL, chars_atlas_tex.GetAddressOf()),
+				"failed to create character atlas texture");
 
-				if (desc.DedicatedVideoMemory > adapter_vram) {
-					adapter = found_adapter;
-				}
-				adapter_idx++;
-			}
+			checkErrStack1(dx11::singleLoad(im_ctx4.Get(), chars_atlas_tex.Get(),
+				atlas.colors.data(), sizeof(uint8_t) * atlas.colors.size()));
 		}
 
-		// Device
+		// Character Atlas Sampler
 		{
-			std::array<D3D_FEATURE_LEVEL, 1> features = {
-				D3D_FEATURE_LEVEL_11_1
-			};
+			D3D11_SAMPLER_DESC desc;
+			desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+			desc.AddressU = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.AddressV = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.AddressW = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.MipLODBias = 0;
+			desc.MaxAnisotropy = 1;
+			desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+			desc.BorderColor[0] = 0;
+			desc.BorderColor[1] = 0;
+			desc.BorderColor[2] = 0;
+			desc.BorderColor[3] = 0;
+			desc.MinLOD = 0;
+			desc.MaxLOD = 0;
 
-			checkHResult(D3D11CreateDevice(adapter,
-				D3D_DRIVER_TYPE_UNKNOWN,
-				NULL,
-				D3D11_CREATE_DEVICE_DEBUG,// | D3D11_CREATE_DEVICE_DEBUGGABLE,
-				features.data(), (uint32_t)features.size(),
-				D3D11_SDK_VERSION,
-				device.GetAddressOf(),
-				NULL,
-				im_ctx.GetAddressOf()),
-				"failed to create device");
-
-				checkHResult(device->QueryInterface<ID3D11Device5>(dev5.GetAddressOf()),
-					"failed to obtain ID3D11Device5");
-
-				checkHResult(im_ctx->QueryInterface<ID3D11DeviceContext4>(im_ctx4.GetAddressOf()),
-					"failed to obtain ID3D11DeviceContext4");
+			checkHResult(dev5->CreateSamplerState(&desc, chars_atlas_sampler.GetAddressOf()),
+				"failed to create character atlas sampler");
 		}
 
-		// Swapchain
+		// Shader Resource View
 		{
-		DXGI_SWAP_CHAIN_DESC1 desc = {};
-		desc.Width = 0;
-		desc.Height = 0;
-		desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.Stereo = false;
-		desc.SampleDesc.Count = 1;
-		desc.SampleDesc.Quality = 0;
-		desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-		desc.BufferCount = 2;
-		desc.Scaling = DXGI_SCALING_NONE;
-		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-		desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-		desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+			checkHResult(dev5->CreateShaderResourceView(parents_clip_mask_img.Get(), NULL,
+				parents_clip_mask_srv.GetAddressOf()),
+				"failed to create parents clip mask srv");
 
-		DXGI_SWAP_CHAIN_FULLSCREEN_DESC full_desc = {};
-		full_desc.RefreshRate.Numerator = 60;
-		full_desc.RefreshRate.Denominator = 1;
-		full_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-		full_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-		full_desc.Windowed = true;
-
-		checkHResult(factory->CreateSwapChainForHwnd(dev5.Get(), hwnd,
-			&desc, &full_desc, NULL, swapchain.GetAddressOf()),
-			"failed to create swapchain");
+			checkHResult(dev5->CreateShaderResourceView(chars_atlas_tex.Get(), NULL,
+				chars_atlas_srv.GetAddressOf()),
+				"failed to create character atlas srv");
 		}
 
-		// Present Target View
+		// Render Target Views
 		{
-			checkHResult(swapchain->GetBuffer(0, IID_PPV_ARGS(present_img.GetAddressOf())),
-				"failed to get swapchain back buffer");
+			checkHResult(dev5->CreateRenderTargetView(parents_clip_mask_img.Get(), NULL,
+				parents_clip_mask_rtv.GetAddressOf()),
+				"failed to create parents clip mask rtv");
 
-			checkHResult(dev5->CreateRenderTargetView(present_img.Get(), NULL, present_rtv.GetAddressOf()),
-				"failed to create present RTV");
+			checkHResult(dev5->CreateRenderTargetView(next_parents_clip_mask_img.Get(), NULL,
+				next_parents_clip_mask_rtv.GetAddressOf()),
+				"failed to create next parents clip mask rtv");
 		}
 
-		// Vertex Shader
+		// Vertex Shaders
 		{
 			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/VertexShader.cso"));
-			checkErrStack(path.read(vertex_shader_cso),
-				"failed to read shader code");
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/WrapVS.cso"));
+			checkErrStack(path.read(wrap_vs_cso),
+				"failed to read wrap VS cso");
 
-			checkHResult(dev5->CreateVertexShader(vertex_shader_cso.data(), vertex_shader_cso.size(),
-				NULL, vertex_shader.GetAddressOf()),
-				"failed to create shader");
+			checkHResult(dev5->CreateVertexShader(wrap_vs_cso.data(), wrap_vs_cso.size(),
+				NULL, wrap_vs.GetAddressOf()),
+				"failed to create wrap VS");
+
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/CharsVS.cso"));
+			checkErrStack(path.read(chars_vs_cso),
+				"failed to read chars VS cso");
+
+			checkHResult(dev5->CreateVertexShader(chars_vs_cso.data(), chars_vs_cso.size(),
+				NULL, chars_vs.GetAddressOf()),
+				"failed to create chars VS");
+		}
+
+		// Wrap Input Layout
+		{
+			std::vector<D3D11_INPUT_ELEMENT_DESC> input_elems;
+
+			auto vertex_elems = GPU_WrapVertex::getInputLayout();
+			for (auto& elem : vertex_elems) {
+				input_elems.push_back(elem);
+			}
+
+			auto instance_elems = GPU_WrapInstance::getInputLayout(1);
+			for (auto& elem : instance_elems) {
+				input_elems.push_back(elem);
+			}
+
+			checkHResult(dev5->CreateInputLayout(input_elems.data(), input_elems.size(),
+				wrap_vs_cso.data(), wrap_vs_cso.size(), wrap_input_layout.GetAddressOf()),
+				"failed to create wrap input layout");
+		}
+
+		// Chars Input Layout
+		{
+			std::vector<D3D11_INPUT_ELEMENT_DESC> input_elems;
+
+			auto vertex_elems = GPU_CharacterVertex::getInputLayout();
+			for (auto& elem : vertex_elems) {
+				input_elems.push_back(elem);
+			}
+
+			auto instance_elems = GPU_CharacterInstance::getInputLayout(1);
+			for (auto& elem : instance_elems) {
+				input_elems.push_back(elem);
+			}
+
+			checkHResult(dev5->CreateInputLayout(input_elems.data(), input_elems.size(),
+				chars_vs_cso.data(), chars_vs_cso.size(), chars_input_layout.GetAddressOf()),
+				"failed to create chars input layout");
+		}
+
+		// Rasterizer
+		{
+			D3D11_RASTERIZER_DESC desc = {};
+			desc.FillMode = D3D11_FILL_SOLID;
+			desc.CullMode = D3D11_CULL_NONE;
+			desc.FrontCounterClockwise = false;
+			desc.DepthBias = 0;
+			desc.DepthBiasClamp = 0;
+			desc.SlopeScaledDepthBias = 0;
+			desc.DepthClipEnable = false;
+			desc.ScissorEnable = false;
+			desc.MultisampleEnable = false;
+			desc.AntialiasedLineEnable = false;
+
+			checkHResult(dev5->CreateRasterizerState(&desc, rasterizer_state.GetAddressOf()),
+				"failed to create rasterizer state");
 		}
 
 		// Pixel Shader
 		{
 			FilePath path;
-			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/PixelShader.cso"));
-			checkErrStack(path.read(pixel_shader_cso),
-				"failed to read shader code");
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/WrapPS.cso"));
+			checkErrStack(path.read(wrap_ps_cso),
+				"failed to read wrap PS cso");
 
-			checkHResult(dev5->CreatePixelShader(pixel_shader_cso.data(), pixel_shader_cso.size(),
-				NULL, pixel_shader.GetAddressOf()),
-				"failed to create shader");
+			checkHResult(dev5->CreatePixelShader(wrap_ps_cso.data(), wrap_ps_cso.size(),
+				NULL, wrap_ps.GetAddressOf()),
+				"failed to create wrap PS");
+
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/CharsPS.cso"));
+			checkErrStack(path.read(chars_ps_cso),
+				"failed to read chars PS cso");
+
+			checkHResult(dev5->CreatePixelShader(chars_ps_cso.data(), chars_ps_cso.size(),
+				NULL, chars_ps.GetAddressOf()),
+				"failed to create chars PS");
 		}
 
-		// Input Layout
+		// Blend States
 		{
-			auto input_elems = GPU_Vertex::getInputLayout();
-			checkHResult(dev5->CreateInputLayout(input_elems.data(), input_elems.size(),
-				vertex_shader_cso.data(), vertex_shader_cso.size(), vertex_il.GetAddressOf()),
-				"failed to create input layout");
+			D3D11_BLEND_DESC desc = {};
+			desc.AlphaToCoverageEnable = false;
+			desc.IndependentBlendEnable = true;
+
+			desc.RenderTarget[0].BlendEnable = true;
+			desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
+			desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+			desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+			desc.RenderTarget[1].BlendEnable = false;
+			desc.RenderTarget[1].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+			checkHResult(dev5->CreateBlendState(&desc, blend_state.GetAddressOf()),
+				"failed to create wrap blend state");
 		}
 
-		// Vertex Buffer
+		// Vertex Buffers
 		{
-			//D3D11_BUFFER_DESC desc = {};
-			//desc.ByteWidth;
-			//desc.Usage;
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
 
-			//UINT ByteWidth;
-			//D3D11_USAGE Usage;
-			//UINT BindFlags;
-			//UINT CPUAccessFlags;
-			//UINT MiscFlags;
-			//UINT StructureByteStride;
+			wrap_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			checkErrStack1(wrap_vbuff.load(wrap_verts.data(), sizeof(GPU_WrapVertex)* wrap_verts.size()));
 
-			//dev5->CreateBuffer()
+			chars_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
 		}
+
+		// Index Buffers
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
+
+			wrap_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), sizeof(uint32_t) * wrap_idxs.size()));
+
+			chars_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+		}
+
+		// Instance Buffers
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
+
+			wrap_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			chars_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
+		}
+
+		// Constant Buffer
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
+
+			cbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+
+			DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
+			swapchain->GetDesc1(&swapchain_desc);
+
+			GPU_CommonsUniform commons;
+			commons.screen_size.x = (float)swapchain_desc.Width;
+			commons.screen_size.y = (float)swapchain_desc.Height;
+			checkErrStack1(cbuff.load(&commons, sizeof(GPU_CommonsUniform)));
+		}
+
+		checkErrStack1(generateGPU_Data());
+	}
+
+	// resize
+	DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
+	swapchain->GetDesc1(&swapchain_desc);
+	if (surface_width != swapchain_desc.Width || surface_height != swapchain_desc.Height) {
+
+		present_rtv->Release();
+		parents_clip_mask_rtv->Release();
+		next_parents_clip_mask_rtv->Release();
+
+		parents_clip_mask_srv->Release();
+
+		present_img->Release();
+		parents_clip_mask_img->Release();
+		next_parents_clip_mask_img->Release();
+
+		// Images
+		checkHResult(swapchain->ResizeBuffers(2, width, height,
+			DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH),
+			"failed to resize swapchain back buffers");
+
+		checkHResult(swapchain->GetBuffer(0, IID_PPV_ARGS(present_img.GetAddressOf())),
+			"failed to get swapchain back buffer");
+
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = surface_width;
+		desc.Height = surface_height;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R32_UINT;
+		desc.SampleDesc.Count = 1;
+		desc.SampleDesc.Quality = 0;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+		desc.CPUAccessFlags = 0;
+		desc.MiscFlags = 0;
+
+		checkHResult(dev5->CreateTexture2D(&desc, NULL, parents_clip_mask_img.GetAddressOf()),
+			"failed to create parents clip mask image");
+
+		desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+
+		checkHResult(dev5->CreateTexture2D(&desc, NULL, next_parents_clip_mask_img.GetAddressOf()),
+			"failed to create next parents clip mask image");
+
+		// Render Target Views
+		checkHResult(dev5->CreateRenderTargetView(present_img.Get(), NULL, present_rtv.GetAddressOf()),
+			"failed to create present RTV");
+
+		checkHResult(dev5->CreateRenderTargetView(parents_clip_mask_img.Get(), NULL,
+			parents_clip_mask_rtv.GetAddressOf()),
+			"failed to create next parents clip mask rtv");
+
+		checkHResult(dev5->CreateRenderTargetView(next_parents_clip_mask_img.Get(), NULL,
+			next_parents_clip_mask_rtv.GetAddressOf()),
+			"failed to create next parents clip mask rtv");
+
+		// Shader Resource Views
+		checkHResult(dev5->CreateShaderResourceView(parents_clip_mask_img.Get(), NULL,
+			parents_clip_mask_srv.GetAddressOf()),
+			"failed to create parents clip mask srv");
+
+		Wrap* root = getRoot();
+		root->width.setAbsolute((float)surface_width);
+		root->height.setAbsolute((float)surface_height);
+
+		checkErrStack1(generateGPU_Data());
+
+		GPU_CommonsUniform commons;
+		commons.screen_size.x = (float)surface_width;
+		commons.screen_size.y = (float)surface_height;
+		checkErrStack1(cbuff.load(&commons, sizeof(GPU_CommonsUniform)));
 	}
 
 	// Commands
-	{
-		float present_clear_color[4] = {
-				1, 0, 0, 1
-		};
-		im_ctx4->ClearRenderTargetView(present_rtv.Get(), present_clear_color);
+	float clear_color[4] = {
+		0, 0, 0, 0
+	};
+	im_ctx4->ClearRenderTargetView(present_rtv.Get(), clear_color);
+	im_ctx4->ClearRenderTargetView(parents_clip_mask_rtv.Get(), clear_color);
+	im_ctx4->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), clear_color);
+
+	std::vector<Node*> now_nodes = {
+		&nodes.front()
+	};
+	std::vector<Node*> next_nodes;
+		
+	while (now_nodes.size()) {
+
+		for (Node* node : now_nodes) {
+
+			switch (node->type) {
+			case NodeType::TEXT: {
+				Text* text = (Text*)node->elem;
+
+				if (!text->drawcalls.size()) {
+					break;
+				}
+
+				// Input Assembly
+				im_ctx4->IASetInputLayout(chars_input_layout.Get());
+				im_ctx4->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				std::array<ID3D11Buffer*, 2> vbuffs;
+				vbuffs[0] = chars_vbuff.buff.Get();
+				vbuffs[1] = chars_instabuff.buff.Get();
+
+				std::array<uint32_t, 2> strides = {
+					sizeof(GPU_CharacterVertex), sizeof(GPU_CharacterInstance)
+				};
+
+				std::array<uint32_t, 2> offsets = {
+					0, 0
+				};
+				im_ctx4->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
+				im_ctx4->IASetIndexBuffer(chars_idxbuff.buff.Get(), DXGI_FORMAT_R32_UINT, 0);
+
+				// Vertex Shader
+				im_ctx4->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());
+				im_ctx4->VSSetShader(chars_vs.Get(), NULL, 0);
+
+				// Rasterizer
+				{
+					D3D11_VIEWPORT viewport = {};
+					viewport.TopLeftX = 0;
+					viewport.TopLeftY = 0;
+					viewport.Width = (float)swapchain_desc.Width;
+					viewport.Height = (float)swapchain_desc.Height;
+					viewport.MinDepth = 0;
+					viewport.MaxDepth = 1;
+
+					im_ctx4->RSSetViewports(1, &viewport);
+
+					im_ctx4->RSSetState(rasterizer_state.Get());
+				}
+
+				// Pixel Shader
+				std::array<ID3D11ShaderResourceView*, 2> srviews = {
+					parents_clip_mask_srv.Get(), chars_atlas_srv.Get()
+				};
+				im_ctx4->PSSetShaderResources(0, srviews.size(), srviews.data());
+				im_ctx4->PSSetSamplers(0, 1, chars_atlas_sampler.GetAddressOf());
+				im_ctx4->PSSetShader(chars_ps.Get(), NULL, 0);
+
+				// Output Merger
+				im_ctx4->OMSetBlendState(blend_state.Get(), clear_color, 0xFFFF'FFFF);
+
+				std::array<ID3D11RenderTargetView*, 1> rtvs;
+				rtvs[0] = present_rtv.Get();
+				im_ctx4->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
+
+				for (CharacterDrawcall& drawcall : text->drawcalls) {
+					im_ctx4->DrawIndexedInstanced(6, (uint32_t)drawcall.instances.size(),
+						drawcall.chara->index_start_idx, 0, drawcall.instance_start_idx);
+				}
+				break;
+			}
+
+			case NodeType::WRAP: {
+				Wrap* wrap = (Wrap*)node->elem;
+
+				// Input Assembly
+				im_ctx4->IASetInputLayout(wrap_input_layout.Get());
+				im_ctx4->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				std::array<ID3D11Buffer*, 2> vbuffs;
+				vbuffs[0] = wrap_vbuff.buff.Get();
+				vbuffs[1] = wrap_instabuff.buff.Get();
+
+				std::array<uint32_t, 2> strides = {
+					sizeof(GPU_WrapVertex), sizeof(GPU_WrapInstance)
+				};
+
+				std::array<uint32_t, 2> offsets = {
+					0, 0
+				};
+
+				im_ctx4->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
+				im_ctx4->IASetIndexBuffer(wrap_idxbuff.buff.Get(), DXGI_FORMAT_R16_UINT, 0);
+
+				// Vertex Shader
+				im_ctx4->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());			
+				im_ctx4->VSSetShader(wrap_vs.Get(), NULL, 0);
+
+				// Rasterizer
+				{
+					D3D11_VIEWPORT viewport = {};
+					viewport.TopLeftX = 0;
+					viewport.TopLeftY = 0;
+					viewport.Width = (float)swapchain_desc.Width;
+					viewport.Height = (float)swapchain_desc.Height;
+					viewport.MinDepth = 0;
+					viewport.MaxDepth = 1;
+
+					im_ctx4->RSSetViewports(1, &viewport);
+
+					im_ctx4->RSSetState(rasterizer_state.Get());
+				}
+
+				// Pixel Shader
+				im_ctx4->PSSetShaderResources(0, 1, parents_clip_mask_srv.GetAddressOf());
+				im_ctx4->PSSetShader(wrap_ps.Get(), NULL, 0);
+
+				// Output Merger
+				im_ctx4->OMSetBlendState(blend_state.Get(), clear_color, 0xFFFF'FFFF);
+
+				std::array<ID3D11RenderTargetView*, 2> rtvs;
+				rtvs[0] = present_rtv.Get();
+				rtvs[1] = next_parents_clip_mask_rtv.Get();
+				im_ctx4->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
+
+				im_ctx4->DrawIndexedInstanced(6, 1, 0, 0, wrap->drawcall.instance_idx);
+				break;
+			}
+			}
+
+			for (Node* child : node->children) {
+				next_nodes.push_back(child);
+			}
+		}
+
+		now_nodes = next_nodes;
+		next_nodes.clear();
+
+		im_ctx4->CopyResource(parents_clip_mask_img.Get(), next_parents_clip_mask_img.Get());
+		im_ctx4->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), clear_color);
 	}
-	
-	/*{
-		DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
-		swapchain->GetDesc1(&swapchain_desc);
-
-		D3D11_VIEWPORT viewport = {};
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.Width = (float)swapchain_desc.Width;
-		viewport.Height = (float)swapchain_desc.Height;
-		viewport.MinDepth = 0;
-		viewport.MaxDepth = 1;
-
-
-	}*/
-
-	im_ctx4->OMSetRenderTargets(1, present_rtv.GetAddressOf(), NULL);
 
 	checkHResult(swapchain->Present(0, 0),
 		"failed to present swapchain");
@@ -1143,37 +1094,30 @@ ErrStack Instance::create()
 		checkErrStack1(char_atlas.addFont(path, sizes, font));
 	}
 
-	// Vulkan
-	vkw::InstanceCreateInfo info;
-	checkErrStack(inst.create(info),
-		"failed to create vulkan instance");
-
-	// DirectX 11
-
 	return err_stack;
 }
 
 ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 {
-	ErrStack err_stack{};
+	ErrStack err_stack;
+	HRESULT hr = S_OK;
 
-	Window& window = windows.emplace_back();
-	window.instance = this;
-
-	window.hinstance = GetModuleHandle(NULL);
+	Window& w = windows.emplace_back();
+	w.instance = this;
+	w.hinstance = GetModuleHandle(NULL);
 
 	const char CLASS_NAME[] = "Sample Window Class";
 
-	WNDCLASS wc = {};
-	wc.lpfnWndProc = windowProc;
-	wc.hInstance = window.hinstance;
-	wc.lpszClassName = CLASS_NAME;
+	w.window_class = {};
+	w.window_class.lpfnWndProc = windowProc;
+	w.window_class.hInstance = w.hinstance;
+	w.window_class.lpszClassName = CLASS_NAME;
 
-	if (!RegisterClass(&wc)) {
+	if (!RegisterClass(&w.window_class)) {
 		return ErrStack(code_location, "failed to register window class");
 	}
 
-	window.hwnd = CreateWindowEx(
+	w.hwnd = CreateWindowEx(
 		0,                              // Optional window styles.
 		CLASS_NAME,                     // Window class
 		"Window",                       // Window text
@@ -1181,58 +1125,149 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 		CW_USEDEFAULT, CW_USEDEFAULT, info.width, info.height, // Position and Size
 		NULL,       // Parent window    
 		NULL,       // Menu
-		window.hinstance,  // Instance handle
+		w.hinstance,  // Instance handle
 		NULL        // Additional application data
 	);
 
-	if (window.hwnd == NULL) {
+	if (w.hwnd == NULL) {
 		return ErrStack(code_location, "failed to create window");
 	}
 
-	window.minimized = false;
-	window.close = false;
-	window.clip_mask_id = 0;
-	window.rendering_configured = false;
+	w.width = info.width;
+	w.height = info.height;
 
-	window.wrap_verts[0].pos = { 0, 0 };
-	window.wrap_verts[1].pos = { 1, 0 };
-	window.wrap_verts[2].pos = { 1, 1 };
-	window.wrap_verts[3].pos = { 0, 1 };
+	RECT rect;
+	if (!GetClientRect(w.hwnd, &rect)) {
+		return ErrStack(code_location, "failed to retrieve window client rect");
+	}
+	w.surface_width = rect.right - rect.left;
+	w.surface_height = rect.bottom - rect.top;
 
-	window.wrap_idxs = {
+	w.minimized = false;
+	w.close = false;
+	w.clip_mask_id = 0;
+	w.rendering_configured = false;
+
+	w.wrap_verts[0].pos = { 0, 0 };
+	w.wrap_verts[1].pos = { 1, 0 };
+	w.wrap_verts[2].pos = { 1, 1 };
+	w.wrap_verts[3].pos = { 0, 1 };
+
+	w.wrap_idxs = {
 		0, 1, 3,
 		1, 2, 3
 	};
 
 	// Rendering
 	{
-		vkw::DeviceCreateInfo dev_info;
-		dev_info.hinstance = window.hinstance;
-		dev_info.hwnd = window.hwnd;
-		dev_info.features.independentBlend = VK_TRUE;
+		// Factory
+		{
+			checkHResult(CreateDXGIFactory2(0, IID_PPV_ARGS(w.factory.GetAddressOf())),
+				"failed to create DXGI factory");
+		}
 
-		checkErrStack(inst.createDevice(dev_info, window.dev),
-			"failed to create device");
+		// Choose Adapter with most VRAM
+		{
+			uint32_t adapter_idx = 0;
+			IDXGIAdapter* found_adapter;
+			size_t adapter_vram = 0;
+
+			while (SUCCEEDED(w.factory.Get()->EnumAdapters(adapter_idx, &found_adapter))) {
+
+				DXGI_ADAPTER_DESC desc;
+				checkHResult(found_adapter->GetDesc(&desc),
+					"failed to get adapter description");
+
+				if (desc.DedicatedVideoMemory > adapter_vram) {
+					w.adapter = found_adapter;
+				}
+				adapter_idx++;
+			}
+		}
+
+		// Device
+		{
+			std::array<D3D_FEATURE_LEVEL, 1> features = {
+				D3D_FEATURE_LEVEL_11_1
+			};
+
+			checkHResult(D3D11CreateDevice(w.adapter,
+				D3D_DRIVER_TYPE_UNKNOWN,
+				NULL,
+				D3D11_CREATE_DEVICE_DEBUG,// | D3D11_CREATE_DEVICE_DEBUGGABLE,
+				features.data(), (uint32_t)features.size(),
+				D3D11_SDK_VERSION,
+				w.device.GetAddressOf(),
+				NULL,
+				w.im_ctx.GetAddressOf()),
+				"failed to create device");
+
+			checkHResult(w.device->QueryInterface<ID3D11Device5>(w.dev5.GetAddressOf()),
+				"failed to obtain ID3D11Device5");
+
+			checkHResult(w.im_ctx->QueryInterface<ID3D11DeviceContext4>(w.im_ctx4.GetAddressOf()),
+				"failed to obtain ID3D11DeviceContext4");
+		}
+
+		// Swapchain
+		{
+			DXGI_SWAP_CHAIN_DESC1 desc = {};
+			desc.Width = 0;
+			desc.Height = 0;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			desc.Stereo = false;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+			desc.BufferCount = 2;
+			desc.Scaling = DXGI_SCALING_NONE;
+			desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+			desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+			desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+			DXGI_SWAP_CHAIN_FULLSCREEN_DESC full_desc = {};
+			full_desc.RefreshRate.Numerator = 60;
+			full_desc.RefreshRate.Denominator = 1;
+			full_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+			full_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+			full_desc.Windowed = true;
+
+			checkHResult(w.factory->CreateSwapChainForHwnd(w.dev5.Get(), w.hwnd,
+				&desc, &full_desc, NULL, w.swapchain.GetAddressOf()),
+				"failed to create swapchain");
+		}
+
+		// Present Target View
+		{
+			checkHResult(w.swapchain->GetBuffer(0, IID_PPV_ARGS(w.present_img.GetAddressOf())),
+				"failed to get swapchain back buffer");
+
+			checkHResult(w.dev5->CreateRenderTargetView(w.present_img.Get(), NULL, w.present_rtv.GetAddressOf()),
+				"failed to create present RTV");
+		}
 	}
 
 	// Root UI Element
 	{
-		Node& new_node = window.nodes.emplace_back();
+		DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
+		w.swapchain->GetDesc1(&swapchain_desc);
+
+		Node& new_node = w.nodes.emplace_back();
 		new_node.parent = nullptr;
 
 		Wrap* root = new_node.createWrap();
-		root->node_comp.window = &window;
+		root->node_comp.window = &w;
 		root->node_comp.this_elem = &new_node;
 
 		// Default Values
 		root->pos = { 0, 0 };
-		root->width.setAbsolute((float)window.dev.surface.width);
-		root->height.setAbsolute((float)window.dev.surface.height);
+		root->width.setAbsolute((float)swapchain_desc.Width);
+		root->height.setAbsolute((float)swapchain_desc.Height);
 		root->overflow = Overflow::CLIP;
 		root->background_color = { 0, 0, 0, 1 };
 	}
 
-	r_window = &window;
+	r_window = &w;
 	return ErrStack();
 }
 

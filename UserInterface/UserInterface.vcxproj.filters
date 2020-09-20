@@ -17,9 +17,6 @@
     <Filter Include="Source Files\VulkanWrapper">
       <UniqueIdentifier>{f80d927a-aca7-47e9-9dd6-0bf96303e711}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\GPU_Types">
-      <UniqueIdentifier>{da9988bf-e7a5-4508-a961-c5455f319d63}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\FontRasterization">
       <UniqueIdentifier>{f57a30c7-5ee3-4e46-a968-673ee7040140}</UniqueIdentifier>
     </Filter>
@@ -29,11 +26,14 @@
     <Filter Include="Source Files\DX11Wrapper">
       <UniqueIdentifier>{82e32baa-7480-46fd-a483-80a26e0545f0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\GPU_DX11_Shaders">
+    <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{99d9a32f-5e39-481c-bec7-ebcd2bdf3974}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\GPU_DX11_Shaders\Pass">
+    <Filter Include="Source Files\Shaders\Wrap">
       <UniqueIdentifier>{b98445e5-2983-4445-a73c-32ad25460538}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Chars">
+      <UniqueIdentifier>{d09dbbc3-8cea-42fc-98be-72f8b9655f0e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -55,9 +55,6 @@
     <ClInclude Include="TextureAtlas.hpp">
       <Filter>Source Files\TextureAtlas</Filter>
     </ClInclude>
-    <ClInclude Include="GPU_Types.hpp">
-      <Filter>Source Files\GPU_Types</Filter>
-    </ClInclude>
     <ClInclude Include="NuiLibrary.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -65,7 +62,7 @@
       <Filter>Source Files\DX11Wrapper</Filter>
     </ClInclude>
     <ClInclude Include="GPU_ShaderTypes.hpp">
-      <Filter>Source Files\GPU_DX11_Shaders</Filter>
+      <Filter>Source Files\Shaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -101,11 +98,17 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="VertexShader.hlsl">
-      <Filter>Source Files\GPU_DX11_Shaders\Pass</Filter>
+    <FxCompile Include="WrapPS.hlsl">
+      <Filter>Source Files\Shaders\Wrap</Filter>
     </FxCompile>
-    <FxCompile Include="PixelShader.hlsl">
-      <Filter>Source Files\GPU_DX11_Shaders\Pass</Filter>
+    <FxCompile Include="WrapVS.hlsl">
+      <Filter>Source Files\Shaders\Wrap</Filter>
+    </FxCompile>
+    <FxCompile Include="CharsVS.hlsl">
+      <Filter>Source Files\Shaders\Chars</Filter>
+    </FxCompile>
+    <FxCompile Include="CharsPS.hlsl">
+      <Filter>Source Files\Shaders\Chars</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
