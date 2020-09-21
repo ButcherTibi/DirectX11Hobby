@@ -111,7 +111,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					wnd.surface_width = rect.right - rect.left;
 					wnd.surface_height = rect.bottom - rect.top;
 					break;
-				}				
+				}
 
 				case SIZE_MINIMIZED:
 					wnd.minimized = true;
@@ -1179,6 +1179,7 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 					"failed to get adapter description");
 
 				if (desc.DedicatedVideoMemory > adapter_vram) {
+					adapter_vram = desc.DedicatedVideoMemory;
 					w.adapter = found_adapter;
 				}
 				adapter_idx++;

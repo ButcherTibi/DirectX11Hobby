@@ -117,12 +117,12 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FileIO.cpp" />
     <ClCompile Include="TextureAtlas.cpp" />
     <ClCompile Include="CommonTypes.cpp" />
     <ClCompile Include="GLTFParser.cpp" />
     <ClCompile Include="JSONParser.cpp" />
     <ClCompile Include="LinkageMesh.cpp" />
-    <ClCompile Include="FileIO.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MathDefinitions.cpp" />

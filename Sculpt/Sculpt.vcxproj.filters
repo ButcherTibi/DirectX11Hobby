@@ -58,9 +58,6 @@
     <ClCompile Include="ErrorStuff.cpp">
       <Filter>Source Files\Mine</Filter>
     </ClCompile>
-    <ClCompile Include="FileIO.cpp">
-      <Filter>Source Files\Mine</Filter>
-    </ClCompile>
     <ClCompile Include="Input.cpp">
       <Filter>Source Files\Mine</Filter>
     </ClCompile>
@@ -81,6 +78,9 @@
     </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileIO.cpp">
+      <Filter>Source Files\Mine</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -105,9 +105,6 @@
     <ClInclude Include="ErrorStuff.h">
       <Filter>Source Files\Mine</Filter>
     </ClInclude>
-    <ClInclude Include="FileIO.h">
-      <Filter>Source Files\Mine</Filter>
-    </ClInclude>
     <ClInclude Include="Input.h">
       <Filter>Source Files\Mine</Filter>
     </ClInclude>
@@ -125,6 +122,9 @@
     </ClInclude>
     <ClInclude Include="Internals.h">
       <Filter>Source Files\NewUserInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="FileIO.h">
+      <Filter>Source Files\Mine</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -31,15 +31,15 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 	w0->background_color = { 1, 0, 0, 1 };
 	w0->overflow = nui::Overflow::CLIP;
 
-	nui::Text* t0 = w0->addText();
-	t0->pos.x = 455;
-	t0->text = U"DirectX 11";
-
-	/*nui::Wrap* w1 = w0->addWrap();
-	w1->pos.x = 400;
+	nui::Wrap* w1 = w0->addWrap();
 	w1->width.setRelative(0.5);
 	w1->height.setRelative(0.5);
-	w1->background_color = { 0, 1, 0, 1 };*/
+	w1->background_color = { 0, 1, 0, 1 };
+
+	nui::Wrap* w2 = w1->addWrap();
+	w2->width.setRelative(0.5);
+	w2->height.setRelative(0.5);
+	w2->background_color = { 0, 0, 1, 1 };
 
 	while (!window->close) {
 

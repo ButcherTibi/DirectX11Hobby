@@ -73,9 +73,12 @@ namespace nui {
 
 	// Wrap Ideas:
 	// - self origin, child pos can refer to center of child
-	// Flex
+	// Flex Ideas:
 
-	// Dynamic:
+	// Props:
+	// - Z index
+	
+	// Interaction:
 	// - collider check
 	// - redraw
 
@@ -83,12 +86,18 @@ namespace nui {
 	public:
 		Window* window;
 
-		Node* this_elem;	
+		Node* this_elem;
 
 	public:
 		Text* addText();
 		Wrap* addWrap();
 		Flex* addFlex();
+	};
+
+
+	class RectColider {
+	public:
+		BoundingBox2D<uint32_t> collider;
 	};
 
 
@@ -114,6 +123,10 @@ namespace nui {
 	public:
 		Text* addText();
 		Wrap* addWrap();
+
+		// addOnClickEvent(event)
+		// addOnHoverEvent(function point of signature)
+		// listOnHoverEvents(events with their name)
 	};
 
 
