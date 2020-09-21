@@ -59,7 +59,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\glm</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4703;4267;4201;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <CompileAsManaged>false</CompileAsManaged>
       <CompileAsWinRT>false</CompileAsWinRT>
@@ -83,8 +83,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;freetype.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
+      <AdditionalDependencies>freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>
@@ -99,7 +99,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(VULKAN_SDK)\Third-Party\Include;$(ProjectDir)ThirdParty\FreeType\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\glm</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4703;4267;4201;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <CompileAsManaged>false</CompileAsManaged>
@@ -126,8 +126,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;freetype.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
+      <AdditionalDependencies>freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>
@@ -140,11 +140,8 @@
     <ClInclude Include="NuiLibrary.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="TextureAtlas.hpp" />
-    <ClInclude Include="VulkanWrapper.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CommandList.cpp" />
-    <ClCompile Include="Drawpass.cpp" />
     <ClCompile Include="DX11Wrapper.cpp" />
     <ClCompile Include="ErrorStack.cpp" />
     <ClCompile Include="FileIO.cpp" />
@@ -155,7 +152,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp" />
-    <ClCompile Include="VulkanWrapper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="CharsPS.hlsl">

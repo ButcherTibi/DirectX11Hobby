@@ -14,9 +14,6 @@
     <Filter Include="Source Files\FileIO">
       <UniqueIdentifier>{88a39a18-e860-46ff-82f9-a1440c6986ea}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\VulkanWrapper">
-      <UniqueIdentifier>{f80d927a-aca7-47e9-9dd6-0bf96303e711}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\FontRasterization">
       <UniqueIdentifier>{f57a30c7-5ee3-4e46-a968-673ee7040140}</UniqueIdentifier>
     </Filter>
@@ -46,9 +43,6 @@
     <ClInclude Include="FileIO.hpp">
       <Filter>Source Files\FileIO</Filter>
     </ClInclude>
-    <ClInclude Include="VulkanWrapper.hpp">
-      <Filter>Source Files\VulkanWrapper</Filter>
-    </ClInclude>
     <ClInclude Include="FontRasterization.hpp">
       <Filter>Source Files\FontRasterization</Filter>
     </ClInclude>
@@ -77,15 +71,6 @@
     </ClCompile>
     <ClCompile Include="FileIO.cpp">
       <Filter>Source Files\FileIO</Filter>
-    </ClCompile>
-    <ClCompile Include="CommandList.cpp">
-      <Filter>Source Files\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="Drawpass.cpp">
-      <Filter>Source Files\VulkanWrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="VulkanWrapper.cpp">
-      <Filter>Source Files\VulkanWrapper</Filter>
     </ClCompile>
     <ClCompile Include="FontRasterization.cpp">
       <Filter>Source Files\FontRasterization</Filter>
