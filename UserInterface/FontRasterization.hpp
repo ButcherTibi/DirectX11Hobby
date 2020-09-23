@@ -1,12 +1,12 @@
 #pragma once
 
-#include "pch.h"
-
 #include "FileIO.hpp"
 #include "TextureAtlas.hpp"
 
 
 namespace nui {
+
+	class CharacterAtlas;
 
 
 	struct Character {
@@ -36,20 +36,35 @@ namespace nui {
 		std::vector<Character> chars;
 	};
 
-	struct Font {
+	class Font {
+	public:
+		CharacterAtlas* atlas;
+		std::vector<uint8_t> ttf_file;
+		void* face_ft;
+
+		// cache
+		std::vector<uint8_t> bitmap;
+
+		// props
 		std::string family_name;
 		std::string style_name;
 
 		std::vector<FontSize> sizes;
+
+	public:
+		ErrStack addSize(uint32_t size);
 	};
 
 	class CharacterAtlas {
 	public:
 		TextureAtlas atlas;
 
+		void* free_type_ft = nullptr;
+
 		std::vector<Font> fonts;
 
 	public:
+		ErrStack addFont(FilePath& path, Font*& r_font);
 		ErrStack addFont(FilePath& path, std::vector<uint32_t>& sizes, Font*& r_font);
 	};
 }

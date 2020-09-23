@@ -62,6 +62,7 @@
       <CompileAsManaged>false</CompileAsManaged>
       <EnableModules>false</EnableModules>
       <SupportJustMyCode>true</SupportJustMyCode>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -98,6 +99,7 @@
       <EnableModules>false</EnableModules>
       <CompileAsManaged>false</CompileAsManaged>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

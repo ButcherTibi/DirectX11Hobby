@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pch.h"
-
+// GLM
+#include <glm\vec4.hpp>
 
 #include "DX11Wrapper.hpp"
 #include "GPU_ShaderTypes.hpp"
@@ -19,24 +19,52 @@ namespace nui {
 	class Node;
 
 
-	enum class Overflow {
-		OVERFLOw,
-		CLIP
-	};
-
-
-	enum class ContentSizeType {
+	enum class ElementSizeType {
 		RELATIVE_SIZE,
 		ABSOLUTE_SIZE,
 		FIT
 	};
 
-	struct ContentSize {
-		ContentSizeType type = ContentSizeType::FIT;
+	struct ElementSize {
+		ElementSizeType type = ElementSizeType::FIT;
 		float size;
 
+	public:
+		ElementSize& operator=(uint32_t size_px);
+		ElementSize& operator=(float percentage);
 		void setAbsolute(float size);
-		void setRelative(float size);
+	};
+
+
+	#undef OVERFLOW
+	enum class Overflow {
+		OVERFLOW,
+		CLIP
+	};
+
+
+	struct Color {
+		glm::vec4 rgba;
+
+	public:
+		Color();
+		Color(int32_t red, int32_t green, int32_t blue, uint8_t alpha = 255);
+		Color(double red, double green, double blue, double alpha = 1.0);
+		Color(float red, float green, float blue, float alpha = 1.0);
+		Color(int32_t hex_without_alpha);	
+
+		static Color red();
+		static Color green();
+		static Color blue();
+
+		static Color black();
+		static Color white();
+
+		static Color cyan();
+		static Color magenta();
+		static Color yellow();
+
+		void setRGBA_UNORM(float r, float g, float b, float a = 1.0f);
 	};
 
 
@@ -71,16 +99,18 @@ namespace nui {
 		SPACE_BETWEEN,
 	};
 
-	// Wrap Ideas:
-	// - self origin, child pos can refer to center of child
-	// Flex Ideas:
+	/* TODO:
+	- atomatic rasterized character set
+	- TextureAtlas resizes if to small to 2X until <= 64K
+	- fix overflow by parents += nextparents at end of layer procesing
 
-	// Props:
-	// - Z index
-	
-	// Interaction:
-	// - collider check
-	// - redraw
+	- events void event(EventContext event_ctx, void* user_data)
+
+	- multiple fonts, font name = filename no support for style family
+	- flex
+	- wrap self origin, child pos can refer to center of child
+	- z order
+	*/
 
 	class NodeComponent {
 	public:
@@ -115,10 +145,10 @@ namespace nui {
 
 	public:
 		glm::vec2 pos;
-		ContentSize width;
-		ContentSize height;
+		ElementSize width;
+		ElementSize height;
 		Overflow overflow;  // CURSED: assigning a default value causes undefined behaviour, memory coruption
-		glm::vec4 background_color;
+		Color background_color;
 
 	public:
 		Text* addText();
@@ -165,7 +195,7 @@ namespace nui {
 		glm::vec2 pos;
 		float size;
 		float line_height;
-		glm::vec4 color;
+		Color color;
 	};
 
 
@@ -294,41 +324,6 @@ namespace nui {
 		ComPtr<ID3D11PixelShader> chars_ps;
 
 		ComPtr<ID3D11BlendState> blend_state;
-
-		// Vulkan
-		/*vkw::VulkanDevice dev;
-		vkw::Buffer chars_vbuff;
-		vkw::Buffer chars_idxbuff;
-		vkw::Buffer chars_instabuff;
-		vkw::Buffer text_ubuff;
-		vkw::Buffer wrap_vbuff;
-		vkw::Buffer wrap_idxbuff;
-		vkw::Buffer wrap_instabuff;
-
-		vkw::Image composition_img;
-		vkw::Image parents_clip_mask_img;
-		vkw::Image next_parents_clip_mask_img;
-		vkw::Image char_atlas_tex;
-
-		vkw::ImageView composition_view;
-		vkw::ImageView parents_clip_mask_view;
-		vkw::ImageView next_parents_clip_mask_view;
-		vkw::ImageView char_atlas_view;
-
-		vkw::Sampler text_sampler;
-
-		vkw::Shader text_vs;
-		vkw::Shader text_fs;
-		vkw::Shader wrap_vs;
-		vkw::Shader wrap_fs;
-
-		vkw::Drawpass text_pass;
-		vkw::Drawpass wrap_pass;
-
-		vkw::Framebuffer text_framebuff;
-		vkw::Framebuffer wrap_framebuff;
-
-		vkw::CommandList cmd_list;*/
 
 	public:
 		void generateDrawcalls(Node* node, AncestorProps& ancestor,

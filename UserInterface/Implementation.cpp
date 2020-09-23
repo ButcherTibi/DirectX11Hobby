@@ -13,16 +13,112 @@ using namespace nui;
 std::list<Window> nui::windows;
 
 
-void ContentSize::setAbsolute(float new_size)
+ElementSize& ElementSize::operator=(uint32_t size_px)
 {
-	this->type = ContentSizeType::ABSOLUTE_SIZE;
-	this->size = new_size;
+	this->type = ElementSizeType::ABSOLUTE_SIZE;
+	this->size = (float)size_px;
+	return *this;
 }
 
-void ContentSize::setRelative(float new_size)
+ElementSize& ElementSize::operator=(float percentage)
 {
-	this->type = ContentSizeType::RELATIVE_SIZE;
-	this->size = new_size;
+	this->type = ElementSizeType::RELATIVE_SIZE;
+	this->size = percentage / 100.0f;
+	return *this;
+}
+
+void ElementSize::setAbsolute(float size_px)
+{
+	this->type = ElementSizeType::ABSOLUTE_SIZE;
+	this->size = size_px;
+}
+
+Color::Color() {}
+
+Color::Color(int32_t red, int32_t green, int32_t blue, uint8_t alpha)
+{
+	this->rgba.r = (float)(red / 255);
+	this->rgba.g = (float)(green / 255);
+	this->rgba.b = (float)(blue / 255);
+	this->rgba.a = (float)(alpha / 255);
+}
+
+Color::Color(double red, double green, double blue, double alpha)
+{
+	this->rgba.r = (float)red;
+	this->rgba.g = (float)green;
+	this->rgba.b = (float)blue;
+	this->rgba.a = (float)alpha;
+}
+
+Color::Color(float red, float green, float blue, float alpha)
+{
+	this->rgba.r = red;
+	this->rgba.g = green;
+	this->rgba.b = blue;
+	this->rgba.a = alpha;
+}
+
+Color::Color(int32_t hex)
+{
+	// white = 0x00'FF'FF'FF'FF
+	float red = float(hex >> 16 & 0xFF);
+	float green = float(hex >> 8 & 0xFF);
+	float blue = float(hex & 0xFF);
+
+	this->rgba.r = red / 255;
+	this->rgba.g = green / 255;
+	this->rgba.b = blue / 255;
+	this->rgba.a = 1.0f;
+}
+
+Color Color::red()
+{
+	return Color(1.0f, 0.0f, 0.0f);
+}
+
+Color Color::green()
+{
+	return Color(0.0f, 1.0f, 0.0f);
+}
+
+Color Color::blue()
+{
+	return Color(0.0f, 0.0f, 1.0f);
+}
+
+Color Color::black()
+{
+	return Color(0.0f, 0.0f, 0.0f);
+}
+
+Color Color::white()
+{
+	return Color(1.0f, 1.0f, 1.0f);
+}
+
+Color Color::cyan()
+{
+	return Color(0.0f, 1.0f, 1.0f);
+}
+
+Color Color::magenta()
+{
+	return Color(1.0f, 0.0f, 1.0f);
+}
+
+Color Color::yellow()
+{
+	return Color(1.0f, 1.0f, 0.0f);
+
+}
+
+void Color::setRGBA_UNORM(float r, float g, float b, float a)
+{
+	this->rgba.r = r;
+	this->rgba.g = g;
+	this->rgba.b = b;
+	this->rgba.a = a;
 }
 
 Text* NodeComponent::addText()
@@ -36,7 +132,7 @@ Text* NodeComponent::addText()
 	new_text->pos = { 0, 0 };
 	new_text->size = 14.0f;
 	new_text->line_height = 1.15f;
-	new_text->color = { 1, 1, 1, 1 };
+	new_text->color.rgba = {1, 1, 1, 1};
 
 	// Parent ---> Child
 	this->this_elem->children.push_back(&child_node);
@@ -56,8 +152,8 @@ Wrap* NodeComponent::addWrap()
 	child_wrap->node_comp.this_elem = &child_node;
 
 	child_wrap->pos = { 0, 0 };
-	child_wrap->overflow = Overflow::OVERFLOw;
-	child_wrap->background_color = { 0, 0, 0, 0 };
+	child_wrap->overflow = Overflow::OVERFLOW;
+	child_wrap->background_color.rgba = { 0, 0, 0, 0 };
 
 	// Parent ---> Child
 	this->this_elem->children.push_back(&child_node);
@@ -258,10 +354,10 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 				new_pos.y += (char_height - char_top) * scale;
 
 				GPU_CharacterInstance& new_instance = drawcall->instances.emplace_back();
-				new_instance.color.x = text->color.r;
-				new_instance.color.y = text->color.g;
-				new_instance.color.z = text->color.b;
-				new_instance.color.w = text->color.a;
+				new_instance.color.x = text->color.rgba.r;
+				new_instance.color.y = text->color.rgba.g;
+				new_instance.color.z = text->color.rgba.b;
+				new_instance.color.w = text->color.rgba.a;
 
 				new_instance.pos.x = new_pos.x;
 				new_instance.pos.y = new_pos.y;
@@ -294,11 +390,11 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		AncestorProps child_ancs;
 
 		// Size
-		auto calcSize = [](ContentSize size, float ancestor_size) -> float {
+		auto calcSize = [](ElementSize size, float ancestor_size) -> float {
 			switch (size.type) {
-			case ContentSizeType::ABSOLUTE_SIZE:
+			case ElementSizeType::ABSOLUTE_SIZE:
 				return size.size;
-			case ContentSizeType::RELATIVE_SIZE:
+			case ElementSizeType::RELATIVE_SIZE:
 				return size.size * ancestor_size;
 			}
 			// FIT
@@ -326,7 +422,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 			generateDrawcalls(*child_it, child_ancs, child_prop);
 		}
 
-		if (wrap->width.type == ContentSizeType::FIT) {
+		if (wrap->width.type == ElementSizeType::FIT) {
 
 			float right_most = 0;
 			for (DescendantProps& child_prop : child_props) {
@@ -342,7 +438,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 			r_descendant.width = child_ancs.width;
 		}
 
-		if (wrap->height.type == ContentSizeType::FIT) {
+		if (wrap->height.type == ElementSizeType::FIT) {
 
 			float bottom_most = 0;
 			for (DescendantProps& child_prop : child_props) {
@@ -359,10 +455,10 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 		}
 
 		auto& inst = wrap->drawcall.instance;
-		inst.color.x = wrap->background_color.r;
-		inst.color.y = wrap->background_color.g;
-		inst.color.z = wrap->background_color.b;
-		inst.color.w = wrap->background_color.a;
+		inst.color.x = wrap->background_color.rgba.r;
+		inst.color.y = wrap->background_color.rgba.g;
+		inst.color.z = wrap->background_color.rgba.b;
+		inst.color.w = wrap->background_color.rgba.a;
 
 		if (parent != nullptr) {	
 			inst.pos.x = wrap->pos.x;
@@ -463,16 +559,16 @@ ErrStack Window::generateGPU_Data()
 
 				// Character origin is bottom left
 				char_verts[vertex_idx + 0].pos = { 0, 0 };
-				char_verts[vertex_idx + 0].uv = chara.zone->bb_uv.getBotLeft();
+				char_verts[vertex_idx + 0].uv = toXMFloat2(chara.zone->bb_uv.getBotLeft());
 
 				char_verts[vertex_idx + 1].pos = { 0, -h };
-				char_verts[vertex_idx + 1].uv = chara.zone->bb_uv.getTopLeft();
+				char_verts[vertex_idx + 1].uv = toXMFloat2(chara.zone->bb_uv.getTopLeft());
 
 				char_verts[vertex_idx + 2].pos = { w, -h };
-				char_verts[vertex_idx + 2].uv = chara.zone->bb_uv.getTopRight();
+				char_verts[vertex_idx + 2].uv = toXMFloat2(chara.zone->bb_uv.getTopRight());
 
 				char_verts[vertex_idx + 3].pos = { w, 0 };
-				char_verts[vertex_idx + 3].uv = chara.zone->bb_uv.getBotRight();
+				char_verts[vertex_idx + 3].uv = toXMFloat2(chara.zone->bb_uv.getBotRight());
 
 				chars_idxs[index_idx + 0] = vertex_idx + 0;
 				chars_idxs[index_idx + 1] = vertex_idx + 1;
@@ -1265,7 +1361,7 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 		root->width.setAbsolute((float)swapchain_desc.Width);
 		root->height.setAbsolute((float)swapchain_desc.Height);
 		root->overflow = Overflow::CLIP;
-		root->background_color = { 0, 0, 0, 1 };
+		root->background_color.rgba = { 0, 0, 0, 1 };
 	}
 
 	r_window = &w;

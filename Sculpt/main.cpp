@@ -25,21 +25,24 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	nui::Wrap* root = window->getRoot();
 
-	nui::Wrap* w0 = root->addWrap();
-	w0->width.setRelative(0.5);
-	w0->height.setRelative(0.5);
-	w0->background_color = { 1, 0, 0, 1 };
+	auto w0 = root->addWrap();
+	w0->width = 50.0f;
+	w0->height = 50.0f;
+	w0->background_color = nui::Color::red();
 	w0->overflow = nui::Overflow::CLIP;
 
-	nui::Wrap* w1 = w0->addWrap();
-	w1->width.setRelative(0.5);
-	w1->height.setRelative(0.5);
-	w1->background_color = { 0, 1, 0, 1 };
+	auto w1 = w0->addWrap();
+	w1->width = 50.0f;
+	w1->height = 50.0f;
+	w1->background_color = nui::Color::green();
 
-	nui::Wrap* w2 = w1->addWrap();
-	w2->width.setRelative(0.5);
-	w2->height.setRelative(0.5);
-	w2->background_color = { 0, 0, 1, 1 };
+	auto w2 = w1->addWrap();
+	w2->width = 50.0f;
+	w2->height = 50.0f;
+	w2->background_color = nui::Color::blue();
+
+	nui::Text* t = w2->addText();
+	t->text = U"Hello";
 
 	while (!window->close) {
 

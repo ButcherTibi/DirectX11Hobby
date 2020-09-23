@@ -81,6 +81,9 @@
     <ClCompile Include="DX11Wrapper.cpp">
       <Filter>Source Files\DX11Wrapper</Filter>
     </ClCompile>
+    <ClCompile Include="GPU_ShaderTypes.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="WrapPS.hlsl">

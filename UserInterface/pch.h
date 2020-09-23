@@ -3,9 +3,10 @@
 // Windows
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+
+// Windows undefs
 #undef min
 #undef max
-#include <wrl\client.h>
 
 // DirectX 11
 #include <d3d11_4.h>

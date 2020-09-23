@@ -1,6 +1,10 @@
 #pragma once
 
-#include "pch.h"
+#include <d3d11_4.h>
+#include <wrl\client.h>
+
+#include "ErrorStack.hpp"
+
 
 template<typename T>
 using ComPtr = Microsoft::WRL::ComPtr<T>;

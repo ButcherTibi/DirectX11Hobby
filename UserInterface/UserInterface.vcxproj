@@ -87,6 +87,10 @@
       <AdditionalDependencies>freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
+    <ProjectReference />
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -130,6 +134,10 @@
       <AdditionalDependencies>freetype.lib</AdditionalDependencies>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
+    <ProjectReference />
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="DX11Wrapper.hpp" />
@@ -146,6 +154,7 @@
     <ClCompile Include="ErrorStack.cpp" />
     <ClCompile Include="FileIO.cpp" />
     <ClCompile Include="FontRasterization.cpp" />
+    <ClCompile Include="GPU_ShaderTypes.cpp" />
     <ClCompile Include="Implementation.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

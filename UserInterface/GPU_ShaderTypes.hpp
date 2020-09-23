@@ -1,15 +1,22 @@
 #pragma once
 
-#include "pch.h"
+// Standard
+#include <array>
 
+// DirectX 11
 #include <DirectXMath.h>
 
+// GLM
+#include <glm\vec2.hpp>
 
 namespace nui {
 
+	DirectX::XMFLOAT2 toXMFloat2(glm::vec2 val);
+
+
 	struct GPU_CharacterVertex {
-		glm::vec2 pos;
-		glm::vec2 uv;
+		DirectX::XMFLOAT2 pos;
+		DirectX::XMFLOAT2 uv;
 
 		static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
 		{

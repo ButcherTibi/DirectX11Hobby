@@ -1,5 +1,10 @@
 #pragma once
 
+// Standard
+#include <stdint.h>
+#include <string>
+#include <vector>
+
 
 namespace nui {
 
