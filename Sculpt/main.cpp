@@ -16,6 +16,7 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 	nui::WindowCrateInfo info;
 	info.width = 1027;
 	info.height = 720;
+
 	nui::Window* window;
 	err_stack = instance.createWindow(info, window);
 	if (err_stack.isBad()) {
@@ -33,16 +34,16 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	auto w1 = w0->addWrap();
 	w1->width = 50.0f;
-	w1->height = 50.0f;
+	w1->height = 100.0f;
 	w1->background_color = nui::Color::green();
 
 	auto w2 = w1->addWrap();
 	w2->width = 50.0f;
-	w2->height = 50.0f;
+	w2->height = 100.0f;
 	w2->background_color = nui::Color::blue();
 
-	nui::Text* t = w2->addText();
-	t->text = U"Hello";
+	auto t = w2->addText();
+	t->text = U"This text should overflow past blue into green and red but clipped by red";
 
 	while (!window->close) {
 

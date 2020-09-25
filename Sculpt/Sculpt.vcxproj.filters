@@ -5,17 +5,8 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\Math">
-      <UniqueIdentifier>{53783eda-5290-49bb-ae24-ac4fffa0bb81}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Mesh">
       <UniqueIdentifier>{db273801-5239-4134-9a5f-eb598bc972e4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Importer">
-      <UniqueIdentifier>{73c0de51-568c-486b-b747-400f71b18cd9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Mine">
-      <UniqueIdentifier>{10803e6a-b26c-41e4-8b3f-218047b714b7}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\ThirdParty">
       <UniqueIdentifier>{a262b940-e443-4e56-b65a-7e9d9126f61f}</UniqueIdentifier>
@@ -23,20 +14,23 @@
     <Filter Include="Source Files\ThirdParty\stb_image">
       <UniqueIdentifier>{10891787-7a85-4b6e-8a75-da84801afa37}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\TextureAtlas">
-      <UniqueIdentifier>{a17daa4c-fb9d-437f-95cc-188a38c3a23c}</UniqueIdentifier>
+    <Filter Include="Source Files\Importers">
+      <UniqueIdentifier>{73c0de51-568c-486b-b747-400f71b18cd9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\NewUserInterface">
-      <UniqueIdentifier>{a755132e-1fb2-44ea-aa2b-b94efb1bfc2f}</UniqueIdentifier>
+    <Filter Include="Source Files\Error">
+      <UniqueIdentifier>{4829bd37-ac8c-4c61-ab1a-d8fed6acfd60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\FileIO">
+      <UniqueIdentifier>{37a2ad13-7048-4873-8450-23915d4486b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Input">
+      <UniqueIdentifier>{0b3c375a-750e-47a0-8a9f-5c21831a55f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Precompiled Headers">
+      <UniqueIdentifier>{10803e6a-b26c-41e4-8b3f-218047b714b7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MathUtils.cpp">
-      <Filter>Source Files\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="MathDefinitions.cpp">
-      <Filter>Source Files\Math</Filter>
-    </ClCompile>
     <ClCompile Include="Primitives.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
@@ -46,85 +40,55 @@
     <ClCompile Include="LinkageMesh.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="MathTypes.cpp">
-      <Filter>Source Files\Math</Filter>
-    </ClCompile>
     <ClCompile Include="JSONParser.cpp">
-      <Filter>Source Files\Importer</Filter>
+      <Filter>Source Files\Importers</Filter>
     </ClCompile>
     <ClCompile Include="GLTFParser.cpp">
-      <Filter>Source Files\Importer</Filter>
-    </ClCompile>
-    <ClCompile Include="ErrorStuff.cpp">
-      <Filter>Source Files\Mine</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\Importers</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\Precompiled Headers</Filter>
     </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClCompile>
-    <ClCompile Include="CommonTypes.cpp">
-      <Filter>Source Files\Mine</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureAtlas.cpp">
-      <Filter>Source Files\TextureAtlas</Filter>
-    </ClCompile>
-    <ClCompile Include="InternalUI.cpp">
-      <Filter>Source Files\NewUserInterface</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ErrorStuff.cpp">
+      <Filter>Source Files\Error</Filter>
+    </ClCompile>
     <ClCompile Include="FileIO.cpp">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\FileIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>Source Files\Input</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MathDefinitions.h">
-      <Filter>Source Files\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="MathUtils.h">
-      <Filter>Source Files\Math</Filter>
-    </ClInclude>
     <ClInclude Include="Primitives.h">
       <Filter>Source Files\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="Meshes.h">
       <Filter>Source Files\Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="MathTypes.h">
-      <Filter>Source Files\Math</Filter>
-    </ClInclude>
     <ClInclude Include="Importer.h">
-      <Filter>Source Files\Importer</Filter>
-    </ClInclude>
-    <ClInclude Include="ErrorStuff.h">
-      <Filter>Source Files\Mine</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\Importers</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\Precompiled Headers</Filter>
     </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
-    <ClInclude Include="CommonTypes.h">
-      <Filter>Source Files\Mine</Filter>
-    </ClInclude>
-    <ClInclude Include="TextureAtlas.h">
-      <Filter>Source Files\TextureAtlas</Filter>
-    </ClInclude>
-    <ClInclude Include="Internals.h">
-      <Filter>Source Files\NewUserInterface</Filter>
+    <ClInclude Include="ErrorStuff.h">
+      <Filter>Source Files\Error</Filter>
     </ClInclude>
     <ClInclude Include="FileIO.h">
-      <Filter>Source Files\Mine</Filter>
+      <Filter>Source Files\FileIO</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
+      <Filter>Source Files\Input</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

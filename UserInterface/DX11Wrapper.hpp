@@ -1,6 +1,9 @@
 #pragma once
 
+// DirectX 11
 #include <d3d11_4.h>
+
+// ComPtr
 #include <wrl\client.h>
 
 #include "ErrorStack.hpp"

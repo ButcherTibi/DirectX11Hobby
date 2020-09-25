@@ -40,14 +40,14 @@ namespace nui {
 	public:
 		CharacterAtlas* atlas;
 		std::vector<uint8_t> ttf_file;
-		void* face_ft;
-
-		// cache
-		std::vector<uint8_t> bitmap;
+		void* face_ft;	
 
 		// props
 		std::string family_name;
 		std::string style_name;
+
+		// cache
+		std::vector<uint8_t> bitmap;
 
 		std::vector<FontSize> sizes;
 
@@ -65,6 +65,5 @@ namespace nui {
 
 	public:
 		ErrStack addFont(FilePath& path, Font*& r_font);
-		ErrStack addFont(FilePath& path, std::vector<uint32_t>& sizes, Font*& r_font);
 	};
 }

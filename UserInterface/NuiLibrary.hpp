@@ -8,6 +8,27 @@
 #include "FontRasterization.hpp"
 
 
+/* TODO:
+- fix overflow by parents += nextparents at end of layer procesing
+- fix line height for one row and make line height absolute, because pixel matching
+- fullscreen support
+- fix cursor icon
+- realtime resize
+
+- add events: void event(EventContext event_ctx, void* user_data)
+
+- multiple fonts
+- flex
+- wrap self origin, child pos can refer to center of child
+- z order
+*/
+
+/* LIMITATIONS:
+- the DirectX 11 character atlas texture does resize with atlas
+- make addBitmap return true on resize
+*/
+
+
 namespace nui {
 
 	// Forward declarations
@@ -99,18 +120,6 @@ namespace nui {
 		SPACE_BETWEEN,
 	};
 
-	/* TODO:
-	- atomatic rasterized character set
-	- TextureAtlas resizes if to small to 2X until <= 64K
-	- fix overflow by parents += nextparents at end of layer procesing
-
-	- events void event(EventContext event_ctx, void* user_data)
-
-	- multiple fonts, font name = filename no support for style family
-	- flex
-	- wrap self origin, child pos can refer to center of child
-	- z order
-	*/
 
 	class NodeComponent {
 	public:
@@ -263,7 +272,7 @@ namespace nui {
 
 		// Rendering Data
 		bool rendering_configured;	
-		
+
 		uint32_t char_instance_count;
 		uint32_t wrap_instance_count;
 		
@@ -277,14 +286,14 @@ namespace nui {
 
 		// DirectX 11
 		ComPtr<IDXGIFactory2> factory;
-		IDXGIAdapter* adapter;
-		ComPtr<ID3D11Device> device;
+		ComPtr<IDXGIAdapter> adapter;
+		ComPtr<ID3D11Device> _dev;
 		ComPtr<ID3D11Device5> dev5;
-		ComPtr<ID3D11DeviceContext> im_ctx;
+		ComPtr<ID3D11DeviceContext> _im_ctx;
 		ComPtr<ID3D11DeviceContext4> im_ctx4;
-		ComPtr<IDXGISwapChain1> swapchain;
+		ComPtr<IDXGISwapChain> swapchain;
 
-		ComPtr<ID3D11Texture2D> present_img;	
+		ComPtr<ID3D11Texture2D> present_img;
 		ComPtr<ID3D11Texture2D> parents_clip_mask_img;
 		ComPtr<ID3D11Texture2D> next_parents_clip_mask_img;
 		ComPtr<ID3D11Texture2D> chars_atlas_tex;
@@ -311,14 +320,13 @@ namespace nui {
 
 		std::vector<char> wrap_vs_cso;
 		std::vector<char> chars_vs_cso;
+		std::vector<char> all_vs_cso;
 
 		ComPtr<ID3D11VertexShader> wrap_vs;
 		ComPtr<ID3D11VertexShader> chars_vs;
+		ComPtr<ID3D11VertexShader> all_vs;
 
 		ComPtr<ID3D11RasterizerState> rasterizer_state;
-
-		std::vector<char> wrap_ps_cso;
-		std::vector<char> chars_ps_cso;
 
 		ComPtr<ID3D11PixelShader> wrap_ps;
 		ComPtr<ID3D11PixelShader> chars_ps;
@@ -333,8 +341,7 @@ namespace nui {
 
 		ErrStack generateGPU_Data();
 
-		// ErrStack draw();
-		ErrStack draw2();
+		ErrStack draw();
 
 	public:
 		Wrap* getRoot();

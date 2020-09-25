@@ -32,6 +32,12 @@
     <Filter Include="Source Files\Shaders\Chars">
       <UniqueIdentifier>{d09dbbc3-8cea-42fc-98be-72f8b9655f0e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\Common">
+      <UniqueIdentifier>{a08948ce-7c48-4065-af34-cf634b040aec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\CopyParentsMask">
+      <UniqueIdentifier>{8ae53808-a1a0-4065-a60e-277173dfdaba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
@@ -97,6 +103,12 @@
     </FxCompile>
     <FxCompile Include="CharsPS.hlsl">
       <Filter>Source Files\Shaders\Chars</Filter>
+    </FxCompile>
+    <FxCompile Include="AllVS.hlsl">
+      <Filter>Source Files\Shaders\Common</Filter>
+    </FxCompile>
+    <FxCompile Include="CopyParentsMaskPS.hlsl">
+      <Filter>Source Files\Shaders\CopyParentsMask</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

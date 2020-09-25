@@ -54,17 +54,11 @@ namespace nui {
 		std::list<AtlasRegion> zones;
 
 	private:
-		void copyPixels(uint32_t x0, uint32_t y0, uint32_t width, uint32_t height,
-			std::vector<uint8_t>& new_pixels);
-		
 		bool addRegion(AtlasRegion& bitmap_zone,
 			std::vector<uint8_t>& bitmap, uint32_t bitmap_width,
 			AtlasRegion& r_zone);
 
 	public:
-		void create(uint32_t tex_size);
-
-		bool addBitmap2(std::vector<uint8_t>& bitmap, uint32_t width, uint32_t height, AtlasRegion*& r_zone_used);
 		bool addBitmap(std::vector<uint8_t>& bitmap, uint32_t width, uint32_t height, AtlasRegion*& r_zone_used);
 
 		void debugPrint();

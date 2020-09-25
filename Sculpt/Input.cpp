@@ -1,6 +1,5 @@
 
-// Windows
-#include <Windows.h>
+#include "stdafx.h"
 
 // Standard
 #include <execution>

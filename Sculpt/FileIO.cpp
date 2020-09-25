@@ -1,9 +1,5 @@
 
-// Windows
-#include <Windows.h>
-
-// Mine
-#include "ErrorStuff.h"
+#include "stdafx.h"
 
 // Header
 #include "FileIO.h"

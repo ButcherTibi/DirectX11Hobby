@@ -1,14 +1,18 @@
 
 #include "pch.h"
 
-// Mine
-#include "FileIO.hpp"
-
 // Header
 #include "NuiLibrary.hpp"
 
+// Standard
+#include <algorithm>
+
+// Mine
+#include "FileIO.hpp"
+
 
 using namespace nui;
+
 
 std::list<Window> nui::windows;
 
@@ -287,7 +291,7 @@ void Window::generateDrawcalls(Node* node, AncestorProps& ancestor,
 			float min_diff = 9999;
 
 			// Choose most similar font size
-			for (FontSize& fsize : text->node_comp.window->instance->char_atlas.fonts[0].sizes) {
+			for (FontSize& fsize : instance->char_atlas.fonts[0].sizes) {
 
 				float diff = abs(text->size - fsize.size);
 				if (diff < min_diff) {
@@ -527,10 +531,33 @@ ErrStack Window::generateGPU_Data()
 {
 	ErrStack err_stack;
 
+	// Rasterize new font sizes
+	Font& font = instance->char_atlas.fonts[0];
+	{
+		std::set<uint32_t> sizes;
+
+		for (Node& node : nodes) {
+			if (node.type == NodeType::TEXT) {
+
+				Text* text = (Text*)node.elem;
+				sizes.insert((uint32_t)(text->size));
+			}
+		}
+
+		// sort from smalles to biggest to better pack in atlas
+		//std::sort(sizes.begin(), sizes.end(), std::greater<int>());
+
+		for (FontSize& font_size : font.sizes) {
+			sizes.erase(font_size.size);
+		}
+
+		for (uint32_t size : sizes) {
+			checkErrStack1(font.addSize(size));
+		}
+	}
+
 	// Create Character Meshes
 	{
-		Font& font = instance->char_atlas.fonts[0];
-
 		uint32_t vertex_count = 0;
 		uint32_t index_count = 0;
 
@@ -650,7 +677,7 @@ ErrStack Window::generateGPU_Data()
 	return err_stack;
 }
 
-ErrStack Window::draw2()
+ErrStack Window::draw()
 {
 	ErrStack err_stack;
 	HRESULT hr = 0;
@@ -659,7 +686,9 @@ ErrStack Window::draw2()
 
 		rendering_configured = true;
 
-		// Parents Clip Mask Images
+		FilePath path;
+		std::vector<char> shader_cso;
+
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
 			desc.Width = surface_width;
@@ -674,75 +703,22 @@ ErrStack Window::draw2()
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 
+			// Parents Clip Mask Images
 			checkHResult(dev5->CreateTexture2D(&desc, NULL, parents_clip_mask_img.GetAddressOf()),
 				"failed to create parents clip mask image");
 
-			desc.BindFlags = D3D11_BIND_RENDER_TARGET;
-			checkHResult(dev5->CreateTexture2D(&desc, NULL, next_parents_clip_mask_img.GetAddressOf()),
-				"failed to create next parents clip mask image");
-		}
-
-		// Character Atlas
-		{
-			TextureAtlas& atlas = instance->char_atlas.atlas;
-
-			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = atlas.tex_size;
-			desc.Height = atlas.tex_size;
-			desc.MipLevels = 1;
-			desc.ArraySize = 1;
-			desc.Format = DXGI_FORMAT_R8_UNORM;
-			desc.SampleDesc.Count = 1;
-			desc.SampleDesc.Quality = 0;
-			desc.Usage = D3D11_USAGE_DYNAMIC;
-			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-			desc.MiscFlags = 0;
-
-			checkHResult(dev5->CreateTexture2D(&desc, NULL, chars_atlas_tex.GetAddressOf()),
-				"failed to create character atlas texture");
-
-			checkErrStack1(dx11::singleLoad(im_ctx4.Get(), chars_atlas_tex.Get(),
-				atlas.colors.data(), sizeof(uint8_t) * atlas.colors.size()));
-		}
-
-		// Character Atlas Sampler
-		{
-			D3D11_SAMPLER_DESC desc;
-			desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-			desc.AddressU = D3D11_TEXTURE_ADDRESS_MIRROR;
-			desc.AddressV = D3D11_TEXTURE_ADDRESS_MIRROR;
-			desc.AddressW = D3D11_TEXTURE_ADDRESS_MIRROR;
-			desc.MipLODBias = 0;
-			desc.MaxAnisotropy = 1;
-			desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-			desc.BorderColor[0] = 0;
-			desc.BorderColor[1] = 0;
-			desc.BorderColor[2] = 0;
-			desc.BorderColor[3] = 0;
-			desc.MinLOD = 0;
-			desc.MaxLOD = 0;
-
-			checkHResult(dev5->CreateSamplerState(&desc, chars_atlas_sampler.GetAddressOf()),
-				"failed to create character atlas sampler");
-		}
-
-		// Shader Resource View
-		{
 			checkHResult(dev5->CreateShaderResourceView(parents_clip_mask_img.Get(), NULL,
 				parents_clip_mask_srv.GetAddressOf()),
 				"failed to create parents clip mask srv");
 
-			checkHResult(dev5->CreateShaderResourceView(chars_atlas_tex.Get(), NULL,
-				chars_atlas_srv.GetAddressOf()),
-				"failed to create character atlas srv");
-		}
-
-		// Render Target Views
-		{
 			checkHResult(dev5->CreateRenderTargetView(parents_clip_mask_img.Get(), NULL,
 				parents_clip_mask_rtv.GetAddressOf()),
 				"failed to create parents clip mask rtv");
+
+			// Next Parents Clip Mask Images
+			desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+			checkHResult(dev5->CreateTexture2D(&desc, NULL, next_parents_clip_mask_img.GetAddressOf()),
+				"failed to create next parents clip mask image");
 
 			checkHResult(dev5->CreateRenderTargetView(next_parents_clip_mask_img.Get(), NULL,
 				next_parents_clip_mask_rtv.GetAddressOf()),
@@ -751,7 +727,7 @@ ErrStack Window::draw2()
 
 		// Vertex Shaders
 		{
-			FilePath path;
+			// Wrap
 			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/WrapVS.cso"));
 			checkErrStack(path.read(wrap_vs_cso),
 				"failed to read wrap VS cso");
@@ -760,6 +736,7 @@ ErrStack Window::draw2()
 				NULL, wrap_vs.GetAddressOf()),
 				"failed to create wrap VS");
 
+			// Chars
 			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/CharsVS.cso"));
 			checkErrStack(path.read(chars_vs_cso),
 				"failed to read chars VS cso");
@@ -767,6 +744,15 @@ ErrStack Window::draw2()
 			checkHResult(dev5->CreateVertexShader(chars_vs_cso.data(), chars_vs_cso.size(),
 				NULL, chars_vs.GetAddressOf()),
 				"failed to create chars VS");
+
+			// All
+			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/AllVS.cso"));
+			checkErrStack(path.read(all_vs_cso),
+				"failed to read all VS cso");
+
+			checkHResult(dev5->CreateVertexShader(all_vs_cso.data(), all_vs_cso.size(),
+				NULL, all_vs.GetAddressOf()),
+				"failed to create all VS");
 		}
 
 		// Wrap Input Layout
@@ -827,22 +813,25 @@ ErrStack Window::draw2()
 
 		// Pixel Shader
 		{
-			FilePath path;
+			// Wrap
 			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/WrapPS.cso"));
-			checkErrStack(path.read(wrap_ps_cso),
+			checkErrStack(path.read(shader_cso),
 				"failed to read wrap PS cso");
 
-			checkHResult(dev5->CreatePixelShader(wrap_ps_cso.data(), wrap_ps_cso.size(),
+			checkHResult(dev5->CreatePixelShader(shader_cso.data(), shader_cso.size(),
 				NULL, wrap_ps.GetAddressOf()),
 				"failed to create wrap PS");
 
+			// Chars
 			checkErrStack1(path.recreateRelativeToSolution("UserInterface/CompiledShaders/CharsPS.cso"));
-			checkErrStack(path.read(chars_ps_cso),
+			checkErrStack(path.read(shader_cso),
 				"failed to read chars PS cso");
 
-			checkHResult(dev5->CreatePixelShader(chars_ps_cso.data(), chars_ps_cso.size(),
+			checkHResult(dev5->CreatePixelShader(shader_cso.data(), shader_cso.size(),
 				NULL, chars_ps.GetAddressOf()),
 				"failed to create chars PS");
+
+			// Copy Parent Mask
 		}
 
 		// Blend States
@@ -921,23 +910,73 @@ ErrStack Window::draw2()
 
 			cbuff.create(dev5.Get(), im_ctx4.Get(), desc);
 
-			DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
-			swapchain->GetDesc1(&swapchain_desc);
+			DXGI_SWAP_CHAIN_DESC swapchain_desc;
+			swapchain->GetDesc(&swapchain_desc);
 
 			GPU_CommonsUniform commons;
-			commons.screen_size.x = (float)swapchain_desc.Width;
-			commons.screen_size.y = (float)swapchain_desc.Height;
+			commons.screen_size.x = (float)swapchain_desc.BufferDesc.Width;
+			commons.screen_size.y = (float)swapchain_desc.BufferDesc.Height;
 			checkErrStack1(cbuff.load(&commons, sizeof(GPU_CommonsUniform)));
 		}
 
 		checkErrStack1(generateGPU_Data());
+
+		// Character Atlas
+		{
+			TextureAtlas& atlas = instance->char_atlas.atlas;
+
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = atlas.tex_size;
+			desc.Height = atlas.tex_size;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8_UNORM;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+
+			checkHResult(dev5->CreateTexture2D(&desc, NULL, chars_atlas_tex.GetAddressOf()),
+				"failed to create character atlas texture");
+
+			checkErrStack1(dx11::singleLoad(im_ctx4.Get(), chars_atlas_tex.Get(),
+				atlas.colors.data(), sizeof(uint8_t) * atlas.colors.size()));
+
+			checkHResult(dev5->CreateShaderResourceView(chars_atlas_tex.Get(), NULL,
+				chars_atlas_srv.GetAddressOf()),
+				"failed to create character atlas srv");
+		}
+
+		// Character Atlas Sampler
+		{
+			D3D11_SAMPLER_DESC desc;
+			desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+			desc.AddressU = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.AddressV = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.AddressW = D3D11_TEXTURE_ADDRESS_MIRROR;
+			desc.MipLODBias = 0;
+			desc.MaxAnisotropy = 1;
+			desc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+			desc.BorderColor[0] = 0;
+			desc.BorderColor[1] = 0;
+			desc.BorderColor[2] = 0;
+			desc.BorderColor[3] = 0;
+			desc.MinLOD = 0;
+			desc.MaxLOD = 0;
+
+			checkHResult(dev5->CreateSamplerState(&desc, chars_atlas_sampler.GetAddressOf()),
+				"failed to create character atlas sampler");
+		}
 	}
 
 	// resize
-	DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
-	swapchain->GetDesc1(&swapchain_desc);
-	if (surface_width != swapchain_desc.Width || surface_height != swapchain_desc.Height) {
-
+	DXGI_SWAP_CHAIN_DESC swapchain_desc;
+	swapchain->GetDesc(&swapchain_desc);
+	if (surface_width != swapchain_desc.BufferDesc.Width ||
+		surface_height != swapchain_desc.BufferDesc.Height) 
+	{
 		present_rtv->Release();
 		parents_clip_mask_rtv->Release();
 		next_parents_clip_mask_rtv->Release();
@@ -1010,8 +1049,12 @@ ErrStack Window::draw2()
 	float clear_color[4] = {
 		0, 0, 0, 0
 	};
+	float parent_init_value[4] = {
+		0, 0, 0, 0
+	};
+
 	im_ctx4->ClearRenderTargetView(present_rtv.Get(), clear_color);
-	im_ctx4->ClearRenderTargetView(parents_clip_mask_rtv.Get(), clear_color);
+	im_ctx4->ClearRenderTargetView(parents_clip_mask_rtv.Get(), parent_init_value);
 	im_ctx4->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), clear_color);
 
 	std::vector<Node*> now_nodes = {
@@ -1058,8 +1101,8 @@ ErrStack Window::draw2()
 					D3D11_VIEWPORT viewport = {};
 					viewport.TopLeftX = 0;
 					viewport.TopLeftY = 0;
-					viewport.Width = (float)swapchain_desc.Width;
-					viewport.Height = (float)swapchain_desc.Height;
+					viewport.Width = (float)swapchain_desc.BufferDesc.Width;
+					viewport.Height = (float)swapchain_desc.BufferDesc.Height;
 					viewport.MinDepth = 0;
 					viewport.MaxDepth = 1;
 
@@ -1121,8 +1164,8 @@ ErrStack Window::draw2()
 					D3D11_VIEWPORT viewport = {};
 					viewport.TopLeftX = 0;
 					viewport.TopLeftY = 0;
-					viewport.Width = (float)swapchain_desc.Width;
-					viewport.Height = (float)swapchain_desc.Height;
+					viewport.Width = (float)swapchain_desc.BufferDesc.Width;
+					viewport.Height = (float)swapchain_desc.BufferDesc.Height;
 					viewport.MinDepth = 0;
 					viewport.MaxDepth = 1;
 
@@ -1182,12 +1225,8 @@ ErrStack Instance::create()
 		FilePath path;
 		checkErrStack1(path.recreateRelativeToSolution("UserInterface/Fonts/Roboto-Regular.ttf"));
 
-		std::vector<uint32_t> sizes = {
-			14
-		};
-
 		Font* font;
-		checkErrStack1(char_atlas.addFont(path, sizes, font));
+		checkErrStack1(char_atlas.addFont(path, font));
 	}
 
 	return err_stack;
@@ -1241,7 +1280,6 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 
 	w.minimized = false;
 	w.close = false;
-	w.clip_mask_id = 0;
 	w.rendering_configured = false;
 
 	w.wrap_verts[0].pos = { 0, 0 };
@@ -1288,49 +1326,44 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 				D3D_FEATURE_LEVEL_11_1
 			};
 
-			checkHResult(D3D11CreateDevice(w.adapter,
+			checkHResult(D3D11CreateDevice(w.adapter.Get(),
 				D3D_DRIVER_TYPE_UNKNOWN,
 				NULL,
 				D3D11_CREATE_DEVICE_DEBUG,// | D3D11_CREATE_DEVICE_DEBUGGABLE,
 				features.data(), (uint32_t)features.size(),
 				D3D11_SDK_VERSION,
-				w.device.GetAddressOf(),
+				w._dev.GetAddressOf(),
 				NULL,
-				w.im_ctx.GetAddressOf()),
+				w._im_ctx.GetAddressOf()),
 				"failed to create device");
 
-			checkHResult(w.device->QueryInterface<ID3D11Device5>(w.dev5.GetAddressOf()),
+			checkHResult(w._dev->QueryInterface<ID3D11Device5>(w.dev5.GetAddressOf()),
 				"failed to obtain ID3D11Device5");
 
-			checkHResult(w.im_ctx->QueryInterface<ID3D11DeviceContext4>(w.im_ctx4.GetAddressOf()),
+			checkHResult(w._im_ctx->QueryInterface<ID3D11DeviceContext4>(w.im_ctx4.GetAddressOf()),
 				"failed to obtain ID3D11DeviceContext4");
 		}
 
 		// Swapchain
 		{
-			DXGI_SWAP_CHAIN_DESC1 desc = {};
-			desc.Width = 0;
-			desc.Height = 0;
-			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-			desc.Stereo = false;
+			DXGI_SWAP_CHAIN_DESC desc = {};
+			desc.BufferDesc.Width = 0;
+			desc.BufferDesc.Height = 0;
+			desc.BufferDesc.RefreshRate.Numerator = 0;
+			desc.BufferDesc.RefreshRate.Denominator = 0;
+			desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			desc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+			desc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 			desc.SampleDesc.Count = 1;
 			desc.SampleDesc.Quality = 0;
 			desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 			desc.BufferCount = 2;
-			desc.Scaling = DXGI_SCALING_NONE;
-			desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-			desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+			desc.OutputWindow = w.hwnd;
+			desc.Windowed = true;
+			desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 			desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
-			DXGI_SWAP_CHAIN_FULLSCREEN_DESC full_desc = {};
-			full_desc.RefreshRate.Numerator = 60;
-			full_desc.RefreshRate.Denominator = 1;
-			full_desc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-			full_desc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-			full_desc.Windowed = true;
-
-			checkHResult(w.factory->CreateSwapChainForHwnd(w.dev5.Get(), w.hwnd,
-				&desc, &full_desc, NULL, w.swapchain.GetAddressOf()),
+			checkHResult(w.factory->CreateSwapChain(w.dev5.Get(), &desc, w.swapchain.GetAddressOf()),
 				"failed to create swapchain");
 		}
 
@@ -1346,8 +1379,8 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 
 	// Root UI Element
 	{
-		DXGI_SWAP_CHAIN_DESC1 swapchain_desc;
-		w.swapchain->GetDesc1(&swapchain_desc);
+		DXGI_SWAP_CHAIN_DESC swapchain_desc;
+		w.swapchain->GetDesc(&swapchain_desc);
 
 		Node& new_node = w.nodes.emplace_back();
 		new_node.parent = nullptr;
@@ -1358,8 +1391,8 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 
 		// Default Values
 		root->pos = { 0, 0 };
-		root->width.setAbsolute((float)swapchain_desc.Width);
-		root->height.setAbsolute((float)swapchain_desc.Height);
+		root->width.setAbsolute((float)swapchain_desc.BufferDesc.Width);
+		root->height.setAbsolute((float)swapchain_desc.BufferDesc.Height);
 		root->overflow = Overflow::CLIP;
 		root->background_color.rgba = { 0, 0, 0, 1 };
 	}
@@ -1381,11 +1414,9 @@ ErrStack Instance::update()
 			DispatchMessage(&msg);
 		}
 
-		/*if (!window.minimized) {
+		if (!window.minimized) {
 			checkErrStack1(window.draw());
-		}*/
-
-		checkErrStack1(window.draw2());
+		}
 	}
 	
 	return err_stack;
