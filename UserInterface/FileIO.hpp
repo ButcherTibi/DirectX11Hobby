@@ -15,7 +15,7 @@ namespace nui {
 	public:
 		void recreateAbsolute(std::string path);
 		ErrStack recreateRelative(std::string path);
-		ErrStack recreateRelativeToSolution(std::string path);
+		//ErrStack recreateRelativeToSolution(std::string path);
 
 		bool hasExtension(std::string extension);
 
@@ -32,4 +32,10 @@ namespace nui {
 		template<typename T = char>
 		ErrStack read(std::vector<T>& content);
 	};
+
+	template<typename T = char>
+	ErrStack readFile(std::string& path, std::vector<T>& content);
+
+	template<typename T = char>
+	ErrStack readLocalFile(std::string path, std::vector<T>& content);
 }

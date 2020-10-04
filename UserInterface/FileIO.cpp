@@ -112,27 +112,6 @@ ErrStack FilePath::recreateRelative(std::string path)
 	return ErrStack();
 }
 
-ErrStack FilePath::recreateRelativeToSolution(std::string path)
-{
-	entries.clear();
-
-	std::string exe_filename;
-	exe_filename.resize(max_path);
-
-	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-
-		return ErrStack(code_location, getLastError());
-	}
-
-	pushPathToEntries(this->entries, exe_filename);
-
-	pop_back(3);
-
-	push_back(path);
-
-	return ErrStack();
-}
-
 bool FilePath::hasExtension(std::string extension)
 {
 	std::string last = entries.back();
@@ -242,6 +221,101 @@ ErrStack FilePath::read(std::vector<T>& content)
 }
 template ErrStack FilePath::read(std::vector<char>& content);
 template ErrStack FilePath::read(std::vector<uint8_t>& content);
+
+
+template<typename T>
+ErrStack nui::readFile(std::string& path, std::vector<T>& content)
+{
+	// create file handle;
+	HANDLE file_handle = CreateFile(path.data(),
+		GENERIC_READ, // desired acces
+		0,  // share mode
+		NULL,  // security atributes
+		OPEN_EXISTING,  // disposition
+		FILE_ATTRIBUTE_NORMAL, // flags and atributes
+		NULL);
+
+	if (file_handle == INVALID_HANDLE_VALUE) {
+		return ErrStack(code_location,
+			"failed to create file handle for path = " + path);
+	}
+
+	// find file size
+	LARGE_INTEGER file_size;
+	if (!GetFileSizeEx(file_handle, &file_size)) {
+
+		CloseHandle(file_handle);
+		return ErrStack(code_location,
+			"failed to find file size for path = " + path);
+	}
+	content.resize(file_size.QuadPart);
+
+	// read file
+	DWORD bytes_read;
+
+	if (!ReadFile(file_handle, content.data(), (DWORD)file_size.QuadPart, &bytes_read, NULL)) {
+
+		CloseHandle(file_handle);
+		return ErrStack(code_location,
+			"failed to read path = " + path);
+	}
+
+	CloseHandle(file_handle);
+	return ErrStack();
+}
+template ErrStack nui::readFile(std::string& path, std::vector<char>& content);
+template ErrStack nui::readFile(std::string& path, std::vector<uint8_t>& content);
+
+
+template<typename T>
+ErrStack nui::readLocalFile(std::string path, std::vector<T>& content)
+{
+	std::string exe_filename;
+	exe_filename.resize(max_path);
+
+	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
+		return ErrStack(code_location, getLastError());
+	}
+
+	// trim excess
+	for (uint32_t i = 0; i < exe_filename.size(); i++) {
+		if (exe_filename[i] == '\0') {
+			exe_filename.erase(i + 1, exe_filename.size() - (i + 1));
+			break;
+		}
+	}
+
+	// remove last 3 entries
+	uint32_t slash_pos = 0;
+	uint32_t slash_count = 0;
+	for (int32_t i = exe_filename.size() - 1; i >= 0; i--) {
+
+		char& c = exe_filename[i];
+
+		if (c == '\\' || c == '/') {
+			slash_count++;
+
+			if (slash_count == 3) {
+				slash_pos = i;
+				break;
+			}
+		}
+	}
+	exe_filename.erase(slash_pos + 1, exe_filename.size() - (slash_pos + 1));
+
+	assert_cond(path[0] != '/' && path[0] != '\\', "");
+
+	// convert linux '/' to windows '\'
+	for (char& c : path) {
+		c = c == '/' ? '\\' : c;
+	}
+
+	exe_filename.append(path);
+
+	return readFile(exe_filename, content);
+}
+template ErrStack nui::readLocalFile(std::string path, std::vector<char>& content);
+template ErrStack nui::readLocalFile(std::string path, std::vector<uint8_t>& content);
 
 //ErrStack FileSysPath::readLocal(std::vector<char>& content)
 //{

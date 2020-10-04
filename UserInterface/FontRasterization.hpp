@@ -64,6 +64,6 @@ namespace nui {
 		std::vector<Font> fonts;
 
 	public:
-		ErrStack addFont(FilePath& path, Font*& r_font);
+		ErrStack addFont(std::string path, Font*& r_font);
 	};
 }

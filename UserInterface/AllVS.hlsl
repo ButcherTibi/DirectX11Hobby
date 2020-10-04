@@ -1,4 +1,4 @@
-float4 verts[6] = {
+static float4 verts[6] = {
     { -1, 1, 0, 1 },
     { 1, 1, 0, 1 },
     { -1, -1, 0, 1 },

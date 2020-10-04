@@ -15,11 +15,13 @@
 #pragma comment(lib, "DXGI.lib")
 
 // Standard
-#include <string>
 #include <vector>
 #include <array>
 #include <list>
 #include <set>
+
+#include <string>
+
 #include <cmath>
 
 // GLM

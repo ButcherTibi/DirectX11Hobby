@@ -30,7 +30,7 @@ VertexOutput main(VertexInput input)
     float screen_height = screen_size.y;
     
     float2 local_pos = input.pos;
-    local_pos *= input.size;;
+    local_pos *= input.size;
     local_pos += input.inst_pos;
 
     float4 dx11_pos = float4(

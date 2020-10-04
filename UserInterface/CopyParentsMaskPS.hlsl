@@ -11,5 +11,5 @@ uint main(float4 pixel_pos : SV_Position) : SV_TARGET
     }
     
     discard;
-    return 0;
+    return 0xFFFFFFFF;
 }

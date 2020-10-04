@@ -38,6 +38,12 @@
     <Filter Include="Source Files\Shaders\CopyParentsMask">
       <UniqueIdentifier>{8ae53808-a1a0-4065-a60e-277173dfdaba}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Implementation">
+      <UniqueIdentifier>{4cd41a8d-fe79-4679-8e08-251b5c388bba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Input">
+      <UniqueIdentifier>{f77fcdef-9e5d-40a0-8504-c3e18c338fd6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
@@ -64,6 +70,9 @@
     <ClInclude Include="GPU_ShaderTypes.hpp">
       <Filter>Source Files\Shaders</Filter>
     </ClInclude>
+    <ClInclude Include="WindowInput.hpp">
+      <Filter>Source Files\Input</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ErrorStack.cpp">
@@ -71,9 +80,6 @@
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <Filter>Source Files\Precompiled Headers</Filter>
-    </ClCompile>
-    <ClCompile Include="Implementation.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileIO.cpp">
       <Filter>Source Files\FileIO</Filter>
@@ -89,6 +95,21 @@
     </ClCompile>
     <ClCompile Include="GPU_ShaderTypes.cpp">
       <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Implementation.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="UserInterfaceElements.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowInput.cpp">
+      <Filter>Source Files\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="Events.cpp">
+      <Filter>Source Files\Implementation</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

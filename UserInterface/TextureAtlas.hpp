@@ -11,6 +11,7 @@ namespace nui {
 		T x0, y0;  // Top Left Corner
 		T x1, y1;  // Bot Right Corner
 
+	public:
 		glm::vec2 getTopLeft() {
 			return glm::vec2(x0, y0);
 		}
@@ -33,6 +34,20 @@ namespace nui {
 
 		T getHeight() {
 			return y1 - y0;
+		}
+
+		bool isInside(T x, T y) {
+			return (x0 <= x && x < x1) &&
+				(y0 <= y && y < y1);
+		}
+
+	public:
+		void set(uint32_t width, uint32_t height)
+		{
+			x0 = 0;
+			x1 = width;
+			y0 = 0;
+			y1 = height;
 		}
 	};
 

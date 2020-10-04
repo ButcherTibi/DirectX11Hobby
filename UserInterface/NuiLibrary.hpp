@@ -1,31 +1,30 @@
 #pragma once
 
+// Standard
+#include <atomic>
+#include <chrono>
+
 // GLM
 #include <glm\vec4.hpp>
 
+// Mine
 #include "DX11Wrapper.hpp"
 #include "GPU_ShaderTypes.hpp"
 #include "FontRasterization.hpp"
+#include "WindowInput.hpp"
 
 
 /* TODO:
-- fix overflow by parents += nextparents at end of layer procesing
-- fix line height for one row and make line height absolute, because pixel matching
+- on key press (duration)
+- on key up
+- handle Alt, F10
 - fullscreen support
-- fix cursor icon
-- realtime resize
-
-- add events: void event(EventContext event_ctx, void* user_data)
-
 - multiple fonts
 - flex
 - wrap self origin, child pos can refer to center of child
 - z order
-*/
-
-/* LIMITATIONS:
-- the DirectX 11 character atlas texture does resize with atlas
-- make addBitmap return true on resize
+- multiple windows, needs atomics
+- the DirectX 11 character atlas texture does NOT resize with atlas
 */
 
 
@@ -47,7 +46,7 @@ namespace nui {
 	};
 
 	struct ElementSize {
-		ElementSizeType type = ElementSizeType::FIT;
+		ElementSizeType type;
 		float size;
 
 	public:
@@ -134,9 +133,89 @@ namespace nui {
 	};
 
 
-	class RectColider {
+	struct MouseHoverEvent {
+		Node* source;
+		float duration;
+		void* user_ptr;
+	};
+
+	struct MouseEnterEvent {
+		Node* source;
+		void* user_ptr;
+	};
+
+	struct MouseLeaveEvent {
+		Node* source;
+		void* user_ptr;
+	};
+
+	struct MouseMoveEvent {
+		Node* source;
+		void* user_ptr;
+	};
+
+	struct KeyDownEvent {
+		Node* source;
+		void* user_ptr;
+	};
+
+	typedef void (*MouseHoverCallback)(MouseHoverEvent& hover_event);
+	typedef void (*MouseEnterCallback)(MouseEnterEvent& hover_event);
+	typedef void (*MouseLeaveCallback)(MouseLeaveEvent& hover_event);
+	typedef void (*MouseMoveCallback)(MouseMoveEvent& move_event);
+	typedef void (*KeyDownCallback)(KeyDownEvent& key_down_event);
+
+	struct KeyDown {
+		uint32_t key;
+		KeyDownEvent event;
+		KeyDownCallback callback;
+	};
+
+	class CommonEventsComponent {
 	public:
-		BoundingBox2D<uint32_t> collider;
+		Window* window;
+		Node* source;
+		
+		uint32_t last_mouse_x;
+		uint32_t last_mouse_y;
+		SteadyTime mouse_enter_time;
+		bool mouse_entered;
+		bool mouse_left;
+
+		// Event State
+		MouseHoverEvent hover_event;
+		MouseEnterEvent enter_event;
+		MouseLeaveEvent leave_event;
+		MouseMoveEvent move_event;
+
+		// Callbacks
+		void (*onMouseHover)(MouseHoverEvent& hover_event);
+		void (*onMouseEnter)(MouseEnterEvent& enter_event);
+		void (*onMouseLeave)(MouseLeaveEvent& leave_event);
+		void (*onMouseMove)(MouseMoveEvent& move_event);
+		std::list<KeyDown> keys_down;
+
+	public:
+
+	public:
+		void create(Window* wnd, Node* node);
+
+		void emitInsideEvents();
+		void emitOutsideEvents();
+
+		void setMouseHoverEvent(MouseHoverCallback callback, void* user_ptr);
+		void setMouseEnterEvent(MouseEnterCallback callback, void* user_ptr);
+		void setMouseLeaveEvent(MouseLeaveCallback callback, void* user_ptr);
+		void setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr);
+
+		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr);
+		bool removeKeyDownEvent(uint32_t key);
+	};
+
+
+	class Root {
+	public:
+		NodeComponent node_comp;
 	};
 
 
@@ -148,12 +227,14 @@ namespace nui {
 
 	class Wrap {
 	public:
-		// Internal
-		NodeComponent node_comp;
-		WrapDrawcall drawcall;
+		// General
+		NodeComponent _node_comp;
+		
+		// Particular
+		WrapDrawcall _drawcall;
 
 	public:
-		glm::vec2 pos;
+		glm::uvec2 pos;
 		ElementSize width;
 		ElementSize height;
 		Overflow overflow;  // CURSED: assigning a default value causes undefined behaviour, memory coruption
@@ -163,9 +244,12 @@ namespace nui {
 		Text* addText();
 		Wrap* addWrap();
 
-		// addOnClickEvent(event)
-		// addOnHoverEvent(function point of signature)
-		// listOnHoverEvents(events with their name)
+		void setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data = nullptr);
+		void setOnMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
+		void setOnMouseLeaveEvent(MouseLeaveCallback callback, void* user_data = nullptr);
+		void setOnMouseMoveEvent(MouseMoveCallback callback, void* user_data = nullptr);
+		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr = nullptr);
+		bool removeKeyDownEvent(uint32_t key);
 	};
 
 
@@ -190,25 +274,36 @@ namespace nui {
 
 		std::vector<GPU_CharacterInstance> instances;
 
-		uint32_t instance_start_idx;
+		uint32_t instance_idx;
 	};
 
 	class Text {
-	public:
-		// Internal
-		NodeComponent node_comp;
-		std::vector<CharacterDrawcall> drawcalls;
+	public:  // Internal
+		// Generic
+		NodeComponent _node_comp;
+
+		// Particular
+		std::vector<CharacterDrawcall> _drawcalls;
 
 	public:
 		std::u32string text;
-		glm::vec2 pos;
-		float size;
-		float line_height;
+		glm::uvec2 pos;
+		uint32_t size;
+		uint32_t line_height;
 		Color color;
+
+	public:
+		void setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data = nullptr);
+		void setOnMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
+		void setOnMouseLeaveEvent(MouseLeaveCallback callback, void* user_data = nullptr);
+		void setOnMouseMoveEvent(MouseMoveCallback callback, void* user_data = nullptr);
+		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr = nullptr);
+		bool removeKeyDownEvent(uint32_t key);
 	};
 
 
-	enum class NodeType {
+	enum class ElementType {
+		ROOT,
 		WRAP,
 		FLEX,
 		TEXT
@@ -216,13 +311,20 @@ namespace nui {
 
 	class Node {
 	public:
-		NodeType type;
+		ElementType type;
 		void* elem = nullptr;
 
+		// Common Components
+		BoundingBox2D<uint32_t> collider;
+		CommonEventsComponent event_comp;
+		uint32_t layer_idx;
+
+		// Relations
 		Node* parent;
 		std::list<Node*> children;
 
 	public:
+		Root* createRoot();
 		Wrap* createWrap();
 		Flex* createFlex();
 		Text* createText();
@@ -232,37 +334,40 @@ namespace nui {
 
 
 	struct WindowCrateInfo {
-		uint32_t width;
-		uint32_t height;
+		uint16_t width;
+		uint16_t height;
 	};
 
 	struct AncestorProps {
-		float width;
-		float height;
+		uint32_t width;
+		uint32_t height;
+		uint32_t clip_width;
+		uint32_t clip_height;
 		uint32_t clip_mask;
 	};
 
 	struct DescendantProps {
-		glm::vec2* pos;
-		float width;
-		float height;
+		glm::uvec2* pos;
+		uint32_t width;
+		uint32_t height;
 	};
 
 	class Window {
 	public:
-		Instance* instance;
-
-		HINSTANCE hinstance;
 		WNDCLASS window_class;
 		HWND hwnd;
 
-		// Properties
-		uint32_t width;
-		uint32_t height;
-		uint32_t surface_width;
-		uint32_t surface_height;
-		
-		// Messages
+		// Window Procedure Messages
+		Input input;
+		uint32_t mouse_x;
+		uint32_t mouse_y;
+
+		std::uint32_t width;
+		std::uint32_t height;
+		RECT client_rect;
+		std::uint32_t surface_width;
+		std::uint32_t surface_height;
+	
 		bool minimized;
 		bool close;
 
@@ -271,7 +376,7 @@ namespace nui {
 		std::list<Node> nodes;
 
 		// Rendering Data
-		bool rendering_configured;	
+		bool rendering_configured;
 
 		uint32_t char_instance_count;
 		uint32_t wrap_instance_count;
@@ -300,6 +405,7 @@ namespace nui {
 
 		ComPtr<ID3D11SamplerState> chars_atlas_sampler;
 
+		ComPtr<ID3D11ShaderResourceView> next_parents_clip_mask_srv;
 		ComPtr<ID3D11ShaderResourceView> parents_clip_mask_srv;
 		ComPtr<ID3D11ShaderResourceView> chars_atlas_srv;
 
@@ -318,10 +424,6 @@ namespace nui {
 		ComPtr<ID3D11InputLayout> wrap_input_layout;
 		ComPtr<ID3D11InputLayout> chars_input_layout;
 
-		std::vector<char> wrap_vs_cso;
-		std::vector<char> chars_vs_cso;
-		std::vector<char> all_vs_cso;
-
 		ComPtr<ID3D11VertexShader> wrap_vs;
 		ComPtr<ID3D11VertexShader> chars_vs;
 		ComPtr<ID3D11VertexShader> all_vs;
@@ -330,21 +432,28 @@ namespace nui {
 
 		ComPtr<ID3D11PixelShader> wrap_ps;
 		ComPtr<ID3D11PixelShader> chars_ps;
+		ComPtr<ID3D11PixelShader> copy_parents_ps;
 
 		ComPtr<ID3D11BlendState> blend_state;
 
 	public:
-		void generateDrawcalls(Node* node, AncestorProps& ancestor,
-			DescendantProps& r_descendant);
-
-		void calcGlobalPositions(Node* node, glm::vec2 pos);
-
-		ErrStack generateGPU_Data();
-
-		ErrStack draw();
+		Instance* instance;
 
 	public:
-		Wrap* getRoot();
+		void _emitEvents();
+
+		void _calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
+			DescendantProps& r_descendant);
+		void _calcGlobalPositions(Node* node, glm::uvec2 pos);
+
+		ErrStack _updateCPU_Data();
+		ErrStack _loadCPU_DataToGPU();
+		ErrStack _resizeAllAtachments();
+		ErrStack _render();
+
+	public:
+		Wrap* addWrap();
+		Text* addText();
 	};
 
 	 
@@ -352,8 +461,20 @@ namespace nui {
 
 
 	class Instance {
-	public:
-		CharacterAtlas char_atlas;
+	public:	
+		HINSTANCE _hinstance;
+
+		HCURSOR _arrow_cursor;
+
+		std::vector<char> _wrap_vs_cso;
+		std::vector<char> _chars_vs_cso;
+		std::vector<char> _all_vs_cso;
+
+		std::vector<char> _wrap_ps_cso;
+		std::vector<char> _chars_ps_cso;
+		std::vector<char> _copy_parents_ps_cso;
+
+		CharacterAtlas _char_atlas;
 
 	public:
 		ErrStack create();

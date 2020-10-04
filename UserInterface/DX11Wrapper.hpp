@@ -29,4 +29,7 @@ namespace dx11 {
 
 	nui::ErrStack singleLoad(ID3D11DeviceContext4* ctx, ID3D11Resource* resource,
 		void* data, size_t load_size, uint32_t sub_resource_idx = 0);
+
+	nui::ErrStack resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t new_height,
+		ComPtr<ID3D11Texture2D>& tex);
 }

@@ -147,6 +147,7 @@
     <ClInclude Include="FileIO.hpp" />
     <ClInclude Include="FontRasterization.hpp" />
     <ClInclude Include="GPU_ShaderTypes.hpp" />
+    <ClInclude Include="WindowInput.hpp" />
     <ClInclude Include="NuiLibrary.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="TextureAtlas.hpp" />
@@ -158,11 +159,15 @@
     <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
     <ClCompile Include="Implementation.cpp" />
+    <ClCompile Include="Events.cpp" />
+    <ClCompile Include="Rendering.cpp" />
+    <ClCompile Include="WindowInput.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp" />
+    <ClCompile Include="UserInterfaceElements.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="AllVS.hlsl">

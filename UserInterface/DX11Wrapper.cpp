@@ -70,3 +70,21 @@ nui::ErrStack dx11::singleLoad(ID3D11DeviceContext4* ctx, ID3D11Resource* resour
 
 	return err_stack;
 }
+
+nui::ErrStack dx11::resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t new_height,
+	ComPtr<ID3D11Texture2D>& tex)
+{
+	HRESULT hr = S_OK;
+
+	D3D11_TEXTURE2D_DESC desc;
+	tex->GetDesc(&desc);
+
+	tex->Release();
+
+	desc.Width = new_width;
+	desc.Height = new_height;
+	checkHResult(dev->CreateTexture2D(&desc, NULL, tex.GetAddressOf()),
+		"failed to resize texture 2D");
+
+	return nui::ErrStack();
+}

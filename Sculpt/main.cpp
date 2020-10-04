@@ -2,6 +2,46 @@
 #include "NuiLibrary.hpp"
 
 
+void onRedKeyDown(nui::KeyDownEvent& event)
+{
+	printf("Red key down \n");
+}
+
+void onBlueEnter(nui::MouseEnterEvent& event)
+{
+	printf("Blue entered \n");
+}
+
+void onBlueHover(nui::MouseHoverEvent& event)
+{
+	printf("Blue hover called for %f \n", event.duration);
+}
+
+void onBlueLeave(nui::MouseLeaveEvent& event)
+{
+	printf("Blue leave \n");
+}
+
+void onBlueMove(nui::MouseMoveEvent& event)
+{
+	printf("Blue move \n");
+}
+
+void onTextEnter(nui::MouseEnterEvent& event)
+{
+	printf("text entered \n");
+}
+
+void onTextHover(nui::MouseHoverEvent& event)
+{
+	printf("text hover called for %f \n", event.duration);
+}
+
+void onTextLeave(nui::MouseLeaveEvent& event)
+{
+	printf("text leave \n");
+}
+
 int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR pCmdLine, _In_ int nCmdShow)
 {
 	nui::ErrStack err_stack{};
@@ -24,26 +64,31 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		return 1;
 	}
 
-	nui::Wrap* root = window->getRoot();
-
-	auto w0 = root->addWrap();
+	auto w0 = window->addWrap();
 	w0->width = 50.0f;
 	w0->height = 50.0f;
 	w0->background_color = nui::Color::red();
 	w0->overflow = nui::Overflow::CLIP;
+	w0->addKeyDownEvent(onRedKeyDown, nui::VirtualKey::A);
 
-	auto w1 = w0->addWrap();
-	w1->width = 50.0f;
-	w1->height = 100.0f;
-	w1->background_color = nui::Color::green();
+	auto green = w0->addWrap();
+	green->width = 50.0f;
+	green->height = 100.0f;
+	green->background_color = nui::Color::green();
 
-	auto w2 = w1->addWrap();
-	w2->width = 50.0f;
-	w2->height = 100.0f;
-	w2->background_color = nui::Color::blue();
+	auto blue = green->addWrap();
+	blue->width = 50.0f;
+	blue->height = 100.0f;
+	blue->background_color = nui::Color::blue();
+	blue->setOnMouseEnterEvent(onBlueEnter);
+	blue->setOnMouseLeaveEvent(onBlueLeave);
+	blue->setOnMouseMoveEvent(onBlueMove);
 
-	auto t = w2->addText();
+	auto t = blue->addText();
 	t->text = U"This text should overflow past blue into green and red but clipped by red";
+	t->pos.x = 100;
+	t->setOnMouseEnterEvent(onTextEnter);
+	t->setOnMouseLeaveEvent(onTextLeave);
 
 	while (!window->close) {
 
