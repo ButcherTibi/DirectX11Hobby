@@ -1,5 +1,6 @@
 
 #include "NuiLibrary.hpp"
+#include "Renderer.hpp"
 
 
 void onRedKeyDown(nui::KeyDownEvent& event)
@@ -44,7 +45,15 @@ void onTextLeave(nui::MouseLeaveEvent& event)
 
 int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR pCmdLine, _In_ int nCmdShow)
 {
-	nui::ErrStack err_stack{};
+	ErrStack err_stack{};
+
+	// Application
+	{
+		application.field_of_view = 25;
+		application.z_near = 0.1f;
+		application.z_far = 100;
+		application.mesh.createAsTriangle(glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 0, 0 });
+	}
 
 	nui::Instance instance;
 	err_stack = instance.create();
@@ -64,7 +73,9 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		return 1;
 	}
 
+	// UI code
 	auto w0 = window->addWrap();
+	w0->pos.x = 50;
 	w0->width = 50.0f;
 	w0->height = 50.0f;
 	w0->background_color = nui::Color::red();
@@ -89,6 +100,11 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 	t->pos.x = 100;
 	t->setOnMouseEnterEvent(onTextEnter);
 	t->setOnMouseLeaveEvent(onTextLeave);
+
+	MeshRenderer renderer;
+	nui::Surface* surface = window->addSurface();
+	surface->callback = geometryDraw;
+	surface->user_data = &renderer;
 
 	while (!window->close) {
 

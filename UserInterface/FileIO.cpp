@@ -5,10 +5,10 @@
 #include "FileIO.hpp"
 
 
-using namespace nui;
+using namespace io;
 
 
-uint32_t nui::max_path = 1024;
+uint32_t io::max_path = 1024;
 
 
 static uint32_t findEntryCount(std::string path)
@@ -224,7 +224,7 @@ template ErrStack FilePath::read(std::vector<uint8_t>& content);
 
 
 template<typename T>
-ErrStack nui::readFile(std::string& path, std::vector<T>& content)
+ErrStack io::readFile(std::string& path, std::vector<T>& content)
 {
 	// create file handle;
 	HANDLE file_handle = CreateFile(path.data(),
@@ -263,12 +263,12 @@ ErrStack nui::readFile(std::string& path, std::vector<T>& content)
 	CloseHandle(file_handle);
 	return ErrStack();
 }
-template ErrStack nui::readFile(std::string& path, std::vector<char>& content);
-template ErrStack nui::readFile(std::string& path, std::vector<uint8_t>& content);
+template ErrStack io::readFile(std::string& path, std::vector<char>& content);
+template ErrStack io::readFile(std::string& path, std::vector<uint8_t>& content);
 
 
 template<typename T>
-ErrStack nui::readLocalFile(std::string path, std::vector<T>& content)
+ErrStack io::readLocalFile(std::string path, std::vector<T>& content)
 {
 	std::string exe_filename;
 	exe_filename.resize(max_path);
@@ -314,8 +314,8 @@ ErrStack nui::readLocalFile(std::string path, std::vector<T>& content)
 
 	return readFile(exe_filename, content);
 }
-template ErrStack nui::readLocalFile(std::string path, std::vector<char>& content);
-template ErrStack nui::readLocalFile(std::string path, std::vector<uint8_t>& content);
+template ErrStack io::readLocalFile(std::string path, std::vector<char>& content);
+template ErrStack io::readLocalFile(std::string path, std::vector<uint8_t>& content);
 
 //ErrStack FileSysPath::readLocal(std::vector<char>& content)
 //{

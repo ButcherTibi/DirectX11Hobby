@@ -112,7 +112,7 @@ ErrStack CharacterAtlas::addFont(std::string path, Font*& r_font)
 	Font& font = this->fonts.emplace_back();
 	font.atlas = this;
 
-	checkErrStack(readLocalFile(path, font.ttf_file), "failed to read font file");
+	checkErrStack(io::readLocalFile(path, font.ttf_file), "failed to read font file");
 	
 	FT_Face face;
 	err = FT_New_Memory_Face(free_type, font.ttf_file.data(), (uint32_t)font.ttf_file.size(), 0, &face);

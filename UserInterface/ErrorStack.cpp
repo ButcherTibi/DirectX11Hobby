@@ -5,9 +5,6 @@
 #include "ErrorStack.hpp"
 
 
-using namespace nui;
-
-
 ErrStack::ErrStack()
 {
 
@@ -73,7 +70,7 @@ void ErrStack::debugPrint()
 	}
 }
 
-std::string nui::getLastError()
+std::string getLastError()
 {
 	LPSTR buffer;
 
@@ -94,7 +91,7 @@ std::string nui::getLastError()
 	return error_msg;
 }
 
-std::string nui::asIs(char c)
+std::string asIs(char c)
 {
 	switch (c)
 	{

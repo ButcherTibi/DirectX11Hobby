@@ -17,17 +17,29 @@
     <Filter Include="Source Files\Importers">
       <UniqueIdentifier>{73c0de51-568c-486b-b747-400f71b18cd9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Error">
-      <UniqueIdentifier>{4829bd37-ac8c-4c61-ab1a-d8fed6acfd60}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\FileIO">
-      <UniqueIdentifier>{37a2ad13-7048-4873-8450-23915d4486b6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Input">
-      <UniqueIdentifier>{0b3c375a-750e-47a0-8a9f-5c21831a55f2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Precompiled Headers">
       <UniqueIdentifier>{10803e6a-b26c-41e4-8b3f-218047b714b7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Renderer">
+      <UniqueIdentifier>{d49cd30f-9858-472e-956c-6803c7e2db33}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\SculptMesh">
+      <UniqueIdentifier>{60719244-c19b-4b96-9fba-45608d625ae8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Importers\JSON">
+      <UniqueIdentifier>{dc44d6b6-f88a-47df-9d71-e7ff9059fe9e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Importers\GLTF">
+      <UniqueIdentifier>{04d803b2-4a78-46f4-b3ad-adf8c50a06ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BoundingBox3D">
+      <UniqueIdentifier>{fe002ff6-eeae-47dc-a8eb-1e22d760637f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders">
+      <UniqueIdentifier>{ccd85e4f-9442-46b6-b000-bff55edb8f36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Mesh">
+      <UniqueIdentifier>{49c9dcac-25b7-468a-8797-9464a73b22d1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -40,12 +52,6 @@
     <ClCompile Include="LinkageMesh.cpp">
       <Filter>Source Files\Mesh</Filter>
     </ClCompile>
-    <ClCompile Include="JSONParser.cpp">
-      <Filter>Source Files\Importers</Filter>
-    </ClCompile>
-    <ClCompile Include="GLTFParser.cpp">
-      <Filter>Source Files\Importers</Filter>
-    </ClCompile>
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files\Precompiled Headers</Filter>
     </ClCompile>
@@ -55,14 +61,32 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ErrorStuff.cpp">
-      <Filter>Source Files\Error</Filter>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>Source Files\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="FileIO.cpp">
-      <Filter>Source Files\FileIO</Filter>
+    <ClCompile Include="FromGLTF.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Source Files\Input</Filter>
+    <ClCompile Include="JSON_File.cpp">
+      <Filter>Source Files\Importers\JSON</Filter>
+    </ClCompile>
+    <ClCompile Include="GLTF_File.cpp">
+      <Filter>Source Files\Importers\GLTF</Filter>
+    </ClCompile>
+    <ClCompile Include="Base64.cpp">
+      <Filter>Source Files\Importers\GLTF</Filter>
+    </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Source Files\BoundingBox3D</Filter>
+    </ClCompile>
+    <ClCompile Include="SubPrimitives.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU_ShaderTypesMesh.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -72,23 +96,40 @@
     <ClInclude Include="Meshes.h">
       <Filter>Source Files\Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="Importer.h">
-      <Filter>Source Files\Importers</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Source Files\Precompiled Headers</Filter>
     </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
-    <ClInclude Include="ErrorStuff.h">
-      <Filter>Source Files\Error</Filter>
+    <ClInclude Include="Renderer.hpp">
+      <Filter>Source Files\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="FileIO.h">
-      <Filter>Source Files\FileIO</Filter>
+    <ClInclude Include="SculptMesh.hpp">
+      <Filter>Source Files\SculptMesh</Filter>
     </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>Source Files\Input</Filter>
+    <ClInclude Include="JSON_File.hpp">
+      <Filter>Source Files\Importers\JSON</Filter>
     </ClInclude>
+    <ClInclude Include="GLTF_File.hpp">
+      <Filter>Source Files\Importers\GLTF</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.hpp">
+      <Filter>Source Files\BoundingBox3D</Filter>
+    </ClInclude>
+    <ClInclude Include="GPU_ShaderTypesMesh.hpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="MeshVS.hlsl">
+      <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="MeshPS.hlsl">
+      <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

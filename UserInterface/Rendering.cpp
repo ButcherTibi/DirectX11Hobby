@@ -11,10 +11,10 @@ using namespace nui;
 void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 	DescendantProps& r_descendant)
 {
-	switch (node->type) {
+	switch (node->elem.index()) {
 	case ElementType::TEXT: {
 
-		Text* text = (Text*)node->elem;
+		Text* text = std::get_if<Text>(&node->elem);
 
 		// Drawcalls
 		text->_drawcalls.clear();
@@ -136,7 +136,7 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 
 	case ElementType::WRAP: {
 
-		Wrap* wrap = (Wrap*)node->elem;
+		Wrap* wrap = std::get_if<Wrap>(&node->elem);
 
 		AncestorProps child_ancs;
 
@@ -236,8 +236,99 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 		break;
 	}
 
-	case ElementType::FLEX: {
-		// Flex* flex = (Flex*)node->elem;
+	case ElementType::SURFACE: {
+		Surface* surf = std::get_if<Surface>(&node->elem);
+
+		AncestorProps child_ancs;
+
+		// Sizes
+		auto calcSize = [](ElementSize size, uint32_t ancestor_size) -> uint32_t {
+			switch (size.type) {
+			case ElementSizeType::ABSOLUTE_SIZE:
+				return (uint32_t)size.size;
+			case ElementSizeType::RELATIVE_SIZE:
+				return (uint32_t)(size.size * (float)ancestor_size);
+			}
+			return ancestor_size;  // FIT
+		};
+
+		child_ancs.width = calcSize(surf->width, ancestor.width);
+		child_ancs.height = calcSize(surf->height, ancestor.height);
+
+		// Collider Sizes and Child Clip Mask
+		if (surf->overflow == Overflow::CLIP) {
+			child_ancs.clip_width = child_ancs.width;
+			child_ancs.clip_height = child_ancs.height;
+
+			this->clip_mask_id++;
+			child_ancs.clip_mask = this->clip_mask_id;
+		}
+		else {
+			child_ancs.clip_width = ancestor.clip_width;
+			child_ancs.clip_height = ancestor.clip_height;
+
+			child_ancs.clip_mask = ancestor.clip_mask;
+		}
+
+		// Calculate Children
+		std::vector<DescendantProps> child_props(node->children.size());
+		auto child_it = node->children.begin();
+
+		for (uint32_t i = 0; i < node->children.size(); i++, child_it++) {
+
+			DescendantProps& child_prop = child_props[i];
+			_calculateLayoutAndDrawcalls(*child_it, child_ancs, child_prop);
+		}
+
+		r_descendant.pos = &surf->pos;
+
+		// Make size big enough to engulf all children
+		if (surf->width.type == ElementSizeType::FIT) {
+
+			uint32_t right_most = 0;
+			for (DescendantProps& child_prop : child_props) {
+				uint32_t right = child_prop.pos->x + child_prop.width;
+				if (right_most < right) {
+					right_most = right;
+				}
+			}
+
+			r_descendant.width = right_most;
+		}
+		else {
+			r_descendant.width = child_ancs.width;
+		}
+
+		if (surf->height.type == ElementSizeType::FIT) {
+
+			uint32_t bottom_most = 0;
+			for (DescendantProps& child_prop : child_props) {
+				uint32_t bottom = child_prop.pos->y + child_prop.height;
+				if (bottom_most < bottom) {
+					bottom_most = bottom;
+				}
+			}
+
+			r_descendant.height = bottom_most;
+		}
+		else {
+			r_descendant.height = child_ancs.height;
+		}
+
+		// make width and height not be zero
+
+		// Drawcall
+		SurfaceEvent& event = surf->_event;
+		event.pos = { (float)surf->pos.x, (float)surf->pos.y };
+		event.size = { (float)r_descendant.width, (float)r_descendant.height };
+		event.parent_clip_id = ancestor.clip_mask;
+		event.child_clip_id = child_ancs.clip_mask;
+
+		// Calculate Event Collider
+		node->collider.x0 = surf->pos.x;
+		node->collider.x1 = std::min(surf->pos.x + r_descendant.width, ancestor.clip_width);
+		node->collider.y0 = surf->pos.y;
+		node->collider.y1 = std::min(surf->pos.y + r_descendant.height, ancestor.clip_height);
 		break;
 	}
 	}
@@ -245,9 +336,9 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 
 void Window::_calcGlobalPositions(Node* node, glm::uvec2 pos)
 {
-	switch (node->type) {
+	switch (node->elem.index()) {
 	case ElementType::TEXT: {
-		Text* text = (Text*)node->elem;
+		Text* text = std::get_if<Text>(&node->elem);
 
 		for (CharacterDrawcall& drawcall : text->_drawcalls) {
 			for (GPU_CharacterInstance& inst : drawcall.instances) {
@@ -256,19 +347,14 @@ void Window::_calcGlobalPositions(Node* node, glm::uvec2 pos)
 			}
 		}
 
-		// Collider
-		node->collider.x0 += pos.x;
-		node->collider.x1 += pos.x;
-		node->collider.y0 += pos.y;
-		node->collider.y1 += pos.y;
 		break;
 	}
 
 	case ElementType::WRAP: {
-		Wrap* wrap = (Wrap*)node->elem;
+		Wrap* wrap = std::get_if<Wrap>(&node->elem);
 
 		wrap->_drawcall.instance.pos.x += pos.x;
-		wrap->_drawcall.instance.pos.y += pos.y;
+		wrap->_drawcall.instance.pos.y += pos.y;	
 
 		for (Node* child : node->children) {
 			_calcGlobalPositions(child, { wrap->_drawcall.instance.pos.x, wrap->_drawcall.instance.pos.y });
@@ -276,11 +362,23 @@ void Window::_calcGlobalPositions(Node* node, glm::uvec2 pos)
 		break;
 	}
 
-	case ElementType::FLEX: {
-		// Flex* flex = (Flex*)node->elem;
+	case ElementType::SURFACE: {
+		Surface* surface = std::get_if<Surface>(&node->elem);
+
+		surface->_event.pos += pos;
+
+		for (Node* child : node->children) {
+			_calcGlobalPositions(child, { surface->_event.pos.x, surface->_event.pos.y });
+		}
 		break;
 	}
 	}
+
+	// Collider
+	node->collider.x0 += pos.x;
+	node->collider.x1 += pos.x;
+	node->collider.y0 += pos.y;
+	node->collider.y1 += pos.y;
 }
 
 ErrStack Window::_updateCPU_Data()
@@ -302,9 +400,9 @@ ErrStack Window::_updateCPU_Data()
 			std::set<uint32_t> sizes;
 
 			for (Node& node : nodes) {
-				if (node.type == ElementType::TEXT) {
+				if (node.elem.index() == ElementType::TEXT) {
 
-					Text* text = (Text*)node.elem;
+					Text* text = std::get_if<Text>(&node.elem);
 					sizes.insert((uint32_t)(text->size));
 				}
 			}
@@ -408,9 +506,9 @@ ErrStack Window::_updateCPU_Data()
 
 		for (Node& node : nodes) {
 
-			switch (node.type) {
+			switch (node.elem.index()) {
 			case ElementType::TEXT: {
-				Text* text = (Text*)node.elem;
+				Text* text = std::get_if<Text>(&node.elem);
 
 				for (CharacterDrawcall& drawcall : text->_drawcalls) {
 
@@ -425,7 +523,7 @@ ErrStack Window::_updateCPU_Data()
 			}
 
 			case ElementType::WRAP: {
-				Wrap* wrap = (Wrap*)node.elem;
+				Wrap* wrap = std::get_if<Wrap>(&node.elem);
 
 				wrap->_drawcall.instance_idx = wrap_instance_idx;
 
@@ -696,10 +794,10 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			wrap_vbuff.create(dev5.Get(), de_ctx3.Get(), desc);
 			checkErrStack1(wrap_vbuff.load(wrap_verts.data(), sizeof(GPU_WrapVertex) * wrap_verts.size()));
 
-			chars_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			chars_vbuff.create(dev5.Get(), de_ctx3.Get(), desc);
 		}
 
 		// Index Buffers
@@ -711,10 +809,10 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			wrap_idxbuff.create(dev5.Get(), de_ctx3.Get(), desc);
 			checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), sizeof(uint16_t) * wrap_idxs.size()));
 
-			chars_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			chars_idxbuff.create(dev5.Get(), de_ctx3.Get(), desc);
 		}
 
 		// Instance Buffers
@@ -726,8 +824,8 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
-			chars_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			wrap_instabuff.create(dev5.Get(), de_ctx3.Get(), desc);
+			chars_instabuff.create(dev5.Get(), de_ctx3.Get(), desc);
 		}
 
 		// Constant Buffer
@@ -739,7 +837,7 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			cbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			cbuff.create(dev5.Get(), de_ctx3.Get(), desc);
 		}
 
 		// Character Atlas
@@ -809,9 +907,9 @@ ErrStack Window::_render()
 		1, 0, 0, 0
 	};
 
-	im_ctx4->ClearRenderTargetView(present_rtv.Get(), zero_color);
-	im_ctx4->ClearRenderTargetView(parents_clip_mask_rtv.Get(), parent_init_value);
-	im_ctx4->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), zero_color);
+	de_ctx3->ClearRenderTargetView(present_rtv.Get(), zero_color);
+	de_ctx3->ClearRenderTargetView(parents_clip_mask_rtv.Get(), parent_init_value);
+	de_ctx3->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), zero_color);
 
 	std::vector<Node*> now_nodes = {
 		&nodes.front()
@@ -831,19 +929,19 @@ ErrStack Window::_render()
 
 		for (Node* node : now_nodes) {
 
-			switch (node->type) {
+			switch (node->elem.index()) {
 			case ElementType::TEXT: {
-				Text* text = (Text*)node->elem;
+				Text* text = std::get_if<Text>(&node->elem);
 
 				if (!text->_drawcalls.size()) {
 					break;
 				}
 
-				im_ctx4->ClearState();
+				de_ctx3->ClearState();
 
 				// Input Assembly
-				im_ctx4->IASetInputLayout(chars_input_layout.Get());
-				im_ctx4->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				de_ctx3->IASetInputLayout(chars_input_layout.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> vbuffs;
 				vbuffs[0] = chars_vbuff.buff.Get();
@@ -856,47 +954,47 @@ ErrStack Window::_render()
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				im_ctx4->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
-				im_ctx4->IASetIndexBuffer(chars_idxbuff.buff.Get(), DXGI_FORMAT_R32_UINT, 0);
+				de_ctx3->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
+				de_ctx3->IASetIndexBuffer(chars_idxbuff.buff.Get(), DXGI_FORMAT_R32_UINT, 0);
 
 				// Vertex Shader
-				im_ctx4->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());
-				im_ctx4->VSSetShader(chars_vs.Get(), NULL, 0);
+				de_ctx3->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(chars_vs.Get(), NULL, 0);
 
 				// Rasterizer
-				im_ctx4->RSSetViewports(1, &viewport);
-				im_ctx4->RSSetState(rasterizer_state.Get());
+				de_ctx3->RSSetViewports(1, &viewport);
+				de_ctx3->RSSetState(rasterizer_state.Get());
 
 				// Pixel Shader
 				std::array<ID3D11ShaderResourceView*, 2> srviews = {
 					parents_clip_mask_srv.Get(), chars_atlas_srv.Get()
 				};
-				im_ctx4->PSSetShaderResources(0, srviews.size(), srviews.data());
-				im_ctx4->PSSetSamplers(0, 1, chars_atlas_sampler.GetAddressOf());
-				im_ctx4->PSSetShader(chars_ps.Get(), NULL, 0);
+				de_ctx3->PSSetShaderResources(0, srviews.size(), srviews.data());
+				de_ctx3->PSSetSamplers(0, 1, chars_atlas_sampler.GetAddressOf());
+				de_ctx3->PSSetShader(chars_ps.Get(), NULL, 0);
 
 				// Output Merger
-				im_ctx4->OMSetBlendState(blend_state.Get(), zero_color, 0xFFFF'FFFF);
+				de_ctx3->OMSetBlendState(blend_state.Get(), zero_color, 0xFFFF'FFFF);
 
 				std::array<ID3D11RenderTargetView*, 1> rtvs;
 				rtvs[0] = present_rtv.Get();
-				im_ctx4->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
 
 				for (CharacterDrawcall& drawcall : text->_drawcalls) {
-					im_ctx4->DrawIndexedInstanced(6, (uint32_t)drawcall.instances.size(),
+					de_ctx3->DrawIndexedInstanced(6, (uint32_t)drawcall.instances.size(),
 						drawcall.chara->index_start_idx, 0, drawcall.instance_idx);
 				}
 				break;
 			}
 
 			case ElementType::WRAP: {
-				Wrap* wrap = (Wrap*)node->elem;
+				Wrap* wrap = std::get_if<Wrap>(&node->elem);
 
-				im_ctx4->ClearState();
+				de_ctx3->ClearState();
 
 				// Input Assembly
-				im_ctx4->IASetInputLayout(wrap_input_layout.Get());
-				im_ctx4->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				de_ctx3->IASetInputLayout(wrap_input_layout.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> vbuffs;
 				vbuffs[0] = wrap_vbuff.buff.Get();
@@ -910,30 +1008,55 @@ ErrStack Window::_render()
 					0, 0
 				};
 
-				im_ctx4->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
-				im_ctx4->IASetIndexBuffer(wrap_idxbuff.buff.Get(), DXGI_FORMAT_R16_UINT, 0);
+				de_ctx3->IASetVertexBuffers(0, vbuffs.size(), vbuffs.data(), strides.data(), offsets.data());
+				de_ctx3->IASetIndexBuffer(wrap_idxbuff.buff.Get(), DXGI_FORMAT_R16_UINT, 0);
 
 				// Vertex Shader
-				im_ctx4->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());
-				im_ctx4->VSSetShader(wrap_vs.Get(), NULL, 0);
+				de_ctx3->VSSetConstantBuffers(0, 1, cbuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(wrap_vs.Get(), NULL, 0);
 
 				// Rasterizer
-				im_ctx4->RSSetViewports(1, &viewport);
-				im_ctx4->RSSetState(rasterizer_state.Get());
+				de_ctx3->RSSetViewports(1, &viewport);
+				de_ctx3->RSSetState(rasterizer_state.Get());
 
 				// Pixel Shader
-				im_ctx4->PSSetShaderResources(0, 1, parents_clip_mask_srv.GetAddressOf());
-				im_ctx4->PSSetShader(wrap_ps.Get(), NULL, 0);
+				de_ctx3->PSSetShaderResources(0, 1, parents_clip_mask_srv.GetAddressOf());
+				de_ctx3->PSSetShader(wrap_ps.Get(), NULL, 0);
 
 				// Output Merger
-				im_ctx4->OMSetBlendState(blend_state.Get(), zero_color, 0xFFFF'FFFF);
+				de_ctx3->OMSetBlendState(blend_state.Get(), zero_color, 0xFFFF'FFFF);
 
 				std::array<ID3D11RenderTargetView*, 2> rtvs;
 				rtvs[0] = present_rtv.Get();
 				rtvs[1] = next_parents_clip_mask_rtv.Get();
-				im_ctx4->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), NULL);
 
-				im_ctx4->DrawIndexedInstanced(6, 1, 0, 0, wrap->_drawcall.instance_idx);
+				de_ctx3->DrawIndexedInstanced(6, 1, 0, 0, wrap->_drawcall.instance_idx);
+				break;
+			}
+
+			case ElementType::SURFACE: {
+				Surface* surf = std::get_if<Surface>(&node->elem);
+
+				if (surf->callback == nullptr) {
+					break;
+				}
+
+				surf->_event.surface_width = swapchain_desc.BufferDesc.Width;
+				surf->_event.surface_height = swapchain_desc.BufferDesc.Height;
+
+				surf->_event.user_data = surf->user_data;
+				surf->_event.dev5 = dev5.Get();
+				surf->_event.de_ctx3 = de_ctx3.Get();
+
+				surf->_event.parent_clip_mask_srv = parents_clip_mask_srv.Get();
+				surf->_event.next_parents_clip_mask_srv = next_parents_clip_mask_srv.Get();
+
+				surf->_event.compose_rtv = present_rtv.Get();
+				surf->_event.parent_clip_mask_rtv = parents_clip_mask_rtv.Get();
+				surf->_event.next_parents_clip_mask_rtv = next_parents_clip_mask_rtv.Get();
+
+				surf->callback(surf->_event);
 				break;
 			}
 			}
@@ -948,35 +1071,42 @@ ErrStack Window::_render()
 
 		// Copy Next Parents to Parents
 		{
-			im_ctx4->ClearState();
+			de_ctx3->ClearState();
 
 			// Input Assempbly
-			im_ctx4->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 			// Vertex Shader
-			im_ctx4->VSSetShader(all_vs.Get(), nullptr, 0);
+			de_ctx3->VSSetShader(all_vs.Get(), nullptr, 0);
 
 			// Rasterizer
-			im_ctx4->RSSetViewports(1, &viewport);
-			im_ctx4->RSSetState(rasterizer_state.Get());
+			de_ctx3->RSSetViewports(1, &viewport);
+			de_ctx3->RSSetState(rasterizer_state.Get());
 
 			// Pixel Shader
 			std::array<ID3D11ShaderResourceView*, 2> srvs = {
 				next_parents_clip_mask_srv.Get(),
 				nullptr
 			};
-			im_ctx4->PSSetShaderResources(0, srvs.size(), srvs.data());
-			im_ctx4->PSSetShader(copy_parents_ps.Get(), nullptr, 0);
+			de_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());
+			de_ctx3->PSSetShader(copy_parents_ps.Get(), nullptr, 0);
 
 			// Output Merger
-			im_ctx4->OMSetRenderTargets(1, parents_clip_mask_rtv.GetAddressOf(), nullptr);
+			de_ctx3->OMSetRenderTargets(1, parents_clip_mask_rtv.GetAddressOf(), nullptr);
 
-			im_ctx4->Draw(6, 0);
+			de_ctx3->Draw(6, 0);
 		}
 
 		//im_ctx4->CopyResource(parents_clip_mask_img.Get(), next_parents_clip_mask_img.Get());
-		im_ctx4->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), zero_color);
+		de_ctx3->ClearRenderTargetView(next_parents_clip_mask_rtv.Get(), zero_color);
 	}
+
+	ID3D11CommandList* command_list;
+	checkHResult(de_ctx3->FinishCommandList(FALSE, &command_list),
+		"failed to finish command list");
+
+	im_ctx4->ExecuteCommandList(command_list, false);
+	command_list->Release();
 
 	checkHResult(swapchain->Present(0, 0),
 		"failed to present swapchain");

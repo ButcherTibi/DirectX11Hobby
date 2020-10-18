@@ -7,26 +7,26 @@
 
 using namespace dx11;
 
-void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext4* context, D3D11_BUFFER_DESC& desc)
+void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext3* context, D3D11_BUFFER_DESC& desc)
 {
 	this->dev = device;
 	this->ctx = context;
 	this->init_desc = desc;
 }
 
-nui::ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_resource_idx)
+ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_resource_idx)
 {
-	nui::ErrStack err_stack;
+	ErrStack err_stack;
 	HRESULT hr = S_OK;
 
 	// Create New Buffer of load size
-	auto create_buff = [&]() -> nui::ErrStack {
+	auto create_buff = [&]() -> ErrStack {
 
 		init_desc.ByteWidth = load_size;
 		checkHResult(dev->CreateBuffer(&init_desc, NULL, buff.GetAddressOf()),
 			"failed to create vertex buffer");
 
-		return nui::ErrStack();
+		return ErrStack();
 	};
 
 	if (buff == nullptr) {
@@ -54,11 +54,11 @@ nui::ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_resource_i
 	return err_stack;
 }
 
-nui::ErrStack dx11::singleLoad(ID3D11DeviceContext4* ctx, ID3D11Resource* resource,
+ErrStack dx11::singleLoad(ID3D11DeviceContext3* ctx, ID3D11Resource* resource,
 	void* data, size_t load_size, uint32_t sub_resource_idx)
 {
 	HRESULT hr = S_OK;
-	nui::ErrStack err_stack;
+	ErrStack err_stack;
 
 	D3D11_MAPPED_SUBRESOURCE mapped;
 	checkHResult(ctx->Map(resource, sub_resource_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
@@ -71,7 +71,7 @@ nui::ErrStack dx11::singleLoad(ID3D11DeviceContext4* ctx, ID3D11Resource* resour
 	return err_stack;
 }
 
-nui::ErrStack dx11::resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t new_height,
+ErrStack dx11::resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t new_height,
 	ComPtr<ID3D11Texture2D>& tex)
 {
 	HRESULT hr = S_OK;
@@ -86,5 +86,5 @@ nui::ErrStack dx11::resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint
 	checkHResult(dev->CreateTexture2D(&desc, NULL, tex.GetAddressOf()),
 		"failed to resize texture 2D");
 
-	return nui::ErrStack();
+	return ErrStack();
 }

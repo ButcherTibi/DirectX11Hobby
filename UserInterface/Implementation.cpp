@@ -21,13 +21,13 @@ ErrStack Instance::create()
 	_hinstance = GetModuleHandleA(NULL);
 	_arrow_cursor = LoadCursorA(NULL, IDC_ARROW);
 
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/WrapVS.cso", _wrap_vs_cso));
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/CharsVS.cso", _chars_vs_cso));
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/AllVS.cso", _all_vs_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/WrapVS.cso", _wrap_vs_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/CharsVS.cso", _chars_vs_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/AllVS.cso", _all_vs_cso));
 
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/WrapPS.cso", _wrap_ps_cso));
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/CharsPS.cso", _chars_ps_cso));
-	checkErrStack1(readLocalFile("UserInterface/CompiledShaders/CopyParentsMaskPS.cso", _copy_parents_ps_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/WrapPS.cso", _wrap_ps_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/CharsPS.cso", _chars_ps_cso));
+	checkErrStack1(io::readLocalFile("UserInterface/CompiledShaders/CopyParentsMaskPS.cso", _copy_parents_ps_cso));
 
 	Font* font;
 	checkErrStack1(_char_atlas.addFont("UserInterface/Fonts/Roboto-Regular.ttf", font));
@@ -129,6 +129,36 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 			case WM_KEYUP: {
 				setKeyUpState(wnd, (uint32_t)wParam);
+				return 0;
+			}
+
+			case WM_LBUTTONDOWN: {
+				setKeyDownState(wnd, VirtualKey::LEFT_MOUSE_BUTTON, 0);
+				return 0;
+			}
+
+			case WM_LBUTTONUP: {
+				setKeyUpState(wnd, VirtualKey::LEFT_MOUSE_BUTTON);
+				return 0;
+			}
+
+			case WM_RBUTTONDOWN: {
+				setKeyDownState(wnd, VirtualKey::RIGHT_MOUSE_BUTTON, 0);
+				return 0;
+			}
+
+			case WM_RBUTTONUP: {
+				setKeyUpState(wnd, VirtualKey::RIGHT_MOUSE_BUTTON);
+				return 0;
+			}
+
+			case WM_MBUTTONDOWN: {
+				setKeyDownState(wnd, VirtualKey::MIDDLE_MOUSE_BUTTON, 0);
+				return 0;
+			}
+
+			case WM_MBUTTONUP: {
+				setKeyUpState(wnd, VirtualKey::MIDDLE_MOUSE_BUTTON);
 				return 0;
 			}
 
@@ -257,6 +287,9 @@ ErrStack Instance::createWindow(WindowCrateInfo& info, Window*& r_window)
 
 		checkHResult(w._dev->QueryInterface<ID3D11Device5>(w.dev5.GetAddressOf()),
 			"failed to obtain ID3D11Device5");
+
+		checkHResult(w.dev5->CreateDeferredContext3(0, w.de_ctx3.GetAddressOf()),
+			"failed to obtain deferred context 3");
 
 		checkHResult(w._im_ctx->QueryInterface<ID3D11DeviceContext4>(w.im_ctx4.GetAddressOf()),
 			"failed to obtain ID3D11DeviceContext4");

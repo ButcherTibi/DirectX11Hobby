@@ -175,6 +175,32 @@ Flex* NodeComponent::addFlex()
 	return child_flex;
 }
 
+Surface* NodeComponent::addSurface()
+{
+	Node& child_node = window->nodes.emplace_back();
+	child_node.event_comp.create(this->window, &child_node);
+	child_node.layer_idx = this->this_elem->layer_idx + 1;
+
+	Surface* child_surface = child_node.createSurface();
+	child_surface->_node_comp.window = this->window;
+	child_surface->_node_comp.this_elem = &child_node;
+	child_surface->_event.surface = child_surface;
+
+	child_surface->pos = { 0, 0 };
+	child_surface->width = 100.0f;
+	child_surface->height = 100.0f;
+	child_surface->overflow = Overflow::OVERFLOW;
+	child_surface->callback = nullptr;
+
+	// Parent ---> Child
+	this->this_elem->children.push_back(&child_node);
+
+	// Parent <--- Child	
+	child_node.parent = this->this_elem;
+
+	return child_surface;
+}
+
 Text* Wrap::addText()
 {
 	return _node_comp.addText();
@@ -183,6 +209,11 @@ Text* Wrap::addText()
 Wrap* Wrap::addWrap()
 {
 	return _node_comp.addWrap();
+}
+
+Surface* Wrap::addSurface()
+{
+	return _node_comp.addSurface();
 }
 
 void Wrap::setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data)
@@ -247,69 +278,46 @@ bool Text::removeKeyDownEvent(uint32_t key)
 
 Root* Node::createRoot()
 {
-	this->type = ElementType::ROOT;
-	this->elem = new Root();
-	return static_cast<Root*>(elem);
+	return std::get_if<Root>(&elem);
 }
 
 Wrap* Node::createWrap()
 {
-	this->type = ElementType::WRAP;
-	this->elem = new Wrap();
-	return static_cast<Wrap*>(elem);
+	return &elem.emplace<Wrap>();
 }
 
 Flex* Node::createFlex()
 {
-	this->type = ElementType::FLEX;
-	this->elem = new Flex();
-	return static_cast<Flex*>(elem);
+	return &elem.emplace<Flex>();
 }
 
 Text* Node::createText()
 {
-	this->type = ElementType::TEXT;
-	this->elem = new Text();
-	return static_cast<Text*>(elem);
+	return &elem.emplace<Text>();
 }
 
-Node::~Node()
+Surface* Node::createSurface()
 {
-	if (elem != nullptr) {
-		switch (type) {
-		case nui::ElementType::ROOT:
-			delete (Root*)elem;
-			break;
-
-		case nui::ElementType::WRAP:
-			delete (Wrap*)elem;
-			break;
-
-		case nui::ElementType::FLEX:
-			delete (Flex*)elem;
-			break;
-
-		case nui::ElementType::TEXT:
-			delete (Text*)elem;
-			break;
-
-		default:
-			printf("missing type \n");
-			break;
-		}
-	}
+	return &elem.emplace<Surface>();
 }
 
 Wrap* Window::addWrap()
 {
-	Root* root_wrap = (Root*)nodes.front().elem;
+	Root* root_wrap = std::get_if<Root>(&nodes.front().elem);
 
 	return root_wrap->node_comp.addWrap();
 }
 
 Text* Window::addText()
 {
-	Root* root_wrap = (Root*)nodes.front().elem;
+	Root* root_wrap = std::get_if<Root>(&nodes.front().elem);
 
 	return root_wrap->node_comp.addText();
+}
+
+Surface* Window::addSurface()
+{
+	Root* root_wrap = std::get_if<Root>(&nodes.front().elem);
+
+	return root_wrap->node_comp.addSurface();
 }

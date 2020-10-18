@@ -3,7 +3,7 @@
 #include "ErrorStack.hpp"
 
 
-namespace nui {
+namespace io {
 
 	extern uint32_t max_path;
 

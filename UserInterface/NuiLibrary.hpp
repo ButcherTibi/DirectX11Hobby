@@ -1,6 +1,7 @@
 #pragma once
 
 // Standard
+#include <variant>
 #include <atomic>
 #include <chrono>
 
@@ -15,7 +16,6 @@
 
 
 /* TODO:
-- on key press (duration)
 - on key up
 - handle Alt, F10
 - fullscreen support
@@ -36,6 +36,7 @@ namespace nui {
 	class Wrap;
 	class Flex;
 	class Text;
+	class Surface;
 	class Node;
 
 
@@ -130,6 +131,7 @@ namespace nui {
 		Text* addText();
 		Wrap* addWrap();
 		Flex* addFlex();
+		Surface* addSurface();
 	};
 
 
@@ -243,6 +245,7 @@ namespace nui {
 	public:
 		Text* addText();
 		Wrap* addWrap();
+		Surface* addSurface();
 
 		void setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data = nullptr);
 		void setOnMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
@@ -302,17 +305,66 @@ namespace nui {
 	};
 
 
-	enum class ElementType {
-		ROOT,
-		WRAP,
-		FLEX,
-		TEXT
+
+
+	struct SurfaceEvent {
+		Surface* surface;
+		void* user_data;
+
+		uint32_t surface_width;
+		uint32_t surface_height;
+
+		// Resource
+		ID3D11Device5* dev5;
+		ID3D11DeviceContext3* de_ctx3;
+
+		// ID3D11ShaderResourceView* compose_srv;
+		ID3D11ShaderResourceView* parent_clip_mask_srv;
+		ID3D11ShaderResourceView* next_parents_clip_mask_srv;
+
+		ID3D11RenderTargetView* compose_rtv;
+		ID3D11RenderTargetView* parent_clip_mask_rtv;
+		ID3D11RenderTargetView* next_parents_clip_mask_rtv;
+
+		// Drawcall
+		glm::vec2 pos;
+		glm::vec2 size;
+		uint32_t parent_clip_id;
+		uint32_t child_clip_id;
 	};
+
+	typedef ErrStack(*RenderingSurfaceCallback)(SurfaceEvent& event);
+
+	class Surface {
+	public:
+		// Internal
+		NodeComponent _node_comp;
+
+		SurfaceEvent _event;
+
+	public:
+		glm::uvec2 pos;
+		ElementSize width;
+		ElementSize height;
+		Overflow overflow;
+
+		RenderingSurfaceCallback callback;
+		void* user_data;
+	};
+
+	namespace ElementType {
+		enum {
+			ROOT,
+			WRAP,
+			FLEX,
+			TEXT,
+			SURFACE,
+		};
+	}
 
 	class Node {
 	public:
-		ElementType type;
-		void* elem = nullptr;
+		std::variant<Root, Wrap, Flex, Text, Surface> elem;
 
 		// Common Components
 		BoundingBox2D<uint32_t> collider;
@@ -328,8 +380,7 @@ namespace nui {
 		Wrap* createWrap();
 		Flex* createFlex();
 		Text* createText();
-
-		~Node();
+		Surface* createSurface();
 	};
 
 
@@ -394,6 +445,7 @@ namespace nui {
 		ComPtr<IDXGIAdapter> adapter;
 		ComPtr<ID3D11Device> _dev;
 		ComPtr<ID3D11Device5> dev5;
+		ComPtr<ID3D11DeviceContext3> de_ctx3;
 		ComPtr<ID3D11DeviceContext> _im_ctx;
 		ComPtr<ID3D11DeviceContext4> im_ctx4;
 		ComPtr<IDXGISwapChain> swapchain;
@@ -454,6 +506,7 @@ namespace nui {
 	public:
 		Wrap* addWrap();
 		Text* addText();
+		Surface* addSurface();
 	};
 
 	 

@@ -5,6 +5,7 @@
 
 // DirectX 11
 #include <DirectXMath.h>
+#include <d3d11_4.h>
 
 // GLM
 #include <glm\vec2.hpp>

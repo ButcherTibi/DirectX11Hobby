@@ -80,6 +80,10 @@
     <PostBuildEvent>
       <Message>copy Noesis DLL to target directory</Message>
     </PostBuildEvent>
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -117,32 +121,53 @@
     <PostBuildEvent>
       <Message>copy Noesis DLL to target directory</Message>
     </PostBuildEvent>
+    <FxCompile>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="FileIO.cpp" />
-    <ClCompile Include="GLTFParser.cpp" />
-    <ClCompile Include="JSONParser.cpp" />
+    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="Base64.cpp" />
+    <ClCompile Include="Geometry.cpp" />
+    <ClCompile Include="GLTF_File.cpp" />
+    <ClCompile Include="GPU_ShaderTypesMesh.cpp" />
+    <ClCompile Include="JSON_File.cpp" />
     <ClCompile Include="LinkageMesh.cpp" />
-    <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MeshOps.cpp" />
     <ClCompile Include="Primitives.cpp" />
+    <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="FromGLTF.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="ErrorStuff.cpp" />
+    <ClCompile Include="SubPrimitives.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FileIO.h" />
+    <ClInclude Include="Application.hpp" />
+    <ClInclude Include="Geometry.hpp" />
+    <ClInclude Include="GLTF_File.hpp" />
+    <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
+    <ClInclude Include="JSON_File.hpp" />
+    <ClInclude Include="Renderer.hpp" />
+    <ClInclude Include="SculptMesh.hpp" />
     <ClInclude Include="stb_image.h" />
-    <ClInclude Include="Importer.h" />
-    <ClInclude Include="Input.h" />
     <ClInclude Include="Primitives.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Meshes.h" />
-    <ClInclude Include="ErrorStuff.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="MeshPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="MeshVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
