@@ -319,9 +319,8 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 
 		// Drawcall
 		SurfaceEvent& event = surf->_event;
-		event.pos = { (float)surf->pos.x, (float)surf->pos.y };
-		event.size = { (float)r_descendant.width, (float)r_descendant.height };
-		event.parent_clip_id = ancestor.clip_mask;
+		event.pos = { surf->pos.x, surf->pos.y };
+		event.size = { r_descendant.width, r_descendant.height };
 		event.child_clip_id = child_ancs.clip_mask;
 
 		// Calculate Event Collider
@@ -387,9 +386,49 @@ ErrStack Window::_updateCPU_Data()
 
 	std::list<Node*>& children = nodes.front().children;
 
-	// Respond to Input
+	// Emit Events
 	{
-		_emitEvents();
+		// Input is locked to who started the delta event
+		if (mouse_delta_owner != nullptr) {
+
+			// save for when mouse delta ends and mouse_delta_owner == nullptr
+			Node* owner = mouse_delta_owner;
+
+			for (Node& node : nodes) {
+
+				if (&node != owner) {
+					EventComp* event_comp = node.getCommonEventComponent();
+					event_comp->_emitOutsideEvents();
+				}
+			}
+
+			EventComp* event_comp = owner->getCommonEventComponent();
+			event_comp->_emitInsideEvents();
+		}
+		else {
+			Node* first_hit_node = &nodes.front();
+
+			for (Node& node : nodes) {
+
+				if (node.collider.isInside(input.mouse_x, input.mouse_y)) {
+
+					if (node.layer_idx > first_hit_node->layer_idx) {
+						first_hit_node = &node;
+					}
+				}
+			}
+
+			for (Node& node : nodes) {
+
+				if (&node != first_hit_node) {
+					EventComp* event_comp = node.getCommonEventComponent();
+					event_comp->_emitOutsideEvents();
+				}
+			}
+
+			EventComp* event_comp = first_hit_node->getCommonEventComponent();
+			event_comp->_emitInsideEvents();
+		}
 	}
 
 	// Create Character Meshes
@@ -1038,7 +1077,7 @@ ErrStack Window::_render()
 			case ElementType::SURFACE: {
 				Surface* surf = std::get_if<Surface>(&node->elem);
 
-				if (surf->callback == nullptr) {
+				if (surf->gpu_callback == nullptr) {
 					break;
 				}
 
@@ -1049,14 +1088,11 @@ ErrStack Window::_render()
 				surf->_event.dev5 = dev5.Get();
 				surf->_event.de_ctx3 = de_ctx3.Get();
 
-				surf->_event.parent_clip_mask_srv = parents_clip_mask_srv.Get();
-				surf->_event.next_parents_clip_mask_srv = next_parents_clip_mask_srv.Get();
-
 				surf->_event.compose_rtv = present_rtv.Get();
-				surf->_event.parent_clip_mask_rtv = parents_clip_mask_rtv.Get();
 				surf->_event.next_parents_clip_mask_rtv = next_parents_clip_mask_rtv.Get();
 
-				surf->callback(surf->_event);
+				checkErrStack(surf->gpu_callback(surf->_event),
+					"surface GPU time callback error");
 				break;
 			}
 			}

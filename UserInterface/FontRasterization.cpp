@@ -2,7 +2,7 @@
 #include "pch.h"
 
 // Header
-#include "FontRasterization.hpp"
+#include "CharacterAtlas.hpp"
 
 // FreeType
 #include <ft2build.h>

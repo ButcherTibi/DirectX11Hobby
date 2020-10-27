@@ -8,7 +8,7 @@
 using namespace scme;
 
 
-void SculptMesh::createAsTriangle(glm::vec3& new_pos, glm::vec3& new_rot)
+void SculptMesh::createAsTriangle(glm::vec3& new_pos, glm::vec3& new_rot, float size)
 {
 	this->pos = new_pos;
 	this->rot = new_rot;
@@ -20,14 +20,14 @@ void SculptMesh::createAsTriangle(glm::vec3& new_pos, glm::vec3& new_rot)
 	auto& gpu_vs = root.gpu_vs;
 	auto& cpu_vs = root.cpu_vs;
 
-	const float size = 5;
-	gpu_vs[0].pos = { 0, size, 0 };
+	float half = size / 2;
+	gpu_vs[0].pos = { 0, half, 0 };
 	gpu_vs[0].normal = { 0, 0, -1 };
 
-	gpu_vs[1].pos = { size, -size, 0 };
+	gpu_vs[1].pos = { half, -half, 0 };
 	gpu_vs[1].normal = { 0, 0, -1 };
 
-	gpu_vs[2].pos = { -size, -size, 0 };
+	gpu_vs[2].pos = { -half, -half, 0 };
 	gpu_vs[2].normal = { 0, 0, -1 };
 
 	cpu_vs[0].gpu_vertex = &gpu_vs[0];

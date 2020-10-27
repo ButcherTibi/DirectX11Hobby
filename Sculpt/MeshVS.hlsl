@@ -10,6 +10,7 @@ struct VertexIn
 
 cbuffer Uniform : register(b0)
 {
+	float3 camera_pos;
 	float4 camera_quat;
 	float4x4 perspective;
 	
@@ -25,13 +26,25 @@ struct VertexOut
 	float3 normal : NORMAL;
 };
 
+//float4 quatRotate(float3 pos, float4 quat)
+//{
+//	vec < 3, T, Q > const QuatVector( q.x, q.y, q.z);
+//	vec < 3, T, Q > const uv( glm::cross(QuatVector, v));
+//	vec < 3, T, Q > const uuv( glm::cross(QuatVector, uv));
+
+//	return v + ((uv * q.w) + uuv) * static_cast < T > (2);
+//}
+
 VertexOut main(VertexIn input)
 {
 	VertexOut output;
 	
-	float4 dx_v = float4(input.pos, 0);
-    dx_v = mul(dx_v, perspective);
-	output.dx_pos = dx_v;
+	float3 pos = input.pos;
+	pos += input.inst_pos;
+	pos -= camera_pos;
+	
+	float4 persp = mul(float4(pos, 1), perspective);
+	output.dx_pos = persp;
 
 	// Output
     output.normal = input.normal;

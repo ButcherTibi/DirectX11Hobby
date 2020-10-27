@@ -32,14 +32,14 @@
     <Filter Include="Source Files\Importers\GLTF">
       <UniqueIdentifier>{04d803b2-4a78-46f4-b3ad-adf8c50a06ad}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\BoundingBox3D">
-      <UniqueIdentifier>{fe002ff6-eeae-47dc-a8eb-1e22d760637f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{ccd85e4f-9442-46b6-b000-bff55edb8f36}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Shaders\Mesh">
       <UniqueIdentifier>{49c9dcac-25b7-468a-8797-9464a73b22d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Geometry">
+      <UniqueIdentifier>{fe002ff6-eeae-47dc-a8eb-1e22d760637f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -77,7 +77,7 @@
       <Filter>Source Files\Importers\GLTF</Filter>
     </ClCompile>
     <ClCompile Include="Geometry.cpp">
-      <Filter>Source Files\BoundingBox3D</Filter>
+      <Filter>Source Files\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="SubPrimitives.cpp">
       <Filter>Source Files\SculptMesh</Filter>
@@ -115,7 +115,7 @@
       <Filter>Source Files\Importers\GLTF</Filter>
     </ClInclude>
     <ClInclude Include="Geometry.hpp">
-      <Filter>Source Files\BoundingBox3D</Filter>
+      <Filter>Source Files\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="GPU_ShaderTypesMesh.hpp">
       <Filter>Source Files\Shaders</Filter>

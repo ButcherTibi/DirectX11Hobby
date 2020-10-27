@@ -11,12 +11,15 @@
 // Mine
 #include "DX11Wrapper.hpp"
 #include "GPU_ShaderTypes.hpp"
-#include "FontRasterization.hpp"
-#include "WindowInput.hpp"
+#include "CharacterAtlas.hpp"
+#include "Input.hpp"
+
+// Window Components
+#include "EventComp.hpp"
+#include "NodeComp.hpp"
 
 
 /* TODO:
-- on key up
 - handle Alt, F10
 - fullscreen support
 - multiple fonts
@@ -72,7 +75,7 @@ namespace nui {
 		Color(int32_t red, int32_t green, int32_t blue, uint8_t alpha = 255);
 		Color(double red, double green, double blue, double alpha = 1.0);
 		Color(float red, float green, float blue, float alpha = 1.0);
-		Color(int32_t hex_without_alpha);	
+		Color(int32_t hex_without_alpha);
 
 		static Color red();
 		static Color green();
@@ -121,118 +124,18 @@ namespace nui {
 	};
 
 
-	class NodeComponent {
-	public:
-		Window* window;
-
-		Node* this_elem;
-
-	public:
-		Text* addText();
-		Wrap* addWrap();
-		Flex* addFlex();
-		Surface* addSurface();
-	};
-
-
-	struct MouseHoverEvent {
-		Node* source;
-		float duration;
-		void* user_ptr;
-	};
-
-	struct MouseEnterEvent {
-		Node* source;
-		void* user_ptr;
-	};
-
-	struct MouseLeaveEvent {
-		Node* source;
-		void* user_ptr;
-	};
-
-	struct MouseMoveEvent {
-		Node* source;
-		void* user_ptr;
-	};
-
-	struct KeyDownEvent {
-		Node* source;
-		void* user_ptr;
-	};
-
-	typedef void (*MouseHoverCallback)(MouseHoverEvent& hover_event);
-	typedef void (*MouseEnterCallback)(MouseEnterEvent& hover_event);
-	typedef void (*MouseLeaveCallback)(MouseLeaveEvent& hover_event);
-	typedef void (*MouseMoveCallback)(MouseMoveEvent& move_event);
-	typedef void (*KeyDownCallback)(KeyDownEvent& key_down_event);
-
-	struct KeyDown {
-		uint32_t key;
-		KeyDownEvent event;
-		KeyDownCallback callback;
-	};
-
-	class CommonEventsComponent {
-	public:
-		Window* window;
-		Node* source;
-		
-		uint32_t last_mouse_x;
-		uint32_t last_mouse_y;
-		SteadyTime mouse_enter_time;
-		bool mouse_entered;
-		bool mouse_left;
-
-		// Event State
-		MouseHoverEvent hover_event;
-		MouseEnterEvent enter_event;
-		MouseLeaveEvent leave_event;
-		MouseMoveEvent move_event;
-
-		// Callbacks
-		void (*onMouseHover)(MouseHoverEvent& hover_event);
-		void (*onMouseEnter)(MouseEnterEvent& enter_event);
-		void (*onMouseLeave)(MouseLeaveEvent& leave_event);
-		void (*onMouseMove)(MouseMoveEvent& move_event);
-		std::list<KeyDown> keys_down;
-
-	public:
-
-	public:
-		void create(Window* wnd, Node* node);
-
-		void emitInsideEvents();
-		void emitOutsideEvents();
-
-		void setMouseHoverEvent(MouseHoverCallback callback, void* user_ptr);
-		void setMouseEnterEvent(MouseEnterCallback callback, void* user_ptr);
-		void setMouseLeaveEvent(MouseLeaveCallback callback, void* user_ptr);
-		void setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr);
-
-		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr);
-		bool removeKeyDownEvent(uint32_t key);
-	};
-
-
-	class Root {
-	public:
-		NodeComponent node_comp;
+	class Root : public NodeComp, public EventComp {
+		// methods are on window
 	};
 
 
 	struct WrapDrawcall {
 		GPU_WrapInstance instance;
-
 		uint32_t instance_idx;
 	};
 
-	class Wrap {
+	class Wrap : public NodeComp, public EventComp {
 	public:
-		// General
-		NodeComponent _node_comp;
-		
-		// Particular
 		WrapDrawcall _drawcall;
 
 	public:
@@ -243,23 +146,13 @@ namespace nui {
 		Color background_color;
 
 	public:
-		Text* addText();
-		Wrap* addWrap();
-		Surface* addSurface();
-
-		void setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data = nullptr);
-		void setOnMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
-		void setOnMouseLeaveEvent(MouseLeaveCallback callback, void* user_data = nullptr);
-		void setOnMouseMoveEvent(MouseMoveCallback callback, void* user_data = nullptr);
-		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr = nullptr);
-		bool removeKeyDownEvent(uint32_t key);
 	};
 
 
 	class Flex {
 	public:
 		// Internal
-		NodeComponent node_comp;
+		NodeComp node_comp;
 
 	public:
 		FlexDirection direction;
@@ -268,24 +161,17 @@ namespace nui {
 		FlexLinesAlign lines_align;
 
 	public:
-
 	};
 
 
 	struct CharacterDrawcall {
 		Character* chara;
-
 		std::vector<GPU_CharacterInstance> instances;
-
 		uint32_t instance_idx;
 	};
 
-	class Text {
-	public:  // Internal
-		// Generic
-		NodeComponent _node_comp;
-
-		// Particular
+	class Text : public EventComp {
+	public:
 		std::vector<CharacterDrawcall> _drawcalls;
 
 	public:
@@ -296,15 +182,7 @@ namespace nui {
 		Color color;
 
 	public:
-		void setOnMouseEnterEvent(MouseEnterCallback callback, void* user_data = nullptr);
-		void setOnMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
-		void setOnMouseLeaveEvent(MouseLeaveCallback callback, void* user_data = nullptr);
-		void setOnMouseMoveEvent(MouseMoveCallback callback, void* user_data = nullptr);
-		bool addKeyDownEvent(KeyDownCallback callback, uint32_t key, void* user_ptr = nullptr);
-		bool removeKeyDownEvent(uint32_t key);
 	};
-
-
 
 
 	struct SurfaceEvent {
@@ -318,38 +196,31 @@ namespace nui {
 		ID3D11Device5* dev5;
 		ID3D11DeviceContext3* de_ctx3;
 
-		// ID3D11ShaderResourceView* compose_srv;
-		ID3D11ShaderResourceView* parent_clip_mask_srv;
-		ID3D11ShaderResourceView* next_parents_clip_mask_srv;
-
 		ID3D11RenderTargetView* compose_rtv;
-		ID3D11RenderTargetView* parent_clip_mask_rtv;
 		ID3D11RenderTargetView* next_parents_clip_mask_rtv;
 
 		// Drawcall
-		glm::vec2 pos;
-		glm::vec2 size;
-		uint32_t parent_clip_id;
+		glm::uvec2 pos;
+		glm::uvec2 size;
 		uint32_t child_clip_id;
 	};
 
 	typedef ErrStack(*RenderingSurfaceCallback)(SurfaceEvent& event);
 
-	class Surface {
+	class Surface : public NodeComp, public EventComp {
 	public:
-		// Internal
-		NodeComponent _node_comp;
-
 		SurfaceEvent _event;
 
 	public:
 		glm::uvec2 pos;
-		ElementSize width;
-		ElementSize height;
-		Overflow overflow;
+		ElementSize width;  // relative of fit not usefull
+		ElementSize height;  // relative of fit not usefull
+		Overflow overflow;  // not usefull should always be clip
 
-		RenderingSurfaceCallback callback;
+		RenderingSurfaceCallback gpu_callback;
 		void* user_data;
+
+	public:
 	};
 
 	namespace ElementType {
@@ -368,7 +239,6 @@ namespace nui {
 
 		// Common Components
 		BoundingBox2D<uint32_t> collider;
-		CommonEventsComponent event_comp;
 		uint32_t layer_idx;
 
 		// Relations
@@ -381,13 +251,10 @@ namespace nui {
 		Flex* createFlex();
 		Text* createText();
 		Surface* createSurface();
+
+		EventComp* getCommonEventComponent();
 	};
 
-
-	struct WindowCrateInfo {
-		uint16_t width;
-		uint16_t height;
-	};
 
 	struct AncestorProps {
 		uint32_t width;
@@ -410,14 +277,12 @@ namespace nui {
 
 		// Window Procedure Messages
 		Input input;
-		uint32_t mouse_x;
-		uint32_t mouse_y;
 
 		std::uint32_t width;
 		std::uint32_t height;
-		RECT client_rect;
-		std::uint32_t surface_width;
-		std::uint32_t surface_height;
+
+		std::uint32_t surface_width;  // width of the renderable surface
+		std::uint32_t surface_height;  // height of the renderable surface
 	
 		bool minimized;
 		bool close;
@@ -425,6 +290,8 @@ namespace nui {
 		// UI
 		uint32_t clip_mask_id;
 		std::list<Node> nodes;
+
+		Node* mouse_delta_owner;  // set by the event component
 
 		// Rendering Data
 		bool rendering_configured;
@@ -492,8 +359,6 @@ namespace nui {
 		Instance* instance;
 
 	public:
-		void _emitEvents();
-
 		void _calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 			DescendantProps& r_descendant);
 		void _calcGlobalPositions(Node* node, glm::uvec2 pos);
@@ -507,11 +372,22 @@ namespace nui {
 		Wrap* addWrap();
 		Text* addText();
 		Surface* addSurface();
+
+		RECT getClientRectangle();
+		bool setLocalMousePosition(uint32_t x, uint32_t y);
+		bool trapLocalMousePosition(BoundingBox2D<uint32_t>& box);
+		bool untrapMousePosition();
+		void hideMousePointer(bool hide);
 	};
 
 	 
 	extern std::list<Window> windows;
 
+
+	struct WindowCreateInfo {
+		uint16_t width;
+		uint16_t height;
+	};
 
 	class Instance {
 	public:	
@@ -532,7 +408,7 @@ namespace nui {
 	public:
 		ErrStack create();
 
-		ErrStack createWindow(WindowCrateInfo& info, Window*& r_window);
+		ErrStack createWindow(WindowCreateInfo& info, Window*& r_window);
 
 		ErrStack update();
 

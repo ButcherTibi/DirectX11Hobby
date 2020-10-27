@@ -144,10 +144,12 @@
   <ItemGroup>
     <ClInclude Include="DX11Wrapper.hpp" />
     <ClInclude Include="ErrorStack.hpp" />
-    <ClInclude Include="FileIO.hpp" />
-    <ClInclude Include="FontRasterization.hpp" />
+    <ClInclude Include="EventComp.hpp" />
+    <ClInclude Include="FilePath.hpp" />
+    <ClInclude Include="CharacterAtlas.hpp" />
     <ClInclude Include="GPU_ShaderTypes.hpp" />
-    <ClInclude Include="WindowInput.hpp" />
+    <ClInclude Include="Input.hpp" />
+    <ClInclude Include="NodeComp.hpp" />
     <ClInclude Include="NuiLibrary.hpp" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="TextureAtlas.hpp" />
@@ -155,19 +157,21 @@
   <ItemGroup>
     <ClCompile Include="DX11Wrapper.cpp" />
     <ClCompile Include="ErrorStack.cpp" />
-    <ClCompile Include="FileIO.cpp" />
+    <ClCompile Include="EventComp.cpp" />
+    <ClCompile Include="FilePath.cpp" />
     <ClCompile Include="FontRasterization.cpp" />
     <ClCompile Include="GPU_ShaderTypes.cpp" />
-    <ClCompile Include="Implementation.cpp" />
-    <ClCompile Include="Events.cpp" />
+    <ClCompile Include="Instance.cpp" />
+    <ClCompile Include="NodeComp.cpp" />
     <ClCompile Include="Rendering.cpp" />
-    <ClCompile Include="WindowInput.cpp" />
+    <ClCompile Include="Input.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TextureAtlas.cpp" />
     <ClCompile Include="UserInterfaceElements.cpp" />
+    <ClCompile Include="WindowImplementation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="AllVS.hlsl">

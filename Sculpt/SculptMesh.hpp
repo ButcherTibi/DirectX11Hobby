@@ -138,7 +138,7 @@ namespace scme {
 
 		// ray query
 
-		void createAsTriangle(glm::vec3& pos, glm::vec3& rot);
+		void createAsTriangle(glm::vec3& pos, glm::vec3& rot, float size);
 		ErrStack createFromGLTF(std::vector<char>& gltf_file);
 		//nui::ErrStack createFromOBJ(std::vector<uint8_t> obj_file);
 	};
