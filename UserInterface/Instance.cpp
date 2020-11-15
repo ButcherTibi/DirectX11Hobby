@@ -46,6 +46,16 @@ FORCEINLINE uint16_t getHighOrder(uint32_t param)
 	return param >> 16;
 }
 
+FORCEINLINE int16_t getSignedLowOrder(uint32_t param)
+{
+	return param & 0xFFFF;
+}
+
+FORCEINLINE int16_t getSignedHighOrder(uint32_t param)
+{
+	return param >> 16;
+}
+
 LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	ErrStack err_stack;
@@ -366,6 +376,9 @@ ErrStack Instance::createWindow(WindowCreateInfo& info, Window*& r_window)
 		root->NodeComp::_create(&w, &root_node);
 	}
 
+	// Delta Time
+	w.start_time = std::chrono::steady_clock::now();
+
 	r_window = &w;
 	return ErrStack();
 }
@@ -375,26 +388,30 @@ ErrStack Instance::update()
 	ErrStack err_stack;
 
 	// Input
-	for (Window& window : windows) {
+	for (Window& window : windows) {	
 
-		// WaitMessage();
+		window.delta_time = fsec_cast(std::chrono::steady_clock::now() - window.start_time);
+
+		WaitMessage();
 
 		MSG msg{};
 		while (PeekMessageA(&msg, window.hwnd, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageA(&msg);
 		}
-		
-		window.input.startFrame();
 
 		if (!window.minimized &&
-			window.surface_width && window.surface_height)
+			window.surface_width > 10 && window.surface_height > 10)
 		{
+			window.input.startFrame();
+
 			checkErrStack1(window._updateCPU_Data());
 			checkErrStack1(window._render());
+
+			window.input.endFrame();
 		}
 
-		window.input.endFrame();
+		window.start_time = std::chrono::steady_clock::now();
 	}
 	
 	return err_stack;

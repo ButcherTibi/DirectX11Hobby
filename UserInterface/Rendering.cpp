@@ -394,6 +394,7 @@ ErrStack Window::_updateCPU_Data()
 			// save for when mouse delta ends and mouse_delta_owner == nullptr
 			Node* owner = mouse_delta_owner;
 
+			// TODO: if new owner == old owner then no longer emit outside events
 			for (Node& node : nodes) {
 
 				if (&node != owner) {

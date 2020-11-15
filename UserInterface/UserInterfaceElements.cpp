@@ -7,7 +7,7 @@
 using namespace nui;
 
 
-ElementSize& ElementSize::operator=(uint32_t size_px)
+ElementSize& ElementSize::operator=(int32_t size_px)
 {
 	this->type = ElementSizeType::ABSOLUTE_SIZE;
 	this->size = (float)size_px;

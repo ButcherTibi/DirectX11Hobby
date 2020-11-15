@@ -1,7 +1,7 @@
 #pragma once
 
 #include "NuiLibrary.hpp"
-#include "Application.hpp"
+// #include "Application.hpp"
 #include "GPU_ShaderTypesMesh.hpp"
 
 
@@ -39,6 +39,10 @@ public:
 
 	std::vector<char> mesh_vs_cso;
 	std::vector<char> mesh_ps_cso;
+
+	// Update
+	bool load_vertices;
+	bool load_uniform;
 
 public:
 	ID3D11Device5* dev5 = nullptr;

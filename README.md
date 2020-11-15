@@ -7,20 +7,20 @@ Sculpt is a test application that uses the library.
 
 ---
 
-**Wrap Element**
-Is a container of other UI elements, supports:
-- clipping of other child components
-- background color
+The UI is build using a graph of elements that are attached to each other in a parent child relationship.
 
-**Text Element**
-Is a text label, supports:
-- color
-- line height
+**Wrap**
+Is a container of other UI elements, all child components have their position relative to wrap, children that fall outside of the wrap element can be clipped by setting the `overflow` property to `Overflow::CLIP`.
+The size of the element can be specified in absolute, relative units or as `ElementSizeType::FIT` meaning it will resize itself to fit its children.
 
-**Surface Element**
-Is a surface for rendering outside of the library using special surface events that hold relevant rendering context eg. Device, DeviceContext, Shader Resource Views, Render Target Views, viewport size and position etc.
 
-Elements may have their size specified in ElementSize which enables them to have size relative to their parents or have size fit their children.
+**Text**
+Is a text label that supports adjusting its size, line height and color.
+
+**Surface**
+Is a element  for rendering outside of the library using special surface events that hold relevant rendering context eg. Device, DeviceContext, Shader Resource Views, Render Target Views, viewport size and position etc.
+
+Elements have components attached to them to add additional functionallity.
 
 **NodeComp**
 Is a component present on all UI elements and is responsable for enabling further attaching by other componets.
@@ -31,9 +31,11 @@ Is the event handling component for the following events:
 - mouse hover
 - mouse move
 - mouse leave
-- mouse delta capture
+- mouse delta capture begin
+- mouse delta capture begin
+- mouse delta capture end
 - key down
-- key held downm
+- key held down
 - key up
 
 ### Other Stuff

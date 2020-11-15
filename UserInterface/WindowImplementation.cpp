@@ -90,3 +90,9 @@ void Window::hideMousePointer(bool hide)
 		}
 	}
 }
+
+void Window::getMouseDelta(int32_t& mouse_delta_x, int32_t& mouse_delta_y)
+{
+	mouse_delta_x = this->input.mouse_delta_x;
+	mouse_delta_y = this->input.mouse_delta_y;
+}

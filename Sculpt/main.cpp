@@ -1,82 +1,41 @@
 
 #include "NuiLibrary.hpp"
-#include "Renderer.hpp"
+#include "Application.hpp"
 
 
-void onBlueEnter(nui::MouseEnterEvent& event)
+void onCameraOrbitKeyDown(nui::KeyDownEvent& event)
 {
-	printf("Blue entered \n");
+	nui::Surface* wrap = std::get_if<nui::Surface>(&event.source->elem);
 
-	// nui::Wrap* wrap = std::get_if<nui::Wrap>(&event.source->elem);
-}
-
-void onBlueLeave(nui::MouseLeaveEvent& event)
-{
-	printf("Blue leave \n");
-
-	// nui::Wrap* wrap = std::get_if<nui::Wrap>(&event.source->elem);
-}
-
-void onBlueDeltaBegin(nui::MouseDeltaEvent& event)
-{
-	printf("Blue delta begin \n");
-}
-
-void onBlueDelta(nui::MouseDeltaEvent& event)
-{
-	printf("Blue delta for %d %d \n", event.delta_x, event.delta_y);
-}
-
-void onBlueDeltaEnd(nui::MouseDeltaEvent& event)
-{
-	printf("Blue delta end \n");
-}
-
-void onBlueKeyDown(nui::KeyDownEvent& event)
-{
-	printf("Blue key down \n");
-
-	nui::Wrap* wrap = std::get_if<nui::Wrap>(&event.source->elem);
 	wrap->beginMouseDelta();
+
+	printf("RMB down \n");
 }
 
-void onBlueHeldKeyDown(nui::KeyHeldDownEvent& event)
+void onCameraOrbit(nui::KeyHeldDownEvent& event)
 {
-	printf("Blue key held down for %f \n", event.duration);
+	int32_t delta_x;
+	int32_t delta_y;
+	application.window->getMouseDelta(delta_x, delta_y);
 
-	nui::Wrap* wrap = std::get_if<nui::Wrap>(&event.source->elem);
-	// wrap->endMouseDelta();
+	float scaling = application.mouse_sensitivity * application.window->delta_time;
+	application.arcballOrbitCamera((float)delta_y * scaling, (float)delta_x * scaling,
+		application.mesh.pos);
 }
 
-void onBlueKeyUp(nui::KeyUpEvent& event)
+void onCameraOrbitKeyUp(nui::KeyUpEvent& event)
 {
-	printf("Blue key up \n");
+	nui::Surface* wrap = std::get_if<nui::Surface>(&event.source->elem);
 
-	nui::Wrap* wrap = std::get_if<nui::Wrap>(&event.source->elem);
 	wrap->endMouseDelta();
+
+	printf("RMB up \n");
 }
 
-void onTextEnter(nui::MouseEnterEvent& event)
+void onCameraResetKeyDown(nui::KeyDownEvent& event)
 {
-	printf("text entered \n");
-}
-
-void onTextHover(nui::MouseHoverEvent& event)
-{
-	printf("text hover called for %f \n", event.duration);
-}
-
-void onTextLeave(nui::MouseLeaveEvent& event)
-{
-	printf("text leave \n");
-}
-
-void onCameraOrbitBtn(nui::KeyHeldDownEvent& event)
-{
-	printf("key held down for %f \n", event.duration);
-
-	nui::Surface* surf = std::get_if<nui::Surface>(&event.source->elem);
-	surf->NodeComp::window->setLocalMousePosition(0, 0);
+	application.setCameraPosition(0, 0, 0);
+	application.setCameraRotation(0, 0, 0);
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR pCmdLine, _In_ int nCmdShow)
@@ -85,13 +44,14 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	// Application
 	{
-		application.mesh.createAsTriangle(glm::vec3{ 0, 0, 0 }, glm::vec3{ 0, 0, 0 }, 1);
+		application.mesh.createAsCube(glm::vec3{ 0, 0, -10 }, glm::quat{ 1, 0, 0, 0 }, 1);
 
 		application.field_of_view = 90;
 		application.z_near = 0.1f;
 		application.z_far = 100;
-		application.camera_pos = { 0, 0, 10 };
-		application.camera_quat = { 0, 0, 0, 1 };
+		application.camera_pos = { 0, 0, 0 };
+		application.camera_quat_inv = { 1, 0, 0, 0 };
+		application.mouse_sensitivity = 50000;
 	}
 
 	nui::Instance instance;
@@ -105,54 +65,32 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 	info.width = 1027;
 	info.height = 720;
 
-	nui::Window* window;
-	err_stack = instance.createWindow(info, window);
+	err_stack = instance.createWindow(info, application.window);
 	if (err_stack.isBad()) {
 		err_stack.debugPrint();
 		return 1;
 	}
 
 	// UI code
-	MeshRenderer renderer;
-	nui::Surface* surface = window->addSurface();
+	nui::Surface* surface = application.window->addSurface();
 	surface->gpu_callback = geometryDraw;
-	surface->user_data = &renderer;
-	surface->addKeyHeldDownEvent(onCameraOrbitBtn, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+	surface->user_data = &application.renderer;
 
-	auto w0 = surface->addWrap();
-	w0->pos.x = 50;
-	w0->width = 50.0f;
-	w0->height = 50.0f;
-	w0->background_color = nui::Color::red();
-	w0->overflow = nui::Overflow::CLIP;
+	// Camera Orbit
+	surface->addKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+	surface->addKeyHeldDownEvent(onCameraOrbit, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+	surface->addKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
 
-	auto green = w0->addWrap();
-	green->width = 50.0f;
-	green->height = 100.0f;
-	green->background_color = nui::Color::green();
+	// Camera Pan
 
-	auto blue = green->addWrap();
-	blue->width = 50.0f;
-	blue->height = 100.0f;
-	blue->background_color = nui::Color::blue();
-	blue->setMouseEnterEvent(onBlueEnter);
-	blue->setMouseLeaveEvent(onBlueLeave);
+	// Camera Dolly
 
-	blue->setMouseDeltaBeginEvent(onBlueDeltaBegin);
-	blue->setMouseDeltaEvent(onBlueDelta);
-	blue->setMouseDeltaEndEvent(onBlueDeltaEnd);
+	// Camera Reset
+	surface->addKeyDownEvent(onCameraResetKeyDown, nui::VirtualKeys::F);
 
-	blue->addKeyDownEvent(onBlueKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
-	blue->addKeyHeldDownEvent(onBlueHeldKeyDown, nui::VirtualKeys::S);
-	blue->addKeyUpEvent(onBlueKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+	// Camera Frame
 
-	auto t = blue->addText();
-	t->text = U"This text should overflow past blue into green and red but clipped by red";
-	t->pos.x = 100;
-	t->setMouseEnterEvent(onTextEnter);
-	t->setMouseLeaveEvent(onTextLeave);
-
-	while (!window->close) {
+	while (!application.window->close) {
 
 		err_stack = instance.update();
 		if (err_stack.isBad()) {

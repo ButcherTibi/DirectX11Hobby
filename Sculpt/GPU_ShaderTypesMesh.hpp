@@ -48,7 +48,7 @@ struct GPU_MeshVertex {
 
 struct GPU_MeshInstance {
 	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT3 rot;
+	DirectX::XMFLOAT4 rot;
 
 	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout(uint32_t input_slot = 1)
 	{
@@ -63,7 +63,7 @@ struct GPU_MeshInstance {
 
 		elems[1].SemanticName = "INSTANCE_ROTATION";
 		elems[1].SemanticIndex = 0;
-		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		elems[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 		elems[1].InputSlot = input_slot;
 		elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
 		elems[1].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;

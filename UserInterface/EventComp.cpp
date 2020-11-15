@@ -15,9 +15,9 @@ void EventComp::_create(Window* wnd, Node* source_node)
 	window = wnd;
 	source = source_node;
 
-	last_mouse_x = 0xFFFF'FFFF;
-	last_mouse_y = 0xFFFF'FFFF;
-	mouse_state = MouseState::OUTSIDE;
+	last_mouse_x = 0xFFFF;
+	last_mouse_y = 0xFFFF;
+	mouse_state = MouseState::OFF;
 	mouse_delta_state = MouseDeltaState::OFF;
 
 	hover_event.source = source_node;
@@ -25,18 +25,17 @@ void EventComp::_create(Window* wnd, Node* source_node)
 	leave_event.source = source_node;
 	move_event.source = source_node;
 
-	delta_start_event.source = source_node;
-	delta_event.source = source_node;
-	delta_end_event.source = source_node;
-
 	onMouseHover = nullptr;
 	onMouseEnter = nullptr;
 	onMouseLeave = nullptr;
 	onMouseMove = nullptr;
+}
 
-	onMouseDeltaBegin = nullptr;
-	onMouseDelta = nullptr;
-	onMouseDeltaEnd = nullptr;
+void EventComp::_endMouseDelta()
+{
+	window->untrapMousePosition();
+
+	mouse_delta_state = MouseDeltaState::OFF;
 }
 
 void EventComp::_emitInsideEvents()
@@ -44,7 +43,7 @@ void EventComp::_emitInsideEvents()
 	auto now = std::chrono::steady_clock::now();
 
 	// Mouse Entered for the first time
-	if (mouse_state == MouseState::OUTSIDE) {
+	if (mouse_state == MouseState::OFF) {
 
 		mouse_enter_time = now;
 		hover_event.duration = 0;
@@ -90,13 +89,6 @@ void EventComp::_emitInsideEvents()
 
 		window->trapLocalMousePosition(source->collider);
 
-		if (onMouseDeltaBegin != nullptr) {
-
-			delta_start_event.duration = 0;
-			this->onMouseDeltaBegin(delta_start_event);
-		}
-
-		delta_start_time = now;
 		mouse_delta_state = MouseDeltaState::NOW;
 		break;
 	}
@@ -119,28 +111,13 @@ void EventComp::_emitInsideEvents()
 		else if(input.mouse_x == trap.x1 - 1) {
 			window->setLocalMousePosition(trap.x0 + 1, input.mouse_y);
 		}
-
-		if (onMouseDelta != nullptr && (input.mouse_delta_x != 0 && input.mouse_delta_y != 0)) {
-
-			delta_event.delta_x = input.mouse_delta_x;
-			delta_event.delta_y = input.mouse_delta_y;
-			delta_event.duration = fsec_cast(now - delta_start_time);
-			this->onMouseDelta(delta_event);
-		}
 		break;
 	}
 
 	// Mouse Delta End
 	case nui::MouseDeltaState::END: {
 
-		window->untrapMousePosition();
-
-		if (onMouseDeltaEnd != nullptr) {
-			delta_end_event.duration = fsec_cast(now - delta_start_time);
-			this->onMouseDeltaEnd(delta_end_event);
-		}
-
-		mouse_delta_state = MouseDeltaState::OFF;
+		_endMouseDelta();
 		break;
 	}
 	}
@@ -186,13 +163,13 @@ void EventComp::_emitInsideEvents()
 		}
 	}
 
-	mouse_state = MouseState::INSIDE;
+	mouse_state = MouseState::ENTER;
 }
 
 void EventComp::_emitOutsideEvents()
 {
 	// Mouse Leave
-	if (mouse_state == MouseState::INSIDE) {
+	if (mouse_state != MouseState::OFF) {
 
 		if (onMouseLeave != nullptr) {
 
@@ -200,26 +177,20 @@ void EventComp::_emitOutsideEvents()
 			leave_event.mouse_y = window->input.mouse_y;
 			this->onMouseLeave(leave_event);
 		}
+
+		last_mouse_x = 0xFFFF;
+		last_mouse_y = 0xFFFF;
+		mouse_state = MouseState::OFF;
 	}
 
 	// Mouse Delta Ended
-	if (mouse_delta_state == MouseDeltaState::END) {
-
-		if (onMouseDeltaEnd != nullptr) {
-			delta_end_event.duration = fsec_cast(std::chrono::steady_clock::now() - delta_start_time);
-			this->onMouseDeltaEnd(delta_end_event);
-		}
-
-		mouse_delta_state = MouseDeltaState::OFF;
+	if (mouse_delta_state != MouseDeltaState::OFF) {
+		_endMouseDelta();
 	}
 
 	for (KeyHeldDown& held : keys_held_down) {
 		held.event.duration = std::numeric_limits<float>::max();
 	}
-
-	last_mouse_x = 0xFFFF'FFFF;
-	last_mouse_y = 0xFFFF'FFFF;
-	mouse_state = MouseState::OUTSIDE;
 }
 
 void EventComp::setMouseHoverEvent(MouseHoverCallback callback, void* user_ptr)
@@ -244,23 +215,6 @@ void EventComp::setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr)
 {
 	this->onMouseMove = callback;
 	this->move_event.user_ptr = user_ptr;
-}
-
-void EventComp::setMouseDeltaBeginEvent(MouseDeltaBeginCallback callback, void* user_ptr)
-{
-	this->onMouseDeltaBegin = callback;
-	this->delta_start_event.user_ptr = user_ptr;
-}
-
-void EventComp::setMouseDeltaEvent(MouseDeltaCallback callback, void* user_ptr)
-{
-	this->onMouseDelta = callback;
-	this->delta_event.user_ptr = user_ptr;
-}
-void EventComp::setMouseDeltaEndEvent(MouseDeltaEndCallback callback, void* user_ptr)
-{
-	this->onMouseDeltaEnd = callback;
-	this->delta_end_event.user_ptr = user_ptr;
 }
 
 void EventComp::beginMouseDelta()

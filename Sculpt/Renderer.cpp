@@ -5,6 +5,8 @@
 // GLM
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "Application.hpp"
+
 
 using namespace scme;
 
@@ -15,18 +17,51 @@ void MeshRenderer::generateVertices()
 
 	// Vertices
 	uint32_t vertex_count = 0;
-	for (VertexBoundingBox& aabb : mesh.aabbs) {
-		for (GPU_Vertex& gv : aabb.gpu_vs) {
-			vertex_count++;
+	for (Poly& poly : mesh.polys) {
+
+		if (poly.vs[3] == nullptr) {
+			vertex_count += 3;
+		}
+		else {
+			vertex_count += 6;
 		}
 	}
+
 	vertices.resize(vertex_count);
 
 	uint32_t vi = 0;
-	for (VertexBoundingBox& aabb : mesh.aabbs) {
-		for (GPU_Vertex& gv : aabb.gpu_vs) {
-			vertices[vi].pos = dxConvert(gv.pos);
-			vi++;
+	for (Poly& poly : mesh.polys) {
+
+		if (poly.vs[3] == nullptr) {
+		
+			vertices[vi].pos = dxConvert(poly.vs[0]->pos);
+			vertices[vi + 1].pos = dxConvert(poly.vs[1]->pos);
+			vertices[vi + 2].pos = dxConvert(poly.vs[2]->pos);
+
+			vi += 3;
+		}
+		else if (poly.tesselation_type == 0) {
+
+			vertices[vi].pos = dxConvert(poly.vs[0]->pos);
+			vertices[vi + 1].pos = dxConvert(poly.vs[2]->pos);
+			vertices[vi + 2].pos = dxConvert(poly.vs[3]->pos);
+
+			vertices[vi + 3].pos = dxConvert(poly.vs[0]->pos);
+			vertices[vi + 4].pos = dxConvert(poly.vs[1]->pos);
+			vertices[vi + 5].pos = dxConvert(poly.vs[2]->pos);
+
+			vi += 6;
+		}
+		else {
+			vertices[vi].pos = dxConvert(poly.vs[0]->pos);
+			vertices[vi + 1].pos = dxConvert(poly.vs[1]->pos);
+			vertices[vi + 2].pos = dxConvert(poly.vs[3]->pos);
+
+			vertices[vi + 3].pos = dxConvert(poly.vs[1]->pos);
+			vertices[vi + 4].pos = dxConvert(poly.vs[2]->pos);
+			vertices[vi + 5].pos = dxConvert(poly.vs[3]->pos);
+
+			vi += 6;
 		}
 	}
 
@@ -39,8 +74,7 @@ void MeshRenderer::generateVertices()
 void MeshRenderer::generateUniform()
 {
 	uniform.camera_pos = dxConvert(application.camera_pos);
-
-	uniform.camera_quat = dxConvert(application.camera_quat);
+	uniform.camera_quat = dxConvert(application.camera_quat_inv);
 
 	uniform.perspective_matrix = dxConvert(glm::perspectiveFovRH_ZO(toRad(application.field_of_view),
 		(float)viewport_width, (float)viewport_height, application.z_near, application.z_far));
@@ -74,19 +108,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	ErrStack err_stack;
 	HRESULT hr = S_OK;
 
-	// Generate CPU Data
-	{
-		generateVertices();
-		generateUniform();
-	}
-
 	if (dev5 == nullptr) {
 
+		// Init
 		dev5 = event.dev5;
 		de_ctx3 = event.de_ctx3;
-
-		viewport_width = event.surface_width;
-		viewport_height = event.surface_height;
+		
+		load_vertices = true;
+		load_uniform = true;
 
 		// Vertex Buffer
 		{
@@ -169,7 +198,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			D3D11_RASTERIZER_DESC desc = {};
 			desc.FillMode = D3D11_FILL_SOLID;
 			desc.CullMode = D3D11_CULL_BACK;
-			desc.FrontCounterClockwise = false;
+			desc.FrontCounterClockwise = true;
 			desc.DepthBias = 0;
 			desc.DepthBiasClamp = 0;
 			desc.SlopeScaledDepthBias = 0;
@@ -204,9 +233,23 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			checkHResult(dev5->CreateBlendState(&desc, mesh_bs.GetAddressOf()),
 				"failed to create mesh blend state");
 		}
+	}
 
+	viewport_width = event.surface_width;
+	viewport_height = event.surface_height;
+
+	if (load_vertices) {
+		generateVertices();
 		checkErrStack1(loadVertices());
+
+		load_vertices = false;
+	}
+
+	if (load_uniform) {
+		generateUniform();
 		checkErrStack1(loadUniform());
+
+		load_uniform = false;
 	}
 
 	// Command List

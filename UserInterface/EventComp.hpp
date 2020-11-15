@@ -103,8 +103,9 @@ namespace nui {
 	};
 
 	enum class MouseState {
-		OUTSIDE,
-		INSIDE,
+		OFF,
+		ENTER,
+		LEAVE
 	};
 
 	enum class MouseDeltaState {
@@ -119,12 +120,10 @@ namespace nui {
 		Window* window;
 		Node* source;
 
-		uint32_t last_mouse_x;
-		uint32_t last_mouse_y;
+		uint16_t last_mouse_x;
+		uint16_t last_mouse_y;
 		SteadyTime mouse_enter_time;
 		MouseState mouse_state;
-
-		SteadyTime delta_start_time;
 		MouseDeltaState mouse_delta_state;
 
 		// Event State
@@ -132,18 +131,12 @@ namespace nui {
 		MouseEnterEvent enter_event;
 		MouseLeaveEvent leave_event;
 		MouseMoveEvent move_event;
-		MouseDeltaEvent delta_start_event;
-		MouseDeltaEvent delta_event;
-		MouseDeltaEvent delta_end_event;
 
 		// Callbacks
 		void (*onMouseHover)(MouseHoverEvent& hover_event);
 		void (*onMouseEnter)(MouseEnterEvent& enter_event);
 		void (*onMouseLeave)(MouseLeaveEvent& leave_event);
 		void (*onMouseMove)(MouseMoveEvent& move_event);
-		void (*onMouseDeltaBegin)(MouseDeltaEvent& delta_event);
-		void (*onMouseDelta)(MouseDeltaEvent& delta_event);
-		void (*onMouseDeltaEnd)(MouseDeltaEvent& delta_event);
 
 		std::list<KeyDown> keys_down;
 		std::list<KeyHeldDown> keys_held_down;
@@ -154,6 +147,9 @@ namespace nui {
 	public:
 		void _create(Window* wnd, Node* node);
 
+		/* mouse delta is ended by explicit end call or by being outside */
+		void _endMouseDelta();
+
 		void _emitInsideEvents();
 		void _emitOutsideEvents();
 
@@ -161,10 +157,6 @@ namespace nui {
 		void setMouseEnterEvent(MouseEnterCallback callback, void* user_ptr = nullptr);
 		void setMouseLeaveEvent(MouseLeaveCallback callback, void* user_ptr = nullptr);
 		void setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr = nullptr);
-
-		void setMouseDeltaBeginEvent(MouseDeltaBeginCallback callback, void* user_ptr = nullptr);
-		void setMouseDeltaEvent(MouseDeltaCallback callback, void* user_ptr = nullptr);
-		void setMouseDeltaEndEvent(MouseDeltaEndCallback callback, void* user_ptr = nullptr);
 
 		void beginMouseDelta();
 		void endMouseDelta();

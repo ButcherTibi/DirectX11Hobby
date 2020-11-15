@@ -44,3 +44,23 @@ float toRad(float degree)
 {
 	return degree * (M_PI / 180.0f);
 }
+
+void Quaternion::rotateAroundX(float deg)
+{
+	this->q = glm::rotate(this->q, toRad(deg), { 1, 0, 0 });
+}
+
+void Quaternion::rotateAroundY(float deg)
+{
+	this->q = glm::rotate(this->q, toRad(deg), { 0, 1, 0 });
+}
+
+void Quaternion::rotateAroundZ(float deg)
+{
+	this->q = glm::rotate(this->q, toRad(deg), { 0, 0, 1 });
+}
+
+void Quaternion::normalize()
+{
+	this->q = glm::normalize(this->q);
+}

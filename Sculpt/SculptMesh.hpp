@@ -42,13 +42,9 @@ namespace scme {
 	class Poly;
 
 
-	struct GPU_Vertex {
+	struct Vertex {
 		glm::vec3 pos;
 		glm::vec3 normal;
-	};
-
-	struct CPU_Vertex {
-		GPU_Vertex* gpu_vertex;
 
 		std::list<Edge*> edges;
 	};
@@ -57,8 +53,7 @@ namespace scme {
 	struct VertexBoundingBox {
 		AxisBoundingBox3D aabb;
 
-		std::vector<GPU_Vertex> gpu_vs;
-		std::vector<CPU_Vertex> cpu_vs;
+		std::vector<Vertex> vs;
 
 		VertexBoundingBox* parent;
 		std::list<VertexBoundingBox*> children;
@@ -67,8 +62,8 @@ namespace scme {
 
 	class Edge {
 	public:
-		CPU_Vertex* v0;
-		CPU_Vertex* v1;
+		Vertex* v0;
+		Vertex* v1;
 
 		std::list<Poly*> polys;
 	};
@@ -78,10 +73,10 @@ namespace scme {
 	public:
 		glm::vec3 normal;
 
-		std::vector<CPU_Vertex*> vs;
-		std::vector<Edge*> edges;
+		std::array<Vertex*, 4> vs;
+		std::array<Edge*, 4> edges;
 
-		std::array<uint8_t, 6> tesselation;
+		bool tesselation_type;
 		std::array<glm::vec3, 2> tess_normals;
 
 	public:
@@ -92,7 +87,7 @@ namespace scme {
 	class SculptMesh {
 	public:
 		glm::vec3 pos;
-		glm::vec3 rot;
+		glm::quat rot;
 
 		std::list<VertexBoundingBox> aabbs;
 		std::list<Edge> edges;
@@ -118,10 +113,17 @@ namespace scme {
 
 		////////////////////////////////////////////////////////////
 		// add edge
-		Edge& addEdge(CPU_Vertex& v0, CPU_Vertex& v1);
+		Edge& addEdge(Vertex& v0, Vertex& v1);
 
 		////////////////////////////////////////////////////////////
-		Poly& addTris(CPU_Vertex& v0, CPU_Vertex& v1, CPU_Vertex& v2, Edge& e0, Edge& e1, Edge& e2);
+		Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,
+			Edge& e0, Edge& e1, Edge& e2, bool tesselation_type = 1);
+
+		Poly& addQuad(Vertex& v0, Vertex& v1, Vertex& v2, Vertex& v3,
+			Edge& e0, Edge& e1, Edge& e2, Edge& e3, bool tesselation_type = 1);
+
+		// add poly where edges are created if not existing
+
 		// addLoneQuad
 		// addTris
 		// addQuad
@@ -138,7 +140,8 @@ namespace scme {
 
 		// ray query
 
-		void createAsTriangle(glm::vec3& pos, glm::vec3& rot, float size);
+		void createAsTriangle(glm::vec3& pos, glm::quat& rot, float size);
+		void createAsCube(glm::vec3& pos, glm::quat& rot, float size);
 		ErrStack createFromGLTF(std::vector<char>& gltf_file);
 		//nui::ErrStack createFromOBJ(std::vector<uint8_t> obj_file);
 	};

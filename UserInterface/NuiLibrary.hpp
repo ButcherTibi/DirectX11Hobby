@@ -54,7 +54,7 @@ namespace nui {
 		float size;
 
 	public:
-		ElementSize& operator=(uint32_t size_px);
+		ElementSize& operator=(int32_t size_px);
 		ElementSize& operator=(float percentage);
 		void setAbsolute(float size);
 	};
@@ -276,6 +276,9 @@ namespace nui {
 		HWND hwnd;
 
 		// Window Procedure Messages
+		SteadyTime start_time;
+		float delta_time;
+
 		Input input;
 
 		std::uint32_t width;
@@ -374,10 +377,14 @@ namespace nui {
 		Surface* addSurface();
 
 		RECT getClientRectangle();
+
 		bool setLocalMousePosition(uint32_t x, uint32_t y);
+
 		bool trapLocalMousePosition(BoundingBox2D<uint32_t>& box);
 		bool untrapMousePosition();
-		void hideMousePointer(bool hide);
+		
+		void hideMousePointer(bool hide = true);
+		void getMouseDelta(int32_t& mouse_delta_x, int32_t& mouse_delta_y);
 	};
 
 	 
