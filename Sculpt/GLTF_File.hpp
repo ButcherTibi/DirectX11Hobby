@@ -5,8 +5,11 @@
 
 // GLM
 #include <glm\vec3.hpp>
+#include <glm\gtc\quaternion.hpp>
+#include <glm\mat4x4.hpp>
 
 #include "JSON_File.hpp"
+#include "FilePath.hpp"
 
 
 namespace base64 {
@@ -19,6 +22,8 @@ namespace base64 {
 	public:
 		/* add a bit to the end */
 		void push_back(bool bit);
+		
+		void push_back(uint8_t byte);
 
 		/* converts one Base64 character to 6 bits
 		 * @returns false if character is unrecognized */
@@ -38,13 +43,13 @@ namespace gltf {
 
 	namespace Modes {
 		enum {
-			POINTS,
-			LINES,
-			LINE_LOOP,
-			LINE_STRIP,
-			TRIANGLES,
-			TRIANGLE_STRIP,
-			TRIANGLE_FAN
+			POINTS = 0,
+			LINES = 1,
+			LINE_LOOP = 2,
+			LINE_STRIP = 3,
+			TRIANGLES = 4,
+			TRIANGLE_STRIP = 5,
+			TRIANGLE_FAN = 6
 		};
 	}
 
@@ -56,7 +61,7 @@ namespace gltf {
 	struct Primitive {
 		std::unordered_map<std::string, uint64_t> attributes;
 		uint64_t indices;
-		uint64_t mode;
+		uint64_t mode = Modes::TRIANGLES;
 
 		// Extracted Data
 		std::vector<uint32_t> indexes;
@@ -76,18 +81,20 @@ namespace gltf {
 		std::vector<uint64_t> children;
 
 		// Content
-		uint64_t mesh;
+		uint64_t mesh = 0xFFFF'FFFF'FFFF'FFFF;
 
 		// Transformation
-		double translation[3] = { 0, 0, 0 };
-		double rotation[4] = { 0, 0, 0, 1 };
-		double scale[3] = { 1, 1, 1 };
-		double matrix[16] = {
+		glm::vec3 translation = { 0, 0, 0 };
+		glm::quat rotation = { 1, 0, 0, 0 };  // W, x, y, z
+		glm::vec3 scale = { 1, 1, 1 };
+
+		glm::mat4x4 matrix = {
 			1, 0, 0, 0,
 			0, 1, 0, 0,
 			0, 0, 1, 0,
 			0, 0, 0, 1
 		};
+		bool uses_matrix = false;
 	};
 
 
@@ -171,6 +178,6 @@ namespace gltf {
 		ErrStack _loadVec3FromBuffer(uint64_t acc_idx,
 			std::vector<base64::BitVector>& bin_buffs, std::vector<glm::vec3>& r_vecs);
 
-		ErrStack importGLTF(json::Graph& json_graph);
+		ErrStack importGLTF(io::FilePath& path_to_gltf_file);
 	};
 }

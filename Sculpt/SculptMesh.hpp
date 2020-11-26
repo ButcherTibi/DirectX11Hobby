@@ -8,8 +8,8 @@
 // GLM
 #include "glm\vec3.hpp"
 
-#include "GPU_ShaderTypes.hpp"
 #include "ErrorStack.hpp"
+#include "GLTF_File.hpp"
 #include "Geometry.hpp"
 
 
@@ -42,11 +42,16 @@ namespace scme {
 	class Poly;
 
 
-	struct Vertex {
+	class Vertex {
+	public:
 		glm::vec3 pos;
 		glm::vec3 normal;
 
-		std::list<Edge*> edges;
+		std::vector<Edge*> edges;
+
+	public:
+		void calcNormalFromEdges();
+		void calcNormalFromPolyNormals();
 	};
 
 
@@ -65,7 +70,7 @@ namespace scme {
 		Vertex* v0;
 		Vertex* v1;
 
-		std::list<Poly*> polys;
+		std::vector<Poly*> polys;
 	};
 
 
@@ -80,18 +85,21 @@ namespace scme {
 		std::array<glm::vec3, 2> tess_normals;
 
 	public:
+		// void calcNormal();
 		void calcNormalForTris();
 	};
 
 
+	/*  */
 	class SculptMesh {
 	public:
-		glm::vec3 pos;
-		glm::quat rot;
-
 		std::list<VertexBoundingBox> aabbs;
 		std::list<Edge> edges;
 		std::list<Poly> polys;
+
+		// GPU Rendering
+		uint32_t _vertex_start;
+		uint32_t _vertex_count;
 
 	public:
 		//void createTriangle();
@@ -112,12 +120,28 @@ namespace scme {
 		// redistributeRootVertices 
 
 		////////////////////////////////////////////////////////////
-		// add edge
-		Edge& addEdge(Vertex& v0, Vertex& v1);
+
+		/* always creates a edge between existing vertices */
+		Edge* addEdge(Vertex* v0, Vertex* v1);
+
+		/* only creates a edge if there is no edge between the vertices */
+		Edge* addEdgeIfNone(Vertex* v0, Vertex* v1);
 
 		////////////////////////////////////////////////////////////
+
+		/* creates a triangle from existing vertices and edges */
 		Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,
-			Edge& e0, Edge& e1, Edge& e2, bool tesselation_type = 1);
+			Edge& e0, Edge& e1, Edge& e2);
+
+		/* creates a new triangle from existing vertices, creates new edges between the vertices 
+		if they are not already present */
+		Poly* addTris(Vertex* v0, Vertex* v1, Vertex* v2);
+
+		/* creates a new triangle from existing vertices, creates new edges between the vertices 
+		if they are not already present, winding is set based on average normal */
+		Poly* addTrisNormalWinding(Vertex* v0, Vertex* v1, Vertex* v2);
+		
+		// Poly* addTrisPositionWinding(Vertex* v0, Vertex* v1, Vertex* v2);
 
 		Poly& addQuad(Vertex& v0, Vertex& v1, Vertex& v2, Vertex& v3,
 			Edge& e0, Edge& e1, Edge& e2, Edge& e3, bool tesselation_type = 1);
@@ -140,9 +164,11 @@ namespace scme {
 
 		// ray query
 
-		void createAsTriangle(glm::vec3& pos, glm::quat& rot, float size);
-		void createAsCube(glm::vec3& pos, glm::quat& rot, float size);
-		ErrStack createFromGLTF(std::vector<char>& gltf_file);
-		//nui::ErrStack createFromOBJ(std::vector<uint8_t> obj_file);
+		void createAsTriangle(float size);
+		void createAsCube(float size);
+		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
+			bool flip_winding = false);
+		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
+			bool flip_winding = false);
 	};
 }

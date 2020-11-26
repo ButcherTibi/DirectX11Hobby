@@ -43,11 +43,9 @@ namespace nui {
 		void* user_ptr;
 	};
 
-	struct MouseDeltaEvent {
+	struct MouseScrollEvent {
 		Node* source;
-		int32_t delta_x;
-		int32_t delta_y;
-		float duration;
+		int16_t scroll_delta;
 		void* user_ptr;
 	};
 
@@ -74,10 +72,7 @@ namespace nui {
 	typedef void (*MouseEnterCallback)(MouseEnterEvent& hover_event);
 	typedef void (*MouseLeaveCallback)(MouseLeaveEvent& hover_event);
 	typedef void (*MouseMoveCallback)(MouseMoveEvent& move_event);
-
-	typedef void (*MouseDeltaBeginCallback)(MouseDeltaEvent& mouse_delta_begin_event);
-	typedef void (*MouseDeltaCallback)(MouseDeltaEvent& mouse_delta_event);
-	typedef void (*MouseDeltaEndCallback)(MouseDeltaEvent& mouse_delta_end_event);
+	typedef void (*MouseScrollCallback)(MouseScrollEvent& scroll_event);
 
 	typedef void (*KeyDownCallback)(KeyDownEvent& key_down_event);
 	typedef void (*KeyHeldDownCallback)(KeyHeldDownEvent& key_held_down_event);
@@ -131,12 +126,14 @@ namespace nui {
 		MouseEnterEvent enter_event;
 		MouseLeaveEvent leave_event;
 		MouseMoveEvent move_event;
+		MouseScrollEvent scroll_event;
 
 		// Callbacks
 		void (*onMouseHover)(MouseHoverEvent& hover_event);
 		void (*onMouseEnter)(MouseEnterEvent& enter_event);
 		void (*onMouseLeave)(MouseLeaveEvent& leave_event);
 		void (*onMouseMove)(MouseMoveEvent& move_event);
+		void (*onMouseScroll)(MouseScrollEvent& scroll_event);
 
 		std::list<KeyDown> keys_down;
 		std::list<KeyHeldDown> keys_held_down;
@@ -157,6 +154,7 @@ namespace nui {
 		void setMouseEnterEvent(MouseEnterCallback callback, void* user_ptr = nullptr);
 		void setMouseLeaveEvent(MouseLeaveCallback callback, void* user_ptr = nullptr);
 		void setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr = nullptr);
+		void setMouseScrollEvent(MouseScrollCallback callback, void* user_ptr = nullptr);
 
 		void beginMouseDelta();
 		void endMouseDelta();
@@ -168,5 +166,7 @@ namespace nui {
 		bool removeKeyDownEvent(uint32_t key);
 		bool removeKeyHeldDownEvent(uint32_t key);
 		bool removeKeyUpEvent(uint32_t key);
+
+		// TODO: add shortcuts
 	};
 }

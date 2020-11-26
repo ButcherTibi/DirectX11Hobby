@@ -133,6 +133,9 @@ namespace nui {
 		int32_t mouse_delta_x;
 		int32_t mouse_delta_y;
 
+		// Mouse Wheel
+		int16_t mouse_wheel_delta;
+
 	public:
 
 		void setKeyDownState(uint32_t wParam, uint32_t lParam);

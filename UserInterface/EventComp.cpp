@@ -24,11 +24,13 @@ void EventComp::_create(Window* wnd, Node* source_node)
 	enter_event.source = source_node;
 	leave_event.source = source_node;
 	move_event.source = source_node;
+	scroll_event.source = source_node;
 
 	onMouseHover = nullptr;
 	onMouseEnter = nullptr;
 	onMouseLeave = nullptr;
 	onMouseMove = nullptr;
+	onMouseScroll = nullptr;
 }
 
 void EventComp::_endMouseDelta()
@@ -80,6 +82,15 @@ void EventComp::_emitInsideEvents()
 			move_event.mouse_x = window->input.mouse_x;
 			move_event.mouse_y = window->input.mouse_y;
 			this->onMouseMove(move_event);
+		}
+	}
+
+	// Mouse Scroll
+	if (window->input.mouse_wheel_delta) {
+		if (this->onMouseScroll != nullptr) {
+
+			scroll_event.scroll_delta = window->input.mouse_wheel_delta;
+			this->onMouseScroll(scroll_event);
 		}
 	}
 
@@ -215,6 +226,12 @@ void EventComp::setMouseMoveEvent(MouseMoveCallback callback, void* user_ptr)
 {
 	this->onMouseMove = callback;
 	this->move_event.user_ptr = user_ptr;
+}
+
+void EventComp::setMouseScrollEvent(MouseScrollCallback callback, void* user_ptr)
+{
+	this->onMouseScroll = callback;
+	this->scroll_event.user_ptr = user_ptr;
 }
 
 void EventComp::beginMouseDelta()

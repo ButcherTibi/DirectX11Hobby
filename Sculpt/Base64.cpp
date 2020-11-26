@@ -15,6 +15,12 @@ void base64::BitVector::push_back(bool bit)
 	bit_count++;
 }
 
+void base64::BitVector::push_back(uint8_t byte)
+{
+	bytes.push_back(byte);
+	bit_count += 8;
+}
+
 bool base64::BitVector::pushBase64Char(char c)
 {
 	uint8_t d;
@@ -44,12 +50,12 @@ bool base64::BitVector::pushBase64Char(char c)
 		return false;
 	}
 
-	push_back(d & 0b100000);
-	push_back(d & 0b010000);
-	push_back(d & 0b001000);
-	push_back(d & 0b000100);
-	push_back(d & 0b000010);
-	push_back(d & 0b000001);
+	push_back(bool(d & 0b100000));
+	push_back(bool(d & 0b010000));
+	push_back(bool(d & 0b001000));
+	push_back(bool(d & 0b000100));
+	push_back(bool(d & 0b000010));
+	push_back(bool(d & 0b000001));
 
 	return true;
 }

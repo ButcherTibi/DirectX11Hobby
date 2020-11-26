@@ -12,8 +12,8 @@ cbuffer Uniform : register(b0)
 {
 	float3 camera_pos;
 	float4 camera_quat_inv;
+	float3 camera_forward;
 	float4x4 perspective;
-	
 	//int parent_clip_id;
 	//int child_clip_id;
 };

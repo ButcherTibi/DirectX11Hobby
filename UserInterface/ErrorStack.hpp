@@ -19,7 +19,8 @@ enum class ErrorOrigins {
 	NOT_SPECIFIED,
 	VULKAN_ERROR_CODE,
 	WINDOWS_ERROR_HANDLE,
-	WINDOWS_LAST_ERROR
+	WINDOWS_LAST_ERROR,
+	USER_ACTION
 };
 
 
@@ -28,7 +29,7 @@ struct Error {
 
 	std::string location;
 	std::string msg;
-	ErrorOrigins type = ErrorOrigins::NOT_SPECIFIED;
+	ErrorOrigins origin = ErrorOrigins::NOT_SPECIFIED;
 };
 
 	
@@ -42,6 +43,7 @@ public:
 	ErrStack(std::string location, std::string msg, int32_t err_code, ErrorOrigins origin);
 
 	void pushError(std::string location, std::string msg);
+	void pushError(std::string location, std::string msg, int32_t err_code, ErrorOrigins origin);
 
 	Error lastError();
 

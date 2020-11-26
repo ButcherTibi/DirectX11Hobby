@@ -23,7 +23,7 @@ ErrStack::ErrStack(std::string location, std::string msg, int32_t err_code, Erro
 	err.err_code = err_code;
 	err.location = location;
 	err.msg = msg;
-	err.type = origin;
+	err.origin = origin;
 }
 
 void ErrStack::pushError(std::string location, std::string msg)
@@ -31,6 +31,15 @@ void ErrStack::pushError(std::string location, std::string msg)
 	Error& err = this->error_stack.emplace_back();
 	err.location = location;
 	err.msg = msg;
+}
+
+void ErrStack::pushError(std::string location, std::string msg, int32_t err_code, ErrorOrigins origin)
+{
+	Error& err = this->error_stack.emplace_back();
+	err.location = location;
+	err.msg = msg;
+	err.err_code = err_code;
+	err.origin = origin;
 }
 
 Error ErrStack::lastError()
@@ -56,7 +65,12 @@ void ErrStack::debugPrint()
 		printf("  %s \n", error.location.c_str());
 		printf("  msg= %s \n", error.msg.c_str());
 
-		switch (error.type) {
+		switch (error.origin) {
+		case ErrorOrigins::NOT_SPECIFIED:
+			printf("  type= NOT_SPECIFIED \n");
+			printf("  err_code= %I32d \n", error.err_code);
+			break;
+
 		case ErrorOrigins::VULKAN_ERROR_CODE:
 			printf("  type= VULKAN_ERROR_CODE \n");
 			printf("  err_code= %I32d 0x%I32x \n", error.err_code, error.err_code);

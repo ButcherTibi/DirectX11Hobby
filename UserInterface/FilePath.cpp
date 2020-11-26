@@ -85,29 +85,49 @@ void FilePath::recreateAbsolute(std::string path)
 
 ErrStack FilePath::recreateRelative(std::string path)
 {
-	entries.clear();
-
 	std::string exe_filename;
 	exe_filename.resize(max_path);
 
 	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-
 		return ErrStack(code_location, getLastError());
 	}
 
-	pushPathToEntries(this->entries, exe_filename);
-
-	std::string project_name;
-	{
-		std::string& last = entries.back();
-		size_t dot_pos = last.find_last_of('.');
-		project_name = last.substr(0, dot_pos);	
+	// trim excess
+	for (uint32_t i = 0; i < exe_filename.size(); i++) {
+		if (exe_filename[i] == '\0') {
+			exe_filename.erase(i + 1, exe_filename.size() - (i + 1));
+			break;
+		}
 	}
 
-	pop_back(3);
-	push_back(project_name);
-	
-	push_back(path);
+	// remove last 3 entries
+	uint32_t slash_pos = 0;
+	uint32_t slash_count = 0;
+	for (int32_t i = exe_filename.size() - 1; i >= 0; i--) {
+
+		char& c = exe_filename[i];
+
+		if (c == '\\' || c == '/') {
+			slash_count++;
+
+			if (slash_count == 3) {
+				slash_pos = i;
+				break;
+			}
+		}
+	}
+	exe_filename.erase(slash_pos + 1, exe_filename.size() - (slash_pos + 1));
+
+	assert_cond(path[0] != '/' && path[0] != '\\', "");
+
+	// convert linux '/' to windows '\'
+	for (char& c : path) {
+		c = c == '/' ? '\\' : c;
+	}
+
+	exe_filename.append(path);
+
+	push_back(exe_filename);
 
 	return ErrStack();
 }

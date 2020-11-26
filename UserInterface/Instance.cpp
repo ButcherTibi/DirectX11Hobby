@@ -105,6 +105,11 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				return 0;
 			}
 
+			case WM_MOUSEWHEEL: {
+				wnd.input.mouse_wheel_delta = GET_WHEEL_DELTA_WPARAM(wParam);
+				return 0;
+			}
+
 			case WM_KEYDOWN: {
 				wnd.input.setKeyDownState((uint32_t)wParam, (uint32_t)lParam);
 				return 0;
@@ -392,7 +397,7 @@ ErrStack Instance::update()
 
 		window.delta_time = fsec_cast(std::chrono::steady_clock::now() - window.start_time);
 
-		WaitMessage();
+		WaitMessage();  // TODO: try thread sleep for remainder of time
 
 		MSG msg{};
 		while (PeekMessageA(&msg, window.hwnd, 0, 0, PM_REMOVE)) {

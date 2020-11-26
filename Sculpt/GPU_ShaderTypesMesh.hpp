@@ -76,7 +76,9 @@ struct GPU_MeshInstance {
 
 struct GPU_MeshUniform {
 	DirectX::XMFLOAT3 camera_pos;
-	float pad_1;
+	float pad_0;
 	DirectX::XMFLOAT4 camera_quat;
+	DirectX::XMFLOAT3 camera_forward;
+	float pad_1;
 	DirectX::XMFLOAT4X4 perspective_matrix;
 };

@@ -8,14 +8,14 @@
 using namespace json;
 
 
-static std::string msgWithPos(std::string msg, uint64_t i, std::vector<char>& text)
+static std::string msgWithPos(std::string msg, uint64_t i, std::vector<uint8_t>& text)
 {
 	uint64_t line = 1;
 	uint64_t col = 1;
 
 	for (uint64_t idx = 0; idx <= i; idx++) {
 
-		char& c = text[idx];
+		uint8_t& c = text[idx];
 
 		if (c == '\n') {
 			line++;
@@ -29,11 +29,11 @@ static std::string msgWithPos(std::string msg, uint64_t i, std::vector<char>& te
 		" at ln= " + std::to_string(line) + " col= " + std::to_string(col - 1);
 }
 
-void json::_skipWhiteSpace(uint64_t& i, std::vector<char>& text)
+void json::_skipWhiteSpace(uint64_t& i, std::vector<uint8_t>& text)
 {
 	for (; i < text.size(); i++) {
 
-		char& c = text[i];
+		uint8_t& c = text[i];
 
 		// skip anything below whitespace
 		if (c < 0x21) {
@@ -43,13 +43,13 @@ void json::_skipWhiteSpace(uint64_t& i, std::vector<char>& text)
 	}
 }
 
-bool json::_seekSymbol(uint64_t& i, std::vector<char>& text, char symbol)
+bool json::_seekSymbol(uint64_t& i, std::vector<uint8_t>& text, char symbol)
 {
 	for (; i < text.size(); i++) {
 
 		_skipWhiteSpace(i, text);
 
-		char& c = text[i];
+		uint8_t& c = text[i];
 
 		if (c == symbol) {
 			i++;
@@ -59,7 +59,7 @@ bool json::_seekSymbol(uint64_t& i, std::vector<char>& text, char symbol)
 	return false;
 }
 
-ErrStack json::_confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keyword)
+ErrStack json::_confirmKeyword(uint64_t& i, std::vector<uint8_t>& text, std::string keyword)
 {
 	uint64_t idx = 0;
 
@@ -82,14 +82,14 @@ ErrStack json::_confirmKeyword(uint64_t& i, std::vector<char>& text, std::string
 	}
 	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing keyword " + keyword,
-			i, text));
+			i - 1, text));
 }
 
-ErrStack json::_parseString(uint64_t& i, std::vector<char>& text, std::string& out)
+ErrStack json::_parseString(uint64_t& i, std::vector<uint8_t>& text, std::string& out)
 {
 	for (; i < text.size(); i++) {
 
-		char& c = text[i];
+		uint8_t& c = text[i];
 
 		// skip newline and carriage return
 		if (c == '\n' || c == '\r') {
@@ -105,12 +105,13 @@ ErrStack json::_parseString(uint64_t& i, std::vector<char>& text, std::string& o
 	}
 	return ErrStack(code_location,
 		msgWithPos("missing ending '\"' or premature end of characters in file when parsing string",
-			i, text));
+			i - 1, text));
 }
 
 enum class NumberParseMode {
 	INTEGER,
-	FRACTION
+	FRACTION,
+	EXPONENT,
 };
 
 #define isUTF8Number(c) \
@@ -131,7 +132,7 @@ void convertCharsToInt(std::vector<char>& integer_chars, int64_t& int_num)
 	}
 }
 
-ErrStack Graph::_parseNumber(uint64_t& i, std::vector<char>& text, Value& number)
+ErrStack Graph::_parseNumber(uint64_t& i, std::vector<uint8_t>& text, Value& number)
 {
 	this->integer_chars.clear();
 	this->frac_chars.clear();
@@ -140,10 +141,11 @@ ErrStack Graph::_parseNumber(uint64_t& i, std::vector<char>& text, Value& number
 
 	int64_t int_sign = 1;
 	int64_t int_part = 0;
+	bool exp_sign = 1;
 
 	for (; i < text.size(); i++) {
 
-		char& c = text[i];
+		uint8_t& c = text[i];
 
 		switch (mode) {
 		case NumberParseMode::INTEGER:
@@ -165,7 +167,7 @@ ErrStack Graph::_parseNumber(uint64_t& i, std::vector<char>& text, Value& number
 					mode = NumberParseMode::FRACTION;
 				}
 				else {
-					number.value = (int64_t)int_part;
+					number.value = (double)int_part;
 					return ErrStack();
 				}
 			}
@@ -176,6 +178,9 @@ ErrStack Graph::_parseNumber(uint64_t& i, std::vector<char>& text, Value& number
 			if (isUTF8Number(c)) {
 				frac_chars.push_back(c);
 			}
+			else if (c == 'e' || c == 'E') {
+				mode = NumberParseMode::EXPONENT;
+			}
 			else {
 				// Extract 0.1234
 				int64_t frac_part;
@@ -185,20 +190,38 @@ ErrStack Graph::_parseNumber(uint64_t& i, std::vector<char>& text, Value& number
 				number.value = (double)int_part + frac_part_dbl;
 				return ErrStack();
 			}
-			break;;
+			break;
+
+		case NumberParseMode::EXPONENT: {
+
+			if (c == '+') {
+				exp_sign = 1;
+			}
+			else if (c == '-') {
+				exp_sign = 0;
+			}
+			else if (isUTF8Number(c)) {
+
+			}
+			else {
+				number.value = (double)1.0;
+				return ErrStack();
+			}
+			break;
+		}
 		}
 	}
 	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing number",
-			i, text));
+			i - 1, text));
 }
 
-ErrStack Graph::_parseValue(uint64_t& i, std::vector<char>& text, Value& json_value)
+ErrStack Graph::_parseValue(uint64_t& i, std::vector<uint8_t>& text, Value& json_value)
 {
 	ErrStack err_stack;
 
 	_skipWhiteSpace(i, text);
-	char& c = text[i];
+	uint8_t& c = text[i];
 
 	if (isUTF8Number(c) || c == '+' || c == '-') {
 		err_stack = _parseNumber(i, text, json_value);
@@ -245,7 +268,7 @@ ErrStack Graph::_parseValue(uint64_t& i, std::vector<char>& text, Value& json_va
 	return ErrStack();
 }
 
-ErrStack Graph::_parseArray(uint64_t& i, std::vector<char>& text, Value& json_value)
+ErrStack Graph::_parseArray(uint64_t& i, std::vector<uint8_t>& text, Value& json_value)
 {
 	std::vector<Value*> array_vals;
 
@@ -287,10 +310,10 @@ ErrStack Graph::_parseArray(uint64_t& i, std::vector<char>& text, Value& json_va
 	}
 	return ErrStack(code_location,
 		msgWithPos("premature end of characters in file when parsing array",
-			i, text));
+			i - 1, text));
 }
 
-ErrStack Graph::_parseObject(uint64_t& i, std::vector<char>& text, Value& json_value)
+ErrStack Graph::_parseObject(uint64_t& i, std::vector<uint8_t>& text, Value& json_value)
 {
 	ErrStack err_stack;
 
@@ -362,10 +385,10 @@ ErrStack Graph::_parseObject(uint64_t& i, std::vector<char>& text, Value& json_v
 	}
 	return ErrStack(code_location, msgWithPos(
 		"premature end of characters in file when parsing object",
-		i, text));
+		i - 1, text));
 }
 
-ErrStack Graph::importJSON(std::vector<char>& text)
+ErrStack Graph::importJSON(std::vector<uint8_t>& text)
 {
 	uint64_t i = 0;
 

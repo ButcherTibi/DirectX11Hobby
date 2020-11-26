@@ -8,22 +8,23 @@
 #include "ErrorStack.hpp"
 
 
+// TODO maybe: store line and column, idx of the text file in json::Value for error messages of consuming uses
 namespace json {
 
 	// Forward declaration
 	struct Value;
 
 	/* move i to next character */
-	void _skipWhiteSpace(uint64_t& i, std::vector<char>& text);
+	void _skipWhiteSpace(uint64_t& i, std::vector<uint8_t>& text);
 
 	/* return true or false if symbol has been found */
-	bool _seekSymbol(uint64_t& i, std::vector<char>& text, char symbol);
+	bool _seekSymbol(uint64_t& i, std::vector<uint8_t>& text, char symbol);
 
 	/* checks if next char sequence == keyword */
-	ErrStack _confirmKeyword(uint64_t& i, std::vector<char>& text, std::string keyword);
+	ErrStack _confirmKeyword(uint64_t& i, std::vector<uint8_t>& text, std::string keyword);
 
 	/* assumes i after '"' */
-	ErrStack _parseString(uint64_t& i, std::vector<char>& text, std::string& out);
+	ErrStack _parseString(uint64_t& i, std::vector<uint8_t>& text, std::string& out);
 
 
 	struct Field {
@@ -33,7 +34,6 @@ namespace json {
 
 	struct Value {
 		std::variant<bool,
-			int64_t,
 			double,
 			std::string,
 			std::vector<Value*>,  // array
@@ -54,18 +54,18 @@ namespace json {
 		std::string temp_string;
 
 	public:
-		ErrStack _parseValue(uint64_t& i, std::vector<char>& text, Value& json_value);
+		ErrStack _parseValue(uint64_t& i, std::vector<uint8_t>& text, Value& json_value);
 
 		/* assumes i is at first digit of number */
-		ErrStack _parseNumber(uint64_t& i, std::vector<char>& text, Value& json_value);
+		ErrStack _parseNumber(uint64_t& i, std::vector<uint8_t>& text, Value& json_value);
 
 		/* assumes i after '[' */
-		ErrStack _parseArray(uint64_t& i, std::vector<char>& text, Value& json_value);
+		ErrStack _parseArray(uint64_t& i, std::vector<uint8_t>& text, Value& json_value);
 
 		/* assumes i after '{' */
-		ErrStack _parseObject(uint64_t& i, std::vector<char>& text, Value& json_value);
+		ErrStack _parseObject(uint64_t& i, std::vector<uint8_t>& text, Value& json_value);
 
 	public:
-		ErrStack importJSON(std::vector<char>& text);
+		ErrStack importJSON(std::vector<uint8_t>& text);
 	};
 }

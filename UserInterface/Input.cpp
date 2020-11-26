@@ -74,6 +74,8 @@ void Input::endFrame()
 	mouse_delta_x = 0;
 	mouse_delta_y = 0;
 
+	mouse_wheel_delta = 0;
+
 	for (uint16_t virtual_key = 0; virtual_key < key_list.size(); virtual_key++) {
 
 		KeyState& key = key_list[virtual_key];

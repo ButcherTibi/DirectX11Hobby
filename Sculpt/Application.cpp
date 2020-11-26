@@ -2,8 +2,143 @@
 // Header
 #include "Application.hpp"
 
+#include "glm\gtx\matrix_decompose.hpp"
+
 
 Application application;
+
+void Application::createTriangleMesh(glm::vec3& pos, glm::quat& rot, float size)
+{
+	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
+	new_mesh.createAsTriangle(size);
+
+	MeshInstance& new_instance = this->instances.emplace_back();
+	new_instance.mesh = &new_mesh;
+	new_instance.pos = pos;
+	new_instance.rot = rot;
+	new_instance.scale = { 1, 1, 1 };
+	// new_instance.shading = MeshShading::SMOOTH_VERTEX;
+
+	MeshLayer& root = this->layers.front();
+	root.instances.push_back(&new_instance);
+
+	this->renderer.load_vertices = true;
+}
+
+void Application::createCubeMesh(glm::vec3& pos, glm::quat& rot, float size)
+{
+	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
+	new_mesh.createAsCube(size);
+
+	MeshInstance& new_instance = this->instances.emplace_back();
+	new_instance.mesh = &new_mesh;
+	new_instance.pos = pos;
+	new_instance.rot = rot;
+	new_instance.scale = { 1, 1, 1 };
+	// new_instance.shading = MeshShading::SMOOTH_VERTEX;
+
+	MeshLayer& root = this->layers.front();
+	root.instances.push_back(&new_instance);
+
+	this->renderer.load_vertices = true;
+}
+
+ErrStack Application::importGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings)
+{
+	ErrStack err_stack;
+
+	gltf::Structure structure;
+
+	err_stack = structure.importGLTF(path);
+	if (err_stack.isBad()) {
+		err_stack.pushError(code_location, "failed to import GLTF file at the level GLTF");
+		return err_stack;
+	}
+
+	// Meshes
+	std::vector<scme::SculptMesh*> new_meshes(structure.meshes.size());
+	for (scme::SculptMesh*& new_mesh : new_meshes) {
+		new_mesh = &this->meshes.emplace_back();
+	}
+
+	uint32_t i = 0;
+	for (gltf::Mesh& mesh : structure.meshes) {
+
+		gltf::Primitive& prim = mesh.primitives.front();
+		scme::SculptMesh* new_mesh = new_meshes[i];
+
+		if (prim.positions.size()) {
+
+			if (prim.indexes.size()) {
+				if (prim.normals.size()) {
+					new_mesh->addFromLists(prim.indexes, prim.positions, prim.normals, true);
+				}
+				else {
+					new_mesh->addFromLists(prim.indexes, prim.positions, true);
+				}
+			}
+		}
+
+		i++;
+	}
+
+	// Layers
+	auto& root_children = this->layers.front().children;
+	std::vector<MeshLayer*> new_layers(structure.nodes.size());
+
+	for (MeshLayer*& new_layer : new_layers) {
+		new_layer = &this->layers.emplace_back();
+		root_children.push_back(new_layer);  // add new layers to root layer
+	};
+
+	i = 0;
+	for (gltf::Node& node : structure.nodes) {
+
+		MeshLayer* new_layer = new_layers[i];
+		new_layer->name = node.name;
+		new_layer->children.resize(node.children.size());
+
+		// Child Index to Child Pointer conversion
+		uint32_t child_idx = 0;
+		for (MeshLayer* child_layer : new_layer->children) {
+
+			child_layer = new_layers[node.children[child_idx]];
+			child_idx++;
+		}
+
+		if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
+
+			MeshInstance& new_instance = this->instances.emplace_back();
+			new_instance.shading = MeshShading::SMOOTH_VERTEX;
+			
+			if (node.uses_matrix) {
+
+				glm::vec3 skew;
+				glm::vec4 perspective;
+				glm::decompose(node.matrix, new_instance.scale, new_instance.rot, new_instance.pos,
+					skew, perspective);
+			}
+			else {
+				new_instance.pos = node.translation;
+				new_instance.rot = node.rotation;
+				new_instance.scale = node.scale;
+			}
+
+			new_layer->instances.push_back(&new_instance);
+		}
+
+		i++;
+	}
+
+	this->renderer.load_vertices = true;
+
+	return err_stack;
+}
+
+void Application::setCameraFocus(glm::vec3& new_focus)
+{
+	this->camera_focus = new_focus;
+}
 
 // TODO: ask stack exchange about below
 
@@ -47,30 +182,31 @@ mesh.rot = glm::normalize(mesh.rot);*/
 
 // if I rotate a quaternion by position then clusterfuck
 
-
-void Application::arcballOrbitCamera(float deg_x, float deg_y, glm::vec3& pivot)
+void Application::arcballOrbitCamera(float deg_x, float deg_y)
 {
 	glm::vec3 camera_right = glm::normalize(glm::vec3{ 1, 0, 0 } *camera_quat_inv);
 	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } *camera_quat_inv);
 
 	glm::quat delta_rot = { 1, 0, 0, 0 };
-	delta_rot = glm::rotate(delta_rot, toRad(deg_x), camera_right);
-	delta_rot = glm::rotate(delta_rot, toRad(deg_y), camera_up);
+	delta_rot = glm::rotate(delta_rot, toRad(deg_y), camera_right);
+	delta_rot = glm::rotate(delta_rot, toRad(deg_x), camera_up);
 	delta_rot = glm::normalize(delta_rot);
 
-	camera_pos = (camera_pos - pivot) * delta_rot;
-	this->camera_pos += pivot;
+	camera_pos = (camera_pos - camera_focus) * delta_rot;
+	this->camera_pos += camera_focus;
 
 	glm::quat reverse_rot = camera_quat_inv;
-	reverse_rot = glm::rotate(reverse_rot, toRad(deg_x), camera_right);
-	reverse_rot = glm::rotate(reverse_rot, toRad(deg_y), camera_up);
+	reverse_rot = glm::rotate(reverse_rot, toRad(deg_y), camera_right);
+	reverse_rot = glm::rotate(reverse_rot, toRad(deg_x), camera_up);
 
 	this->camera_quat_inv = reverse_rot;
+
+	this->camera_forward = glm::normalize(glm::vec3{ 0, 0, -1 } *camera_quat_inv);
 
 	renderer.load_uniform = true;
 }
 
-void Application::pivotCameraAroundY(float deg_x, float deg_y, glm::vec3& pivot)
+void Application::pivotCameraAroundY(float deg_x, float deg_y)
 {
 	glm::vec3 camera_right = glm::normalize(glm::vec3{ 1, 0, 0 } * camera_quat_inv);
 	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } * camera_quat_inv);
@@ -80,14 +216,43 @@ void Application::pivotCameraAroundY(float deg_x, float deg_y, glm::vec3& pivot)
 	delta_rot = glm::rotate(delta_rot, toRad(deg_y), { 0, 1, 0 });
 	delta_rot = glm::normalize(delta_rot);
 
-	camera_pos = (camera_pos - pivot) * delta_rot;
-	this->camera_pos += pivot;
+	camera_pos = (camera_pos - camera_focus) * delta_rot;
+	this->camera_pos += camera_focus;
 
 	glm::quat reverse_rot = camera_quat_inv;
 	reverse_rot = glm::rotate(reverse_rot, toRad(deg_x), camera_right);
 	reverse_rot = glm::rotate(reverse_rot, toRad(deg_y), { 0, 1, 0 });
 
 	this->camera_quat_inv = reverse_rot;
+
+	renderer.load_uniform = true;
+}
+
+void Application::panCamera(float amount_x, float amount_y)
+{
+	glm::vec3 camera_right = glm::normalize(glm::vec3{ 1, 0, 0 } * camera_quat_inv);
+	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } * camera_quat_inv);
+
+	float dist = glm::distance(camera_focus, camera_pos);
+	if (!dist) {
+		dist = 1;
+	}
+
+	this->camera_pos += amount_x * dist * camera_right + (-amount_y) * dist * camera_up;
+
+	renderer.load_uniform = true;
+}
+
+void Application::dollyCamera(float amount)
+{
+	glm::vec3 camera_forward = glm::normalize(glm::vec3{ 0, 0, -1 } * camera_quat_inv);
+
+	float dist = glm::distance(camera_focus, camera_pos);
+	if (!dist) {
+		dist = 1;
+	}
+
+	this->camera_pos += amount * dist * camera_forward;
 
 	renderer.load_uniform = true;
 }

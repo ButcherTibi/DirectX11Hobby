@@ -64,9 +64,6 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
-    <ClCompile Include="FromGLTF.cpp">
-      <Filter>Source Files\SculptMesh</Filter>
-    </ClCompile>
     <ClCompile Include="JSON_File.cpp">
       <Filter>Source Files\Importers\JSON</Filter>
     </ClCompile>
@@ -87,6 +84,9 @@
     </ClCompile>
     <ClCompile Include="Application.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CreateOrAppend.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
