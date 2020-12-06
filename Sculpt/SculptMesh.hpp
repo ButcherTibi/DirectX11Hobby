@@ -50,18 +50,17 @@ namespace scme {
 		std::vector<Edge*> edges;
 
 	public:
-		void calcNormalFromEdges();
-		void calcNormalFromPolyNormals();
+		void calcNormal();
 	};
 
 
 	struct VertexBoundingBox {
+		VertexBoundingBox* parent;
+		std::list<VertexBoundingBox*> children;
+
 		AxisBoundingBox3D aabb;
 
 		std::vector<Vertex> vs;
-
-		VertexBoundingBox* parent;
-		std::list<VertexBoundingBox*> children;
 	};
 
 
@@ -85,8 +84,9 @@ namespace scme {
 		std::array<glm::vec3, 2> tess_normals;
 
 	public:
-		// void calcNormal();
 		void calcNormalForTris();
+		void calcNormalForQuad();
+		void calcNormal();
 	};
 
 
@@ -146,7 +146,9 @@ namespace scme {
 		Poly& addQuad(Vertex& v0, Vertex& v1, Vertex& v2, Vertex& v3,
 			Edge& e0, Edge& e1, Edge& e2, Edge& e3, bool tesselation_type = 1);
 
-		// add poly where edges are created if not existing
+		Poly* addQuad(Vertex* v0, Vertex* v1, Vertex* v2, Vertex* v3, bool tesselation_type = 1);
+
+		void stichVerticesToVertex(Vertex* v, std::vector<Vertex*>& vertices, bool loop = false);
 
 		// addLoneQuad
 		// addTris
@@ -158,6 +160,9 @@ namespace scme {
 		// stichQuadToThree()
 
 		////////////////////////////////////////////////////////////
+		void calculateAllNormalsFromWindings();
+
+		////////////////////////////////////////////////////////////
 		// delete vertex
 		// delete edge
 		// delete poly
@@ -166,6 +171,9 @@ namespace scme {
 
 		void createAsTriangle(float size);
 		void createAsCube(float size);
+		void createAsCylinder(float height, float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
+		void createAsUV_Sphere(float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
+
 		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
 			bool flip_winding = false);
 		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,

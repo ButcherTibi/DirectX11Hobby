@@ -7,40 +7,96 @@
 
 Application application;
 
-void Application::createTriangleMesh(glm::vec3& pos, glm::quat& rot, float size)
+MeshInstance& Application::createTriangleMesh(CreateTriangleInfo& info)
 {
 	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsTriangle(size);
+	new_mesh.createAsTriangle(info.size);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = pos;
-	new_instance.rot = rot;
-	new_instance.scale = { 1, 1, 1 };
-	// new_instance.shading = MeshShading::SMOOTH_VERTEX;
+	new_instance.pos = info.pos;
+	new_instance.rot = info.rot;
+	new_instance.scale = info.scale;
+
+	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
+	new_instance.diffuse_color = info.diffuse_color;
+	new_instance.emissive = info.emissive;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
 
 	this->renderer.load_vertices = true;
+
+	return new_instance;
 }
 
-void Application::createCubeMesh(glm::vec3& pos, glm::quat& rot, float size)
+MeshInstance& Application::createCubeMesh(CreateCubeInfo& info)
 {
 	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsCube(size);
+	new_mesh.createAsCube(info.size);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = pos;
-	new_instance.rot = rot;
-	new_instance.scale = { 1, 1, 1 };
-	// new_instance.shading = MeshShading::SMOOTH_VERTEX;
+	new_instance.pos = info.pos;
+	new_instance.rot = info.rot;
+	new_instance.scale = info.scale;
+
+	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
+	new_instance.diffuse_color = info.diffuse_color;
+	new_instance.emissive = info.emissive;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
 
 	this->renderer.load_vertices = true;
+
+	return new_instance;
+}
+
+MeshInstance& Application::createCylinder(CreateCylinderInfo& info)
+{
+	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
+	new_mesh.createAsCylinder(info.height, info.diameter, info.vertical_sides, info.horizontal_sides);
+
+	MeshInstance& new_instance = this->instances.emplace_back();
+	new_instance.mesh = &new_mesh;
+	new_instance.pos = info.pos;
+	new_instance.rot = info.rot;
+	new_instance.scale = info.scale;
+
+	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
+	new_instance.diffuse_color = info.diffuse_color;
+	new_instance.emissive = info.emissive;
+
+	MeshLayer& root = this->layers.front();
+	root.instances.push_back(&new_instance);
+
+	this->renderer.load_vertices = true;
+
+	return new_instance;
+}
+
+MeshInstance& Application::createUV_Sphere(CreateUV_SphereInfo& info)
+{
+	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
+	new_mesh.createAsUV_Sphere(info.diameter, info.vertical_sides, info.horizontal_sides);
+
+	MeshInstance& new_instance = this->instances.emplace_back();
+	new_instance.mesh = &new_mesh;
+	new_instance.pos = info.pos;
+	new_instance.rot = info.rot;
+	new_instance.scale = info.scale;
+
+	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
+	new_instance.diffuse_color = info.diffuse_color;
+	new_instance.emissive = info.emissive;
+
+	MeshLayer& root = this->layers.front();
+	root.instances.push_back(&new_instance);
+
+	this->renderer.load_vertices = true;
+
+	return new_instance;
 }
 
 ErrStack Application::importGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings)
@@ -109,7 +165,7 @@ ErrStack Application::importGLTF_File(io::FilePath& path, GLTF_ImporterSettings&
 		if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
 
 			MeshInstance& new_instance = this->instances.emplace_back();
-			new_instance.shading = MeshShading::SMOOTH_VERTEX;
+			// new_instance.shading = MeshShadingSubPrimitive::SMOOTH_VERTEX;
 			
 			if (node.uses_matrix) {
 
@@ -271,6 +327,8 @@ void Application::setCameraRotation(float x, float y, float z)
 	glm::quat z_rot = glm::rotate(glm::quat{ 1, 0, 0, 0 }, z, { 0, 0, 1 });
 
 	this->camera_quat_inv = glm::normalize(x_rot * y_rot * z_rot);
+
+	this->camera_forward = glm::normalize(glm::vec3{ 0, 0, -1 } *camera_quat_inv);
 
 	renderer.load_uniform = true;
 }

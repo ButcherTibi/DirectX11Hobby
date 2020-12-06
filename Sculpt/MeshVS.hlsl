@@ -2,20 +2,34 @@
 struct VertexIn
 {
 	float3 pos : POSITION;
-	float3 normal : NORMAL;
+	float3 vertex_normal : VERTEX_NORMAL;
+	float3 tess_normal : TESSELATION_NORMAL;
+	float3 poly_normal : POLY_NORMAL;
 	
 	float3 inst_pos : INSTANCE_POSITION;
 	float4 inst_rot : INSTANCE_ROTATION;
+	uint shading_mode : SHADING_MODE;
+	float3 diffuse : DIFFUSE;
+	float emissive : EMISSIVE;
+};
+
+struct CameraLight
+{
+	float3 normal;
+	float3 color;
+	float intensity;
+	float radius;
 };
 
 cbuffer Uniform : register(b0)
 {
 	float3 camera_pos;
-	float4 camera_quat_inv;
+	float4 camera_quat;
 	float3 camera_forward;
-	float4x4 perspective;
-	//int parent_clip_id;
-	//int child_clip_id;
+	matrix perspective_matrix;
+	float z_near;
+	float z_far;
+	//CameraLight lights[4];
 };
 
 struct VertexOut
@@ -23,7 +37,21 @@ struct VertexOut
 	//int parent_clip_id;
 	//int child_clip_id;
 	float4 dx_pos : SV_POSITION;
-	float3 normal : NORMAL;
+	float3 vertex_normal : VERTEX_NORMAL;
+	float3 tess_normal : TESSELATION_NORMAL;
+	float3 poly_normal : POLY_NORMAL;
+	
+	uint shading_mode : SHADING_MODE;
+	float3 diffuse : DIFFUSE;
+	float emissive : EMISSIVE;
+	
+	//// Debug
+	//float3 camera_pos : DEBUG_camera_pos;
+	//float4 camera_quat : DEBUG_camera_quat;
+	//float3 camera_forward : DEBUG_camera_forward;
+	//matrix perspective_matrix : DEBUG_perspective_matrix;
+	//float z_near : DEBUG_z_near;
+	//float z_far : DEBUG_z_far;
 };
 
 float3 quatRotate(float3 v, float4 q)
@@ -48,6 +76,16 @@ float3 quatRotate(float3 pos, float4 quat, float3 pivot)
 	return p + pivot;
 }
 
+float distPointAndPlane(float3 pos, float3 plane_pos, float3 plane_normal)
+{
+	return dot(plane_normal, pos - plane_pos);
+}
+
+float getLerp(float min, float center, float max)
+{
+	return (center - min) / (max - min);
+}
+
 VertexOut main(VertexIn input)
 {
 	VertexOut output;
@@ -57,14 +95,28 @@ VertexOut main(VertexIn input)
 	pos += input.inst_pos;
 	
 	pos -= camera_pos;
-	pos = quatRotate(pos, camera_quat_inv);
+	pos = quatRotate(pos, camera_quat);
 	
-	float4 persp = mul(float4(pos, 0), perspective);  // perspective transform
-	persp.z = -persp.z;  // left hand coordinate system
+	float4 persp = mul(float4(pos, 1.0f), perspective_matrix); // perspective transform
+	persp.z /= z_far;
 	output.dx_pos = persp;
 
 	// Output
-	output.normal = input.normal;
+	output.vertex_normal = input.vertex_normal;
+	output.tess_normal = input.tess_normal;
+	output.poly_normal = input.poly_normal;
+	
+	output.shading_mode = input.shading_mode;
+	output.diffuse = input.diffuse;
+	output.emissive = input.emissive;
+	
+	// Debug
+	//output.camera_pos = camera_pos;
+	//output.camera_quat = camera_quat;
+	//output.camera_forward = camera_forward;
+	//output.perspective_matrix = perspective_matrix;
+	//output.z_near = z_near;
+	//output.z_far = z_far;
 	
 	return output;
 }

@@ -12,6 +12,12 @@ so that one object changing only rewrites a single buffers
 */
 
 
+/* Order independend depth buffering
+- assert that in each call the camera position does not change
+- set the z value in [camera pos, 1] manually 
+*/
+
+
 struct DrawMesh {
 	uint32_t vertex_start;
 	uint32_t vertex_count;

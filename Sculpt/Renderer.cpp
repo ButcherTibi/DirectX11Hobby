@@ -45,9 +45,16 @@ void MeshRenderer::generateVertices()
 				vertices[vi + 1].pos = dxConvert(poly.vs[1]->pos);
 				vertices[vi + 2].pos = dxConvert(poly.vs[2]->pos);
 
-				vertices[vi].normal = dxConvert(poly.vs[0]->normal);
-				vertices[vi + 1].normal = dxConvert(poly.vs[1]->normal);
-				vertices[vi + 2].normal = dxConvert(poly.vs[2]->normal);
+				vertices[vi].vertex_normal = dxConvert(poly.vs[0]->normal);
+				vertices[vi + 1].vertex_normal = dxConvert(poly.vs[1]->normal);
+				vertices[vi + 2].vertex_normal = dxConvert(poly.vs[2]->normal);
+
+				auto& normal = dxConvert(poly.normal);
+
+				for (uint32_t i = 0; i < 3; i++) {
+					vertices[vi + i].tess_normal = normal;
+					vertices[vi + i].poly_normal = normal;
+				}
 
 				vi += 3;
 			}
@@ -76,7 +83,15 @@ void MeshRenderer::generateVertices()
 
 				for (uint32_t i = 0; i < 6; i++) {
 					vertices[vi + i].pos = dxConvert(tess[i]->pos);
-					vertices[vi + i].normal = dxConvert(tess[i]->normal);
+					vertices[vi + i].vertex_normal = dxConvert(tess[i]->normal);
+					vertices[vi + i].poly_normal = dxConvert(poly.normal);
+				}
+
+				for (uint32_t i = 0; i < 3; i++) {
+					vertices[vi + i].tess_normal = dxConvert(poly.tess_normals[0]);
+				}
+				for (uint32_t i = 3; i < 6; i++) {
+					vertices[vi + i].tess_normal = dxConvert(poly.tess_normals[1]);
 				}
 
 				vi += 6;
@@ -97,11 +112,16 @@ void MeshRenderer::generateVertices()
 		GPU_MeshInstance& gpu_inst = instances[inst_idx];
 		gpu_inst.pos = dxConvert(mesh_instance.pos);
 		gpu_inst.rot = dxConvert(mesh_instance.rot);
+		gpu_inst.shading_mode = mesh_instance.mesh_shading_subprimitive;
+		gpu_inst.diffuse_color = dxConvert(mesh_instance.diffuse_color);
+		gpu_inst.emissive = mesh_instance.emissive;
 
 		DrawMesh& draw_mesh = mesh_draws[inst_idx];
 		draw_mesh.vertex_start = mesh_instance.mesh->_vertex_start;
 		draw_mesh.vertex_count = mesh_instance.mesh->_vertex_count;
 		draw_mesh.instance_start = inst_idx;
+
+		inst_idx++;
 	}
 }
 
@@ -111,9 +131,38 @@ void MeshRenderer::generateUniform()
 	uniform.camera_quat = dxConvert(application.camera_quat_inv);
 	uniform.camera_forward = dxConvert(application.camera_forward);
 
-	uniform.perspective_matrix = dxConvert(glm::perspectiveFovRH_ZO(toRad(application.camera_field_of_view),
+	//printf("%.2f %.2f %.2f \n",
+	//	uniform.camera_forward.x,
+	//	uniform.camera_forward.y,
+	//	uniform.camera_forward.z);
+
+	/*glm::mat4x4 persp = glm::perspectiveFovRH_ZO(toRad(application.camera_field_of_view),
 		(float)viewport_width, (float)viewport_height,
-		application.camera_z_near, application.camera_z_far));
+		application.camera_z_near, application.camera_z_far);*/
+
+	uniform.perspective_matrix = DirectX::XMMatrixPerspectiveFovRH(
+		toRad(application.camera_field_of_view),
+		(float)viewport_width / (float)viewport_height,
+		application.camera_z_near, application.camera_z_far);
+
+	uniform.z_near = application.camera_z_near;
+	uniform.z_far = application.camera_z_far;
+
+	uint32_t i = 0;
+	for (CameraLight& light : application.lights) {
+
+		// Rotate the light normal to be relative to camera orientation
+		glm::vec3 normal = light.normal * application.camera_quat_inv;
+		normal = glm::normalize(normal);
+
+		GPU_CameraLight& gpu_light = uniform.lights[i];
+		gpu_light.normal = dxConvert(light.normal);  // change back to relative
+		gpu_light.color = dxConvert(light.color);
+		gpu_light.intensity = light.intensity;
+		gpu_light.radius = light.radius;
+		
+		i++;
+	}
 }
 
 ErrStack MeshRenderer::loadVertices()
@@ -268,7 +317,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.DepthBias = 0;
 			desc.DepthBiasClamp = 0;
 			desc.SlopeScaledDepthBias = 0;
-			desc.DepthClipEnable = false;
+			desc.DepthClipEnable = true;
 			desc.ScissorEnable = true;
 			desc.MultisampleEnable = false;
 			desc.AntialiasedLineEnable = false;
@@ -282,7 +331,6 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			D3D11_BLEND_DESC desc = {};
 			desc.AlphaToCoverageEnable = false;
 			desc.IndependentBlendEnable = true;
-			std::memset(desc.RenderTarget, 0, 8);
 
 			desc.RenderTarget[0].BlendEnable = false;
 			desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
@@ -307,18 +355,6 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 			desc.DepthFunc = D3D11_COMPARISON_LESS;
 			desc.StencilEnable = false;
-			desc.StencilReadMask = 0xFF;
-			desc.StencilWriteMask = 0xFF;
-
-			desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-			desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
-			desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-			desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-
-			desc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
-			desc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
-			desc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-			desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 
 			checkHResult(dev5->CreateDepthStencilState(&desc, mesh_dss.GetAddressOf()),
 				"failed to create mesh depth stencil state");

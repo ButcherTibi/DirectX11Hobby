@@ -29,14 +29,4 @@ public:
 
 float toRad(float degree);
 
-
-class Quaternion {
-public:
-	glm::quat q;
-
-public:
-	void rotateAroundX(float deg);
-	void rotateAroundY(float deg);
-	void rotateAroundZ(float deg);
-	void normalize();
-};
+glm::vec3 toNormal(float nord, float east);

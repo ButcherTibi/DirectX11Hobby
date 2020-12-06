@@ -7,17 +7,14 @@
 #include "Renderer.hpp"
 
 
-//enum class MeshTransparency {
-//	OPAQUE_SHADING,
-//	TRANSPARENT_SHADING,
-//	WIREFRAME
-//};
-
-enum class MeshShading {
-	FLAT_POLY,
-	FLAT_TESSELATION,
-	SMOOTH_VERTEX,
-};
+/* which subprimitive holds the surface data to respond to the light */
+namespace MeshShadingSubPrimitive {
+	enum {
+		VERTEX,
+		POLY,
+		TESSELATION
+	};
+}
 
 //namespace MeshHighlightMode {
 //	enum : uint8_t {
@@ -29,22 +26,36 @@ enum class MeshShading {
 //	};
 //}
 
+// 1-----------------------------0
+// 1--------------------S        0  radius
+// 1------A             S        0  focus
+
+/* light that is relative to the camera orientation */
+struct CameraLight {
+	glm::vec3 normal;
+
+	glm::vec3 color;
+	float intensity;
+	float radius;
+};
+
 class MeshInstance {
 public:
 	scme::SculptMesh* mesh;
 	
-	// GPU Instance
+	/* GPU Instance */
 	glm::vec3 pos;
 	glm::quat rot;
 	glm::vec3 scale;
+	
+	uint32_t mesh_shading_subprimitive;
+
+	// Material
+	glm::vec3 diffuse_color;
+	float emissive;
 
 	// GPU Draw Call
 	// hide mesh
-	MeshShading shading;
-};
-
-struct GLTF_ImporterSettings {
-
 };
 
 struct MeshLayer {
@@ -52,6 +63,63 @@ struct MeshLayer {
 
 	std::string name;
 	std::list<MeshInstance*> instances;
+};
+
+
+struct CreateTriangleInfo {
+	glm::vec3 pos = { 0, 0, 0 };
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1};
+	float size = 1;
+
+	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+	glm::vec3 diffuse_color = { 1, 1, 1 };
+	float emissive = 1;
+};
+
+struct CreateCubeInfo {
+	glm::vec3 pos = { 0, 0, 0 };
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1 };
+	float size = 1;
+
+	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+	glm::vec3 diffuse_color = { 1, 1, 1 };
+	float emissive = 1;
+};
+
+struct CreateCylinderInfo {
+	glm::vec3 pos = { 0, 0, 0 };
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1 };
+	float diameter = 1;
+	float height = 1;
+
+	uint32_t vertical_sides = 2;
+	uint32_t horizontal_sides = 3;
+	bool with_caps = true;
+
+	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+	glm::vec3 diffuse_color = { 1, 1, 1 };
+	float emissive = 1;
+};
+
+struct CreateUV_SphereInfo {
+	glm::vec3 pos = { 0, 0, 0};
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1 };
+	float diameter = 1;
+
+	uint32_t vertical_sides = 2;
+	uint32_t horizontal_sides = 3;
+
+	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+	glm::vec3 diffuse_color = { 1, 1, 1 };
+	float emissive = 1;
+};
+
+struct GLTF_ImporterSettings {
+
 };
 
 
@@ -69,6 +137,10 @@ public:
 
 	std::list<MeshLayer> layers;
 
+	// Lighting
+	std::array<CameraLight, 4> lights;
+
+	// Camera
 	glm::vec3 camera_focus;
 	float camera_field_of_view;
 	float camera_z_near;
@@ -82,8 +154,10 @@ public:
 	float camera_dolly_sensitivity;
 
 public:
-	void createTriangleMesh(glm::vec3& pos, glm::quat& rot, float size);
-	void createCubeMesh(glm::vec3& pos, glm::quat& rot, float size);
+	MeshInstance& createTriangleMesh(CreateTriangleInfo& info);
+	MeshInstance& createCubeMesh(CreateCubeInfo& infos);
+	MeshInstance& createCylinder(CreateCylinderInfo& info);
+	MeshInstance& createUV_Sphere(CreateUV_SphereInfo& info);
 	ErrStack importGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings);
 
 	void setCameraFocus(glm::vec3& new_focus);

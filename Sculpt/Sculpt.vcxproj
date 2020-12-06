@@ -138,7 +138,7 @@
     <ClCompile Include="MeshOps.cpp" />
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="CreateOrAppend.cpp" />
+    <ClCompile Include="MeshCreation.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

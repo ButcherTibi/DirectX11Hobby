@@ -20,26 +20,32 @@ DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
 
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT3 normal;
+	DirectX::XMFLOAT3 vertex_normal;
+	DirectX::XMFLOAT3 tess_normal;
+	DirectX::XMFLOAT3 poly_normal;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 4> getInputLayout()
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 4> elems;
 		elems[0].SemanticName = "POSITION";
-		elems[0].SemanticIndex = 0;
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		elems[0].InputSlot = 0;
-		elems[0].AlignedByteOffset = 0;
-		elems[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		elems[0].InstanceDataStepRate = 0;
 
-		elems[1].SemanticName = "NORMAL";
-		elems[1].SemanticIndex = 0;
+		elems[1].SemanticName = "VERTEX_NORMAL";
 		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		elems[1].InputSlot = 0;
-		elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-		elems[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-		elems[1].InstanceDataStepRate = 0;
+
+		elems[2].SemanticName = "TESSELATION_NORMAL";
+		elems[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[3].SemanticName = "POLY_NORMAL";
+		elems[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			elem.SemanticIndex = 0;
+			elem.InputSlot = 0;
+			elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+			elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+			elem.InstanceDataStepRate = 0;
+		}
 
 		return elems;
 	}
@@ -50,35 +56,71 @@ struct GPU_MeshInstance {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT4 rot;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout(uint32_t input_slot = 1)
+	uint32_t shading_mode;
+	DirectX::XMFLOAT3 diffuse_color;
+	float emissive;
+
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 5> getInputLayout(uint32_t input_slot = 1)
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 5> elems;
 		elems[0].SemanticName = "INSTANCE_POSITION";
-		elems[0].SemanticIndex = 0;
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-		elems[0].InputSlot = input_slot;
-		elems[0].AlignedByteOffset = 0;
-		elems[0].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-		elems[0].InstanceDataStepRate = 1;
 
 		elems[1].SemanticName = "INSTANCE_ROTATION";
-		elems[1].SemanticIndex = 0;
 		elems[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-		elems[1].InputSlot = input_slot;
-		elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-		elems[1].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-		elems[1].InstanceDataStepRate = 1;
+
+		elems[2].SemanticName = "SHADING_MODE";
+		elems[2].Format = DXGI_FORMAT_R32_UINT;
+
+		elems[3].SemanticName = "DIFFUSE";
+		elems[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[4].SemanticName = "EMISSIVE";
+		elems[4].Format = DXGI_FORMAT_R32_FLOAT;
+
+		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			elem.SemanticIndex = 0;
+			elem.InputSlot = input_slot;
+			elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+			elem.InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
+			elem.InstanceDataStepRate = 1;
+		}
 
 		return elems;
 	}
 };
 
 
+/* WARNING: All structs below are HLSL binary compatible with shader constant buffer */
+#pragma pack(16)
+
+struct GPU_CameraLight {
+	DirectX::XMFLOAT3 normal;
+	uint32_t pad_0;
+	//--------------------------------
+	DirectX::XMFLOAT3 color;
+	float intensity;
+	//--------------------------------
+	float radius;
+	uint32_t _pad_2[3];
+};
+
 struct GPU_MeshUniform {
 	DirectX::XMFLOAT3 camera_pos;
-	float pad_0;
+	uint32_t _pad_0;
+	//--------------------------------
 	DirectX::XMFLOAT4 camera_quat;
+	//--------------------------------
 	DirectX::XMFLOAT3 camera_forward;
-	float pad_1;
-	DirectX::XMFLOAT4X4 perspective_matrix;
+	uint32_t _pad_1;
+	//--------------------------------
+	DirectX::XMMATRIX perspective_matrix;
+	//--------------------------------
+	float z_near;
+	float z_far;
+	uint32_t _pad_2[2];
+	//--------------------------------
+	GPU_CameraLight lights[4];
 };
+
+#pragma pack()

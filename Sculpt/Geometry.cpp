@@ -2,6 +2,8 @@
 // Header
 #include "Geometry.hpp"
 
+#include <glm\ext\quaternion_transform.hpp>
+
 
 bool AxisBoundingBox3D::isRayIsect(Ray& ray)
 {
@@ -45,22 +47,11 @@ float toRad(float degree)
 	return degree * (M_PI / 180.0f);
 }
 
-void Quaternion::rotateAroundX(float deg)
+glm::vec3 toNormal(float nord, float east)
 {
-	this->q = glm::rotate(this->q, toRad(deg), { 1, 0, 0 });
-}
-
-void Quaternion::rotateAroundY(float deg)
-{
-	this->q = glm::rotate(this->q, toRad(deg), { 0, 1, 0 });
-}
-
-void Quaternion::rotateAroundZ(float deg)
-{
-	this->q = glm::rotate(this->q, toRad(deg), { 0, 0, 1 });
-}
-
-void Quaternion::normalize()
-{
-	this->q = glm::normalize(this->q);
+	glm::quat rot = glm::rotate(glm::quat(1, 0, 0, 0), toRad(east), glm::vec3(0, 1, 0));
+	rot = glm::rotate(rot, toRad(nord), glm::vec3(1, 0, 0));
+	rot = glm::normalize(rot);
+	
+	return glm::vec3(0, 0, -1) * rot;
 }

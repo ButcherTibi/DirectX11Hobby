@@ -85,7 +85,7 @@
     <ClCompile Include="Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CreateOrAppend.cpp">
+    <ClCompile Include="MeshCreation.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
   </ItemGroup>
