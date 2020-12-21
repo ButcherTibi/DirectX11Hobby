@@ -58,7 +58,7 @@ void onCameraDollyScroll(nui::MouseScrollEvent& event)
 
 void onCameraResetKeyDown(nui::KeyDownEvent& event)
 {
-	application.setCameraPosition(0, 0, 100);
+	application.setCameraPosition(0, 0, 10);
 	application.setCameraRotation(0, 0, 0);
 }
 
@@ -70,19 +70,31 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 	{
 		application.layers.emplace_back();
 
+		// Lighting
 		application.lights[0].normal = toNormal(45, 45);
 		application.lights[0].color = { 1, 1, 1 };
-		application.lights[0].intensity = 1.0f;
-		application.lights[0].radius = 0.0f;
+		application.lights[0].intensity = 1.f;
 
-		application.lights[1].normal = toNormal(0, 0);
-		application.lights[1].color = { 0, 1, 0 };
-		application.lights[1].intensity = 0.0f;
-		application.lights[1].radius = 0.0f;
+		application.lights[1].normal = toNormal(-45, 45);
+		application.lights[1].color = { 1, 1, 1 };
+		application.lights[1].intensity = 1.f;
 
-		application.lights[2].intensity = 0;
-		application.lights[3].intensity = 0;
+		application.lights[2].normal = toNormal(45, -45);
+		application.lights[2].color = { 1, 1, 1 };
+		application.lights[2].intensity = 1.f;
 
+		application.lights[3].normal = toNormal(-45, -45);
+		application.lights[3].color = { 1, 1, 1 };
+		application.lights[3].intensity = 1.f;
+
+		application.lights[4].intensity = 0.f;
+		application.lights[5].intensity = 0.f;
+		application.lights[6].intensity = 0.f;
+		application.lights[7].intensity = 0.f;
+
+		application.ambient_intensity = 0.03f;
+
+		// Camera
 		application.camera_focus = { 0, 0, 0 };
 		application.camera_field_of_view = 90;
 		application.camera_z_near = 0.1f;
@@ -96,29 +108,84 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 		
 		// Test
+		//{
+		//	CreateTriangleInfo info;
+		//	info.transform.pos = { 0, -2, 0 };
+
+		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
+		//	info.material.albedo_color = { 1, 0, 0 };
+		//	info.material.roughness = 0.5f;
+		//	info.material.metallic = 0.0f;
+		//	info.material.specular = 0.04f;
+
+		//	application.createTriangleMesh(info);
+		//}
+
+		//{
+		//	CreateQuadInfo info;
+		//	info.transform.pos = { 0, -4, 0 };
+
+		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::TESSELATION;
+		//	info.material.albedo_color = { 1, 0, 0 };
+		//	info.material.roughness = 0.5f;
+		//	info.material.metallic = 0.0f;
+		//	info.material.specular = 0.04f;
+
+		//	application.createQuadMesh(info);
+		//}
+		//
+		//{
+		//	CreateCubeInfo info;
+		//	info.transform.pos = { 0, -6, 0};
+
+		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
+		//	info.material.albedo_color = { 1, 0, 0 };
+		//	info.material.roughness = 0.5f;
+		//	info.material.metallic = 0.0f;
+		//	info.material.specular = 0.04f;
+
+		//	application.createCubeMesh(info);
+		//}
+
+		//{
+		//	CreateCylinderInfo info;
+		//	info.transform.pos = { 0, -8, 0 };
+
+		//	info.vertical_sides = 2;
+		//	info.horizontal_sides = 300;
+
+		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
+		//	info.material.albedo_color = { 1, 0, 0 };
+		//	info.material.roughness = 0.5f;
+		//	info.material.metallic = 0.0f;
+		//	info.material.specular = 0.04f;
+
+		//	application.createCylinder(info);
+		//}
+
 		{
-			CreateTriangleInfo info;
-			info.pos = { 0, -2, 0 };
+			CreateUV_SphereInfo info;
+			info.pos = { 0, 0, 0 };
+			info.rot = { 1, 0, 0, 0 };
+			info.diameter = 1;
 
-			info.diffuse_color = { 1, 0, 0 };
-			info.emissive = 0.1f;
+			info.vertical_sides = 400;
+			info.horizontal_sides = 800;
 
-			application.createTriangleMesh(info);
+			info.mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+			info.albedo_color = { 1, 0, 0 };
+			info.roughness = 0.5f;
+			info.metallic = 0.0f;
+			info.specular = 0.04f;
+
+			auto& inst = application.createUV_Sphere(info);
+
+			printf("vertex count = %ld \n", (uint32_t)inst.mesh->verts.size());
+			printf("memory size = %lld \n", inst.mesh->getMemorySizeMegaBytes());
 		}
 
-		{
-			CreateCubeInfo info;
-			info.pos = { 2, -2, 0};
-
-			info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-			info.diffuse_color = { 0, 1, 0 };
-			info.emissive = 0.1f;
-
-			application.createCubeMesh(info);
-		}
-
-		uint32_t rows = 5;
-		uint32_t cols = 5;
+		/*uint32_t rows = 7;
+		uint32_t cols = 7;
 		for (uint32_t row = 0; row < rows; row += 1) {
 			for (uint32_t col = 0; col < cols; col += 1) {
 
@@ -127,19 +194,21 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 				info.rot = { 1, 0, 0, 0 };
 				info.diameter = 1;
 
-				info.vertical_sides = 20;
-				info.horizontal_sides = 40;
+				info.vertical_sides = 40;
+				info.horizontal_sides = 80;
 
 				info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-				info.diffuse_color = { 1, 0, 0 };
-				info.emissive = 0.1f;
+				info.albedo_color = { 1, 0, 0 };
+				info.roughness = (float)col / (cols - 1);
+				info.metallic = (float)row / (rows - 1);;
+				info.specular = 0.04f;
 
 				application.createUV_Sphere(info);
 			}
-		}
+		}*/
 
-		application.setCameraFocus(glm::vec3(4, 4, 0));
-		application.setCameraPosition(4, 4, 70);
+		application.setCameraFocus(glm::vec3(0, 0, 0));
+		application.setCameraPosition(0, 0, 10);
 	}
 
 	nui::Instance instance;

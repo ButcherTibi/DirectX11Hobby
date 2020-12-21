@@ -26,9 +26,6 @@ namespace MeshShadingSubPrimitive {
 //	};
 //}
 
-// 1-----------------------------0
-// 1--------------------S        0  radius
-// 1------A             S        0  focus
 
 /* light that is relative to the camera orientation */
 struct CameraLight {
@@ -36,8 +33,22 @@ struct CameraLight {
 
 	glm::vec3 color;
 	float intensity;
-	float radius;
 };
+
+
+struct MeshTransform {
+	glm::vec3 pos = { 0, 0, 0 };
+	glm::quat rot = { 1, 0, 0, 0 };
+	glm::vec3 scale = { 1, 1, 1 };
+};
+
+struct PhysicalBasedMaterial {
+	glm::vec3 albedo_color = { 1, 1, 1 };
+	float roughness = 0;
+	float metallic = 0;
+	float specular = 0;
+};
+
 
 class MeshInstance {
 public:
@@ -51,12 +62,15 @@ public:
 	uint32_t mesh_shading_subprimitive;
 
 	// Material
-	glm::vec3 diffuse_color;
-	float emissive;
+	glm::vec3 albedo_color;
+	float roughness;
+	float metallic;
+	float specular;
 
 	// GPU Draw Call
 	// hide mesh
 };
+
 
 struct MeshLayer {
 	std::list<MeshLayer*> children;
@@ -67,31 +81,31 @@ struct MeshLayer {
 
 
 struct CreateTriangleInfo {
-	glm::vec3 pos = { 0, 0, 0 };
-	glm::quat rot = { 1, 0, 0, 0 };
-	glm::vec3 scale = { 1, 1, 1};
+	MeshTransform transform;
 	float size = 1;
 
 	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-	glm::vec3 diffuse_color = { 1, 1, 1 };
-	float emissive = 1;
+	PhysicalBasedMaterial material;
+};
+
+struct CreateQuadInfo {
+	MeshTransform transform;
+	float size = 1.f;
+
+	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+	PhysicalBasedMaterial material;
 };
 
 struct CreateCubeInfo {
-	glm::vec3 pos = { 0, 0, 0 };
-	glm::quat rot = { 1, 0, 0, 0 };
-	glm::vec3 scale = { 1, 1, 1 };
+	MeshTransform transform;
 	float size = 1;
 
 	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-	glm::vec3 diffuse_color = { 1, 1, 1 };
-	float emissive = 1;
+	PhysicalBasedMaterial material;
 };
 
 struct CreateCylinderInfo {
-	glm::vec3 pos = { 0, 0, 0 };
-	glm::quat rot = { 1, 0, 0, 0 };
-	glm::vec3 scale = { 1, 1, 1 };
+	MeshTransform transform;
 	float diameter = 1;
 	float height = 1;
 
@@ -100,8 +114,7 @@ struct CreateCylinderInfo {
 	bool with_caps = true;
 
 	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-	glm::vec3 diffuse_color = { 1, 1, 1 };
-	float emissive = 1;
+	PhysicalBasedMaterial material;
 };
 
 struct CreateUV_SphereInfo {
@@ -114,8 +127,10 @@ struct CreateUV_SphereInfo {
 	uint32_t horizontal_sides = 3;
 
 	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-	glm::vec3 diffuse_color = { 1, 1, 1 };
-	float emissive = 1;
+	glm::vec3 albedo_color = { 1, 1, 1 };
+	float roughness = 0;
+	float metallic = 0;
+	float specular = 0.04f;
 };
 
 struct GLTF_ImporterSettings {
@@ -138,7 +153,8 @@ public:
 	std::list<MeshLayer> layers;
 
 	// Lighting
-	std::array<CameraLight, 4> lights;
+	std::array<CameraLight, 8> lights;
+	float ambient_intensity;
 
 	// Camera
 	glm::vec3 camera_focus;
@@ -155,6 +171,7 @@ public:
 
 public:
 	MeshInstance& createTriangleMesh(CreateTriangleInfo& info);
+	MeshInstance& createQuadMesh(CreateQuadInfo& info);
 	MeshInstance& createCubeMesh(CreateCubeInfo& infos);
 	MeshInstance& createCylinder(CreateCylinderInfo& info);
 	MeshInstance& createUV_Sphere(CreateUV_SphereInfo& info);

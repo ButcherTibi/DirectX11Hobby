@@ -20,7 +20,7 @@ void MeshRenderer::generateVertices()
 
 		for (Poly& poly : mesh.polys) {
 
-			if (poly.vs[3] == nullptr) {
+			if (poly.is_tris) {
 				vertex_count += 3;
 			}
 			else {
@@ -39,15 +39,23 @@ void MeshRenderer::generateVertices()
 
 		for (Poly& poly : mesh.polys) {
 
-			if (poly.vs[3] == nullptr) {
+			Loop& l0 = mesh.loops[poly.inner_loop];
+			Loop& l1 = mesh.loops[l0.poly_next_loop];
+			Loop& l2 = mesh.loops[l1.poly_next_loop];
 
-				vertices[vi].pos = dxConvert(poly.vs[0]->pos);
-				vertices[vi + 1].pos = dxConvert(poly.vs[1]->pos);
-				vertices[vi + 2].pos = dxConvert(poly.vs[2]->pos);
+			if (poly.is_tris) {
 
-				vertices[vi].vertex_normal = dxConvert(poly.vs[0]->normal);
-				vertices[vi + 1].vertex_normal = dxConvert(poly.vs[1]->normal);
-				vertices[vi + 2].vertex_normal = dxConvert(poly.vs[2]->normal);
+				Vertex& v0 = mesh.verts[l2.target_v];
+				Vertex& v1 = mesh.verts[l0.target_v];
+				Vertex& v2 = mesh.verts[l1.target_v];
+
+				vertices[vi].pos = dxConvert(v0.pos);
+				vertices[vi + 1].pos = dxConvert(v1.pos);
+				vertices[vi + 2].pos = dxConvert(v2.pos);
+
+				vertices[vi].vertex_normal = dxConvert(v0.normal);
+				vertices[vi + 1].vertex_normal = dxConvert(v1.normal);
+				vertices[vi + 2].vertex_normal = dxConvert(v2.normal);
 
 				auto& normal = dxConvert(poly.normal);
 
@@ -59,26 +67,33 @@ void MeshRenderer::generateVertices()
 				vi += 3;
 			}
 			else {
+				Loop& l3 = mesh.loops[l2.poly_next_loop];
+
+				Vertex& v0 = mesh.verts[l3.target_v];
+				Vertex& v1 = mesh.verts[l0.target_v];
+				Vertex& v2 = mesh.verts[l1.target_v];
+				Vertex& v3 = mesh.verts[l2.target_v];
+
 				std::array<Vertex*, 6> tess;
 
 				if (poly.tesselation_type == 0) {
 
-					tess[0] = poly.vs[0];
-					tess[1] = poly.vs[2];
-					tess[2] = poly.vs[3];
+					tess[0] = &v0;
+					tess[1] = &v2;
+					tess[2] = &v3;
 
-					tess[3] = poly.vs[0];
-					tess[4] = poly.vs[1];
-					tess[5] = poly.vs[2];
+					tess[3] = &v0;
+					tess[4] = &v1;
+					tess[5] = &v2;
 				}
 				else {
-					tess[0] = poly.vs[0];
-					tess[1] = poly.vs[1];
-					tess[2] = poly.vs[3];
+					tess[0] = &v0;
+					tess[1] = &v1;
+					tess[2] = &v3;
 
-					tess[3] = poly.vs[1];
-					tess[4] = poly.vs[2];
-					tess[5] = poly.vs[3];
+					tess[3] = &v1;
+					tess[4] = &v2;
+					tess[5] = &v3;
 				}
 
 				for (uint32_t i = 0; i < 6; i++) {
@@ -113,8 +128,10 @@ void MeshRenderer::generateVertices()
 		gpu_inst.pos = dxConvert(mesh_instance.pos);
 		gpu_inst.rot = dxConvert(mesh_instance.rot);
 		gpu_inst.shading_mode = mesh_instance.mesh_shading_subprimitive;
-		gpu_inst.diffuse_color = dxConvert(mesh_instance.diffuse_color);
-		gpu_inst.emissive = mesh_instance.emissive;
+		gpu_inst.albedo_color = dxConvert(mesh_instance.albedo_color);
+		gpu_inst.roughness = glm::clamp(mesh_instance.roughness, 0.05f, 1.f);
+		gpu_inst.metallic = mesh_instance.metallic;
+		gpu_inst.specular = mesh_instance.specular;
 
 		DrawMesh& draw_mesh = mesh_draws[inst_idx];
 		draw_mesh.vertex_start = mesh_instance.mesh->_vertex_start;
@@ -159,10 +176,11 @@ void MeshRenderer::generateUniform()
 		gpu_light.normal = dxConvert(light.normal);  // change back to relative
 		gpu_light.color = dxConvert(light.color);
 		gpu_light.intensity = light.intensity;
-		gpu_light.radius = light.radius;
 		
 		i++;
 	}
+
+	uniform.ambient_intensity = application.ambient_intensity;
 }
 
 ErrStack MeshRenderer::loadVertices()

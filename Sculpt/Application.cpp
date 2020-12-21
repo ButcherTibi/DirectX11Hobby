@@ -14,13 +14,40 @@ MeshInstance& Application::createTriangleMesh(CreateTriangleInfo& info)
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = info.pos;
-	new_instance.rot = info.rot;
-	new_instance.scale = info.scale;
+	new_instance.pos = info.transform.pos;
+	new_instance.rot = info.transform.rot;
+	new_instance.scale = info.transform.scale;
 
 	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.diffuse_color = info.diffuse_color;
-	new_instance.emissive = info.emissive;
+	new_instance.albedo_color = info.material.albedo_color;
+	new_instance.roughness = info.material.roughness;
+	new_instance.metallic = info.material.metallic;
+	new_instance.specular = info.material.specular;
+
+	MeshLayer& root = this->layers.front();
+	root.instances.push_back(&new_instance);
+
+	this->renderer.load_vertices = true;
+
+	return new_instance;
+}
+
+MeshInstance& Application::createQuadMesh(CreateQuadInfo& info)
+{
+	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
+	new_mesh.createAsQuad(info.size);
+
+	MeshInstance& new_instance = this->instances.emplace_back();
+	new_instance.mesh = &new_mesh;
+	new_instance.pos = info.transform.pos;
+	new_instance.rot = info.transform.rot;
+	new_instance.scale = info.transform.scale;
+
+	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
+	new_instance.albedo_color = info.material.albedo_color;
+	new_instance.roughness = info.material.roughness;
+	new_instance.metallic = info.material.metallic;
+	new_instance.specular = info.material.specular;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
@@ -37,13 +64,15 @@ MeshInstance& Application::createCubeMesh(CreateCubeInfo& info)
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = info.pos;
-	new_instance.rot = info.rot;
-	new_instance.scale = info.scale;
+	new_instance.pos = info.transform.pos;
+	new_instance.rot = info.transform.rot;
+	new_instance.scale = info.transform.scale;
 
 	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.diffuse_color = info.diffuse_color;
-	new_instance.emissive = info.emissive;
+	new_instance.albedo_color = info.material.albedo_color;
+	new_instance.roughness = info.material.roughness;
+	new_instance.metallic = info.material.metallic;
+	new_instance.specular = info.material.specular;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
@@ -56,17 +85,20 @@ MeshInstance& Application::createCubeMesh(CreateCubeInfo& info)
 MeshInstance& Application::createCylinder(CreateCylinderInfo& info)
 {
 	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsCylinder(info.height, info.diameter, info.vertical_sides, info.horizontal_sides);
+	new_mesh.createAsCylinder(info.height, info.diameter,
+		info.vertical_sides, info.horizontal_sides, info.with_caps);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = info.pos;
-	new_instance.rot = info.rot;
-	new_instance.scale = info.scale;
+	new_instance.pos = info.transform.pos;
+	new_instance.rot = info.transform.rot;
+	new_instance.scale = info.transform.scale;
 
 	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.diffuse_color = info.diffuse_color;
-	new_instance.emissive = info.emissive;
+	new_instance.albedo_color = info.material.albedo_color;
+	new_instance.roughness = info.material.roughness;
+	new_instance.metallic = info.material.metallic;
+	new_instance.specular = info.material.specular;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
@@ -88,8 +120,10 @@ MeshInstance& Application::createUV_Sphere(CreateUV_SphereInfo& info)
 	new_instance.scale = info.scale;
 
 	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.diffuse_color = info.diffuse_color;
-	new_instance.emissive = info.emissive;
+	new_instance.albedo_color = info.albedo_color;
+	new_instance.roughness = info.roughness;
+	new_instance.metallic = info.metallic;
+	new_instance.specular = info.specular;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);
@@ -127,10 +161,10 @@ ErrStack Application::importGLTF_File(io::FilePath& path, GLTF_ImporterSettings&
 
 			if (prim.indexes.size()) {
 				if (prim.normals.size()) {
-					new_mesh->addFromLists(prim.indexes, prim.positions, prim.normals, true);
+					//new_mesh->addFromLists(prim.indexes, prim.positions, prim.normals, true);
 				}
 				else {
-					new_mesh->addFromLists(prim.indexes, prim.positions, true);
+					//new_mesh->addFromLists(prim.indexes, prim.positions, true);
 				}
 			}
 		}

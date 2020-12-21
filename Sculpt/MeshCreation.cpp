@@ -6,37 +6,39 @@
 using namespace scme;
 
 
-void SculptMesh::calculateAllNormalsFromWindings()
-{
-	for (Poly& p : polys) {
-		p.calcNormal();
-	}
-
-	for (VertexBoundingBox& aabb : aabbs) {
-		for (Vertex& v : aabb.vs) {
-			v.calcNormal();
-		}
-	}
-}
-
 void SculptMesh::createAsTriangle(float size)
 {
-	VertexBoundingBox& root = aabbs.emplace_back();
-	root.vs.resize(3);
-	auto& vs = root.vs;
+	verts.resize(3);
 
 	float half = size / 2;
-	vs[0].pos = { 0, half, 0 };
-	vs[1].pos = { half, -half, 0 };
-	vs[2].pos = { -half, -half, 0 };
+	verts[0].pos = { 0, half, 0 };
+	verts[1].pos = { half, -half, 0 };
+	verts[2].pos = { -half, -half, 0 };
 
-	Edge* e0 = addEdge(&vs[0], &vs[1]);
-	Edge* e1 = addEdge(&vs[1], &vs[2]);
-	Edge* e2 = addEdge(&vs[2], &vs[0]);
+	for (uint8_t i = 0; i < 3; i++) {
+		verts[i].normal = { 0, 0, 1 };
+		verts[i].away_loop = 0xFFFF'FFFF;
+	}
 
-	Poly& tris = addTris(vs[0], vs[1], vs[2], *e0, *e1, *e2);
-	
-	calculateAllNormalsFromWindings();
+	addTris(0, 1, 2);
+}
+
+void SculptMesh::createAsQuad(float size)
+{
+	verts.resize(4);
+
+	float half = size / 2;
+	verts[0].pos = { -half, half, 0 };
+	verts[1].pos = { half, half, 0 };
+	verts[2].pos = { half, -half, 0 };
+	verts[3].pos = { -half, -half, 0 };
+
+	for (uint8_t i = 0; i < 4; i++) {
+		verts[i].normal = { 0, 0, 1 };
+		verts[i].away_loop = 0xFFFF'FFFF;
+	}
+
+	addQuad(0, 1, 2, 3);
 }
 
 /*
@@ -52,73 +54,57 @@ void SculptMesh::createAsTriangle(float size)
 
 void SculptMesh::createAsCube(float size)
 {
-	VertexBoundingBox& root = aabbs.emplace_back();
-	root.parent = nullptr;
-	root.vs.resize(8);
-
-	auto& vs = root.vs;
+	verts.resize(8);
 
 	float half = size / 2;
 
 	// Front
-	vs[0].pos = { -half,  half, half };
-	vs[1].pos = {  half,  half, half };
-	vs[2].pos = {  half, -half, half };
-	vs[3].pos = { -half, -half, half };
-
+	verts[0].pos = { -half,  half, half };
+	verts[1].pos = {  half,  half, half };
+	verts[2].pos = {  half, -half, half };
+	verts[3].pos = { -half, -half, half };
+	
 	// Back
-	vs[4].pos = { -half,  half, -half };
-	vs[5].pos = {  half,  half, -half };
-	vs[6].pos = {  half, -half, -half };
-	vs[7].pos = { -half, -half, -half };
+	verts[4].pos = { -half,  half, -half };
+	verts[5].pos = {  half,  half, -half };
+	verts[6].pos = {  half, -half, -half };
+	verts[7].pos = { -half, -half, -half };
 
-	// Front
-	Edge* e01 = addEdge(&vs[0], &vs[1]);
-	Edge* e12 = addEdge(&vs[1], &vs[2]);
-	Edge* e23 = addEdge(&vs[2], &vs[3]);
-	Edge* e30 = addEdge(&vs[3], &vs[0]);
+	for (uint8_t i = 0; i < 8; i++) {
+		verts[i].away_loop = 0xFFFF'FFFF;
+	}
 
-	// Back
-	Edge* e45 = addEdge(&vs[4], &vs[5]);
-	Edge* e56 = addEdge(&vs[5], &vs[6]);
-	Edge* e67 = addEdge(&vs[6], &vs[7]);
-	Edge* e74 = addEdge(&vs[7], &vs[4]);
+	addQuad(0, 1, 2, 3);  // front
+	addQuad(1, 5, 6, 2);  // right
+	addQuad(5, 4, 7, 6);  // back
+	addQuad(4, 0, 3, 7);  // left
+	addQuad(0, 4, 5, 1);  // top
+	addQuad(3, 2, 6, 7);  // bot
 
-	// Left
-	Edge* e04 = addEdge(&vs[0], &vs[4]);
-	Edge* e37 = addEdge(&vs[3], &vs[7]);
-
-	// Right
-	Edge* e15 = addEdge(&vs[1], &vs[5]);
-	Edge* e26 = addEdge(&vs[2], &vs[6]);
-
-	Poly& front = addQuad(vs[0], vs[1], vs[2], vs[3],
-		*e01, *e12, *e23, *e30, 0);
-
-	Poly& right = addQuad(vs[1], vs[5], vs[6], vs[2],
-		*e15, *e56, *e26, *e12);
-
-	Poly& back = addQuad(vs[5], vs[4], vs[7], vs[6],
-		*e45, *e74, *e67, *e56);
-
-	Poly& left = addQuad(vs[4], vs[0], vs[3], vs[7],
-		*e04, *e30, *e37, *e74);
-
-	Poly& top = addQuad(vs[0], vs[4], vs[5], vs[1],
-		*e04, *e45, *e15, *e01);
-
-	Poly& bot = addQuad(vs[3], vs[2], vs[6], vs[7],
-		*e23, *e26, *e67, *e37);
-
-	calculateAllNormalsFromWindings();
+	for (uint8_t i = 0; i < 8; i++) {
+		calcVertexNormal(i);
+	}
 }
 
-void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols)
+void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols, bool capped)
 {
-	VertexBoundingBox& root = aabbs.emplace_back();
-	root.parent = nullptr;
-	root.vs.resize(rows * cols + 2);
-	auto& vs = root.vs;
+	uint32_t vertex_count = rows * cols;
+	uint32_t quad_count = (rows - 1) * cols;
+	uint32_t tris_count = 0;
+
+	if (capped) {
+		vertex_count += 2;
+		tris_count = cols * 2;
+	}
+
+	verts.resize(vertex_count);
+
+	// can't be bothered to manually pass indexes when doing cap stiching
+	loops.reserve(quad_count * 4 + tris_count * 3);
+	loops.resize(quad_count * 4);
+
+	polys.reserve(quad_count + tris_count);
+	polys.resize(quad_count);
 
 	float radius = diameter / 2.f;
 	float height_step = height / (rows - 1);
@@ -130,7 +116,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 
 		for (uint32_t col = 0; col < cols; col++) {
 
-			Vertex& v = vs[row_offset + col];
+			Vertex& v = verts[row_offset + col];
 
 			float col_ratio = ((float)col / cols) * (2.f * glm::pi<float>());
 			float cosine = std::cosf(col_ratio);
@@ -139,73 +125,102 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 			v.pos.x = cosine * radius;
 			v.pos.z = -(sine * radius);
 			v.pos.y = y;
+			v.away_loop = 0xFFFF'FFFF;
 		}
 
 		y -= height_step;
 	}
 
-	// top cap
-	std::vector<Vertex*> loop(cols);
-	{	
-		for (uint32_t col = 0; col < cols; col++) {
-			loop[col] = &vs[col];
+	if (capped) {
+
+		// top cap
+		std::vector<uint32_t> rim(cols);
+		{
+			for (uint32_t col = 0; col < cols; col++) {
+				rim[col] = col;
+			}
+
+			stichVerticesToVertexLooped(rim, verts.size() - 2);
 		}
 
-		Vertex& top_vertex = vs[vs.size() - 2];
-		stichVerticesToVertex(&top_vertex, loop, true);
-	}
+		// bot cap
+		{
+			uint32_t row_offset = (rows - 1) * cols;
 
-	// bot cap
-	{
-		uint32_t row_offset = (rows - 1) * cols;
+			uint32_t col = cols - 1;
+			for (auto& v : rim) {
+				v = row_offset + col;
+				col--;
+			}
 
-		uint32_t col = cols - 1;
-		for (auto& v : loop) {
-			v = &vs[row_offset + col];
-			col--;
+			Vertex& bot_vertex = verts.back();
+			bot_vertex.pos.y = -height;
+
+			stichVerticesToVertexLooped(rim, verts.size() - 1);
 		}
-
-		Vertex& bot_vertex = vs.back();
-		bot_vertex.pos.y = -height;
-		stichVerticesToVertex(&bot_vertex, loop, true);
 	}
 
 	// make origin top -> center
 	float half_heigth = height / 2.f;
-	for (Vertex& v : vs) {
+	for (Vertex& v : verts) {
 		v.pos.y += half_heigth;
 	}
 
 	// Create Quads
+	uint32_t loop_idx = 0;
+	uint32_t quad_idx = 0;
+
 	for (uint32_t row = 0; row < rows - 1; row++) {
 		for (uint32_t col = 0; col < cols - 1; col++) {
 
-			Vertex& v0 = vs[row * cols + col];
-			Vertex& v1 = vs[row * cols + col + 1];
-			Vertex& v2 = vs[(row + 1) * cols + col + 1];
-			Vertex& v3 = vs[(row + 1) * cols + col];
+			uint32_t v0_idx = row * cols + col;
+			uint32_t v1_idx = row * cols + col + 1;
+			uint32_t v2_idx = (row + 1) * cols + col + 1;
+			uint32_t v3_idx = (row + 1) * cols + col;
 
-			Poly* new_poly = addQuad(&v0, &v1, &v2, &v3);
-			new_poly->calcNormalForQuad();
+			setQuad(quad_idx, loop_idx, loop_idx + 1, loop_idx + 2, loop_idx + 3,
+				v0_idx, v1_idx, v2_idx, v3_idx);
+			
+			loop_idx += 4;
+			quad_idx++;
 		}
 
-		Vertex& v0 = vs[row * cols + cols - 1];
-		Vertex& v1 = vs[row * cols];
-		Vertex& v2 = vs[(row + 1) * cols];
-		Vertex& v3 = vs[(row + 1) * cols + cols - 1];
+		uint32_t v0_idx = row * cols + cols - 1;
+		uint32_t v1_idx = row * cols;
+		uint32_t v2_idx = (row + 1) * cols;
+		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
-		Poly* new_poly = addQuad(&v0, &v1, &v2, &v3);
+		setQuad(quad_idx, loop_idx, loop_idx + 1, loop_idx + 2, loop_idx + 3,
+			v0_idx, v1_idx, v2_idx, v3_idx);
+
+		loop_idx += 4;
+		quad_idx++;
 	}
 
-	calculateAllNormalsFromWindings();
+	for (uint32_t i = 0; i < verts.size(); i++) {
+		calcVertexNormal(i);
+	}
+
+	// make sure I got the counts right
+	assert_cond(verts.capacity() == vertex_count, "");
+	assert_cond(loops.capacity() == quad_count * 4 + tris_count * 3, "");
+	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
 void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 {
-	VertexBoundingBox& root = aabbs.emplace_back();
-	root.parent = nullptr;
-	root.vs.resize(rows * cols + 2);
-	auto& vs = root.vs;
+	uint32_t vertex_count = rows * cols + 2;
+	uint32_t quad_count = (rows - 1) * cols;
+	uint32_t tris_count = cols * 2;
+
+	verts.resize(vertex_count);
+
+	// can't be bothered to manually pass indexes when doing cap stiching
+	loops.reserve(quad_count * 4 + tris_count * 3);
+	loops.resize(quad_count * 4);
+
+	polys.reserve(quad_count + tris_count);
+	polys.resize(quad_count);
 
 	float radius = diameter / 2.f;
 
@@ -228,7 +243,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			y = sin(Pi * m / M) * sin(2Pi * n / N);
 			z = cos(Pi * m / M);*/
 
-			Vertex& v = vs[row_offset + col];
+			Vertex& v = verts[row_offset + col];
 
 			float col_ratio = ((float)col / cols) * (2.f * glm::pi<float>());
 			float cosine = std::cosf(col_ratio);
@@ -237,19 +252,21 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			v.pos.x = cosine * row_radius;
 			v.pos.z = -(sine * row_radius);
 			v.pos.y = y;
+			v.away_loop = 0xFFFF'FFFF;
 		}
 	}
 
 	// top cap
-	std::vector<Vertex*> loop(cols);
+	std::vector<uint32_t> rim(cols);
 	{
 		for (uint32_t col = 0; col < cols; col++) {
-			loop[col] = &vs[col];
+			rim[col] = col;
 		}
 
-		Vertex& top_vertex = vs[vs.size() - 2];
+		Vertex& top_vertex = verts[verts.size() - 2];
 		top_vertex.pos = { 0, radius, 0};
-		stichVerticesToVertex(&top_vertex, loop, true);
+
+		stichVerticesToVertexLooped(rim, verts.size() - 2);
 	}
 
 	// bot cap
@@ -257,113 +274,141 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 		uint32_t row_offset = (rows - 1) * cols;
 
 		uint32_t col = cols - 1;
-		for (auto& v : loop) {
-			v = &vs[row_offset + col];
+		for (auto& v : rim) {
+			v = row_offset + col;
 			col--;
 		}
 
-		Vertex& bot_vertex = vs.back();
+		Vertex& bot_vertex = verts.back();
 		bot_vertex.pos = { 0, -radius, 0 };
-		stichVerticesToVertex(&bot_vertex, loop, true);
+
+		stichVerticesToVertexLooped(rim, verts.size() - 1);
 	}
 
 	// Create Quads
+	uint32_t loop_idx = 0;
+	uint32_t quad_idx = 0;
+
 	for (uint32_t row = 0; row < rows - 1; row++) {
 		for (uint32_t col = 0; col < cols - 1; col++) {
 
-			Vertex& v0 = vs[row * cols + col];
-			Vertex& v1 = vs[row * cols + col + 1];
-			Vertex& v2 = vs[(row + 1) * cols + col + 1];
-			Vertex& v3 = vs[(row + 1) * cols + col];
+			uint32_t v0_idx = row * cols + col;
+			uint32_t v1_idx = row * cols + col + 1;
+			uint32_t v2_idx = (row + 1) * cols + col + 1;
+			uint32_t v3_idx = (row + 1) * cols + col;
 
-			Poly* new_poly = addQuad(&v0, &v1, &v2, &v3);
-			new_poly->calcNormalForQuad();
+			setQuad(quad_idx, loop_idx, loop_idx + 1, loop_idx + 2, loop_idx + 3,
+				v0_idx, v1_idx, v2_idx, v3_idx);
+
+			loop_idx += 4;
+			quad_idx++;
 		}
 
-		Vertex& v0 = vs[row * cols + cols - 1];
-		Vertex& v1 = vs[row * cols];
-		Vertex& v2 = vs[(row + 1) * cols];
-		Vertex& v3 = vs[(row + 1) * cols + cols - 1];
+		uint32_t v0_idx = row * cols + cols - 1;
+		uint32_t v1_idx = row * cols;
+		uint32_t v2_idx = (row + 1) * cols;
+		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
-		Poly* new_poly = addQuad(&v0, &v1, &v2, &v3);
+		setQuad(quad_idx, loop_idx, loop_idx + 1, loop_idx + 2, loop_idx + 3,
+			v0_idx, v1_idx, v2_idx, v3_idx);
+
+		loop_idx += 4;
+		quad_idx++;
 	}
 
-	calculateAllNormalsFromWindings();
+	for (uint32_t i = 0; i < verts.size(); i++) {
+		calcVertexNormal(i);
+	}
+
+	// make sure I got the counts right
+	assert_cond(verts.capacity() == vertex_count, "");
+	assert_cond(loops.capacity() == quad_count * 4 + tris_count * 3, "");
+	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-	bool flip_winding)
+//void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
+//	bool flip_winding)
+//{
+//	VertexBoundingBox& root = aabbs.front();
+//	uint32_t old_size = root.vs.size();
+//	root.vs.resize(old_size + positions.size());
+//
+//	std::vector<Vertex>& vs = root.vs;
+//
+//	for (uint32_t i = 0; i < positions.size(); i++) {
+//
+//		Vertex& v = vs[old_size + i];
+//		v.pos = positions[i];
+//		v.normal = normals[i];
+//	}
+//
+//	if (flip_winding) {
+//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
+//
+//			uint32_t idx_0 = old_size + indexes[i];
+//			uint32_t idx_1 = old_size + indexes[i + 1];
+//			uint32_t idx_2 = old_size + indexes[i + 2];
+//			addTrisNormalWinding(&vs[idx_2], &vs[idx_1], &vs[idx_0]);
+//		}
+//	}
+//	else {
+//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
+//
+//			uint32_t idx_0 = old_size + indexes[i];
+//			uint32_t idx_1 = old_size + indexes[i + 1];
+//			uint32_t idx_2 = old_size + indexes[i + 2];
+//			addTrisNormalWinding(&vs[idx_0], &vs[idx_1], &vs[idx_2]);
+//		}
+//	}
+//}
+//
+//void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
+//	bool flip_winding)
+//{
+//	VertexBoundingBox& root = aabbs.front();
+//	uint32_t old_size = root.vs.size();
+//	root.vs.resize(old_size + positions.size());
+//
+//	std::vector<Vertex>& vs = root.vs;
+//
+//	for (uint32_t i = 0; i < positions.size(); i++) {
+//
+//		Vertex& v = vs[old_size + i];
+//		v.pos = positions[i];
+//	}
+//
+//	if (flip_winding) {
+//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
+//
+//			uint32_t idx_0 = old_size + indexes[i];
+//			uint32_t idx_1 = old_size + indexes[i + 1];
+//			uint32_t idx_2 = old_size + indexes[i + 2];
+//			Poly* new_tris = addTris(&vs[idx_2], &vs[idx_1], &vs[idx_0]);
+//			new_tris->calcNormalForTris();
+//		}
+//	}
+//	else {
+//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
+//
+//			uint32_t idx_0 = old_size + indexes[i];
+//			uint32_t idx_1 = old_size + indexes[i + 1];
+//			uint32_t idx_2 = old_size + indexes[i + 2];
+//			Poly* new_tris = addTris(&vs[idx_0], &vs[idx_1], &vs[idx_2]);
+//			new_tris->calcNormalForTris();
+//		}
+//	}
+//	
+//	for (uint32_t i = old_size; i < vs.size(); i++) {
+//		vs[i].calcNormal();
+//	}
+//}
+
+size_t SculptMesh::getMemorySizeMegaBytes()
 {
-	VertexBoundingBox& root = aabbs.front();
-	uint32_t old_size = root.vs.size();
-	root.vs.resize(old_size + positions.size());
+	size_t size_in_bytes = verts.size() * sizeof(Vertex) +
+		loops.size() * sizeof(Loop) +
+		polys.size() * sizeof(Poly) +
+		sizeof(SculptMesh);
 
-	std::vector<Vertex>& vs = root.vs;
-
-	for (uint32_t i = 0; i < positions.size(); i++) {
-
-		Vertex& v = vs[old_size + i];
-		v.pos = positions[i];
-		v.normal = normals[i];
-	}
-
-	if (flip_winding) {
-		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-
-			uint32_t idx_0 = old_size + indexes[i];
-			uint32_t idx_1 = old_size + indexes[i + 1];
-			uint32_t idx_2 = old_size + indexes[i + 2];
-			addTrisNormalWinding(&vs[idx_2], &vs[idx_1], &vs[idx_0]);
-		}
-	}
-	else {
-		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-
-			uint32_t idx_0 = old_size + indexes[i];
-			uint32_t idx_1 = old_size + indexes[i + 1];
-			uint32_t idx_2 = old_size + indexes[i + 2];
-			addTrisNormalWinding(&vs[idx_0], &vs[idx_1], &vs[idx_2]);
-		}
-	}
-}
-
-void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
-	bool flip_winding)
-{
-	VertexBoundingBox& root = aabbs.front();
-	uint32_t old_size = root.vs.size();
-	root.vs.resize(old_size + positions.size());
-
-	std::vector<Vertex>& vs = root.vs;
-
-	for (uint32_t i = 0; i < positions.size(); i++) {
-
-		Vertex& v = vs[old_size + i];
-		v.pos = positions[i];
-	}
-
-	if (flip_winding) {
-		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-
-			uint32_t idx_0 = old_size + indexes[i];
-			uint32_t idx_1 = old_size + indexes[i + 1];
-			uint32_t idx_2 = old_size + indexes[i + 2];
-			Poly* new_tris = addTris(&vs[idx_2], &vs[idx_1], &vs[idx_0]);
-			new_tris->calcNormalForTris();
-		}
-	}
-	else {
-		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-
-			uint32_t idx_0 = old_size + indexes[i];
-			uint32_t idx_1 = old_size + indexes[i + 1];
-			uint32_t idx_2 = old_size + indexes[i + 2];
-			Poly* new_tris = addTris(&vs[idx_0], &vs[idx_1], &vs[idx_2]);
-			new_tris->calcNormalForTris();
-		}
-	}
-	
-	for (uint32_t i = old_size; i < vs.size(); i++) {
-		vs[i].calcNormal();
-	}
+	return size_in_bytes / (1024 * 1024);
 }

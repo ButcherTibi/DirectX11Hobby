@@ -6,19 +6,16 @@ struct VertexInput
 	float3 poly_normal : POLY_NORMAL;
 	
 	uint shading_mode : SHADING_MODE;
-	float3 diffuse : DIFFUSE;
-	float emissive : EMISSIVE;
+	float3 albedo_color : ALBEDO_COLOR;
+	float roughness : ROUGHNESS;
+	float metallic : METALLIC;
+	float specular : SPECULAR;
 };
 
 struct CameraLight {
 	float3 normal;
 	float3 color;
 	float intensity;
-	float radius;
-};
-
-struct LightResult {
-	float shading;
 };
 
 cbuffer Uniform : register(b0)
@@ -30,37 +27,48 @@ cbuffer Uniform : register(b0)
 	float z_near;
 	float z_far;
 	
-	CameraLight lights[4];
+	CameraLight lights[8];
+	float3 ambient_intensity;
 };
+
 
 static const float PI = 3.14159265f;
 
-// Trowbridge-Reitz GGX normal distribution function
-float normalDistributionFunction(float NdotH, float a)
+
+float DistributionGGX(float NdotH, float a)
 {
-	float a2     = pow(a, 2);
-	float NdotH2 = pow(NdotH, 2);
+	float a2 = a * a;
 	
-	float nom    = a2;
-	float denom  = (NdotH2 * (a2 - 1.0) + 1.0);
-	denom        = PI * pow(denom, 2);
+	float NdotH2 = NdotH*NdotH;
 	
-	return nom / denom;
-}
-
-float3 fresnelSchlick(float cos_theta, float3 F0)
-{
-	return F0 + (1. - F0) * pow(1. - cos_theta, 5.);
-}
-
-float geometrySchlickGGX(float NdotV, float roughness)
-{
-	float k = pow(roughness + 1., 2.) / 8.;
-
-	float num   = NdotV;
-	float denom = NdotV * (1. - k) + k;
+	float num   = a2;
+	float denom = (NdotH2 * (a2 - 1.) + 1.);
+	denom = PI * denom * denom;
 	
 	return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+	float r = (roughness + 1.0);
+	float k = (r*r) / 8.0;
+
+	float num   = NdotV;
+	float denom = NdotV * (1.0 - k) + k;
+	
+	return num / denom;
+}
+float GeometrySmith(float NdotV, float NdotL, float roughness)
+{
+	float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+	float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+	
+	return ggx1 * ggx2;
+}
+
+float3 fresnelSchlick(float cosTheta, float3 F0)
+{
+	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 float4 main(VertexInput input) : SV_TARGET
@@ -83,58 +91,57 @@ float4 main(VertexInput input) : SV_TARGET
 		break;
 	}
 	
-	float roughness = 0.5;
-	float metallic = 0;
-	float specular = 0.04;
+	float roughness = input.roughness;
+	float metallic  = input.metallic;
+	float specular  = input.specular;
+	
+	float3 N    = surface_normal;
+	float3 V    = -camera_forward;
+	float NdotV = max(dot(N, V), 0.);
 
-	float3 L = -lights[0].normal;  // light vector
-	float3 V = -camera_forward;  // view/eye/camera vector
+	// Fresnel F0
+	float3 F0 = specular;
+	F0 = lerp(F0, input.albedo_color, input.metallic);
 	
-	float3 N = surface_normal;  // normal of the surface pointing up
-	float3 H = normalize(L + V);  // half vector between light and camera vectors
+	// reflectance equation
+	float3 Lo = 0.;
 	
-	// Normal Distribution Function
-	float NdotH = max(dot(N, H), 0.);
-	float D = normalDistributionFunction(NdotH, roughness);
-	
-	// Fresnel
-	// the original source code uses HdotV like Unreal Engine 4 but it didn't seem to make sense
-	float LdotN = max(dot(L, N), 0.);
-	float3 F;
+	for(int i = 0; i < 8; ++i) 
 	{
-		float3 F0 = lerp(specular.xxx, input.diffuse, metallic);
-		F = fresnelSchlick(LdotN,  F0);
+		if (lights[i].intensity == 0.) {
+			continue;
+		}
+		
+		// calculate per-light radiance
+		float3 L = -lights[i].normal;
+		float3 H = normalize(V + L);
+		
+		float NdotH = max(dot(N, H), 0.);
+		float NdotL = max(dot(N, L), 0.);
+		float HdotV = max(dot(H, V), 0.);
+
+		float3 radiance = lights[i].color * lights[i].intensity;
+		
+		// cook-torrance brdf
+		float NDF = DistributionGGX(NdotH, roughness * roughness);
+		float G   = GeometrySmith(NdotV, NdotL, roughness);
+		float3 F  = fresnelSchlick(HdotV, F0);
+		
+		// diffuse blending for metals
+		float3 kS = F;
+		float3 kD = 1. - kS;
+		kD *= 1.0 - metallic;
+		
+		float3 numerator  = NDF * G * F;
+		float denominator = 4. * NdotV * NdotL;
+		float3 specular_BRDF = numerator / max(denominator, 0.001);
+
+		// add to outgoing radiance Lo
+		Lo += (kD * input.albedo_color / PI + specular_BRDF) * radiance * NdotL;
 	}
 	
-	// Geometry
-	float NdotL = max(dot(N, L), 0.0);
-	float NdotV = max(dot(N, V), 0.0);
-	float G;
-	{
-		// GeometrySmith
-		float ggxL  = geometrySchlickGGX(NdotL, roughness);
-		float ggxV  = geometrySchlickGGX(NdotV, roughness);
-		G = ggxL * ggxV; 
-	}
-	
-	// Cook-Torrance Specular BRDF
-	float3 num = N * G * F;
-	float denom = 4. * max(dot(N, L), 0.) * max(dot(N, V), 0.);
-	float3 specular_BRDF = num / max(denom, 0.001);
-	
-	// Diffuse BRDF
-	float3 diffuse_BRDF = input.diffuse / PI;
-	
-	// kD term
-	float3 kS = F;
-    float3 kD = float1(1.).xxx - kS;
-    kD *= 1.0 - metallic;
-	
-	float3 Lo = (kD * diffuse_BRDF + specular) * NdotL;
-	
-	float3 color = Lo;
-	color = color / (color + float(1.).xxx);
-    color = pow(color, float(1.0 / 2.2).xxx); 
+	float3 ambient = ambient_intensity * input.albedo_color;
+	float3 color = ambient + Lo;
 	
 	return float4(color, 1);
 }

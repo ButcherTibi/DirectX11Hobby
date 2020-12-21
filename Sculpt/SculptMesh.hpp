@@ -35,76 +35,84 @@ AABB Merge
 - if all siblings have too many vertices then box gets parented upward and retry (1)
 */
 
+
 namespace scme {
-
-	// Forward declarations
-	class Edge;
-	class Poly;
-
 
 	class Vertex {
 	public:
 		glm::vec3 pos;
 		glm::vec3 normal;
 
-		std::vector<Edge*> edges;
-
-	public:
-		void calcNormal();
+		uint32_t away_loop;  // starting vertices should ha this set to 0xFFFF'FFFF
 	};
 
 
-	struct VertexBoundingBox {
+	/*struct VertexBoundingBox {
 		VertexBoundingBox* parent;
 		std::list<VertexBoundingBox*> children;
 
 		AxisBoundingBox3D aabb;
 
 		std::vector<Vertex> vs;
-	};
+	};*/
 
 
-	class Edge {
+	/* Half-edge data structure */
+	class Loop {
 	public:
-		Vertex* v0;
-		Vertex* v1;
+		uint32_t target_v;
+		uint32_t v_prev_loop;
+		uint32_t v_next_loop;
 
-		std::vector<Poly*> polys;
+		uint32_t poly;
+		uint32_t poly_next_loop;
+
+		uint32_t mirror_loop;
 	};
 
 
 	class Poly {
 	public:
 		glm::vec3 normal;
+		uint32_t inner_loop;
 
-		std::array<Vertex*, 4> vs;
-		std::array<Edge*, 4> edges;
+		uint8_t tesselation_type : 1;
+		uint8_t is_tris : 1;
+		uint8_t _pad : 6;
 
-		bool tesselation_type;
-		std::array<glm::vec3, 2> tess_normals;
-
-	public:
-		void calcNormalForTris();
-		void calcNormalForQuad();
-		void calcNormal();
+		glm::vec3 tess_normals[2];
 	};
 
 
-	/*  */
+	/*struct EmptyGap {
+		uint32_t idx;
+		uint32_t count;
+	};*/
+
+
+	/* Version 3: Allocation-less primitives */
 	class SculptMesh {
 	public:
-		std::list<VertexBoundingBox> aabbs;
-		std::list<Edge> edges;
-		std::list<Poly> polys;
+		// std::list<VertexBoundingBox> aabbs;
+
+		// vector<uint32_t> empty_verts;
+		std::vector<Vertex> verts;
+
+		// vector<uint32_t> empty_edges;
+		std::vector<Loop> loops;
+
+		// vector<uint32_t> empty_polys;
+		std::vector<Poly> polys;
 
 		// GPU Rendering
 		uint32_t _vertex_start;
 		uint32_t _vertex_count;
 
 	public:
-		//void createTriangle();
+		// Vertex ///////////////////////////////////////////////////
 
-		////////////////////////////////////////////////////////////
+		void calcVertexNormal(uint32_t vertex);
+
 		// addLoneVertex(GPU_Vertex new_vertex)
 		// addLoneVertices(GPU_Vertex[] new_vertices)
 
@@ -117,38 +125,50 @@ namespace scme {
 		// boundVerticesTogether
 		// boundVerticesSeparated
 
-		// redistributeRootVertices 
+		// redistributeRootVertices
 
-		////////////////////////////////////////////////////////////
+		// Loop ////////////////////////////////////////////////////
+
+		uint32_t findLoopFromTo(uint32_t src_vertex, uint32_t target_vertex);
+
+		void registerLoopToSourceVertexList(uint32_t away_loop, uint32_t vertex);
+
+		void registerLoopToMirrorLoopList(uint32_t new_loop, uint32_t existing_loop);
 
 		/* always creates a edge between existing vertices */
-		Edge* addEdge(Vertex* v0, Vertex* v1);
+		//Edge* addEdge(Vertex* v0, Vertex* v1);
 
 		/* only creates a edge if there is no edge between the vertices */
-		Edge* addEdgeIfNone(Vertex* v0, Vertex* v1);
+		//Edge* addEdgeIfNone(Vertex* v0, Vertex* v1);
+
+		/* assemble a loop from vertices, unless there is already a loop
+		in which case that loop is used and returned */
+		uint32_t setLoop(uint32_t loop, uint32_t src_vertex, uint32_t target_vertex);
+
+		uint32_t addLoop(uint32_t src_vertex, uint32_t target_vertex);
 
 		////////////////////////////////////////////////////////////
 
+		glm::vec3 calcWindingNormal(Vertex& v0, Vertex& v1, Vertex& v2);
+
 		/* creates a triangle from existing vertices and edges */
-		Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,
-			Edge& e0, Edge& e1, Edge& e2);
+		//Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,
+		//	Edge& e0, Edge& e1, Edge& e2);
 
-		/* creates a new triangle from existing vertices, creates new edges between the vertices 
+		/* creates a new triangle from existing vertices, creates new loops between the vertices 
 		if they are not already present */
-		Poly* addTris(Vertex* v0, Vertex* v1, Vertex* v2);
+		uint32_t addTris(uint32_t v0, uint32_t v1, uint32_t v2);
 
-		/* creates a new triangle from existing vertices, creates new edges between the vertices 
-		if they are not already present, winding is set based on average normal */
-		Poly* addTrisNormalWinding(Vertex* v0, Vertex* v1, Vertex* v2);
-		
-		// Poly* addTrisPositionWinding(Vertex* v0, Vertex* v1, Vertex* v2);
+		/* assemble the quad using blank loops and existing vertices */
+		void setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, uint32_t l3,
+			uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
-		Poly& addQuad(Vertex& v0, Vertex& v1, Vertex& v2, Vertex& v3,
-			Edge& e0, Edge& e1, Edge& e2, Edge& e3, bool tesselation_type = 1);
+		/* creates a new quad from existing vertices, creates new loops between the vertices
+		if they are not already present */
+		uint32_t addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
-		Poly* addQuad(Vertex* v0, Vertex* v1, Vertex* v2, Vertex* v3, bool tesselation_type = 1);
-
-		void stichVerticesToVertex(Vertex* v, std::vector<Vertex*>& vertices, bool loop = false);
+		//void stichVerticesToVertex(Vertex* v, std::vector<Vertex*>& vertices, bool loop = false);
+		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
 
 		// addLoneQuad
 		// addTris
@@ -160,23 +180,18 @@ namespace scme {
 		// stichQuadToThree()
 
 		////////////////////////////////////////////////////////////
-		void calculateAllNormalsFromWindings();
-
-		////////////////////////////////////////////////////////////
-		// delete vertex
-		// delete edge
-		// delete poly
-
-		// ray query
 
 		void createAsTriangle(float size);
+		void createAsQuad(float size);
 		void createAsCube(float size);
-		void createAsCylinder(float height, float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
+		void createAsCylinder(float height, float diameter, uint32_t vertical_sides, uint32_t horizontal_sides, bool capped = true);
 		void createAsUV_Sphere(float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
 
-		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-			bool flip_winding = false);
-		void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
-			bool flip_winding = false);
+		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
+		//	bool flip_winding = false);
+		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
+		//	bool flip_winding = false);
+
+		size_t getMemorySizeMegaBytes();
 	};
 }

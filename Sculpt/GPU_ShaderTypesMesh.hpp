@@ -57,12 +57,14 @@ struct GPU_MeshInstance {
 	DirectX::XMFLOAT4 rot;
 
 	uint32_t shading_mode;
-	DirectX::XMFLOAT3 diffuse_color;
-	float emissive;
+	DirectX::XMFLOAT3 albedo_color;
+	float roughness;
+	float metallic;
+	float specular;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 5> getInputLayout(uint32_t input_slot = 1)
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 7> getInputLayout(uint32_t input_slot = 1)
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 5> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 7> elems;
 		elems[0].SemanticName = "INSTANCE_POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
@@ -72,11 +74,17 @@ struct GPU_MeshInstance {
 		elems[2].SemanticName = "SHADING_MODE";
 		elems[2].Format = DXGI_FORMAT_R32_UINT;
 
-		elems[3].SemanticName = "DIFFUSE";
+		elems[3].SemanticName = "ALBEDO_COLOR";
 		elems[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		elems[4].SemanticName = "EMISSIVE";
+		elems[4].SemanticName = "ROUGHNESS";
 		elems[4].Format = DXGI_FORMAT_R32_FLOAT;
+
+		elems[5].SemanticName = "METALLIC";
+		elems[5].Format = DXGI_FORMAT_R32_FLOAT;
+
+		elems[6].SemanticName = "SPECULAR";
+		elems[6].Format = DXGI_FORMAT_R32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -101,8 +109,6 @@ struct GPU_CameraLight {
 	DirectX::XMFLOAT3 color;
 	float intensity;
 	//--------------------------------
-	float radius;
-	uint32_t _pad_2[3];
 };
 
 struct GPU_MeshUniform {
@@ -120,7 +126,9 @@ struct GPU_MeshUniform {
 	float z_far;
 	uint32_t _pad_2[2];
 	//--------------------------------
-	GPU_CameraLight lights[4];
+	GPU_CameraLight lights[8];
+	//--------------------------------
+	float ambient_intensity;
 };
 
 #pragma pack()

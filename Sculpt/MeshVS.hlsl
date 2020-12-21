@@ -9,27 +9,29 @@ struct VertexIn
 	float3 inst_pos : INSTANCE_POSITION;
 	float4 inst_rot : INSTANCE_ROTATION;
 	uint shading_mode : SHADING_MODE;
-	float3 diffuse : DIFFUSE;
-	float emissive : EMISSIVE;
+	float3 albedo_color : ALBEDO_COLOR;
+	float roughness : ROUGHNESS;
+	float metallic : METALLIC;
+	float specular : SPECULAR;
 };
 
 struct CameraLight
 {
 	float3 normal;
 	float3 color;
-	float intensity;
-	float radius;
+	float radiance;
 };
 
 cbuffer Uniform : register(b0)
 {
 	float3 camera_pos;
-	float4 camera_quat;
+	float4 camera_quat_inv;
 	float3 camera_forward;
-	matrix perspective_matrix;
+	matrix perspective;
 	float z_near;
 	float z_far;
-	//CameraLight lights[4];
+	
+	CameraLight lights[4];
 };
 
 struct VertexOut
@@ -42,8 +44,10 @@ struct VertexOut
 	float3 poly_normal : POLY_NORMAL;
 	
 	uint shading_mode : SHADING_MODE;
-	float3 diffuse : DIFFUSE;
-	float emissive : EMISSIVE;
+	float3 albedo_color : ALBEDO_COLOR;
+	float roughness : ROUGHNESS;
+	float metallic : METALLIC;
+	float specular : SPECULAR;
 	
 	//// Debug
 	//float3 camera_pos : DEBUG_camera_pos;
@@ -95,9 +99,9 @@ VertexOut main(VertexIn input)
 	pos += input.inst_pos;
 	
 	pos -= camera_pos;
-	pos = quatRotate(pos, camera_quat);
+	pos = quatRotate(pos, camera_quat_inv);
 	
-	float4 persp = mul(float4(pos, 1.0f), perspective_matrix); // perspective transform
+	float4 persp = mul(float4(pos, 1.0f), perspective); // perspective transform
 	persp.z /= z_far;
 	output.dx_pos = persp;
 
@@ -107,8 +111,10 @@ VertexOut main(VertexIn input)
 	output.poly_normal = input.poly_normal;
 	
 	output.shading_mode = input.shading_mode;
-	output.diffuse = input.diffuse;
-	output.emissive = input.emissive;
+	output.albedo_color = input.albedo_color;
+	output.roughness = input.roughness;
+	output.metallic = input.metallic;
+	output.specular = input.specular;
 	
 	// Debug
 	//output.camera_pos = camera_pos;
