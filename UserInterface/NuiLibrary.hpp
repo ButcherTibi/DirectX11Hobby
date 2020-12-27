@@ -20,12 +20,11 @@
 
 
 /* TODO:
+- create high-level UI elements, complete menu with submenus and modifiable orientation
 - handle Alt, F10
 - fullscreen support
+- 60fps limit
 - multiple fonts
-- flex
-- wrap self origin, child pos can refer to center of child
-- z order
 - multiple windows, needs atomics
 - the DirectX 11 character atlas texture does NOT resize with atlas
 */
@@ -37,7 +36,6 @@ namespace nui {
 	class Instance;
 	class Window;
 	class Wrap;
-	class Flex;
 	class Text;
 	class Surface;
 	class Node;
@@ -92,38 +90,6 @@ namespace nui {
 	};
 
 
-	enum class FlexDirection {
-		ROW,
-		COLUMN,
-	};
-
-	enum class FlexWrap {
-		NO_WRAP,
-		WRAP,
-	};
-
-	enum class FlexAxisAlign {
-		START,
-		END,
-		CENTER,
-		SPACE_BETWEEN,
-	};
-
-	enum class FlexCrossAxisAlign {
-		START,
-		END,
-		CENTER,
-		PARENT,
-	};
-
-	enum class FlexLinesAlign {
-		START,
-		END,
-		CENTER,
-		SPACE_BETWEEN,
-	};
-
-
 	class Root : public NodeComp, public EventComp {
 		// methods are on window
 	};
@@ -144,21 +110,6 @@ namespace nui {
 		ElementSize height;
 		Overflow overflow;  // CURSED: assigning a default value causes undefined behaviour, memory coruption
 		Color background_color;
-
-	public:
-	};
-
-
-	class Flex {
-	public:
-		// Internal
-		NodeComp node_comp;
-
-	public:
-		FlexDirection direction;
-		FlexWrap wrap;
-		FlexAxisAlign axis_align;
-		FlexLinesAlign lines_align;
 
 	public:
 	};
@@ -189,20 +140,18 @@ namespace nui {
 		Surface* surface;
 		void* user_data;
 
-		uint32_t surface_width;
-		uint32_t surface_height;
-
 		// Resource
 		ID3D11Device5* dev5;
+		ID3D11DeviceContext4* im_ctx4;
 		ID3D11DeviceContext3* de_ctx3;
 
+		uint32_t render_target_width;
+		uint32_t render_target_height;
 		ID3D11RenderTargetView* compose_rtv;
-		ID3D11RenderTargetView* next_parents_clip_mask_rtv;
 
 		// Drawcall
-		glm::uvec2 pos;
-		glm::uvec2 size;
-		uint32_t child_clip_id;
+		glm::uvec2 viewport_pos;
+		glm::uvec2 viewport_size;
 	};
 
 	typedef ErrStack(*RenderingSurfaceCallback)(SurfaceEvent& event);
@@ -212,10 +161,9 @@ namespace nui {
 		SurfaceEvent _event;
 
 	public:
-		glm::uvec2 pos;
-		ElementSize width;  // relative of fit not usefull
-		ElementSize height;  // relative of fit not usefull
-		Overflow overflow;  // not usefull should always be clip
+		glm::uvec2 pos;  // where to render surface on screen
+		ElementSize width;
+		ElementSize height;
 
 		RenderingSurfaceCallback gpu_callback;
 		void* user_data;
@@ -227,7 +175,6 @@ namespace nui {
 		enum {
 			ROOT,
 			WRAP,
-			FLEX,
 			TEXT,
 			SURFACE,
 		};
@@ -235,7 +182,7 @@ namespace nui {
 
 	class Node {
 	public:
-		std::variant<Root, Wrap, Flex, Text, Surface> elem;
+		std::variant<Root, Wrap, Text, Surface> elem;
 
 		// Common Components
 		BoundingBox2D<uint32_t> collider;
@@ -248,7 +195,6 @@ namespace nui {
 	public:
 		Root* createRoot();
 		Wrap* createWrap();
-		Flex* createFlex();
 		Text* createText();
 		Surface* createSurface();
 

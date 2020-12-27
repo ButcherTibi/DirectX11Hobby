@@ -22,56 +22,51 @@
 - modified vertices replace old ones
 */
 
-/* AABB Resize
-- modified vertices cause their AABB and ancestors to resize
-
-AABB Split
-- split occurs when too many vertices belong to single AABB
-- split happens on average vertex position recursivelly until there is no AABB that has
-  too many vertices
-
-AABB Merge
-1. if a AABB has too few vertices then it's merged with its closest sibling
-- if all siblings have too many vertices then box gets parented upward and retry (1)
-*/
-
-
 namespace scme {
 
-	class Vertex {
+	/*
+		normal.x == 1024, normal not calculated
+		normal.y == 1024, vertex is marked as deleted
+		away_loop == 0xFFFF'FFFF, vertex is a point, not connected to anything
+	*/
+	struct Vertex {
 	public:
 		glm::vec3 pos;
 		glm::vec3 normal;
 
-		uint32_t away_loop;  // starting vertices should ha this set to 0xFFFF'FFFF
+		uint32_t away_loop;
+
+		uint32_t aabb;
+		uint32_t idx_in_aabb;
 	};
 
 
-	/*struct VertexBoundingBox {
-		VertexBoundingBox* parent;
-		std::list<VertexBoundingBox*> children;
+	struct VertexBoundingBox {
+		uint32_t parent;
+		uint32_t children[8];
 
 		AxisBoundingBox3D aabb;
 
-		std::vector<Vertex> vs;
-	};*/
+		uint32_t deleted_count;
+		std::vector<uint32_t> verts;
+	};
 
 
 	/* Half-edge data structure */
-	class Loop {
+	struct Loop {
 	public:
 		uint32_t target_v;
-		uint32_t v_prev_loop;
 		uint32_t v_next_loop;
 
 		uint32_t poly;
 		uint32_t poly_next_loop;
+		uint32_t poly_prev_loop;
 
 		uint32_t mirror_loop;
 	};
 
 
-	class Poly {
+	struct Poly {
 	public:
 		glm::vec3 normal;
 		uint32_t inner_loop;
@@ -93,9 +88,8 @@ namespace scme {
 	/* Version 3: Allocation-less primitives */
 	class SculptMesh {
 	public:
-		// std::list<VertexBoundingBox> aabbs;
-
-		// vector<uint32_t> empty_verts;
+		std::vector<VertexBoundingBox> aabbs;
+		
 		std::vector<Vertex> verts;
 
 		// vector<uint32_t> empty_edges;
@@ -104,6 +98,9 @@ namespace scme {
 		// vector<uint32_t> empty_polys;
 		std::vector<Poly> polys;
 
+		// Settings
+		uint32_t max_vertices_in_AABB;
+
 		// GPU Rendering
 		uint32_t _vertex_start;
 		uint32_t _vertex_count;
@@ -111,7 +108,11 @@ namespace scme {
 	public:
 		// Vertex ///////////////////////////////////////////////////
 
-		void calcVertexNormal(uint32_t vertex);
+		void calcVertexNormal(Vertex* vertex);
+
+		void transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
+
+		void registerVertexToAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
 
 		// addLoneVertex(GPU_Vertex new_vertex)
 		// addLoneVertices(GPU_Vertex[] new_vertices)
@@ -149,7 +150,7 @@ namespace scme {
 
 		////////////////////////////////////////////////////////////
 
-		glm::vec3 calcWindingNormal(Vertex& v0, Vertex& v1, Vertex& v2);
+		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
 		/* creates a triangle from existing vertices and edges */
 		//Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,

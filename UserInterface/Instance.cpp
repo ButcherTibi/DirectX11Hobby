@@ -344,7 +344,7 @@ ErrStack Instance::createWindow(WindowCreateInfo& info, Window*& r_window)
 		desc.BufferDesc.Height = 0;
 		desc.BufferDesc.RefreshRate.Numerator = 0;
 		desc.BufferDesc.RefreshRate.Denominator = 0;
-		desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;  // TODO: sRGB
+		desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		desc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 		desc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 		desc.SampleDesc.Count = 1;
@@ -397,7 +397,7 @@ ErrStack Instance::update()
 
 		window.delta_time = fsec_cast(std::chrono::steady_clock::now() - window.start_time);
 
-		WaitMessage();  // TODO: try thread sleep for remainder of time
+		// WaitMessage();  // TODO: try thread sleep for remainder of time
 
 		MSG msg{};
 		while (PeekMessageA(&msg, window.hwnd, 0, 0, PM_REMOVE)) {

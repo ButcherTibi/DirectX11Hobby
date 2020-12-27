@@ -163,49 +163,47 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		//	application.createCylinder(info);
 		//}
 
-		{
+		/*{
 			CreateUV_SphereInfo info;
 			info.pos = { 0, 0, 0 };
 			info.rot = { 1, 0, 0, 0 };
 			info.diameter = 1;
 
-			info.vertical_sides = 400;
-			info.horizontal_sides = 800;
+			info.vertical_sides = 100;
+			info.horizontal_sides = 100;
 
 			info.mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
 			info.albedo_color = { 1, 0, 0 };
-			info.roughness = 0.5f;
-			info.metallic = 0.0f;
+			info.roughness = 0.30f;
+			info.metallic = 0.f;
 			info.specular = 0.04f;
 
 			auto& inst = application.createUV_Sphere(info);
 
 			printf("vertex count = %ld \n", (uint32_t)inst.mesh->verts.size());
 			printf("memory size = %lld \n", inst.mesh->getMemorySizeMegaBytes());
-		}
+		}*/
 
-		/*uint32_t rows = 7;
+		uint32_t rows = 7;
 		uint32_t cols = 7;
 		for (uint32_t row = 0; row < rows; row += 1) {
 			for (uint32_t col = 0; col < cols; col += 1) {
 
 				CreateUV_SphereInfo info;
-				info.pos = { col * 2, row * 2, 0 };
-				info.rot = { 1, 0, 0, 0 };
+				info.transform.pos = { col * 2, row * 2, 0 };
 				info.diameter = 1;
 
 				info.vertical_sides = 40;
 				info.horizontal_sides = 80;
 
-				info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-				info.albedo_color = { 1, 0, 0 };
-				info.roughness = (float)col / (cols - 1);
-				info.metallic = (float)row / (rows - 1);;
-				info.specular = 0.04f;
+				info.mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
+				info.material.albedo_color = { 1, 0, 0 };
+				info.material.roughness = (float)col / (cols - 1);
+				info.material.metallic = (float)row / (rows - 1);
 
 				application.createUV_Sphere(info);
 			}
-		}*/
+		}
 
 		application.setCameraFocus(glm::vec3(0, 0, 0));
 		application.setCameraPosition(0, 0, 10);
@@ -248,8 +246,6 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	// Camera Reset
 	surface->addKeyDownEvent(onCameraResetKeyDown, nui::VirtualKeys::R);
-
-	// Camera Frame
 
 	while (!application.window->close) {
 

@@ -63,16 +63,6 @@ Wrap* NodeComp::addWrap()
 	return child_wrap;
 }
 
-Flex* NodeComp::addFlex()
-{
-	Node& child_node = window->nodes.emplace_back();
-
-	Flex* child_flex = child_node.createFlex();
-	child_flex->node_comp.window = this->window;
-
-	return child_flex;
-}
-
 Surface* NodeComp::addSurface()
 {
 	Node& child_node = window->nodes.emplace_back();
@@ -80,14 +70,11 @@ Surface* NodeComp::addSurface()
 	Surface* child_surface = child_node.createSurface();
 	child_surface->EventComp::_create(this->window, &child_node);
 	child_surface->NodeComp::_create(this->window, &child_node);
-	//child_surface->_node_comp.window = this->window;
-	//child_surface->_node_comp.this_elem = &child_node;
 	child_surface->_event.surface = child_surface;
 
 	child_surface->pos = { 0, 0 };
 	child_surface->width = 100.0f;
 	child_surface->height = 100.0f;
-	child_surface->overflow = Overflow::OVERFLOW;
 	child_surface->gpu_callback = nullptr;
 
 	// Parent ---> Child

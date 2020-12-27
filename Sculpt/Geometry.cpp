@@ -5,6 +5,17 @@
 #include <glm\ext\quaternion_transform.hpp>
 
 
+bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
+{
+	if (min.x < pos.x && pos.x < max.x &&
+		min.y < pos.y && pos.y < max.y &&
+		min.z < pos.z && pos.z < max.z)
+	{
+		return true;
+	}
+	return false;
+}
+
 bool AxisBoundingBox3D::isRayIsect(Ray& ray)
 {
 	/* From Stack exchange

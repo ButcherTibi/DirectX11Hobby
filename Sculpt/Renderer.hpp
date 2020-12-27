@@ -5,40 +5,19 @@
 #include "GPU_ShaderTypesMesh.hpp"
 
 
-/* TODO:
-- render multiple objects
-- handle large amount of objects changing by storing them inside many buffers
-so that one object changing only rewrites a single buffers
-*/
-
-
-/* Order independend depth buffering
-- assert that in each call the camera position does not change
-- set the z value in [camera pos, 1] manually 
-*/
-
-
 struct DrawMesh {
 	uint32_t vertex_start;
 	uint32_t vertex_count;
 	uint32_t instance_start;
-	// other conditional draw
 };
 
 
 // must release this before UI
 class MeshRenderer {
 public:
-	//uint32_t render_width;
-	//uint32_t render_height;
-
-	uint32_t viewport_width;
-	uint32_t viewport_height;
-
-	std::vector<GPU_MeshVertex> vertices;
-	std::vector<GPU_MeshInstance> instances;
+	float viewport_width;
+	float viewport_height;
 	std::vector<DrawMesh> mesh_draws;
-	GPU_MeshUniform uniform;
 
 	std::vector<char> mesh_vs_cso;
 	std::vector<char> mesh_ps_cso;
@@ -49,6 +28,7 @@ public:
 
 public:
 	ID3D11Device5* dev5 = nullptr;
+	ID3D11DeviceContext4* im_ctx4;
 	ID3D11DeviceContext3* de_ctx3;
 
 	ComPtr<ID3D11Texture2D> depth_tex;
@@ -70,13 +50,12 @@ public:
 	ComPtr<ID3D11DepthStencilState> mesh_dss;
 	ComPtr<ID3D11BlendState> mesh_bs;
 
-public:
-	void generateVertices();
-	void generateUniform();
+	uint32_t render_target_width;
+	uint32_t render_target_height;
 
+public:
 	ErrStack loadVertices();
 	ErrStack loadUniform();
-	// nui::ErrStack resizeAtachments();
 
 	ErrStack draw(nui::SurfaceEvent& event);
 };

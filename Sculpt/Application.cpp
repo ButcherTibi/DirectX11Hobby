@@ -115,15 +115,15 @@ MeshInstance& Application::createUV_Sphere(CreateUV_SphereInfo& info)
 
 	MeshInstance& new_instance = this->instances.emplace_back();
 	new_instance.mesh = &new_mesh;
-	new_instance.pos = info.pos;
-	new_instance.rot = info.rot;
-	new_instance.scale = info.scale;
+	new_instance.pos = info.transform.pos;
+	new_instance.rot = info.transform.rot;
+	new_instance.scale = info.transform.scale;
 
 	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.albedo_color;
-	new_instance.roughness = info.roughness;
-	new_instance.metallic = info.metallic;
-	new_instance.specular = info.specular;
+	new_instance.albedo_color = info.material.albedo_color;
+	new_instance.roughness = info.material.roughness;
+	new_instance.metallic = info.material.metallic;
+	new_instance.specular = info.material.specular;
 
 	MeshLayer& root = this->layers.front();
 	root.instances.push_back(&new_instance);

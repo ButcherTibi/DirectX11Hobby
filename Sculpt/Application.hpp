@@ -7,6 +7,27 @@
 #include "Renderer.hpp"
 
 
+/* TODO:
+- Surface Detail Rendering
+- wireframe with color
+- primitive highlighting
+- compute shader mesh deform
+- import GLTF meshes
+- save mesh to file and load from file
+- calculate vertex normals on demand
+
+// Dependent (maybe)
+- Axis Aligned Bounding Boxes
+- ray queries
+- vert groups, edge groups, poly groups
+- partial vertex buffer updates ???
+
+- frame mesh
+- handle large amount of objects changing by storing them inside many buffers
+so that one object changing only rewrites a single buffers
+*/
+
+
 /* which subprimitive holds the surface data to respond to the light */
 namespace MeshShadingSubPrimitive {
 	enum {
@@ -15,17 +36,6 @@ namespace MeshShadingSubPrimitive {
 		TESSELATION
 	};
 }
-
-//namespace MeshHighlightMode {
-//	enum : uint8_t {
-//		VERTEX = 1,
-//		NORMAL = 1 << 1,
-//		EDGE   = 1 << 2,
-//		POLY   = 1 << 3,
-//		TESS   = 1 << 4
-//	};
-//}
-
 
 /* light that is relative to the camera orientation */
 struct CameraLight {
@@ -37,16 +47,16 @@ struct CameraLight {
 
 
 struct MeshTransform {
-	glm::vec3 pos = { 0, 0, 0 };
-	glm::quat rot = { 1, 0, 0, 0 };
-	glm::vec3 scale = { 1, 1, 1 };
+	glm::vec3 pos = { .0f, .0f, .0f };
+	glm::quat rot = { 1.0f, .0f, .0f, .0f };
+	glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
 };
 
 struct PhysicalBasedMaterial {
-	glm::vec3 albedo_color = { 1, 1, 1 };
-	float roughness = 0;
-	float metallic = 0;
-	float specular = 0;
+	glm::vec3 albedo_color = { 1.0f, 1.0f, 1.0f };
+	float roughness = 0.0f;
+	float metallic = 0.0f;
+	float specular = 0.04f;
 };
 
 
@@ -118,19 +128,14 @@ struct CreateCylinderInfo {
 };
 
 struct CreateUV_SphereInfo {
-	glm::vec3 pos = { 0, 0, 0};
-	glm::quat rot = { 1, 0, 0, 0 };
-	glm::vec3 scale = { 1, 1, 1 };
+	MeshTransform transform;
 	float diameter = 1;
 
 	uint32_t vertical_sides = 2;
 	uint32_t horizontal_sides = 3;
 
 	uint32_t mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-	glm::vec3 albedo_color = { 1, 1, 1 };
-	float roughness = 0;
-	float metallic = 0;
-	float specular = 0.04f;
+	PhysicalBasedMaterial material;
 };
 
 struct GLTF_ImporterSettings {

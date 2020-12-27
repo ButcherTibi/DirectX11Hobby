@@ -11,8 +11,10 @@
 using namespace scme;
 
 
-void MeshRenderer::generateVertices()
+ErrStack MeshRenderer::loadVertices()
 {
+	ErrStack err_stack;
+
 	uint32_t vertex_count = 0;
 
 	// Count the number of vertices to rendered
@@ -28,10 +30,13 @@ void MeshRenderer::generateVertices()
 			}
 		}
 	}
-	vertices.resize(vertex_count);
 
 	// Load vertices into common buffer
+	void* vertex_buff_mem;
+	checkErrStack1(vbuff.beginLoad(vertex_count * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
+	
 	uint32_t vi = 0;
+	GPU_MeshVertex gpu_verts[6];
 
 	for (scme::SculptMesh& mesh : application.meshes) {
 
@@ -45,69 +50,82 @@ void MeshRenderer::generateVertices()
 
 			if (poly.is_tris) {
 
-				Vertex& v0 = mesh.verts[l2.target_v];
-				Vertex& v1 = mesh.verts[l0.target_v];
-				Vertex& v2 = mesh.verts[l1.target_v];
+				Vertex* v0 = &mesh.verts[l2.target_v];
+				Vertex* v1 = &mesh.verts[l0.target_v];
+				Vertex* v2 = &mesh.verts[l1.target_v];
 
-				vertices[vi].pos = dxConvert(v0.pos);
-				vertices[vi + 1].pos = dxConvert(v1.pos);
-				vertices[vi + 2].pos = dxConvert(v2.pos);
+				// Convert to GPU format
+				gpu_verts[0].pos = dxConvert(v0->pos);
+				gpu_verts[0].vertex_normal = dxConvert(v0->normal);
 
-				vertices[vi].vertex_normal = dxConvert(v0.normal);
-				vertices[vi + 1].vertex_normal = dxConvert(v1.normal);
-				vertices[vi + 2].vertex_normal = dxConvert(v2.normal);
+				gpu_verts[1].pos = dxConvert(v1->pos);
+				gpu_verts[1].vertex_normal = dxConvert(v1->normal);
+
+				gpu_verts[2].pos = dxConvert(v2->pos);
+				gpu_verts[2].vertex_normal = dxConvert(v2->normal);
 
 				auto& normal = dxConvert(poly.normal);
 
 				for (uint32_t i = 0; i < 3; i++) {
-					vertices[vi + i].tess_normal = normal;
-					vertices[vi + i].poly_normal = normal;
+					gpu_verts[i].tess_normal = normal;
+					gpu_verts[i].poly_normal = normal;
 				}
+
+				// Copy Data
+				std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + vi,
+					gpu_verts, 3 * sizeof(GPU_MeshVertex)
+				);
 
 				vi += 3;
 			}
 			else {
 				Loop& l3 = mesh.loops[l2.poly_next_loop];
 
-				Vertex& v0 = mesh.verts[l3.target_v];
-				Vertex& v1 = mesh.verts[l0.target_v];
-				Vertex& v2 = mesh.verts[l1.target_v];
-				Vertex& v3 = mesh.verts[l2.target_v];
+				Vertex* v0 = &mesh.verts[l3.target_v];
+				Vertex* v1 = &mesh.verts[l0.target_v];
+				Vertex* v2 = &mesh.verts[l1.target_v];
+				Vertex* v3 = &mesh.verts[l2.target_v];
 
 				std::array<Vertex*, 6> tess;
 
 				if (poly.tesselation_type == 0) {
 
-					tess[0] = &v0;
-					tess[1] = &v2;
-					tess[2] = &v3;
+					tess[0] = v0;
+					tess[1] = v2;
+					tess[2] = v3;
 
-					tess[3] = &v0;
-					tess[4] = &v1;
-					tess[5] = &v2;
+					tess[3] = v0;
+					tess[4] = v1;
+					tess[5] = v2;
 				}
 				else {
-					tess[0] = &v0;
-					tess[1] = &v1;
-					tess[2] = &v3;
+					tess[0] = v0;
+					tess[1] = v1;
+					tess[2] = v3;
 
-					tess[3] = &v1;
-					tess[4] = &v2;
-					tess[5] = &v3;
+					tess[3] = v1;
+					tess[4] = v2;
+					tess[5] = v3;
 				}
 
+				// Convert to GPU format
 				for (uint32_t i = 0; i < 6; i++) {
-					vertices[vi + i].pos = dxConvert(tess[i]->pos);
-					vertices[vi + i].vertex_normal = dxConvert(tess[i]->normal);
-					vertices[vi + i].poly_normal = dxConvert(poly.normal);
+					gpu_verts[i].pos = dxConvert(tess[i]->pos);
+					gpu_verts[i].vertex_normal = dxConvert(tess[i]->normal);
+					gpu_verts[i].poly_normal = dxConvert(poly.normal);
 				}
 
 				for (uint32_t i = 0; i < 3; i++) {
-					vertices[vi + i].tess_normal = dxConvert(poly.tess_normals[0]);
+					gpu_verts[i].tess_normal = dxConvert(poly.tess_normals[0]);
 				}
 				for (uint32_t i = 3; i < 6; i++) {
-					vertices[vi + i].tess_normal = dxConvert(poly.tess_normals[1]);
+					gpu_verts[i].tess_normal = dxConvert(poly.tess_normals[1]);
 				}
+
+				// Copy Data
+				std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + vi,
+					gpu_verts, 6 * sizeof(GPU_MeshVertex)
+				);
 
 				vi += 6;
 			}
@@ -116,15 +134,25 @@ void MeshRenderer::generateVertices()
 		mesh._vertex_count = vi - mesh._vertex_start;
 	}
 
-	// Load instances
-	uint32_t inst_idx = 0;
-	instances.resize(application.instances.size());
-	mesh_draws.resize(application.instances.size());
+	vbuff.endLoad();
 
-	// Create Drawcalls
+	// Load instances
+	void* insta_buff_mem;
+	checkErrStack1(instabuff.beginLoad(application.instances.size() * sizeof(GPU_MeshInstance), 0, insta_buff_mem));
+
+	mesh_draws.resize(application.instances.size());
+	uint32_t inst_idx = 0;
+	GPU_MeshInstance gpu_inst;
+
 	for (MeshInstance& mesh_instance : application.instances) {
 
-		GPU_MeshInstance& gpu_inst = instances[inst_idx];
+		// Create Drawcalls
+		DrawMesh& draw_mesh = mesh_draws[inst_idx];
+		draw_mesh.vertex_start = mesh_instance.mesh->_vertex_start;
+		draw_mesh.vertex_count = mesh_instance.mesh->_vertex_count;
+		draw_mesh.instance_start = inst_idx;
+
+		// Convert to GPU format
 		gpu_inst.pos = dxConvert(mesh_instance.pos);
 		gpu_inst.rot = dxConvert(mesh_instance.rot);
 		gpu_inst.shading_mode = mesh_instance.mesh_shading_subprimitive;
@@ -133,25 +161,27 @@ void MeshRenderer::generateVertices()
 		gpu_inst.metallic = mesh_instance.metallic;
 		gpu_inst.specular = mesh_instance.specular;
 
-		DrawMesh& draw_mesh = mesh_draws[inst_idx];
-		draw_mesh.vertex_start = mesh_instance.mesh->_vertex_start;
-		draw_mesh.vertex_count = mesh_instance.mesh->_vertex_count;
-		draw_mesh.instance_start = inst_idx;
+		// Copy Data
+		std::memcpy(((GPU_MeshInstance*)insta_buff_mem) + inst_idx,
+			&gpu_inst, sizeof(GPU_MeshInstance)
+		);
 
 		inst_idx++;
 	}
+
+	instabuff.endLoad();
+
+	return err_stack;
 }
 
-void MeshRenderer::generateUniform()
+ErrStack MeshRenderer::loadUniform()
 {
+	ErrStack err_stack;
+
+	GPU_MeshUniform uniform;
 	uniform.camera_pos = dxConvert(application.camera_pos);
 	uniform.camera_quat = dxConvert(application.camera_quat_inv);
 	uniform.camera_forward = dxConvert(application.camera_forward);
-
-	//printf("%.2f %.2f %.2f \n",
-	//	uniform.camera_forward.x,
-	//	uniform.camera_forward.y,
-	//	uniform.camera_forward.z);
 
 	/*glm::mat4x4 persp = glm::perspectiveFovRH_ZO(toRad(application.camera_field_of_view),
 		(float)viewport_width, (float)viewport_height,
@@ -181,27 +211,13 @@ void MeshRenderer::generateUniform()
 	}
 
 	uniform.ambient_intensity = application.ambient_intensity;
-}
 
-ErrStack MeshRenderer::loadVertices()
-{
-	ErrStack err_stack;
-
-	checkErrStack(vbuff.load(vertices.data(), vertices.size() * sizeof(GPU_MeshVertex)),
-		"failed to load mesh vertices");
-
-	checkErrStack(instabuff.load(instances.data(), instances.size() * sizeof(GPU_MeshInstance)),
-		"failed to load mesh instances");
-
-	return err_stack;
-}
-
-ErrStack MeshRenderer::loadUniform()
-{
-	ErrStack err_stack;
-
-	checkErrStack(ubuff.load(&uniform, sizeof(GPU_MeshUniform)),
-		"failed to load uniform buffer");
+	void* uniform_mem;
+	checkErrStack1(ubuff.beginLoad(sizeof(GPU_MeshUniform), 0, uniform_mem));
+	{
+		std::memcpy(uniform_mem, &uniform, sizeof(GPU_MeshUniform));
+	}
+	ubuff.endLoad();
 
 	return err_stack;
 }
@@ -211,23 +227,26 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	ErrStack err_stack;
 	HRESULT hr = S_OK;
 
-	viewport_width = event.surface_width;
-	viewport_height = event.surface_height;
+	this->viewport_width = (float)event.viewport_size.x;
+	this->viewport_height = (float)event.viewport_size.y;
 
 	if (dev5 == nullptr) {
 
-		// Init
 		dev5 = event.dev5;
+		im_ctx4 = event.im_ctx4;
 		de_ctx3 = event.de_ctx3;
 		
 		load_vertices = true;
 		load_uniform = true;
 
+		this->render_target_width = event.render_target_width;
+		this->render_target_height = event.render_target_height;
+
 		// Depth Resource
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = this->viewport_width;
-			desc.Height = this->viewport_height;
+			desc.Width = event.render_target_width;
+			desc.Height = event.render_target_height;
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -259,7 +278,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			vbuff.create(dev5, de_ctx3, desc);
+			vbuff.create(dev5, im_ctx4, desc);
 		}
 
 		// Instance Buffer
@@ -271,7 +290,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			instabuff.create(dev5, de_ctx3, desc);
+			instabuff.create(dev5, im_ctx4, desc);
 		}
 
 		// Uniform Buffer
@@ -283,7 +302,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			ubuff.create(dev5, de_ctx3, desc);
+			ubuff.create(dev5, im_ctx4, desc);
 		}
 
 		// Vertex Shader
@@ -329,7 +348,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Mesh Rasterization State
 		{
 			D3D11_RASTERIZER_DESC desc = {};
-			desc.FillMode = D3D11_FILL_SOLID;
+			desc.FillMode = D3D11_FILL_WIREFRAME;
 			desc.CullMode = D3D11_CULL_BACK;
 			desc.FrontCounterClockwise = false;
 			desc.DepthBias = 0;
@@ -380,24 +399,39 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	}
 
 	if (load_vertices) {
-		generateVertices();
 		checkErrStack1(loadVertices());
-
 		load_vertices = false;
 	}
 
 	if (load_uniform) {
-		generateUniform();
 		checkErrStack1(loadUniform());
-
 		load_uniform = false;
 	}
 
-	// Command List
-	de_ctx3->ClearState();
-	de_ctx3->ClearDepthStencilView(depth_view.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+	if (render_target_width != event.render_target_width ||
+		render_target_height != event.render_target_height)
+	{
+		depth_view->Release();
 
-	// for each instance draw
+		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, depth_tex));
+
+		D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
+		view_desc.Format = DXGI_FORMAT_D32_FLOAT;
+		view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+		view_desc.Texture2D.MipSlice = 0;
+
+		checkHResult(dev5->CreateDepthStencilView(depth_tex.Get(), &view_desc, depth_view.GetAddressOf()),
+			"failed to rereate mesh depth view");
+
+		checkErrStack1(loadUniform());
+		load_uniform = false;
+	}
+
+	this->render_target_width = event.render_target_width;
+	this->render_target_height = event.render_target_height;
+
+	// Command List
+	de_ctx3->ClearDepthStencilView(depth_view.Get(), D3D11_CLEAR_DEPTH, 1, 0);
 
 	for (DrawMesh& draw : mesh_draws) {
 
@@ -424,20 +458,20 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Rasterization
 		{
 			D3D11_VIEWPORT viewport;
-			viewport.TopLeftX = (float)event.pos.x;
-			viewport.TopLeftY = (float)event.pos.y;
-			viewport.Width = (float)event.surface_width;
-			viewport.Height = (float)event.surface_height;
+			viewport.TopLeftX = (float)event.viewport_pos.x;
+			viewport.TopLeftY = (float)event.viewport_pos.y;
+			viewport.Width = (float)event.viewport_size.x;
+			viewport.Height = (float)event.viewport_size.y;
 			viewport.MinDepth = 0;
 			viewport.MaxDepth = 1;
 
 			de_ctx3->RSSetViewports(1, &viewport);
 
 			D3D11_RECT sccissor;
-			sccissor.left = event.pos.x;
-			sccissor.top = event.pos.y;
-			sccissor.right = event.pos.x + event.surface_width;
-			sccissor.bottom = event.pos.y + event.surface_height;
+			sccissor.left = event.viewport_pos.x;
+			sccissor.top = event.viewport_pos.y;
+			sccissor.right = event.viewport_pos.x + event.viewport_size.x;
+			sccissor.bottom = event.viewport_pos.y + event.viewport_size.y;
 
 			de_ctx3->RSSetScissorRects(1, &sccissor);
 
@@ -453,8 +487,8 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			float blend_factor[4] = { 1, 1, 1, 1 };
 			de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-			std::array<ID3D11RenderTargetView*, 2> rtvs = {
-				event.compose_rtv, event.next_parents_clip_mask_rtv
+			std::array<ID3D11RenderTargetView*, 1> rtvs = {
+				event.compose_rtv
 			};
 
 			de_ctx3->OMSetDepthStencilState(mesh_dss.Get(), 1);
@@ -472,5 +506,5 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 ErrStack geometryDraw(nui::SurfaceEvent& event)
 {
 	MeshRenderer* r = (MeshRenderer*)event.user_data;
-	return r->draw(event);;
+	return r->draw(event);
 }

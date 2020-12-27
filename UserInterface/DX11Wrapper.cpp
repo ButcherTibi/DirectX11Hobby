@@ -7,14 +7,14 @@
 
 using namespace dx11;
 
-void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext3* context, D3D11_BUFFER_DESC& desc)
+void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext4* context, D3D11_BUFFER_DESC& desc)
 {
 	this->dev = device;
-	this->ctx = context;
+	this->im_ctx4 = context;
 	this->init_desc = desc;
 }
 
-ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_resource_idx)
+ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_res_idx)
 {
 	ErrStack err_stack;
 	HRESULT hr = S_OK;
@@ -44,14 +44,67 @@ ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_resource_idx)
 	}
 
 	D3D11_MAPPED_SUBRESOURCE mapped;
-	checkHResult(ctx->Map(buff.Get(), sub_resource_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
+	checkHResult(im_ctx4->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
 		"failed to map resource");
 
 	std::memcpy(mapped.pData, data, load_size);
 
-	ctx->Unmap(buff.Get(), sub_resource_idx);
+	im_ctx4->Unmap(buff.Get(), sub_res_idx);
 
 	return err_stack;
+}
+
+ErrStack Buffer::beginLoad(size_t total_load_size, uint32_t sub_res_idx,
+	void*& mapped_mem)
+{
+	ErrStack err_stack;
+	HRESULT hr = S_OK;
+
+	// Create New Buffer of load size
+	auto create_buff = [&]() -> ErrStack {
+
+		init_desc.ByteWidth = total_load_size;
+		checkHResult(dev->CreateBuffer(&init_desc, NULL, buff.GetAddressOf()),
+			"failed to create vertex buffer");
+
+		return ErrStack();
+	};
+
+	if (buff == nullptr) {
+		checkErrStack1(create_buff());
+	}
+	else {
+		D3D11_BUFFER_DESC desc;
+		buff->GetDesc(&desc);
+
+		if (total_load_size > desc.ByteWidth) {
+
+			buff->Release();
+			checkErrStack1(create_buff());
+		}
+	}
+
+	D3D11_MAPPED_SUBRESOURCE mapped;
+	checkHResult(im_ctx4->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
+		"failed to map resource");
+
+	this->sub_resource_idx = sub_res_idx;
+	mapped_mem = mapped.pData;
+
+	return err_stack;
+}
+
+void Buffer::endLoad()
+{
+	im_ctx4->Unmap(buff.Get(), sub_resource_idx);
+}
+
+size_t Buffer::getMemorySizeMegaBytes()
+{
+	D3D11_BUFFER_DESC desc;
+	buff->GetDesc(&desc);
+
+	return desc.ByteWidth / (1024LL * 1024);
 }
 
 ErrStack dx11::singleLoad(ID3D11DeviceContext3* ctx, ID3D11Resource* resource,

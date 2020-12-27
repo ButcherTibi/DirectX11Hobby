@@ -21,6 +21,17 @@ void SculptMesh::createAsTriangle(float size)
 	}
 
 	addTris(0, 1, 2);
+
+	VertexBoundingBox& aabb = aabbs.emplace_back();
+	aabb.parent = 0xFFFF'FFFF;
+	aabb.aabb.max = { half, half, half };
+	aabb.aabb.min = { -half, -half, -half };
+
+	aabb.deleted_count = 0;
+	aabb.verts.resize(3);
+	aabb.verts[0] = 0;
+	aabb.verts[1] = 1;
+	aabb.verts[2] = 2;
 }
 
 void SculptMesh::createAsQuad(float size)
@@ -39,6 +50,10 @@ void SculptMesh::createAsQuad(float size)
 	}
 
 	addQuad(0, 1, 2, 3);
+
+	VertexBoundingBox& aabb = aabbs.emplace_back();
+	aabb.parent = 0xFFFF'FFFF;
+	aabb.verts.resize(4);
 }
 
 /*
@@ -82,8 +97,12 @@ void SculptMesh::createAsCube(float size)
 	addQuad(3, 2, 6, 7);  // bot
 
 	for (uint8_t i = 0; i < 8; i++) {
-		calcVertexNormal(i);
+		calcVertexNormal(&verts[i]);
 	}
+
+	VertexBoundingBox& aabb = aabbs.emplace_back();
+	aabb.parent = 0xFFFF'FFFF;
+	aabb.verts.resize(8);
 }
 
 void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols, bool capped)
@@ -198,7 +217,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 	}
 
 	for (uint32_t i = 0; i < verts.size(); i++) {
-		calcVertexNormal(i);
+		calcVertexNormal(&verts[i]);
 	}
 
 	// make sure I got the counts right
@@ -317,7 +336,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 	}
 
 	for (uint32_t i = 0; i < verts.size(); i++) {
-		calcVertexNormal(i);
+		calcVertexNormal(&verts[i]);
 	}
 
 	// make sure I got the counts right
@@ -405,7 +424,13 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 
 size_t SculptMesh::getMemorySizeMegaBytes()
 {
-	size_t size_in_bytes = verts.size() * sizeof(Vertex) +
+	size_t aabbs_size = 0;
+	for (auto& aabb : aabbs) {
+		aabbs_size += aabb.verts.size() * sizeof(Vertex) +
+			sizeof(VertexBoundingBox);
+	}
+
+	size_t size_in_bytes = aabbs_size +
 		loops.size() * sizeof(Loop) +
 		polys.size() * sizeof(Poly) +
 		sizeof(SculptMesh);

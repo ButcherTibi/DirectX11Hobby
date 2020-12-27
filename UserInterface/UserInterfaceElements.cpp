@@ -125,11 +125,6 @@ Wrap* Node::createWrap()
 	return &elem.emplace<Wrap>();
 }
 
-Flex* Node::createFlex()
-{
-	return &elem.emplace<Flex>();
-}
-
 Text* Node::createText()
 {
 	return &elem.emplace<Text>();

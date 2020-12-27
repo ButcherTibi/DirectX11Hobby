@@ -254,21 +254,9 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 
 		child_ancs.width = calcSize(surf->width, ancestor.width);
 		child_ancs.height = calcSize(surf->height, ancestor.height);
-
-		// Collider Sizes and Child Clip Mask
-		if (surf->overflow == Overflow::CLIP) {
-			child_ancs.clip_width = child_ancs.width;
-			child_ancs.clip_height = child_ancs.height;
-
-			this->clip_mask_id++;
-			child_ancs.clip_mask = this->clip_mask_id;
-		}
-		else {
-			child_ancs.clip_width = ancestor.clip_width;
-			child_ancs.clip_height = ancestor.clip_height;
-
-			child_ancs.clip_mask = ancestor.clip_mask;
-		}
+		child_ancs.clip_width = ancestor.clip_width;
+		child_ancs.clip_height = ancestor.clip_height;
+		child_ancs.clip_mask = ancestor.clip_mask;
 
 		// Calculate Children
 		std::vector<DescendantProps> child_props(node->children.size());
@@ -319,9 +307,8 @@ void Window::_calculateLayoutAndDrawcalls(Node* node, AncestorProps& ancestor,
 
 		// Drawcall
 		SurfaceEvent& event = surf->_event;
-		event.pos = { surf->pos.x, surf->pos.y };
-		event.size = { r_descendant.width, r_descendant.height };
-		event.child_clip_id = child_ancs.clip_mask;
+		event.viewport_pos = { surf->pos.x, surf->pos.y };
+		event.viewport_size = { r_descendant.width, r_descendant.height };
 
 		// Calculate Event Collider
 		node->collider.x0 = surf->pos.x;
@@ -364,10 +351,11 @@ void Window::_calcGlobalPositions(Node* node, glm::uvec2 pos)
 	case ElementType::SURFACE: {
 		Surface* surface = std::get_if<Surface>(&node->elem);
 
-		surface->_event.pos += pos;
+		surface->_event.viewport_pos += pos;
 
 		for (Node* child : node->children) {
-			_calcGlobalPositions(child, { surface->_event.pos.x, surface->_event.pos.y });
+			_calcGlobalPositions(child, 
+				{ surface->_event.viewport_pos.x, surface->_event.viewport_pos.y });
 		}
 		break;
 	}
@@ -632,13 +620,17 @@ ErrStack Window::_resizeAllAtachments()
 	next_parents_clip_mask_srv->Release();
 
 	// Present Images
-	present_img->Release();
-	checkHResult(swapchain->ResizeBuffers(2, width, height,
-		DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH),
-		"failed to resize swapchain back buffers");
+	{
+		DXGI_SWAP_CHAIN_DESC desc;
+		checkHResult(swapchain->GetDesc(&desc), "");
 
-	checkHResult(swapchain->GetBuffer(0, IID_PPV_ARGS(present_img.GetAddressOf())),
-		"failed to get swapchain back buffer");
+		present_img->Release();
+		checkHResult(swapchain->ResizeBuffers(2, width, height, desc.BufferDesc.Format, desc.Flags),
+			"failed to resize swapchain back buffers");
+
+		checkHResult(swapchain->GetBuffer(0, IID_PPV_ARGS(present_img.GetAddressOf())),
+			"failed to get swapchain back buffer");
+	}
 
 	// Images
 	checkErrStack1(dx11::resizeTexture2D(dev5.Get(), surface_width, surface_height, parents_clip_mask_img));
@@ -834,25 +826,25 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_vbuff.create(dev5.Get(), de_ctx3.Get(), desc);
-			checkErrStack1(wrap_vbuff.load(wrap_verts.data(), sizeof(GPU_WrapVertex) * wrap_verts.size()));
+			wrap_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			checkErrStack1(wrap_vbuff.load(wrap_verts.data(), sizeof(GPU_WrapVertex)* wrap_verts.size()));
 
-			chars_vbuff.create(dev5.Get(), de_ctx3.Get(), desc);
+			chars_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
 		}
 
 		// Index Buffers
 		{
-			D3D11_BUFFER_DESC desc = {};
-			desc.Usage = D3D11_USAGE_DYNAMIC;
-			desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-			desc.MiscFlags = 0;
-			desc.StructureByteStride = 0;
+		D3D11_BUFFER_DESC desc = {};
+		desc.Usage = D3D11_USAGE_DYNAMIC;
+		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		desc.MiscFlags = 0;
+		desc.StructureByteStride = 0;
 
-			wrap_idxbuff.create(dev5.Get(), de_ctx3.Get(), desc);
-			checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), sizeof(uint16_t) * wrap_idxs.size()));
+		wrap_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+		checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), sizeof(uint16_t)* wrap_idxs.size()));
 
-			chars_idxbuff.create(dev5.Get(), de_ctx3.Get(), desc);
+		chars_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
 		}
 
 		// Instance Buffers
@@ -864,8 +856,8 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_instabuff.create(dev5.Get(), de_ctx3.Get(), desc);
-			chars_instabuff.create(dev5.Get(), de_ctx3.Get(), desc);
+			wrap_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			chars_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
 		}
 
 		// Constant Buffer
@@ -877,7 +869,7 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			cbuff.create(dev5.Get(), de_ctx3.Get(), desc);
+			cbuff.create(dev5.Get(), im_ctx4.Get(), desc);
 		}
 
 		// Character Atlas
@@ -928,13 +920,15 @@ ErrStack Window::_render()
 	}
 
 	// Window Resize
-	DXGI_SWAP_CHAIN_DESC swapchain_desc;
-	swapchain->GetDesc(&swapchain_desc);
-
-	if (surface_width != swapchain_desc.BufferDesc.Width ||
-		surface_height != swapchain_desc.BufferDesc.Height)
 	{
-		checkErrStack1(_resizeAllAtachments());
+		DXGI_SWAP_CHAIN_DESC swapchain_desc;
+		swapchain->GetDesc(&swapchain_desc);
+
+		if (surface_width != swapchain_desc.BufferDesc.Width ||
+			surface_height != swapchain_desc.BufferDesc.Height)
+		{
+			checkErrStack1(_resizeAllAtachments());
+		}
 	}
 
 	checkErrStack1(_loadCPU_DataToGPU());
@@ -960,8 +954,8 @@ ErrStack Window::_render()
 	D3D11_VIEWPORT viewport = {};
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
-	viewport.Width = (float)swapchain_desc.BufferDesc.Width;
-	viewport.Height = (float)swapchain_desc.BufferDesc.Height;
+	viewport.Width = (float)surface_width;
+	viewport.Height = (float)surface_height;
 	viewport.MinDepth = 0;
 	viewport.MaxDepth = 1;
 
@@ -1082,15 +1076,14 @@ ErrStack Window::_render()
 					break;
 				}
 
-				surf->_event.surface_width = swapchain_desc.BufferDesc.Width;
-				surf->_event.surface_height = swapchain_desc.BufferDesc.Height;
-
 				surf->_event.user_data = surf->user_data;
 				surf->_event.dev5 = dev5.Get();
+				surf->_event.im_ctx4 = im_ctx4.Get();
 				surf->_event.de_ctx3 = de_ctx3.Get();
 
+				surf->_event.render_target_width = surface_width;
+				surf->_event.render_target_height = surface_height;
 				surf->_event.compose_rtv = present_rtv.Get();
-				surf->_event.next_parents_clip_mask_rtv = next_parents_clip_mask_rtv.Get();
 
 				checkErrStack(surf->gpu_callback(surf->_event),
 					"surface GPU time callback error");

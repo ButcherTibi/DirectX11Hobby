@@ -4,6 +4,11 @@
 #include <chrono>
 
 
+/* TODO:
+- add shortcuts
+*/
+
+
 using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
 
 
@@ -166,7 +171,5 @@ namespace nui {
 		bool removeKeyDownEvent(uint32_t key);
 		bool removeKeyHeldDownEvent(uint32_t key);
 		bool removeKeyUpEvent(uint32_t key);
-
-		// TODO: add shortcuts
 	};
 }

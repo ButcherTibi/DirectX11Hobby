@@ -129,6 +129,7 @@ struct GPU_MeshUniform {
 	GPU_CameraLight lights[8];
 	//--------------------------------
 	float ambient_intensity;
+	uint32_t _pad_3[3];
 };
 
 #pragma pack()

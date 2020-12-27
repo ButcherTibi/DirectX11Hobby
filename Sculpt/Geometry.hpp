@@ -22,6 +22,7 @@ public:
 	glm::vec3 max;
 
 public:
+	bool isPositionInside(glm::vec3& pos);
 	bool isRayIsect(Ray& ray);
 	// bool isSphereIsect();
 };

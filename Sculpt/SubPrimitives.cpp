@@ -8,18 +8,18 @@
 using namespace scme;
 
 
-void SculptMesh::calcVertexNormal(uint32_t v)
+void SculptMesh::calcVertexNormal(Vertex* vertex)
 {
-	Vertex& vertex = verts[v];
+	// Vertex& vertex = verts[v];
 
-	if (vertex.away_loop == 0xFFFF'FFFF) {
+	if (vertex->away_loop == 0xFFFF'FFFF) {
 		return;
 	}
 
 	uint32_t count = 0;
-	vertex.normal = { 0, 0, 0 };
+	vertex->normal = { 0, 0, 0 };
 
-	uint32_t loop_idx = vertex.away_loop;
+	uint32_t loop_idx = vertex->away_loop;
 	Loop* loop = &loops[loop_idx];
 
 	// Iterate around Vertex
@@ -32,7 +32,7 @@ void SculptMesh::calcVertexNormal(uint32_t v)
 
 			do {
 				count++;
-				vertex.normal += polys[mirror_loop->poly].normal;
+				vertex->normal += polys[mirror_loop->poly].normal;
 
 				mirror_loop_idx = mirror_loop->mirror_loop;
 				mirror_loop = &loops[mirror_loop_idx];
@@ -43,10 +43,199 @@ void SculptMesh::calcVertexNormal(uint32_t v)
 		loop_idx = loop->v_next_loop;
 		loop = &loops[loop_idx];
 	}
-	while (loop_idx != vertex.away_loop);
+	while (loop_idx != vertex->away_loop);
 
-	vertex.normal /= count;
-	vertex.normal = glm::normalize(vertex.normal);
+	vertex->normal /= count;
+	vertex->normal = glm::normalize(vertex->normal);
+}
+
+void SculptMesh::transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
+{
+	Vertex* vertex = &verts[v];
+	VertexBoundingBox& destination_aabb = aabbs[dest_aabb];
+
+	// remove from old AABB
+	if (vertex->aabb != 0xFFFF'FFFF) {
+
+		VertexBoundingBox& source_aabb = aabbs[vertex->aabb];
+
+		source_aabb.deleted_count -= 1;
+		source_aabb.verts[vertex->idx_in_aabb] = 0xFFFF'FFFF;
+	}
+
+	vertex->aabb = dest_aabb;
+	vertex->idx_in_aabb = destination_aabb.verts.size();
+	destination_aabb.verts.push_back(v);
+}
+
+void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
+{
+	Vertex& vertex = verts[vertex_idx];
+
+	uint32_t now_count = 1;
+	uint32_t now_aabbs[64];
+
+	uint32_t next_count = 0;
+	uint32_t next_aabbs[64];
+
+	now_aabbs[0] = start_aabb;
+
+	do {
+		for (uint32_t i = 0; i < now_count; i++) {
+
+			uint32_t aabb_idx = now_aabbs[i];
+			VertexBoundingBox& aabb = aabbs[aabb_idx];
+
+			if (aabb.aabb.isPositionInside(vertex.pos)) {
+
+				uint32_t child_vertex_count = aabb.verts.size() - aabb.deleted_count;
+
+				// Leaf
+				if (child_vertex_count) {
+
+					// leaf not full
+					if (child_vertex_count < max_vertices_in_AABB) {
+
+						transferVertexToAABB(vertex_idx, aabb_idx);
+						return;
+					}
+					// Subdivide
+					else {
+						uint32_t idx = aabbs.size();
+						aabbs.resize(aabbs.size() + 8);
+
+						glm::vec3& min = aabb.aabb.min;
+						glm::vec3& max = aabb.aabb.max;
+
+						float x_mid = (aabb.aabb.max.x + aabb.aabb.min.x) / 2.0f;
+						float y_mid = (aabb.aabb.max.y + aabb.aabb.min.y) / 2.0f;
+						float z_mid = (aabb.aabb.max.z + aabb.aabb.min.z) / 2.0f;
+
+						/*	Top Down View
+								   +------+------+   ^
+								  /      /      /    |
+								 /  0   /  1   /     Z X---->
+								+------+------+
+							   /      /      /       Y is Up
+							  /   2  /   3  /        -Z is Forward
+							 +------+------+         X is Right
+						*/
+
+						{
+							// Top Forward Left
+							AxisBoundingBox3D& box_0 = aabbs[idx].aabb;
+							box_0.max = { x_mid, max.y, max.z };
+							box_0.min = { min.x, y_mid, z_mid };
+
+							// Top Forward Right
+							AxisBoundingBox3D& box_1 = aabbs[idx + 1].aabb;
+							box_1.max = { max.x, max.y, max.z };
+							box_1.min = { x_mid, y_mid, z_mid };
+
+							// Top Backward Left
+							AxisBoundingBox3D& box_2 = aabbs[idx + 2].aabb;
+							box_2.max = { x_mid, max.y, z_mid };
+							box_2.min = { min.x, y_mid, min.z };
+
+							// Top Backward Right
+							AxisBoundingBox3D& box_3 = aabbs[idx + 3].aabb;
+							box_3.max = { max.x, max.y, z_mid };
+							box_3.min = { x_mid, y_mid, min.z };
+						}
+
+						{
+							// Bot Forward Left
+							AxisBoundingBox3D& box_0 = aabbs[idx + 4].aabb;
+							box_0.max = { x_mid, y_mid, max.z };
+							box_0.min = { min.x, min.y, z_mid };
+
+							// Bot Forward Right
+							AxisBoundingBox3D& box_1 = aabbs[idx + 5].aabb;
+							box_1.max = { max.x, y_mid, max.z };
+							box_1.min = { x_mid, min.y, z_mid };
+
+							// Bot Backward Left
+							AxisBoundingBox3D& box_2 = aabbs[idx + 6].aabb;
+							box_2.max = { x_mid, y_mid, z_mid };
+							box_2.min = { min.x, min.y, min.z };
+
+							// Bot Backward Right
+							AxisBoundingBox3D& box_3 = aabbs[idx + 7].aabb;
+							box_3.max = { max.x, y_mid, z_mid };
+							box_3.min = { x_mid, min.y, min.z };
+						}
+
+						bool found = false;
+
+						for (uint8_t i = 0; i < 8; i++) {
+
+							uint32_t child_aabb_idx = idx + i;
+							aabb.children[i] = child_aabb_idx;
+
+							VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
+							child_aabb.parent = aabb_idx;
+							child_aabb.deleted_count = 0;
+							child_aabb.verts.reserve(max_vertices_in_AABB / 4);
+
+							// transfer the vertex to one of child AABBs
+							if (!found && child_aabb.aabb.isPositionInside(vertex.pos)) {
+
+								vertex.aabb = child_aabb_idx;
+								vertex.idx_in_aabb = child_aabb.verts.size();
+
+								child_aabb.verts.push_back(vertex_idx);
+								found = true;
+							}
+						}
+
+						// transfer the rest of vertices of the parent to children
+						for (uint32_t aabb_vertex_idx : aabb.verts) {
+
+							Vertex& aabb_vertex = verts[aabb_vertex_idx];
+
+							for (uint8_t i = 0; i < 8; i++) {
+
+								uint32_t child_aabb_idx = idx + i;
+								VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
+
+								if (child_aabb.aabb.isPositionInside(aabb_vertex.pos)) {
+
+									aabb_vertex.aabb = child_aabb_idx;
+									aabb_vertex.idx_in_aabb = child_aabb.verts.size();
+
+									child_aabb.verts.push_back(aabb_vertex_idx);
+									break;
+								}
+							}
+						}
+
+						// remove vertices from parent
+						aabb.deleted_count = 0;
+						aabb.verts.clear();
+						return;
+					}
+				}
+				// Schedule recursive call
+				else {
+					for (uint8_t i = 0; i < 8; i++) {
+						next_aabbs[next_count] = aabb.children[i];
+						next_count++;
+					}
+				}
+			}
+		}
+
+		std::memcpy(now_aabbs, next_aabbs, 8 * sizeof(uint32_t));
+		now_count = next_count;
+		next_count = 0;
+
+		// TODO: 
+		// searched_aabbs.push_back(now_aabbs[0].parent)
+		// now_aabbs.push_back(now_aabbs[0].parent.parent)
+		// 
+		// if aabb not in searched_aabbs then . . .
+	}
+	while (now_count);
 }
 
 uint32_t SculptMesh::findLoopFromTo(uint32_t src_v, uint32_t target_v)
@@ -195,10 +384,6 @@ glm::vec3 calcNormalForTrisPositions(Vertex* v0, Vertex* v1, Vertex* v2)
 //	return addEdge(v0, v1);
 //}
 
-/* existing ----------> next
-				new---> next
-   existing --->new
-   existing --->new---> next */
 void SculptMesh::registerLoopToSourceVertexList(uint32_t away_loop_idx, uint32_t vertex_idx)
 {
 	Loop& new_loop = loops[away_loop_idx];
@@ -210,28 +395,19 @@ void SculptMesh::registerLoopToSourceVertexList(uint32_t away_loop_idx, uint32_t
 		vertex.away_loop = away_loop_idx;
 
 		new_loop.v_next_loop = away_loop_idx;
-		new_loop.v_prev_loop = away_loop_idx;
 	}
 	else {
 		Loop& old_loop = loops[vertex.away_loop];
 		Loop& next_loop = loops[old_loop.v_next_loop];
 
-		// old <--- new ---> next
+		// new ---> next
 		new_loop.v_next_loop = old_loop.v_next_loop;
-		new_loop.v_prev_loop = vertex.away_loop;
 
 		// old ---> new
 		old_loop.v_next_loop = away_loop_idx;
-
-		// new <--- next
-		next_loop.v_prev_loop = away_loop_idx;
 	}
 }
 
-/* existing ----------> next
-				new---> next
-   existing --->new
-   existing --->new---> next */
 void SculptMesh::registerLoopToMirrorLoopList(uint32_t new_loop_idx, uint32_t existing_loop_idx)
 {
 	Loop& new_loop = loops[new_loop_idx];
@@ -263,7 +439,6 @@ uint32_t SculptMesh::setLoop(uint32_t loop, uint32_t src_v, uint32_t target_v)
 
 		new_loop->target_v = target_v;
 		new_loop->v_next_loop = new_loop_idx;
-		new_loop->v_prev_loop = new_loop_idx;
 	}
 
 	registerLoopToSourceVertexList(new_loop_idx, src_v);
@@ -307,7 +482,6 @@ uint32_t SculptMesh::addLoop(uint32_t src_v, uint32_t target_v)
 
 		new_loop->target_v = target_v;
 		new_loop->v_next_loop = new_loop_idx;
-		new_loop->v_prev_loop = new_loop_idx;
 	}
 
 	registerLoopToSourceVertexList(new_loop_idx, src_v);
@@ -329,9 +503,9 @@ uint32_t SculptMesh::addLoop(uint32_t src_v, uint32_t target_v)
 	return new_loop_idx;
 }
 
-glm::vec3 SculptMesh::calcWindingNormal(Vertex& v0, Vertex& v1, Vertex& v2)
+glm::vec3 SculptMesh::calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2)
 {
-	return -glm::normalize(glm::cross(v1.pos - v0.pos, v2.pos - v0.pos));
+	return -glm::normalize(glm::cross(v1->pos - v0->pos, v2->pos - v0->pos));
 }
 
 //Poly& SculptMesh::addTris(Vertex& v0, Vertex& v1, Vertex& v2,
@@ -374,17 +548,22 @@ uint32_t SculptMesh::addTris(uint32_t v0, uint32_t v1, uint32_t v2)
 
 	// Register poly to loops
 	ls[0]->poly_next_loop = ls_idx[1];
+	ls[0]->poly_prev_loop = ls_idx[2];
+
 	ls[1]->poly_next_loop = ls_idx[2];
+	ls[1]->poly_prev_loop = ls_idx[0];
+
 	ls[2]->poly_next_loop = ls_idx[0];
+	ls[2]->poly_prev_loop = ls_idx[1];
 
 	for (uint8_t i = 0; i < 3; i++) {
 		ls[i]->poly = new_poly_idx;
 	}
 
 	// Calculate quad normals
-	Vertex& vertex_0 = verts[ls[0]->target_v];
-	Vertex& vertex_1 = verts[ls[1]->target_v];
-	Vertex& vertex_2 = verts[ls[2]->target_v];
+	Vertex* vertex_0 = &verts[ls[0]->target_v];
+	Vertex* vertex_1 = &verts[ls[1]->target_v];
+	Vertex* vertex_2 = &verts[ls[2]->target_v];
 
 	new_poly.normal = calcWindingNormal(vertex_0, vertex_1, vertex_2);
 	new_poly.inner_loop = ls_idx[0];
@@ -413,21 +592,28 @@ void SculptMesh::setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, u
 
 	// Register poly to loops
 	ls[0]->poly_next_loop = ls_idx[1];
+	ls[0]->poly_prev_loop = ls_idx[3];
+
 	ls[1]->poly_next_loop = ls_idx[2];
+	ls[1]->poly_prev_loop = ls_idx[0];
+
 	ls[2]->poly_next_loop = ls_idx[3];
+	ls[2]->poly_prev_loop = ls_idx[1];
+
 	ls[3]->poly_next_loop = ls_idx[0];
+	ls[3]->poly_prev_loop = ls_idx[2];
 
 	for (uint8_t i = 0; i < 4; i++) {
 		ls[i]->poly = new_poly_idx;
 	}
 
 	// Calculate quad normals
-	Vertex& vertex_0 = verts[ls[0]->target_v];
-	Vertex& vertex_1 = verts[ls[1]->target_v];
-	Vertex& vertex_2 = verts[ls[2]->target_v];
-	Vertex& vertex_3 = verts[ls[3]->target_v];
+	Vertex*vertex_0 = &verts[ls[0]->target_v];
+	Vertex*vertex_1 = &verts[ls[1]->target_v];
+	Vertex*vertex_2 = &verts[ls[2]->target_v];
+	Vertex*vertex_3 = &verts[ls[3]->target_v];
 
-	if (glm::distance(vertex_0.pos, vertex_2.pos) < glm::distance(vertex_1.pos, vertex_3.pos)) {
+	if (glm::distance(vertex_0->pos, vertex_2->pos) < glm::distance(vertex_1->pos, vertex_3->pos)) {
 
 		new_poly.tesselation_type = 0;
 		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_2);
@@ -472,12 +658,12 @@ uint32_t SculptMesh::addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3)
 	}
 
 	// Calculate quad normals
-	Vertex& vertex_0 = verts[ls[0]->target_v];
-	Vertex& vertex_1 = verts[ls[1]->target_v];
-	Vertex& vertex_2 = verts[ls[2]->target_v];
-	Vertex& vertex_3 = verts[ls[3]->target_v];
+	Vertex* vertex_0 = &verts[ls[0]->target_v];
+	Vertex* vertex_1 = &verts[ls[1]->target_v];
+	Vertex* vertex_2 = &verts[ls[2]->target_v];
+	Vertex* vertex_3 = &verts[ls[3]->target_v];
 
-	if (glm::distance(vertex_0.pos, vertex_2.pos) < glm::distance(vertex_1.pos, vertex_3.pos)) {
+	if (glm::distance(vertex_0->pos, vertex_2->pos) < glm::distance(vertex_1->pos, vertex_3->pos)) {
 
 		new_poly.tesselation_type = 0;
 		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_2);

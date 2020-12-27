@@ -7,7 +7,6 @@ namespace nui {
 	class Node;
 	class Text;
 	class Wrap;
-	class Flex;
 	class Surface;
 
 
@@ -21,7 +20,6 @@ namespace nui {
 
 		Text* addText();
 		Wrap* addWrap();
-		Flex* addFlex();
 		Surface* addSurface();
 	};
 

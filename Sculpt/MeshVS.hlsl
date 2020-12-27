@@ -32,6 +32,7 @@ cbuffer Uniform : register(b0)
 	float z_far;
 	
 	CameraLight lights[4];
+	float ambient_intensity;
 };
 
 struct VertexOut

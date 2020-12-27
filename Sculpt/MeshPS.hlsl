@@ -28,7 +28,7 @@ cbuffer Uniform : register(b0)
 	float z_far;
 	
 	CameraLight lights[8];
-	float3 ambient_intensity;
+	float ambient_intensity;
 };
 
 
@@ -141,7 +141,7 @@ float4 main(VertexInput input) : SV_TARGET
 	}
 	
 	float3 ambient = ambient_intensity * input.albedo_color;
-	float3 color = ambient + Lo;
+	float3 color = Lo + ambient;
 	
-	return float4(color, 1);
+	return float4(color, 1.);
 }
