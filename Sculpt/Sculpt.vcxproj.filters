@@ -41,6 +41,9 @@
     <Filter Include="Source Files\Geometry">
       <UniqueIdentifier>{fe002ff6-eeae-47dc-a8eb-1e22d760637f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\Wireframe">
+      <UniqueIdentifier>{105ac79a-fc73-4fb7-8f16-dbc1fd1550be}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Primitives.cpp">
@@ -130,6 +133,9 @@
     </FxCompile>
     <FxCompile Include="MeshPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="DimWireframePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

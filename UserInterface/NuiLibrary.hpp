@@ -142,7 +142,7 @@ namespace nui {
 
 		// Resource
 		ID3D11Device5* dev5;
-		ID3D11DeviceContext4* im_ctx4;
+		ID3D11DeviceContext3* im_ctx3;
 		ID3D11DeviceContext3* de_ctx3;
 
 		uint32_t render_target_width;
@@ -263,7 +263,7 @@ namespace nui {
 		ComPtr<ID3D11Device5> dev5;
 		ComPtr<ID3D11DeviceContext3> de_ctx3;
 		ComPtr<ID3D11DeviceContext> _im_ctx;
-		ComPtr<ID3D11DeviceContext4> im_ctx4;
+		ComPtr<ID3D11DeviceContext3> im_ctx3;
 		ComPtr<IDXGISwapChain> swapchain;
 
 		ComPtr<ID3D11Texture2D> present_img;

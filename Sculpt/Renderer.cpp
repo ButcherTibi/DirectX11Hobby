@@ -15,161 +15,318 @@ ErrStack MeshRenderer::loadVertices()
 {
 	ErrStack err_stack;
 
-	uint32_t vertex_count = 0;
+	uint32_t mesh_vi = 0;
+	uint32_t mesh_insta_idx = 0;
+	uint32_t aabb_vi = 0;
+	uint32_t aabb_idx = 0;
 
-	// Count the number of vertices to rendered
-	for (scme::SculptMesh& mesh : application.meshes) {
+	// Count
+	{
+		for (MeshDrawcall& drawcall : application.drawcalls) {
 
-		for (Poly& poly : mesh.polys) {
+			for (MeshInstanceSet& mesh_instances : drawcall.mesh_instance_sets) {
 
-			if (poly.is_tris) {
-				vertex_count += 3;
-			}
-			else {
-				vertex_count += 6;
+				SculptMesh& mesh = mesh_instances.mesh->mesh;
+
+				for (Poly& poly : mesh.polys) {
+
+					if (poly.is_tris) {
+						mesh_vi += 3;
+					}
+					else {
+						mesh_vi += 6;
+					}
+				}
+
+				mesh_insta_idx += mesh_instances.instances.size();
+				aabb_vi += mesh.aabbs.size() * 8;
+				aabb_idx += mesh.aabbs.size() * 36;
 			}
 		}
 	}
 
-	// Load vertices into common buffer
 	void* vertex_buff_mem;
-	checkErrStack1(vbuff.beginLoad(vertex_count * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
+	void* mesh_instabuff_mem;
+	if (mesh_vi) {
+		checkErrStack1(vbuff.beginLoad(mesh_vi * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
+		checkErrStack1(instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), 0, mesh_instabuff_mem));
+	}
 	
-	uint32_t vi = 0;
+	void* aabb_vbuff_mem;
+	void* aabb_ibuff_mem;
+	if (aabb_vi) {
+		checkErrStack1(aabbs_vbuff.beginLoad(aabb_vi * sizeof(GPU_AABB_Vertex), 0, aabb_vbuff_mem));
+		checkErrStack1(aabbs_ibuff.beginLoad(aabb_idx * sizeof(uint32_t), 0, aabb_ibuff_mem));
+	}
+
+	mesh_vi = 0;
+	mesh_insta_idx = 0;
+	aabb_vi = 0;
+	aabb_idx = 0;
+
 	GPU_MeshVertex gpu_verts[6];
+	GPU_AABB_Vertex gpu_aabb_verts[8];
+	uint32_t gpu_aabb_indexes[36];
+	GPU_MeshInstance gpu_inst;	
 
-	for (scme::SculptMesh& mesh : application.meshes) {
+	for (MeshDrawcall& drawcall : application.drawcalls) {
+		
+		for (MeshInstanceSet& mesh_instances : drawcall.mesh_instance_sets) {
 
-		mesh._vertex_start = vi;
+			MeshInBuffers* mesh_in_buff = mesh_instances.mesh;
+			SculptMesh& mesh = mesh_in_buff->mesh;
 
-		for (Poly& poly : mesh.polys) {
+			// Load mesh vertices
+			if (mesh_in_buff->mesh_vertex_start == 0xFFFF'FFFF) {
 
-			Loop& l0 = mesh.loops[poly.inner_loop];
-			Loop& l1 = mesh.loops[l0.poly_next_loop];
-			Loop& l2 = mesh.loops[l1.poly_next_loop];
+				mesh_in_buff->mesh_vertex_start = mesh_vi;
 
-			if (poly.is_tris) {
+				for (Poly& poly : mesh.polys) {
 
-				Vertex* v0 = &mesh.verts[l2.target_v];
-				Vertex* v1 = &mesh.verts[l0.target_v];
-				Vertex* v2 = &mesh.verts[l1.target_v];
+					Loop& l0 = mesh.loops[poly.inner_loop];
+					Loop& l1 = mesh.loops[l0.poly_next_loop];
+					Loop& l2 = mesh.loops[l1.poly_next_loop];
 
-				// Convert to GPU format
-				gpu_verts[0].pos = dxConvert(v0->pos);
-				gpu_verts[0].vertex_normal = dxConvert(v0->normal);
+					if (poly.is_tris) {
 
-				gpu_verts[1].pos = dxConvert(v1->pos);
-				gpu_verts[1].vertex_normal = dxConvert(v1->normal);
+						Vertex* v0 = &mesh.verts[l2.target_v];
+						Vertex* v1 = &mesh.verts[l0.target_v];
+						Vertex* v2 = &mesh.verts[l1.target_v];
 
-				gpu_verts[2].pos = dxConvert(v2->pos);
-				gpu_verts[2].vertex_normal = dxConvert(v2->normal);
+						// Convert to GPU format
+						gpu_verts[0].pos = dxConvert(v0->pos);
+						gpu_verts[1].pos = dxConvert(v1->pos);
+						gpu_verts[2].pos = dxConvert(v2->pos);
 
-				auto& normal = dxConvert(poly.normal);
+						switch (application.shading_normal) {
+						case ShadingNormal::VERTEX: {
+							gpu_verts[0].normal = dxConvert(v0->normal);
+							gpu_verts[1].normal = dxConvert(v1->normal);
+							gpu_verts[2].normal = dxConvert(v2->normal);
+							break;
+						}
+						case ShadingNormal::POLY:
+						case ShadingNormal::TESSELATION: {
+							gpu_verts[0].normal = dxConvert(poly.normal);
+							gpu_verts[1].normal = dxConvert(poly.normal);
+							gpu_verts[2].normal = dxConvert(poly.normal);
+							break;
+						}
+						}
 
-				for (uint32_t i = 0; i < 3; i++) {
-					gpu_verts[i].tess_normal = normal;
-					gpu_verts[i].poly_normal = normal;
+						// Copy Data
+						std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + mesh_vi,
+							gpu_verts, 3 * sizeof(GPU_MeshVertex)
+						);
+
+						mesh_vi += 3;
+					}
+					else {
+						Loop& l3 = mesh.loops[l2.poly_next_loop];
+
+						Vertex* v0 = &mesh.verts[l3.target_v];
+						Vertex* v1 = &mesh.verts[l0.target_v];
+						Vertex* v2 = &mesh.verts[l1.target_v];
+						Vertex* v3 = &mesh.verts[l2.target_v];
+
+						std::array<Vertex*, 6> tess;
+
+						if (poly.tesselation_type == 0) {
+
+							tess[0] = v0;
+							tess[1] = v2;
+							tess[2] = v3;
+
+							tess[3] = v0;
+							tess[4] = v1;
+							tess[5] = v2;
+						}
+						else {
+							tess[0] = v0;
+							tess[1] = v1;
+							tess[2] = v3;
+
+							tess[3] = v1;
+							tess[4] = v2;
+							tess[5] = v3;
+						}
+
+						// Convert to GPU format
+						for (uint8_t i = 0; i < 6; i++) {
+							gpu_verts[i].pos = dxConvert(tess[i]->pos);
+						}
+
+						switch (application.shading_normal) {
+						case ShadingNormal::VERTEX: {
+							for (uint8_t i = 0; i < 6; i++) {
+								gpu_verts[i].normal = dxConvert(tess[i]->normal);
+							}
+							break;
+						}
+						case ShadingNormal::POLY: {
+							for (uint8_t i = 0; i < 6; i++) {
+								gpu_verts[i].normal = dxConvert(poly.normal);
+							}
+							break;
+						}
+						case ShadingNormal::TESSELATION: {
+							gpu_verts[0].normal = dxConvert(poly.tess_normals[0]);
+							gpu_verts[1].normal = dxConvert(poly.tess_normals[0]);
+							gpu_verts[2].normal = dxConvert(poly.tess_normals[0]);
+							gpu_verts[3].normal = dxConvert(poly.tess_normals[1]);
+							gpu_verts[4].normal = dxConvert(poly.tess_normals[1]);
+							gpu_verts[5].normal = dxConvert(poly.tess_normals[1]);
+							break;
+						}
+						}
+
+						// Copy Data
+						std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + mesh_vi,
+							gpu_verts, 6 * sizeof(GPU_MeshVertex)
+						);
+
+						mesh_vi += 6;
+					}
 				}
 
-				// Copy Data
-				std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + vi,
-					gpu_verts, 3 * sizeof(GPU_MeshVertex)
-				);
-
-				vi += 3;
+				mesh_in_buff->mesh_vertex_count = mesh_vi - mesh_in_buff->mesh_vertex_start;
 			}
-			else {
-				Loop& l3 = mesh.loops[l2.poly_next_loop];
 
-				Vertex* v0 = &mesh.verts[l3.target_v];
-				Vertex* v1 = &mesh.verts[l0.target_v];
-				Vertex* v2 = &mesh.verts[l1.target_v];
-				Vertex* v3 = &mesh.verts[l2.target_v];
+			// Load AABBs vertices
+			if (drawcall.show_aabbs && mesh_in_buff->aabb_vertex_start == 0xFFFF'FFFF)
+			{
+				mesh_in_buff->aabb_vertex_start = aabb_vi;
+				mesh_in_buff->aabb_index_start = aabb_idx;
 
-				std::array<Vertex*, 6> tess;
+				for (VertexBoundingBox& aabb : mesh.aabbs) {
 
-				if (poly.tesselation_type == 0) {
+					glm::vec3& min = aabb.aabb.min;
+					glm::vec3& max = aabb.aabb.max;
 
-					tess[0] = v0;
-					tess[1] = v2;
-					tess[2] = v3;
+					// Forward (Classic winding)
+					gpu_aabb_verts[0].pos = dxConvert(glm::vec3{ min.x, max.y, max.z });  // top left
+					gpu_aabb_verts[1].pos = dxConvert(glm::vec3{ max.x, max.y, max.z });  // top right
+					gpu_aabb_verts[2].pos = dxConvert(glm::vec3{ max.x, min.y, max.z });  // bot right
+					gpu_aabb_verts[3].pos = dxConvert(glm::vec3{ min.x, min.y, max.z });  // bot left
 
-					tess[3] = v0;
-					tess[4] = v1;
-					tess[5] = v2;
+					// Backward
+					gpu_aabb_verts[4].pos = dxConvert(glm::vec3{ min.x, max.y, min.z });  // top left
+					gpu_aabb_verts[5].pos = dxConvert(glm::vec3{ max.x, max.y, min.z });  // top right
+					gpu_aabb_verts[6].pos = dxConvert(glm::vec3{ max.x, min.y, min.z });  // bot right
+					gpu_aabb_verts[7].pos = dxConvert(glm::vec3{ min.x, min.y, min.z });  // bot left
+
+					std::memcpy(((GPU_AABB_Vertex*)vertex_buff_mem) + aabb_vi,
+						gpu_aabb_verts, 8 * sizeof(GPU_AABB_Vertex));
+
+					aabb_vi += 8;
+
+					// Front Face
+					gpu_aabb_indexes[0] = 0;
+					gpu_aabb_indexes[1] = 1;
+					gpu_aabb_indexes[2] = 3;
+
+					gpu_aabb_indexes[3] = 1;
+					gpu_aabb_indexes[4] = 2;
+					gpu_aabb_indexes[5] = 3;
+
+					// Right Face
+					gpu_aabb_indexes[6] = 1;
+					gpu_aabb_indexes[7] = 5;
+					gpu_aabb_indexes[8] = 2;
+
+					gpu_aabb_indexes[9] = 5;
+					gpu_aabb_indexes[10] = 6;
+					gpu_aabb_indexes[11] = 3;
+
+					// Back Face
+					gpu_aabb_indexes[12] = 5;
+					gpu_aabb_indexes[13] = 4;
+					gpu_aabb_indexes[14] = 6;
+
+					gpu_aabb_indexes[15] = 4;
+					gpu_aabb_indexes[16] = 7;
+					gpu_aabb_indexes[17] = 6;
+
+					// Left Face
+					gpu_aabb_indexes[18] = 4;
+					gpu_aabb_indexes[19] = 0;
+					gpu_aabb_indexes[20] = 7;
+
+					gpu_aabb_indexes[21] = 0;
+					gpu_aabb_indexes[22] = 3;
+					gpu_aabb_indexes[23] = 7;
+
+					// Top Face
+					gpu_aabb_indexes[24] = 4;
+					gpu_aabb_indexes[25] = 5;
+					gpu_aabb_indexes[26] = 0;
+
+					gpu_aabb_indexes[27] = 5;
+					gpu_aabb_indexes[28] = 6;
+					gpu_aabb_indexes[29] = 0;
+
+					// Back Face
+					gpu_aabb_indexes[30] = 6;
+					gpu_aabb_indexes[31] = 7;
+					gpu_aabb_indexes[32] = 2;
+
+					gpu_aabb_indexes[33] = 7;
+					gpu_aabb_indexes[34] = 3;
+					gpu_aabb_indexes[35] = 2;
+
+					std::memcpy(((uint32_t*)aabb_ibuff_mem) + aabb_idx, gpu_aabb_indexes,
+						36 * sizeof(uint32_t));
+
+					aabb_idx += 36;
 				}
-				else {
-					tess[0] = v0;
-					tess[1] = v1;
-					tess[2] = v3;
 
-					tess[3] = v1;
-					tess[4] = v2;
-					tess[5] = v3;
+				mesh_in_buff->aabb_vertex_count = aabb_vi - mesh_in_buff->aabb_vertex_start;
+				mesh_in_buff->aabb_index_count = aabb_idx - mesh_in_buff->aabb_index_start;
+			}
+
+			// Load mesh instances
+			if (mesh_instances.mesh_insta_start == 0xFFFF'FFFF) {
+
+				mesh_instances.mesh_insta_start = mesh_insta_idx;
+
+				for (MeshInstance* instance : mesh_instances.instances) {
+
+					gpu_inst.pos = dxConvert(instance->pos);
+					gpu_inst.rot = dxConvert(instance->rot);
+
+					PhysicalBasedMaterial& pbr_mat = instance->pbr_material;
+					gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
+					gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
+					gpu_inst.metallic = pbr_mat.metallic;
+					gpu_inst.specular = pbr_mat.specular;
+
+					MeshWireframeColors wire_colors = instance->wireframe_colors;
+					gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
+					gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
+
+					std::memcpy(((GPU_MeshInstance*)mesh_instabuff_mem) + mesh_insta_idx,
+						&gpu_inst, sizeof(GPU_MeshInstance)
+					);
+
+					mesh_insta_idx++;
 				}
 
-				// Convert to GPU format
-				for (uint32_t i = 0; i < 6; i++) {
-					gpu_verts[i].pos = dxConvert(tess[i]->pos);
-					gpu_verts[i].vertex_normal = dxConvert(tess[i]->normal);
-					gpu_verts[i].poly_normal = dxConvert(poly.normal);
-				}
-
-				for (uint32_t i = 0; i < 3; i++) {
-					gpu_verts[i].tess_normal = dxConvert(poly.tess_normals[0]);
-				}
-				for (uint32_t i = 3; i < 6; i++) {
-					gpu_verts[i].tess_normal = dxConvert(poly.tess_normals[1]);
-				}
-
-				// Copy Data
-				std::memcpy(((GPU_MeshVertex*)vertex_buff_mem) + vi,
-					gpu_verts, 6 * sizeof(GPU_MeshVertex)
-				);
-
-				vi += 6;
+				mesh_instances.mesh_insta_count = mesh_insta_idx - mesh_instances.mesh_insta_start;
 			}
 		}
-
-		mesh._vertex_count = vi - mesh._vertex_start;
 	}
 
-	vbuff.endLoad();
-
-	// Load instances
-	void* insta_buff_mem;
-	checkErrStack1(instabuff.beginLoad(application.instances.size() * sizeof(GPU_MeshInstance), 0, insta_buff_mem));
-
-	mesh_draws.resize(application.instances.size());
-	uint32_t inst_idx = 0;
-	GPU_MeshInstance gpu_inst;
-
-	for (MeshInstance& mesh_instance : application.instances) {
-
-		// Create Drawcalls
-		DrawMesh& draw_mesh = mesh_draws[inst_idx];
-		draw_mesh.vertex_start = mesh_instance.mesh->_vertex_start;
-		draw_mesh.vertex_count = mesh_instance.mesh->_vertex_count;
-		draw_mesh.instance_start = inst_idx;
-
-		// Convert to GPU format
-		gpu_inst.pos = dxConvert(mesh_instance.pos);
-		gpu_inst.rot = dxConvert(mesh_instance.rot);
-		gpu_inst.shading_mode = mesh_instance.mesh_shading_subprimitive;
-		gpu_inst.albedo_color = dxConvert(mesh_instance.albedo_color);
-		gpu_inst.roughness = glm::clamp(mesh_instance.roughness, 0.05f, 1.f);
-		gpu_inst.metallic = mesh_instance.metallic;
-		gpu_inst.specular = mesh_instance.specular;
-
-		// Copy Data
-		std::memcpy(((GPU_MeshInstance*)insta_buff_mem) + inst_idx,
-			&gpu_inst, sizeof(GPU_MeshInstance)
-		);
-
-		inst_idx++;
+	if (mesh_vi) {
+		vbuff.endLoad();
+		instabuff.endLoad();
 	}
 
-	instabuff.endLoad();
+	if (aabb_vi) {
+		aabbs_vbuff.endLoad();
+		aabbs_ibuff.endLoad();
+	}
+
+	// TODO: unsignal stored meshes
 
 	return err_stack;
 }
@@ -213,11 +370,11 @@ ErrStack MeshRenderer::loadUniform()
 	uniform.ambient_intensity = application.ambient_intensity;
 
 	void* uniform_mem;
-	checkErrStack1(ubuff.beginLoad(sizeof(GPU_MeshUniform), 0, uniform_mem));
+	checkErrStack1(frame_ubuff.beginLoad(sizeof(GPU_MeshUniform), 0, uniform_mem));
 	{
 		std::memcpy(uniform_mem, &uniform, sizeof(GPU_MeshUniform));
 	}
-	ubuff.endLoad();
+	frame_ubuff.endLoad();
 
 	return err_stack;
 }
@@ -233,7 +390,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	if (dev5 == nullptr) {
 
 		dev5 = event.dev5;
-		im_ctx4 = event.im_ctx4;
+		im_ctx3 = event.im_ctx3;
 		de_ctx3 = event.de_ctx3;
 		
 		load_vertices = true;
@@ -249,6 +406,42 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.Height = event.render_target_height;
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R32_TYPELESS;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+			checkHResult(dev5->CreateTexture2D(&desc, nullptr, mesh_depth_tex.GetAddressOf()),
+				"failed to create mesh depth texture");
+
+			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
+			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
+			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+			view_desc.Texture2D.MipSlice = 0;
+
+			checkHResult(dev5->CreateDepthStencilView(mesh_depth_tex.Get(), &view_desc, mesh_depth_view.GetAddressOf()),
+				"failed to create mesh depth view");
+			
+			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
+			srv_desc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
+			srv_desc.Texture2D.MostDetailedMip = 0;
+			srv_desc.Texture2D.MipLevels = 1;
+
+			checkHResult(dev5->CreateShaderResourceView(mesh_depth_tex.Get(), &srv_desc, mesh_depth_srv.GetAddressOf()),
+				"failed to create mesh SRV");
+		}
+		
+		// Wireframe Resource
+		{
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = event.render_target_width;
+			desc.Height = event.render_target_height;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_D32_FLOAT;
 			desc.SampleDesc.Count = 1;
 			desc.SampleDesc.Quality = 0;
@@ -257,16 +450,16 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 
-			checkHResult(dev5->CreateTexture2D(&desc, nullptr, depth_tex.GetAddressOf()),
-				"failed to create mesh depth texture");
+			checkHResult(dev5->CreateTexture2D(&desc, nullptr, wireframe_depth_tex.GetAddressOf()),
+				"failed to create wireframe depth texture");
 
 			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
 			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
 			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 			view_desc.Texture2D.MipSlice = 0;
 
-			checkHResult(dev5->CreateDepthStencilView(depth_tex.Get(), &view_desc, depth_view.GetAddressOf()),
-				"failed to create mesh depth view");
+			checkHResult(dev5->CreateDepthStencilView(wireframe_depth_tex.Get(), &view_desc, wireframe_depth_view.GetAddressOf()),
+				"failed to create wireframe depth view");
 		}
 
 		// Vertex Buffer
@@ -278,22 +471,22 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			vbuff.create(dev5, im_ctx4, desc);
+			vbuff.create(dev5, im_ctx3, desc);
 		}
 
 		// Instance Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
-			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.Usage = D3D11_USAGE_DYNAMIC;  // TODO: maybe staging into default
 			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			instabuff.create(dev5, im_ctx4, desc);
+			instabuff.create(dev5, im_ctx3, desc);
 		}
 
-		// Uniform Buffer
+		// Frame Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
 			desc.Usage = D3D11_USAGE_DYNAMIC;
@@ -302,7 +495,19 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			ubuff.create(dev5, im_ctx4, desc);
+			frame_ubuff.create(dev5, im_ctx3, desc);
+		}
+
+		// Drawcall Buffer
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
+
+			drawcall_ubuff.create(dev5, de_ctx3, desc);
 		}
 
 		// Vertex Shader
@@ -321,6 +526,15 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			checkHResult(dev5->CreatePixelShader(mesh_ps_cso.data(), mesh_ps_cso.size(), nullptr,
 				mesh_ps.GetAddressOf()),
 				"failed to create mesh pixel shader");
+		}
+
+		// Wireframe Pixel Shader
+		{
+			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/DimWireframePS.cso", dim_wireframe_ps_cso));
+
+			checkHResult(dev5->CreatePixelShader(dim_wireframe_ps_cso.data(), dim_wireframe_ps_cso.size(), nullptr,
+				dim_wireframe_ps.GetAddressOf()),
+				"failed to create wireframe pixel shader");
 		}
 
 		// Vertex Input Layout
@@ -348,7 +562,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Mesh Rasterization State
 		{
 			D3D11_RASTERIZER_DESC desc = {};
-			desc.FillMode = D3D11_FILL_WIREFRAME;
+			desc.FillMode = D3D11_FILL_SOLID;
 			desc.CullMode = D3D11_CULL_BACK;
 			desc.FrontCounterClockwise = false;
 			desc.DepthBias = 0;
@@ -360,7 +574,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.AntialiasedLineEnable = false;
 
 			checkHResult(dev5->CreateRasterizerState(&desc, mesh_rs.GetAddressOf()),
-				"failed to create mesh rasterized state");
+				"failed to create raster state");
+
+			// Wireframe Rasterizer State
+			desc.FillMode = D3D11_FILL_WIREFRAME;
+			desc.CullMode = D3D11_CULL_NONE;
+			desc.DepthBias = -5000;  // TODO: make this a setting
+			checkHResult(dev5->CreateRasterizerState(&desc, wireframe_none_bias_rs.GetAddressOf()),
+				"failed to create raster state");
 		}
 
 		// Mesh Blend States
@@ -385,6 +606,28 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				"failed to create mesh blend state");
 		}
 
+		// Dim Wireframe Blend States
+		{
+			D3D11_BLEND_DESC desc = {};
+			desc.AlphaToCoverageEnable = false;
+			desc.IndependentBlendEnable = true;
+
+			desc.RenderTarget[0].BlendEnable = true;
+			desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+			desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+			desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+			desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
+			desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+			desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+			desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+			desc.RenderTarget[1].BlendEnable = false;
+			desc.RenderTarget[1].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+			checkHResult(dev5->CreateBlendState(&desc, blend_target_0_bs.GetAddressOf()),
+				"failed to create mesh blend state");
+		}
+
 		// Mesh Depth Stencil
 		{
 			D3D11_DEPTH_STENCIL_DESC desc = {};
@@ -396,10 +639,25 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			checkHResult(dev5->CreateDepthStencilState(&desc, mesh_dss.GetAddressOf()),
 				"failed to create mesh depth stencil state");
 		}
+
+		// Wireframe Depth Stencil
+		{
+			D3D11_DEPTH_STENCIL_DESC desc = {};
+			desc.DepthEnable = true;
+			desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+			desc.DepthFunc = D3D11_COMPARISON_LESS;
+			desc.StencilEnable = false;
+
+			checkHResult(dev5->CreateDepthStencilState(&desc, dim_wireframe_dss.GetAddressOf()),
+				"failed to create wireframe depth stencil state");
+		}
 	}
 
 	if (load_vertices) {
 		checkErrStack1(loadVertices());
+
+		// checkErrStack1(loadAABBs());
+
 		load_vertices = false;
 	}
 
@@ -411,17 +669,37 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	if (render_target_width != event.render_target_width ||
 		render_target_height != event.render_target_height)
 	{
-		depth_view->Release();
+		mesh_depth_view->Release();
+		wireframe_depth_view->Release();
 
-		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, depth_tex));
+		mesh_depth_srv->Release();
 
-		D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
-		view_desc.Format = DXGI_FORMAT_D32_FLOAT;
-		view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-		view_desc.Texture2D.MipSlice = 0;
+		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, mesh_depth_tex));
+		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, wireframe_depth_tex));
 
-		checkHResult(dev5->CreateDepthStencilView(depth_tex.Get(), &view_desc, depth_view.GetAddressOf()),
-			"failed to rereate mesh depth view");
+		{
+			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
+			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
+			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+			view_desc.Texture2D.MipSlice = 0;
+
+			checkHResult(dev5->CreateDepthStencilView(mesh_depth_tex.Get(), &view_desc, mesh_depth_view.GetAddressOf()),
+				"failed to rereate mesh depth view");
+
+			checkHResult(dev5->CreateDepthStencilView(wireframe_depth_tex.Get(), &view_desc, wireframe_depth_view.GetAddressOf()),
+				"failed to rereate wireframe depth view");
+		}
+
+		{
+			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
+			srv_desc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
+			srv_desc.Texture2D.MostDetailedMip = 0;
+			srv_desc.Texture2D.MipLevels = 1;
+
+			checkHResult(dev5->CreateShaderResourceView(mesh_depth_tex.Get(), &srv_desc, mesh_depth_srv.GetAddressOf()),
+				"failed to create mesh SRV");
+		}
 
 		checkErrStack1(loadUniform());
 		load_uniform = false;
@@ -431,31 +709,27 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	this->render_target_height = event.render_target_height;
 
 	// Command List
-	de_ctx3->ClearDepthStencilView(depth_view.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+	de_ctx3->ClearDepthStencilView(mesh_depth_view.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+	de_ctx3->ClearDepthStencilView(wireframe_depth_view.Get(), D3D11_CLEAR_DEPTH, 1, 0);
 
-	for (DrawMesh& draw : mesh_draws) {
+	for (MeshDrawcall& drawcall : application.drawcalls) {
 
-		// Input Assembly
-		de_ctx3->IASetInputLayout(mesh_il.Get());
-		de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// Configure constant buffer
 		{
-			std::array<ID3D11Buffer*, 2> buffers = {
-				vbuff.buff.Get(), instabuff.buff.Get()
-			};
-			std::array<uint32_t, 2> strides = {
-				sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
-			};
-			std::array<uint32_t, 2> offsets = {
-				0, 0
-			};
-			de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+			GPU_DrawcallUniform drawcall_uniform;
+			if (drawcall.cull_mode == CullMode::FRONT) {
+				drawcall_uniform.flip_surface_normal = -1.0f;
+			}
+			else {
+				drawcall_uniform.flip_surface_normal = 1.0f;
+			}
+
+			// set color
+			
+			checkErrStack1(drawcall_ubuff.load(&drawcall_uniform, sizeof(GPU_DrawcallUniform)));
 		}
 
-		// Vertex Shader
-		de_ctx3->VSSetConstantBuffers(0, 1, ubuff.buff.GetAddressOf());
-		de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
-
-		// Rasterization
+		// Rasterizer Viewport
 		{
 			D3D11_VIEWPORT viewport;
 			viewport.TopLeftX = (float)event.viewport_pos.x;
@@ -474,30 +748,175 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			sccissor.bottom = event.viewport_pos.y + event.viewport_size.y;
 
 			de_ctx3->RSSetScissorRects(1, &sccissor);
-
-			de_ctx3->RSSetState(mesh_rs.Get());
 		}
 
-		// Pixel Shader
-		de_ctx3->PSSetConstantBuffers(0, 1, ubuff.buff.GetAddressOf());
-		de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+		for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-		// Output Merger
-		{
-			float blend_factor[4] = { 1, 1, 1, 1 };
-			de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+			switch (drawcall.rasterizer_mode) {
+			case RasterizerMode::SOLID: {
 
-			std::array<ID3D11RenderTargetView*, 1> rtvs = {
-				event.compose_rtv
-			};
+				// Output Merger
+				{
+					float blend_factor[4] = { 1, 1, 1, 1 };
+					de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-			de_ctx3->OMSetDepthStencilState(mesh_dss.Get(), 1);
+					std::array<ID3D11RenderTargetView*, 1> rtvs = {
+						event.compose_rtv
+					};
 
-			de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), depth_view.Get());
+					de_ctx3->OMSetDepthStencilState(mesh_dss.Get(), 1);
+
+					de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), mesh_depth_view.Get());
+				}
+
+				// Input Assembly
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				{
+					std::array<ID3D11Buffer*, 2> buffers = {
+						vbuff.buff.Get(), instabuff.buff.Get()
+					};
+					std::array<uint32_t, 2> strides = {
+						sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+					};
+					std::array<uint32_t, 2> offsets = {
+						0, 0
+					};
+					de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				}
+
+				// Vertex Shader
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+
+				// Rasterization
+				de_ctx3->RSSetState(mesh_rs.Get());
+
+				// Pixel Shader
+				{
+					std::array<ID3D11Buffer*, 2> buffers = {
+						frame_ubuff.buff.Get(), drawcall_ubuff.buff.Get()
+					};
+					de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				}
+				de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+				break;
+			}
+			case RasterizerMode::SOLID_WITH_WIREFRAME_FRONT_NONE: {
+				
+				// Draw the solid mesh
+
+				// Input Assembly
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				{
+					std::array<ID3D11Buffer*, 2> buffs = {
+						vbuff.buff.Get(), instabuff.buff.Get()
+					};
+					std::array<uint32_t, 2> strides = {
+						sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+					};
+					std::array<uint32_t, 2> offsets = {
+						0, 0
+					};
+					de_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
+				}
+
+				// Vertex Shader
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+
+				// Rasterization
+				de_ctx3->RSSetState(mesh_rs.Get());
+
+				// Pixel Shader
+				{
+					std::array<ID3D11Buffer*, 2> buffers = {
+						frame_ubuff.buff.Get(), drawcall_ubuff.buff.Get()
+					};
+					de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				}
+
+				de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+
+				// Output Merger
+				{
+					float blend_factor[4] = { 1, 1, 1, 1 };
+					de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+					de_ctx3->OMSetDepthStencilState(mesh_dss.Get(), 1);
+
+					std::array<ID3D11RenderTargetView*, 1> rtvs = {
+						event.compose_rtv
+					};
+					de_ctx3->OMSetRenderTargets(1, rtvs.data(), mesh_depth_view.Get());
+				}
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+
+				// Read the solid mesh depth buffer and shade the wireframe if behind 
+
+				// Output Merger
+				{
+					de_ctx3->OMSetDepthStencilState(dim_wireframe_dss.Get(), 1);
+
+					float blend_factor[4] = { 1, 1, 1, 1 };
+					de_ctx3->OMSetBlendState(blend_target_0_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+					std::array<ID3D11RenderTargetView*, 1> rtvs = {
+						event.compose_rtv
+					};
+					de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_depth_view.Get());
+				}
+
+				// Input Assembly
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				{
+					std::array<ID3D11Buffer*, 2> buffers = {
+						vbuff.buff.Get(), instabuff.buff.Get()
+					};
+					std::array<uint32_t, 2> strides = {
+						sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+					};
+					std::array<uint32_t, 2> offsets = {
+						0, 0
+					};
+					de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				}
+
+				// Vertex Shader
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+
+				// Rasterization
+				de_ctx3->RSSetState(wireframe_none_bias_rs.Get());
+
+				// Pixel Shader
+				{
+					std::array<ID3D11Buffer*, 2> buffs = {
+						frame_ubuff.buff.Get(), drawcall_ubuff.buff.Get()
+					};
+					de_ctx3->PSSetConstantBuffers(0, buffs.size(), buffs.data());
+
+					std::array<ID3D11ShaderResourceView*, 2> srvs = {
+						mesh_depth_srv.Get(), nullptr
+					};
+					de_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());	
+
+					de_ctx3->PSSetShader(dim_wireframe_ps.Get(), nullptr, 0);
+				}
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+
+				break;
+			}
+			}
 		}
-
-		// Draw
-		de_ctx3->DrawInstanced(draw.vertex_count, 1, draw.vertex_start, draw.instance_start);
 	}
 
 	return err_stack;

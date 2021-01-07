@@ -7,10 +7,10 @@
 
 using namespace dx11;
 
-void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext4* context, D3D11_BUFFER_DESC& desc)
+void Buffer::create(ID3D11Device5* device, ID3D11DeviceContext3* context, D3D11_BUFFER_DESC& desc)
 {
 	this->dev = device;
-	this->im_ctx4 = context;
+	this->ctx3 = context;
 	this->init_desc = desc;
 }
 
@@ -44,12 +44,12 @@ ErrStack Buffer::load(void* data, size_t load_size, uint32_t sub_res_idx)
 	}
 
 	D3D11_MAPPED_SUBRESOURCE mapped;
-	checkHResult(im_ctx4->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
+	checkHResult(ctx3->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
 		"failed to map resource");
 
 	std::memcpy(mapped.pData, data, load_size);
 
-	im_ctx4->Unmap(buff.Get(), sub_res_idx);
+	ctx3->Unmap(buff.Get(), sub_res_idx);
 
 	return err_stack;
 }
@@ -85,7 +85,7 @@ ErrStack Buffer::beginLoad(size_t total_load_size, uint32_t sub_res_idx,
 	}
 
 	D3D11_MAPPED_SUBRESOURCE mapped;
-	checkHResult(im_ctx4->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
+	checkHResult(ctx3->Map(buff.Get(), sub_res_idx, D3D11_MAP_WRITE_DISCARD, 0, &mapped),
 		"failed to map resource");
 
 	this->sub_resource_idx = sub_res_idx;
@@ -96,7 +96,7 @@ ErrStack Buffer::beginLoad(size_t total_load_size, uint32_t sub_res_idx,
 
 void Buffer::endLoad()
 {
-	im_ctx4->Unmap(buff.Get(), sub_resource_idx);
+	ctx3->Unmap(buff.Get(), sub_resource_idx);
 }
 
 size_t Buffer::getMemorySizeMegaBytes()

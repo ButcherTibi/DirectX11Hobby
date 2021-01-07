@@ -101,10 +101,6 @@ namespace scme {
 		// Settings
 		uint32_t max_vertices_in_AABB;
 
-		// GPU Rendering
-		uint32_t _vertex_start;
-		uint32_t _vertex_count;
-
 	public:
 		// Vertex ///////////////////////////////////////////////////
 

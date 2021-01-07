@@ -14,30 +14,49 @@
 
 
 DirectX::XMFLOAT3 dxConvert(glm::vec3& value);
+DirectX::XMFLOAT4 dxConvert(glm::vec4& value);
 DirectX::XMFLOAT4 dxConvert(glm::quat& value);
 DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
 
 
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT3 vertex_normal;
-	DirectX::XMFLOAT3 tess_normal;
-	DirectX::XMFLOAT3 poly_normal;
+	DirectX::XMFLOAT3 normal;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 4> getInputLayout()
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 4> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
 		elems[0].SemanticName = "POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		elems[1].SemanticName = "VERTEX_NORMAL";
+		elems[1].SemanticName = "NORMAL";
 		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		elems[2].SemanticName = "TESSELATION_NORMAL";
-		elems[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			elem.SemanticIndex = 0;
+			elem.InputSlot = 0;
+			elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+			elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+			elem.InstanceDataStepRate = 0;
+		}
 
-		elems[3].SemanticName = "POLY_NORMAL";
-		elems[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		return elems;
+	}
+};
+
+
+struct GPU_AABB_Vertex {
+	DirectX::XMFLOAT3 pos;
+	DirectX::XMFLOAT3 color;
+
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
+	{
+		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
+		elems[0].SemanticName = "POSITION";
+		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[1].SemanticName = "COLOR";
+		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -56,35 +75,40 @@ struct GPU_MeshInstance {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT4 rot;
 
-	uint32_t shading_mode;
 	DirectX::XMFLOAT3 albedo_color;
 	float roughness;
 	float metallic;
 	float specular;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 7> getInputLayout(uint32_t input_slot = 1)
+	DirectX::XMFLOAT3 wireframe_front_color;
+	DirectX::XMFLOAT4 wireframe_back_color;
+
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 8> getInputLayout(uint32_t input_slot = 1)
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 7> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 8> elems;
 		elems[0].SemanticName = "INSTANCE_POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
 		elems[1].SemanticName = "INSTANCE_ROTATION";
 		elems[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
-		elems[2].SemanticName = "SHADING_MODE";
-		elems[2].Format = DXGI_FORMAT_R32_UINT;
+		elems[2].SemanticName = "ALBEDO_COLOR";
+		elems[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		elems[3].SemanticName = "ALBEDO_COLOR";
-		elems[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		elems[3].SemanticName = "ROUGHNESS";
+		elems[3].Format = DXGI_FORMAT_R32_FLOAT;
 
-		elems[4].SemanticName = "ROUGHNESS";
+		elems[4].SemanticName = "METALLIC";
 		elems[4].Format = DXGI_FORMAT_R32_FLOAT;
 
-		elems[5].SemanticName = "METALLIC";
+		elems[5].SemanticName = "SPECULAR";
 		elems[5].Format = DXGI_FORMAT_R32_FLOAT;
 
-		elems[6].SemanticName = "SPECULAR";
-		elems[6].Format = DXGI_FORMAT_R32_FLOAT;
+		elems[6].SemanticName = "WIREFRAME_FRONT_COLOR";
+		elems[6].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[7].SemanticName = "WIREFRAME_BACK_COLOR";
+		elems[7].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -130,6 +154,12 @@ struct GPU_MeshUniform {
 	//--------------------------------
 	float ambient_intensity;
 	uint32_t _pad_3[3];
+};
+
+struct GPU_DrawcallUniform {
+	float flip_surface_normal;
+	uint32_t _pad_0[3];
+	//--------------------------------
 };
 
 #pragma pack()

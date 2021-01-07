@@ -1,11 +1,8 @@
 struct VertexInput
 {
 	float4 dx_pos : SV_POSITION;
-	float3 vertex_normal : VERTEX_NORMAL;
-	float3 tess_normal : TESSELATION_NORMAL;
-	float3 poly_normal : POLY_NORMAL;
+	float3 normal : NORMAL;
 	
-	uint shading_mode : SHADING_MODE;
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
 	float metallic : METALLIC;
@@ -18,7 +15,7 @@ struct CameraLight {
 	float intensity;
 };
 
-cbuffer Uniform : register(b0)
+cbuffer FrameUniforms : register(b0)
 {
 	float3 camera_pos;
 	float4 camera_quat_inv;
@@ -31,6 +28,10 @@ cbuffer Uniform : register(b0)
 	float ambient_intensity;
 };
 
+cbuffer DrawcallUniforms : register(b1)
+{
+	float flip_surface_normal;
+}
 
 static const float PI = 3.14159265f;
 
@@ -51,7 +52,7 @@ float DistributionGGX(float NdotH, float a)
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
 	float r = (roughness + 1.0);
-	float k = (r*r) / 8.0;
+	float k = (r * r) / 8.0;
 
 	float num   = NdotV;
 	float denom = NdotV * (1.0 - k) + k;
@@ -73,23 +74,7 @@ float3 fresnelSchlick(float cosTheta, float3 F0)
 
 float4 main(VertexInput input) : SV_TARGET
 {
-	float3 surface_normal;
-	switch (input.shading_mode) {
-	// Vertex
-	case 0:
-		surface_normal = input.vertex_normal;
-		break;
-		
-	// Poly
-	case 1:
-		surface_normal = input.poly_normal;
-		break;
-		
-	// Tesselation
-	default:
-		surface_normal = input.tess_normal;
-		break;
-	}
+	float3 surface_normal = input.normal * flip_surface_normal;
 	
 	float roughness = input.roughness;
 	float metallic  = input.metallic;

@@ -2,17 +2,18 @@
 struct VertexIn
 {
 	float3 pos : POSITION;
-	float3 vertex_normal : VERTEX_NORMAL;
-	float3 tess_normal : TESSELATION_NORMAL;
-	float3 poly_normal : POLY_NORMAL;
+	float3 normal : NORMAL;
 	
 	float3 inst_pos : INSTANCE_POSITION;
 	float4 inst_rot : INSTANCE_ROTATION;
-	uint shading_mode : SHADING_MODE;
+	
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
 	float metallic : METALLIC;
 	float specular : SPECULAR;
+	
+	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
+	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
 };
 
 struct CameraLight
@@ -22,7 +23,7 @@ struct CameraLight
 	float radiance;
 };
 
-cbuffer Uniform : register(b0)
+cbuffer FrameUniforms : register(b0)
 {
 	float3 camera_pos;
 	float4 camera_quat_inv;
@@ -40,15 +41,15 @@ struct VertexOut
 	//int parent_clip_id;
 	//int child_clip_id;
 	float4 dx_pos : SV_POSITION;
-	float3 vertex_normal : VERTEX_NORMAL;
-	float3 tess_normal : TESSELATION_NORMAL;
-	float3 poly_normal : POLY_NORMAL;
+	float3 normal : NORMAL;
 	
-	uint shading_mode : SHADING_MODE;
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
 	float metallic : METALLIC;
 	float specular : SPECULAR;
+	
+	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
+	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
 	
 	//// Debug
 	//float3 camera_pos : DEBUG_camera_pos;
@@ -107,15 +108,15 @@ VertexOut main(VertexIn input)
 	output.dx_pos = persp;
 
 	// Output
-	output.vertex_normal = input.vertex_normal;
-	output.tess_normal = input.tess_normal;
-	output.poly_normal = input.poly_normal;
-	
-	output.shading_mode = input.shading_mode;
+	output.normal = input.normal;
+
 	output.albedo_color = input.albedo_color;
 	output.roughness = input.roughness;
 	output.metallic = input.metallic;
 	output.specular = input.specular;
+	
+	output.wireframe_front_color = input.wireframe_front_color;
+	output.wireframe_back_color = input.wireframe_back_color;
 	
 	// Debug
 	//output.camera_pos = camera_pos;

@@ -333,7 +333,7 @@ ErrStack Instance::createWindow(WindowCreateInfo& info, Window*& r_window)
 		checkHResult(w.dev5->CreateDeferredContext3(0, w.de_ctx3.GetAddressOf()),
 			"failed to obtain deferred context 3");
 
-		checkHResult(w._im_ctx->QueryInterface<ID3D11DeviceContext4>(w.im_ctx4.GetAddressOf()),
+		checkHResult(w._im_ctx->QueryInterface<ID3D11DeviceContext3>(w.im_ctx3.GetAddressOf()),
 			"failed to obtain ID3D11DeviceContext4");
 	}
 

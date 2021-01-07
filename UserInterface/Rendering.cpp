@@ -597,7 +597,7 @@ ErrStack Window::_loadCPU_DataToGPU()
 	{
 		TextureAtlas& atlas = instance->_char_atlas.atlas;
 
-		checkErrStack1(dx11::singleLoad(im_ctx4.Get(), chars_atlas_tex.Get(),
+		checkErrStack1(dx11::singleLoad(im_ctx3.Get(), chars_atlas_tex.Get(),
 			atlas.colors.data(), sizeof(uint8_t) * atlas.colors.size()));
 	}
 
@@ -826,10 +826,10 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			wrap_vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 			checkErrStack1(wrap_vbuff.load(wrap_verts.data(), sizeof(GPU_WrapVertex)* wrap_verts.size()));
 
-			chars_vbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			chars_vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		}
 
 		// Index Buffers
@@ -841,10 +841,10 @@ ErrStack Window::_render()
 		desc.MiscFlags = 0;
 		desc.StructureByteStride = 0;
 
-		wrap_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+		wrap_idxbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		checkErrStack1(wrap_idxbuff.load(wrap_idxs.data(), sizeof(uint16_t)* wrap_idxs.size()));
 
-		chars_idxbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+		chars_idxbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		}
 
 		// Instance Buffers
@@ -856,8 +856,8 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			wrap_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
-			chars_instabuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			wrap_instabuff.create(dev5.Get(), im_ctx3.Get(), desc);
+			chars_instabuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		}
 
 		// Constant Buffer
@@ -869,7 +869,7 @@ ErrStack Window::_render()
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			cbuff.create(dev5.Get(), im_ctx4.Get(), desc);
+			cbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		}
 
 		// Character Atlas
@@ -1078,7 +1078,7 @@ ErrStack Window::_render()
 
 				surf->_event.user_data = surf->user_data;
 				surf->_event.dev5 = dev5.Get();
-				surf->_event.im_ctx4 = im_ctx4.Get();
+				surf->_event.im_ctx3 = im_ctx3.Get();
 				surf->_event.de_ctx3 = de_ctx3.Get();
 
 				surf->_event.render_target_width = surface_width;
@@ -1135,7 +1135,7 @@ ErrStack Window::_render()
 	checkHResult(de_ctx3->FinishCommandList(FALSE, &command_list),
 		"failed to finish command list");
 
-	im_ctx4->ExecuteCommandList(command_list, false);
+	im_ctx3->ExecuteCommandList(command_list, false);
 	command_list->Release();
 
 	checkHResult(swapchain->Present(0, 0),

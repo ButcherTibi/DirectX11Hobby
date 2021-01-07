@@ -7,126 +7,193 @@
 
 Application application;
 
-MeshInstance& Application::createTriangleMesh(CreateTriangleInfo& info)
+void Application::assignToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer)
 {
-	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsTriangle(info.size);
+	if (dest_layer != nullptr) {
+		dest_layer->instances.insert(mesh_instance);
+		last_used_layer = dest_layer;
+	}
+	else {
+		last_used_layer->instances.insert(mesh_instance);
+	}
+}
+
+MeshDrawcall& Application::createDrawcall(std::string& name)
+{
+	MeshDrawcall& new_drawcall = drawcalls.emplace_back();
+	if (name != "") {
+		new_drawcall.name = name;
+	}
+	else {
+		new_drawcall.name = std::string("Drawcall ") + std::to_string(drawcalls.size());
+	}
+	new_drawcall.fill_mode = FillMode::SOLID;
+	new_drawcall.cull_mode = CullMode::BACK;
+
+	new_drawcall.rasterizer_mode = RasterizerMode::SOLID;
+	new_drawcall.wireframe_color = { 1.f, 1.f, 1.f, 0.5f };
+	new_drawcall.show_aabbs = false;
+
+	return new_drawcall;
+}
+
+void Application::transferToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall)
+{
+	if (mesh_instance->parent_drawcall != nullptr) {
+
+		auto& mesh_instance_sets = mesh_instance->parent_drawcall->mesh_instance_sets;
+
+		for (uint32_t i = 0; i < mesh_instance_sets.size(); i++) {
+
+			MeshInstanceSet& mesh_instance_set = mesh_instance_sets[i];
+			if (mesh_instance_set.mesh == mesh_instance->parent_mesh) {
+
+				for (uint32_t j = 0; j < mesh_instance_set.instances.size(); j++) {
+
+					MeshInstance* instance = mesh_instance_set.instances[j];
+					if (instance == mesh_instance) {
+
+						mesh_instance_set.instances.erase(mesh_instance_set.instances.begin() + j);
+
+						if (!mesh_instance_set.instances.size()) {
+							mesh_instance_sets.erase(mesh_instance_sets.begin() + i);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (dest_drawcall == nullptr) {
+		dest_drawcall = last_used_drawcall;
+	}
+
+	mesh_instance->parent_drawcall = dest_drawcall;
+	last_used_drawcall = dest_drawcall;
+
+	// add to existing set of mesh instances
+	for (MeshInstanceSet& mesh_instances : dest_drawcall->mesh_instance_sets) {
+		if (mesh_instances.mesh == mesh_instance->parent_mesh) {
+			mesh_instances.mesh_insta_start = 0xFFFF'FFFF;
+			mesh_instances.instances.push_back(mesh_instance);
+			return;
+		}
+	}
+
+	// create a new set of mesh instances
+	MeshInstanceSet& mesh_instances = dest_drawcall->mesh_instance_sets.emplace_back();
+	mesh_instances.mesh = mesh_instance->parent_mesh;
+	mesh_instances.mesh_insta_start = 0xFFFF'FFFF;
+	mesh_instances.instances.push_back(mesh_instance);
+}
+
+MeshInstance& Application::createTriangleMesh(CreateTriangleInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
+{
+	MeshInBuffers& new_mesh = this->meshes.emplace_back();
+	new_mesh.mesh.createAsTriangle(info.size);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
-	new_instance.mesh = &new_mesh;
+	new_instance.parent_mesh = &new_mesh;
+	new_instance.parent_drawcall = nullptr;
 	new_instance.pos = info.transform.pos;
 	new_instance.rot = info.transform.rot;
 	new_instance.scale = info.transform.scale;
+	new_instance.pbr_material = info.material;
 
-	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.material.albedo_color;
-	new_instance.roughness = info.material.roughness;
-	new_instance.metallic = info.material.metallic;
-	new_instance.specular = info.material.specular;
-
-	MeshLayer& root = this->layers.front();
-	root.instances.push_back(&new_instance);
+	assignToLayer(&new_instance, dest_layer);
+	transferToDrawcall(&new_instance, dest_drawcall);
 
 	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
 
-MeshInstance& Application::createQuadMesh(CreateQuadInfo& info)
+MeshInstance& Application::createQuadMesh(CreateQuadInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsQuad(info.size);
+	MeshInBuffers& new_mesh = this->meshes.emplace_back();
+	new_mesh.mesh.createAsQuad(info.size);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
-	new_instance.mesh = &new_mesh;
+	new_instance.parent_drawcall = nullptr;
+	new_instance.parent_mesh = &new_mesh;
 	new_instance.pos = info.transform.pos;
 	new_instance.rot = info.transform.rot;
 	new_instance.scale = info.transform.scale;
+	new_instance.pbr_material = info.material;
 
-	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.material.albedo_color;
-	new_instance.roughness = info.material.roughness;
-	new_instance.metallic = info.material.metallic;
-	new_instance.specular = info.material.specular;
-
-	MeshLayer& root = this->layers.front();
-	root.instances.push_back(&new_instance);
+	assignToLayer(&new_instance, dest_layer);
+	transferToDrawcall(&new_instance, dest_drawcall);
 
 	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
 
-MeshInstance& Application::createCubeMesh(CreateCubeInfo& info)
+MeshInstance& Application::createCubeMesh(CreateCubeInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsCube(info.size);
+	MeshInBuffers& new_mesh = this->meshes.emplace_back();
+	new_mesh.mesh.createAsCube(info.size);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
-	new_instance.mesh = &new_mesh;
+	new_instance.parent_drawcall = nullptr;
+	new_instance.parent_mesh = &new_mesh;
 	new_instance.pos = info.transform.pos;
 	new_instance.rot = info.transform.rot;
 	new_instance.scale = info.transform.scale;
+	new_instance.pbr_material = info.material;
 
-	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.material.albedo_color;
-	new_instance.roughness = info.material.roughness;
-	new_instance.metallic = info.material.metallic;
-	new_instance.specular = info.material.specular;
-
-	MeshLayer& root = this->layers.front();
-	root.instances.push_back(&new_instance);
+	assignToLayer(&new_instance, dest_layer);
+	transferToDrawcall(&new_instance, dest_drawcall);
 
 	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
 
-MeshInstance& Application::createCylinder(CreateCylinderInfo& info)
+MeshInstance& Application::createCylinder(CreateCylinderInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsCylinder(info.height, info.diameter,
+	MeshInBuffers& new_mesh = this->meshes.emplace_back();
+	new_mesh.mesh.createAsCylinder(info.height, info.diameter,
 		info.vertical_sides, info.horizontal_sides, info.with_caps);
 
 	MeshInstance& new_instance = this->instances.emplace_back();
-	new_instance.mesh = &new_mesh;
+	new_instance.parent_drawcall = nullptr;
+	new_instance.parent_mesh = &new_mesh;
 	new_instance.pos = info.transform.pos;
 	new_instance.rot = info.transform.rot;
 	new_instance.scale = info.transform.scale;
+	new_instance.pbr_material = info.material;
 
-	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.material.albedo_color;
-	new_instance.roughness = info.material.roughness;
-	new_instance.metallic = info.material.metallic;
-	new_instance.specular = info.material.specular;
-
-	MeshLayer& root = this->layers.front();
-	root.instances.push_back(&new_instance);
+	assignToLayer(&new_instance, dest_layer);
+	transferToDrawcall(&new_instance, dest_drawcall);
 
 	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
 
-MeshInstance& Application::createUV_Sphere(CreateUV_SphereInfo& info)
+MeshInstance& Application::createUV_Sphere(CreateUV_SphereInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	scme::SculptMesh& new_mesh = this->meshes.emplace_back();
-	new_mesh.createAsUV_Sphere(info.diameter, info.vertical_sides, info.horizontal_sides);
+	MeshInBuffers& new_mesh = this->meshes.emplace_back();
+	new_mesh.mesh.createAsUV_Sphere(info.diameter, info.vertical_sides, info.horizontal_sides);
+	new_mesh.mesh_vertex_start = 0xFFFF'FFFF;
+	new_mesh.aabb_vertex_start = 0xFFFF'FFFF;
+	new_mesh.aabb_index_start = 0xFFFF'FFFF;
 
 	MeshInstance& new_instance = this->instances.emplace_back();
-	new_instance.mesh = &new_mesh;
+	new_instance.parent_drawcall = nullptr;
+	new_instance.parent_mesh = &new_mesh;
 	new_instance.pos = info.transform.pos;
 	new_instance.rot = info.transform.rot;
 	new_instance.scale = info.transform.scale;
 
-	new_instance.mesh_shading_subprimitive = info.mesh_shading_subprimitive;
-	new_instance.albedo_color = info.material.albedo_color;
-	new_instance.roughness = info.material.roughness;
-	new_instance.metallic = info.material.metallic;
-	new_instance.specular = info.material.specular;
-
-	MeshLayer& root = this->layers.front();
-	root.instances.push_back(&new_instance);
+	assignToLayer(&new_instance, dest_layer);
+	transferToDrawcall(&new_instance, dest_drawcall);
 
 	this->renderer.load_vertices = true;
 
@@ -137,90 +204,90 @@ ErrStack Application::importGLTF_File(io::FilePath& path, GLTF_ImporterSettings&
 {
 	ErrStack err_stack;
 
-	gltf::Structure structure;
+	//gltf::Structure structure;
 
-	err_stack = structure.importGLTF(path);
-	if (err_stack.isBad()) {
-		err_stack.pushError(code_location, "failed to import GLTF file at the level GLTF");
-		return err_stack;
-	}
+	//err_stack = structure.importGLTF(path);
+	//if (err_stack.isBad()) {
+	//	err_stack.pushError(code_location, "failed to import GLTF file at the level GLTF");
+	//	return err_stack;
+	//}
 
-	// Meshes
-	std::vector<scme::SculptMesh*> new_meshes(structure.meshes.size());
-	for (scme::SculptMesh*& new_mesh : new_meshes) {
-		new_mesh = &this->meshes.emplace_back();
-	}
+	//// Meshes
+	//std::vector<scme::SculptMesh*> new_meshes(structure.meshes.size());
+	//for (scme::SculptMesh*& new_mesh : new_meshes) {
+	//	new_mesh = &this->meshes.emplace_back();
+	//}
 
-	uint32_t i = 0;
-	for (gltf::Mesh& mesh : structure.meshes) {
+	//uint32_t i = 0;
+	//for (gltf::Mesh& mesh : structure.meshes) {
 
-		gltf::Primitive& prim = mesh.primitives.front();
-		scme::SculptMesh* new_mesh = new_meshes[i];
+	//	gltf::Primitive& prim = mesh.primitives.front();
+	//	scme::SculptMesh* new_mesh = new_meshes[i];
 
-		if (prim.positions.size()) {
+	//	if (prim.positions.size()) {
 
-			if (prim.indexes.size()) {
-				if (prim.normals.size()) {
-					//new_mesh->addFromLists(prim.indexes, prim.positions, prim.normals, true);
-				}
-				else {
-					//new_mesh->addFromLists(prim.indexes, prim.positions, true);
-				}
-			}
-		}
+	//		if (prim.indexes.size()) {
+	//			if (prim.normals.size()) {
+	//				//new_mesh->addFromLists(prim.indexes, prim.positions, prim.normals, true);
+	//			}
+	//			else {
+	//				//new_mesh->addFromLists(prim.indexes, prim.positions, true);
+	//			}
+	//		}
+	//	}
 
-		i++;
-	}
+	//	i++;
+	//}
 
-	// Layers
-	auto& root_children = this->layers.front().children;
-	std::vector<MeshLayer*> new_layers(structure.nodes.size());
+	//// Layers
+	//auto& root_children = this->layers.front().children;
+	//std::vector<MeshLayer*> new_layers(structure.nodes.size());
 
-	for (MeshLayer*& new_layer : new_layers) {
-		new_layer = &this->layers.emplace_back();
-		root_children.push_back(new_layer);  // add new layers to root layer
-	};
+	//for (MeshLayer*& new_layer : new_layers) {
+	//	new_layer = &this->layers.emplace_back();
+	//	root_children.push_back(new_layer);  // add new layers to root layer
+	//};
 
-	i = 0;
-	for (gltf::Node& node : structure.nodes) {
+	//i = 0;
+	//for (gltf::Node& node : structure.nodes) {
 
-		MeshLayer* new_layer = new_layers[i];
-		new_layer->name = node.name;
-		new_layer->children.resize(node.children.size());
+	//	MeshLayer* new_layer = new_layers[i];
+	//	new_layer->name = node.name;
+	//	new_layer->children.resize(node.children.size());
 
-		// Child Index to Child Pointer conversion
-		uint32_t child_idx = 0;
-		for (MeshLayer* child_layer : new_layer->children) {
+	//	// Child Index to Child Pointer conversion
+	//	uint32_t child_idx = 0;
+	//	for (MeshLayer* child_layer : new_layer->children) {
 
-			child_layer = new_layers[node.children[child_idx]];
-			child_idx++;
-		}
+	//		child_layer = new_layers[node.children[child_idx]];
+	//		child_idx++;
+	//	}
 
-		if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
+	//	if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
 
-			MeshInstance& new_instance = this->instances.emplace_back();
-			// new_instance.shading = MeshShadingSubPrimitive::SMOOTH_VERTEX;
-			
-			if (node.uses_matrix) {
+	//		MeshInstance& new_instance = this->instances.emplace_back();
+	//		// new_instance.shading = MeshShadingSubPrimitive::SMOOTH_VERTEX;
+	//		
+	//		if (node.uses_matrix) {
 
-				glm::vec3 skew;
-				glm::vec4 perspective;
-				glm::decompose(node.matrix, new_instance.scale, new_instance.rot, new_instance.pos,
-					skew, perspective);
-			}
-			else {
-				new_instance.pos = node.translation;
-				new_instance.rot = node.rotation;
-				new_instance.scale = node.scale;
-			}
+	//			glm::vec3 skew;
+	//			glm::vec4 perspective;
+	//			glm::decompose(node.matrix, new_instance.scale, new_instance.rot, new_instance.pos,
+	//				skew, perspective);
+	//		}
+	//		else {
+	//			new_instance.pos = node.translation;
+	//			new_instance.rot = node.rotation;
+	//			new_instance.scale = node.scale;
+	//		}
 
-			new_layer->instances.push_back(&new_instance);
-		}
+	//		new_layer->instances.push_back(&new_instance);
+	//	}
 
-		i++;
-	}
+	//	i++;
+	//}
 
-	this->renderer.load_vertices = true;
+	//this->renderer.load_vertices = true;
 
 	return err_stack;
 }

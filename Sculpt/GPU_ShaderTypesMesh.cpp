@@ -8,6 +8,11 @@ DirectX::XMFLOAT3 dxConvert(glm::vec3& value)
 	return { value.x, value.y, value.z };
 }
 
+DirectX::XMFLOAT4 dxConvert(glm::vec4& value)
+{
+	return { value.x, value.y, value.z, value.w };
+}
+
 DirectX::XMFLOAT4 dxConvert(glm::quat& value)
 {
 	return { value.x, value.y, value.z, value.w };

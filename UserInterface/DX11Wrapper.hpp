@@ -17,7 +17,7 @@ namespace dx11 {
 	class Buffer {
 	public:
 		ID3D11Device5* dev;
-		ID3D11DeviceContext4* im_ctx4;
+		ID3D11DeviceContext3* ctx3;
 		D3D11_BUFFER_DESC init_desc;
 
 		ComPtr<ID3D11Buffer> buff = nullptr;
@@ -25,7 +25,7 @@ namespace dx11 {
 		uint32_t sub_resource_idx;
 
 	public:
-		void create(ID3D11Device5* dev, ID3D11DeviceContext4* ctx, D3D11_BUFFER_DESC& desc);
+		void create(ID3D11Device5* dev, ID3D11DeviceContext3* ctx, D3D11_BUFFER_DESC& desc);
 		ErrStack load(void* data, size_t load_size, uint32_t sub_resource_idx = 0);
 
 		ErrStack beginLoad(size_t total_load_size, uint32_t sub_resource_idx,

@@ -124,45 +124,45 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 						{
 							// Top Forward Left
 							AxisBoundingBox3D& box_0 = aabbs[idx].aabb;
-							box_0.max = { x_mid, max.y, max.z };
+							box_0.max = { x_mid, max.y, min.z };
 							box_0.min = { min.x, y_mid, z_mid };
 
 							// Top Forward Right
 							AxisBoundingBox3D& box_1 = aabbs[idx + 1].aabb;
-							box_1.max = { max.x, max.y, max.z };
+							box_1.max = { max.x, max.y, min.z };
 							box_1.min = { x_mid, y_mid, z_mid };
 
 							// Top Backward Left
 							AxisBoundingBox3D& box_2 = aabbs[idx + 2].aabb;
 							box_2.max = { x_mid, max.y, z_mid };
-							box_2.min = { min.x, y_mid, min.z };
+							box_2.min = { min.x, y_mid, max.z };
 
 							// Top Backward Right
 							AxisBoundingBox3D& box_3 = aabbs[idx + 3].aabb;
 							box_3.max = { max.x, max.y, z_mid };
-							box_3.min = { x_mid, y_mid, min.z };
+							box_3.min = { x_mid, y_mid, max.z };
 						}
 
 						{
 							// Bot Forward Left
 							AxisBoundingBox3D& box_0 = aabbs[idx + 4].aabb;
-							box_0.max = { x_mid, y_mid, max.z };
+							box_0.max = { x_mid, y_mid, min.z };
 							box_0.min = { min.x, min.y, z_mid };
 
 							// Bot Forward Right
 							AxisBoundingBox3D& box_1 = aabbs[idx + 5].aabb;
-							box_1.max = { max.x, y_mid, max.z };
+							box_1.max = { max.x, y_mid, min.z };
 							box_1.min = { x_mid, min.y, z_mid };
 
 							// Bot Backward Left
 							AxisBoundingBox3D& box_2 = aabbs[idx + 6].aabb;
 							box_2.max = { x_mid, y_mid, z_mid };
-							box_2.min = { min.x, min.y, min.z };
+							box_2.min = { min.x, min.y, max.z };
 
 							// Bot Backward Right
 							AxisBoundingBox3D& box_3 = aabbs[idx + 7].aabb;
 							box_3.max = { max.x, y_mid, z_mid };
-							box_3.min = { x_mid, min.y, min.z };
+							box_3.min = { x_mid, min.y, max.z };
 						}
 
 						bool found = false;

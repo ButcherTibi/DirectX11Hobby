@@ -68,7 +68,18 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	// Application
 	{
-		application.layers.emplace_back();
+		application.last_used_layer = &application.layers.emplace_back();
+		application.last_used_layer->parent = nullptr;
+		application.last_used_layer->name = "Root Layer";
+
+		application.last_used_drawcall = &application.drawcalls.emplace_back();
+		application.last_used_drawcall->name = "Root Drawcall";
+		application.last_used_drawcall->fill_mode = FillMode::SOLID;
+		application.last_used_drawcall->cull_mode = CullMode::BACK;
+		application.last_used_drawcall->show_aabbs = false;
+
+		// Shading
+		application.shading_normal = ShadingNormal::POLY;
 
 		// Lighting
 		application.lights[0].normal = toNormal(45, 45);
@@ -165,26 +176,36 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 		/*{
 			CreateUV_SphereInfo info;
-			info.pos = { 0, 0, 0 };
-			info.rot = { 1, 0, 0, 0 };
-			info.diameter = 1;
+			info.transform.pos = { 0, 0, 0 };
+			info.diameter = 1.0f;
 
-			info.vertical_sides = 100;
-			info.horizontal_sides = 100;
+			info.vertical_sides = 10;
+			info.horizontal_sides = 10;
 
-			info.mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
-			info.albedo_color = { 1, 0, 0 };
-			info.roughness = 0.30f;
-			info.metallic = 0.f;
-			info.specular = 0.04f;
+			info.material.albedo_color = { 1, 0, 0 };
+			info.material.roughness = 0.3f;
+			info.material.metallic = 0.1f;
 
-			auto& inst = application.createUV_Sphere(info);
-
-			printf("vertex count = %ld \n", (uint32_t)inst.mesh->verts.size());
-			printf("memory size = %lld \n", inst.mesh->getMemorySizeMegaBytes());
+			application.createUV_Sphere(info);
 		}*/
 
-		uint32_t rows = 7;
+		MeshDrawcall& new_drawcall = application.createDrawcall();
+		new_drawcall.rasterizer_mode = RasterizerMode::SOLID_WITH_WIREFRAME_FRONT_NONE;
+		{
+			CreateUV_SphereInfo info;
+			info.transform.pos = { 0, 0, 0 };
+			info.diameter = 1.0f;
+
+			info.vertical_sides = 15;
+			info.horizontal_sides = 15;
+
+			MeshInstance& inst = application.createUV_Sphere(info, nullptr, &new_drawcall);
+			inst.pbr_material.albedo_color = { 1, 0, 0 };
+			inst.pbr_material.roughness = 0.3f;
+			inst.pbr_material.metallic = 0.1f;
+		}
+
+		/*uint32_t rows = 7;
 		uint32_t cols = 7;
 		for (uint32_t row = 0; row < rows; row += 1) {
 			for (uint32_t col = 0; col < cols; col += 1) {
@@ -196,14 +217,13 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 				info.vertical_sides = 40;
 				info.horizontal_sides = 80;
 
-				info.mesh_shading_subprimitive = MeshShadingSubPrimitive::POLY;
 				info.material.albedo_color = { 1, 0, 0 };
 				info.material.roughness = (float)col / (cols - 1);
 				info.material.metallic = (float)row / (rows - 1);
 
 				application.createUV_Sphere(info);
 			}
-		}
+		}*/
 
 		application.setCameraFocus(glm::vec3(0, 0, 0));
 		application.setCameraPosition(0, 0, 10);
