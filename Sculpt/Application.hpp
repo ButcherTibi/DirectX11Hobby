@@ -12,12 +12,10 @@
 
 /* TODO:
 - Surface Detail Rendering
-- wireframe with color
 - primitive highlighting
 - compute shader mesh deform
 - import GLTF meshes
 - save mesh to file and load from file
-- calculate vertex normals on demand
 
 // Dependent (maybe)
 - Axis Aligned Bounding Boxes
@@ -25,32 +23,22 @@
 - vert groups, edge groups, poly groups
 - partial vertex buffer updates ???
 
-- frame mesh
+- dynamic z_near and far
+- frame camera to mesh
 - handle large amount of objects changing by storing them inside many buffers
-so that one object changing only rewrites a single buffers
+so that one object changing only rewrites a single buffer
 */
 
 
 // Forward
 struct MeshDrawcall;
 
-enum class FillMode {
-	SOLID,
-	WIREFRAME,
-	SOLID_WITH_WIREFRAME
-};
-
-enum class CullMode {
-	BACK,
-	NONE,
-	FRONT
-};
 
 enum class RasterizerMode {
 	SOLID,
-	WIREFRANE,
-	SOLID_WITH_WIREFRAME,
-	SOLID_WITH_WIREFRAME_FRONT_NONE
+	//SOLID_WITH_WIREFRAME_FRONT,
+	SOLID_WITH_WIREFRAME_NONE
+	//WIREFRANE_FRONT,
 };
 // RasterizerState
 // solid front
@@ -85,14 +73,18 @@ struct MeshTransform {
 
 struct PhysicalBasedMaterial {
 	glm::vec3 albedo_color = { 1.0f, 0.0f, 0.0f };
-	float roughness = 0.0f;
-	float metallic = 0.05f;
+	float roughness = 0.3f;
+	float metallic = 0.1f;
 	float specular = 0.04f;
 };
 
 struct MeshWireframeColors {
 	glm::vec3 front_color = { 0.0f, 1.0f, 0.0f };
-	glm::vec4 back_color = { 0.0f, 1.0f, 0.0f, 0.25f };
+	glm::vec4 back_color = { 0.0f, 0.33f, 0.0f, 1.0f };
+	glm::vec3 tesselation_front_color = { 0.0f, 1.0f, 0.0f };
+	glm::vec4 tesselation_back_color = { 0.0f, 1.0f, 0.0f, 0.25f };
+	float tesselation_split_count = 4.0f;
+	float tesselation_gap = 0.5f;
 };
 
 
@@ -116,12 +108,16 @@ struct MeshInstance {
 	MeshDrawcall* parent_drawcall;
 	MeshInBuffers* parent_mesh;
 
+	std::string name;
+
 	glm::vec3 pos;
 	glm::quat rot;
 	glm::vec3 scale;
 
 	PhysicalBasedMaterial pbr_material;
 	MeshWireframeColors wireframe_colors;
+	
+	uint32_t instance_id;
 };
 
 
@@ -142,18 +138,9 @@ struct MeshDrawcall {
 
 	std::vector<MeshInstanceSet> mesh_instance_sets;
 	
-	// Drawcall
-	FillMode fill_mode;
-	CullMode cull_mode;
-
 	RasterizerMode rasterizer_mode;
-	glm::vec4 wireframe_color;
-
-	// PRB Shader, Sculpt Shader, Fresnel Shader
-
-	// Post effects
-	bool show_aabbs;
-	// transparency
+	bool is_back_culled;
+	bool show_aabbs;  // not implemented
 };
 
 
@@ -167,28 +154,25 @@ struct MeshLayer {
 };
 
 
+struct MeshInstanceSearchResult {
+	MeshInstance* instance;
+	uint32_t char_count;
+};
+
+
 struct CreateTriangleInfo {
 	MeshTransform transform;
 	float size = 1;
-
-	uint32_t shading_normal = ShadingNormal::POLY;
-	PhysicalBasedMaterial material;
 };
 
 struct CreateQuadInfo {
 	MeshTransform transform;
 	float size = 1.f;
-
-	uint32_t shading_normal = ShadingNormal::POLY;
-	PhysicalBasedMaterial material;
 };
 
 struct CreateCubeInfo {
 	MeshTransform transform;
 	float size = 1;
-
-	uint32_t shading_normal = ShadingNormal::POLY;
-	PhysicalBasedMaterial material;
 };
 
 struct CreateCylinderInfo {
@@ -199,9 +183,6 @@ struct CreateCylinderInfo {
 	uint32_t vertical_sides = 2;
 	uint32_t horizontal_sides = 3;
 	bool with_caps = true;
-
-	uint32_t shading_normal = ShadingNormal::POLY;
-	PhysicalBasedMaterial material;
 };
 
 struct CreateUV_SphereInfo {
@@ -213,7 +194,8 @@ struct CreateUV_SphereInfo {
 };
 
 struct GLTF_ImporterSettings {
-
+	MeshLayer* dest_layer = nullptr;
+	MeshDrawcall* dest_drawcall = nullptr;
 };
 
 
@@ -227,7 +209,10 @@ public:
 	nui::Window* window;
 
 	std::list<MeshInBuffers> meshes;
+
+	uint32_t instance_id;
 	std::list<MeshInstance> instances;
+
 	std::list<MeshDrawcall> drawcalls;
 	MeshDrawcall* last_used_drawcall;
 
@@ -256,17 +241,30 @@ public:
 	float camera_dolly_sensitivity;
 
 public:
-	void assignToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer = nullptr);
+	MeshInBuffers* createMesh();
 
-	MeshDrawcall& createDrawcall(std::string& name = std::string(""));
+	// Instances
+	MeshInstance* createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall);
+	MeshInstance* copyInstance(MeshInstance* source, MeshLayer* dest_layer = nullptr);
+
+	void assignInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
+	void searchForInstances(std::string& search, std::vector<MeshInstanceSearchResult>& r_results);
+
+	// Drawcalls
+	MeshDrawcall* createDrawcall(std::string& name = std::string(""));
 	void transferToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
 
-	MeshInstance& createTriangleMesh(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance& createQuadMesh(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance& createCubeMesh(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance& createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance& createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	ErrStack importGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings);
+	// Layers
+	MeshLayer* createLayer(std::string& name, MeshLayer* parent_layer = nullptr);
+	void parentLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
+
+	MeshInstance* createTriangleMesh(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createQuadMesh(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createCubeMesh(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings = GLTF_ImporterSettings(),
+		std::vector<MeshInstance*>* r_instances = nullptr);
 
 	void setCameraFocus(glm::vec3& new_focus);
 	void arcballOrbitCamera(float deg_x, float deg_y);

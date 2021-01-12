@@ -13,7 +13,9 @@ public:
 
 	std::vector<char> mesh_vs_cso;
 	std::vector<char> mesh_ps_cso;
+	std::vector<char> mesh_output_depth_ps_cso;
 	std::vector<char> dim_wireframe_ps_cso;
+	std::vector<char> wireframe_with_tessellation_ps_cso;
 
 	// Update
 	bool load_vertices;
@@ -24,13 +26,26 @@ public:
 	ID3D11DeviceContext3* im_ctx3;
 	ID3D11DeviceContext3* de_ctx3;
 
-	ComPtr<ID3D11Texture2D> mesh_depth_tex;
-	ComPtr<ID3D11Texture2D> wireframe_depth_tex;
+	// Masks
+	// ComPtr<ID3D11Texture2D> instance_id_tex;
+	// ComPtr<ID3D11ShaderResourceView> instance_id_srv;
+	// ComPtr<ID3D11RenderTargetView> instance_id_rtv;
 
-	ComPtr<ID3D11DepthStencilView> mesh_depth_view;
-	ComPtr<ID3D11DepthStencilView> wireframe_depth_view;
-	
-	ComPtr<ID3D11ShaderResourceView> mesh_depth_srv;
+	// Depth Textures
+
+	// for overall proper rendering
+	ComPtr<ID3D11Texture2D> scene_dtex;
+	ComPtr<ID3D11DepthStencilView> scene_dsv;
+	// ComPtr<ID3D11ShaderResourceView> scene_depth_srv;
+
+	/* created by the solid mesh shader to be compared by the wireframe shader to restrict wireframe only to specific drawcall */ 
+	ComPtr<ID3D11Texture2D> mesh_mask_dtex;
+	ComPtr<ID3D11RenderTargetView> mesh_mask_rtv;
+	ComPtr<ID3D11ShaderResourceView> mesh_mask_srv;
+
+	/* the see thru wireframe shader must discard pixels only relative to itself */
+	ComPtr<ID3D11Texture2D> wireframe_dtex;
+	ComPtr<ID3D11DepthStencilView> wireframe_dsv;
 
 	dx11::Buffer vbuff;
 	dx11::Buffer instabuff;
@@ -44,14 +59,17 @@ public:
 
 	ComPtr<ID3D11VertexShader> mesh_vs;
 
-	ComPtr<ID3D11RasterizerState> mesh_rs;
+	ComPtr<ID3D11RasterizerState> fill_front_rs;
+	ComPtr<ID3D11RasterizerState> fill_none_rs;
+	ComPtr<ID3D11RasterizerState> wireframe_bias_rs;
 	ComPtr<ID3D11RasterizerState> wireframe_none_bias_rs;
 
 	ComPtr<ID3D11PixelShader> mesh_ps;
+	ComPtr<ID3D11PixelShader> mesh_output_depth_ps;
 	ComPtr<ID3D11PixelShader> dim_wireframe_ps;
+	ComPtr<ID3D11PixelShader> wireframe_with_tesselation_ps;
 
-	ComPtr<ID3D11DepthStencilState> mesh_dss;
-	ComPtr<ID3D11DepthStencilState> dim_wireframe_dss;
+	ComPtr<ID3D11DepthStencilState> greater_dss;
 
 	ComPtr<ID3D11BlendState> mesh_bs;
 	ComPtr<ID3D11BlendState> blend_target_0_bs;

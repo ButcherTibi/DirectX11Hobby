@@ -3,6 +3,8 @@ struct VertexIn
 {
 	float3 pos : POSITION;
 	float3 normal : NORMAL;
+	float tess_edge : TESSELLATION_EDGE;
+	float tess_edge_dir : TESSELLATION_EDGE_DIR;
 	
 	float3 inst_pos : INSTANCE_POSITION;
 	float4 inst_rot : INSTANCE_ROTATION;
@@ -14,6 +16,10 @@ struct VertexIn
 	
 	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
 	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
+	float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
+	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
+	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
+	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
 };
 
 struct CameraLight
@@ -42,6 +48,8 @@ struct VertexOut
 	//int child_clip_id;
 	float4 dx_pos : SV_POSITION;
 	float3 normal : NORMAL;
+	float tess_edge : TESSELLATION_EDGE;
+	float tess_edge_dir : TESSELLATION_EDGE_DIR;
 	
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
@@ -50,7 +58,10 @@ struct VertexOut
 	
 	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
 	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
-	
+	float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
+	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
+	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
+	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
 	//// Debug
 	//float3 camera_pos : DEBUG_camera_pos;
 	//float4 camera_quat : DEBUG_camera_quat;
@@ -103,12 +114,14 @@ VertexOut main(VertexIn input)
 	pos -= camera_pos;
 	pos = quatRotate(pos, camera_quat_inv);
 	
-	float4 persp = mul(float4(pos, 1.0f), perspective); // perspective transform
-	persp.z /= z_far;
+	float4 persp = mul(perspective, float4(pos, 1.f)); // perspective transform
+	//persp.z /= z_far;
 	output.dx_pos = persp;
 
 	// Output
 	output.normal = input.normal;
+	output.tess_edge = input.tess_edge;
+	output.tess_edge_dir = input.tess_edge_dir;
 
 	output.albedo_color = input.albedo_color;
 	output.roughness = input.roughness;
@@ -117,6 +130,10 @@ VertexOut main(VertexIn input)
 	
 	output.wireframe_front_color = input.wireframe_front_color;
 	output.wireframe_back_color = input.wireframe_back_color;
+	output.wireframe_tess_front_color = input.wireframe_tess_front_color;
+	output.wireframe_tess_back_color = input.wireframe_tess_back_color;
+	output.wireframe_tess_split_count = input.wireframe_tess_split_count;
+	output.wireframe_tess_gap = input.wireframe_tess_gap;
 	
 	// Debug
 	//output.camera_pos = camera_pos;

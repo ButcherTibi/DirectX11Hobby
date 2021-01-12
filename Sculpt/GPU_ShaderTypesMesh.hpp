@@ -17,20 +17,28 @@ DirectX::XMFLOAT3 dxConvert(glm::vec3& value);
 DirectX::XMFLOAT4 dxConvert(glm::vec4& value);
 DirectX::XMFLOAT4 dxConvert(glm::quat& value);
 DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
-
+DirectX::XMMATRIX dxConvertMatrix(glm::mat4& value);
 
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT3 normal;
+	float tess_edge;
+	float tess_edge_dir;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 4> getInputLayout()
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 4> elems;
 		elems[0].SemanticName = "POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
 		elems[1].SemanticName = "NORMAL";
 		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[2].SemanticName = "TESSELLATION_EDGE";
+		elems[2].Format = DXGI_FORMAT_R32_FLOAT;
+
+		elems[3].SemanticName = "TESSELLATION_EDGE_DIR";
+		elems[3].Format = DXGI_FORMAT_R32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -82,10 +90,14 @@ struct GPU_MeshInstance {
 
 	DirectX::XMFLOAT3 wireframe_front_color;
 	DirectX::XMFLOAT4 wireframe_back_color;
+	DirectX::XMFLOAT3 wireframe_tess_front_color;
+	DirectX::XMFLOAT4 wireframe_tess_back_color;
+	float wireframe_tess_split_count;
+	float wireframe_tess_gap;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 8> getInputLayout(uint32_t input_slot = 1)
+	static std::array<D3D11_INPUT_ELEMENT_DESC, 12> getInputLayout(uint32_t input_slot = 1)
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 8> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 12> elems;
 		elems[0].SemanticName = "INSTANCE_POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
@@ -109,6 +121,18 @@ struct GPU_MeshInstance {
 
 		elems[7].SemanticName = "WIREFRAME_BACK_COLOR";
 		elems[7].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+		elems[8].SemanticName = "WIREFRAME_TESS_FRONT_COLOR";
+		elems[8].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+
+		elems[9].SemanticName = "WIREFRAME_TESS_BACK_COLOR";
+		elems[9].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+		elems[10].SemanticName = "WIREFRAME_TESS_SPLIT_COUNT";
+		elems[10].Format = DXGI_FORMAT_R32_FLOAT;
+
+		elems[11].SemanticName = "WIREFRAME_TESS_GAP";
+		elems[11].Format = DXGI_FORMAT_R32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -157,7 +181,7 @@ struct GPU_MeshUniform {
 };
 
 struct GPU_DrawcallUniform {
-	float flip_surface_normal;
+	uint32_t instance_id;
 	uint32_t _pad_0[3];
 	//--------------------------------
 };

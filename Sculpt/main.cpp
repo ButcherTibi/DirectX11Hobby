@@ -68,18 +68,22 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	// Application
 	{
+		// Layers
 		application.last_used_layer = &application.layers.emplace_back();
 		application.last_used_layer->parent = nullptr;
 		application.last_used_layer->name = "Root Layer";
 
+		// Instances
+		application.instance_id = 0;
+
+		// Drawcalls
 		application.last_used_drawcall = &application.drawcalls.emplace_back();
 		application.last_used_drawcall->name = "Root Drawcall";
-		application.last_used_drawcall->fill_mode = FillMode::SOLID;
-		application.last_used_drawcall->cull_mode = CullMode::BACK;
+		application.last_used_drawcall->rasterizer_mode = RasterizerMode::SOLID;
 		application.last_used_drawcall->show_aabbs = false;
 
 		// Shading
-		application.shading_normal = ShadingNormal::POLY;
+		application.shading_normal = ShadingNormal::VERTEX;
 
 		// Lighting
 		application.lights[0].normal = toNormal(45, 45);
@@ -107,9 +111,9 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 		// Camera
 		application.camera_focus = { 0, 0, 0 };
-		application.camera_field_of_view = 90;
-		application.camera_z_near = 0.1f;
-		application.camera_z_far = 100;
+		application.camera_field_of_view = 15;
+		application.camera_z_near = 100'000'000.f;
+		application.camera_z_far = 0.1f;
 		application.camera_pos = { 0, 0, 0 };
 		application.camera_quat_inv = { 1, 0, 0, 0 };
 		application.camera_forward = { 0, 0, -1 };
@@ -117,81 +121,51 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		application.camera_pan_sensitivity = 250;
 		application.camera_dolly_sensitivity = 0.001f;
 
-		
-		// Test
-		//{
-		//	CreateTriangleInfo info;
-		//	info.transform.pos = { 0, -2, 0 };
+		// Tests	
+		application.setCameraPosition(0, 0, 10);
+		application.setCameraFocus(glm::vec3(0, 0, 0));
 
-		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-		//	info.material.albedo_color = { 1, 0, 0 };
-		//	info.material.roughness = 0.5f;
-		//	info.material.metallic = 0.0f;
-		//	info.material.specular = 0.04f;
+		MeshDrawcall* drawcall_1 = application.createDrawcall();
+		drawcall_1->rasterizer_mode = RasterizerMode::SOLID;
 
-		//	application.createTriangleMesh(info);
-		//}
+		MeshDrawcall* drawcall_2 = application.createDrawcall();
+		drawcall_2->rasterizer_mode = RasterizerMode::SOLID_WITH_WIREFRAME_NONE;
 
-		//{
-		//	CreateQuadInfo info;
-		//	info.transform.pos = { 0, -4, 0 };
-
-		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::TESSELATION;
-		//	info.material.albedo_color = { 1, 0, 0 };
-		//	info.material.roughness = 0.5f;
-		//	info.material.metallic = 0.0f;
-		//	info.material.specular = 0.04f;
-
-		//	application.createQuadMesh(info);
-		//}
-		//
-		//{
-		//	CreateCubeInfo info;
-		//	info.transform.pos = { 0, -6, 0};
-
-		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-		//	info.material.albedo_color = { 1, 0, 0 };
-		//	info.material.roughness = 0.5f;
-		//	info.material.metallic = 0.0f;
-		//	info.material.specular = 0.04f;
-
-		//	application.createCubeMesh(info);
-		//}
-
-		//{
-		//	CreateCylinderInfo info;
-		//	info.transform.pos = { 0, -8, 0 };
-
-		//	info.vertical_sides = 2;
-		//	info.horizontal_sides = 300;
-
-		//	// info.mesh_shading_subprimitive = MeshShadingSubPrimitive::VERTEX;
-		//	info.material.albedo_color = { 1, 0, 0 };
-		//	info.material.roughness = 0.5f;
-		//	info.material.metallic = 0.0f;
-		//	info.material.specular = 0.04f;
-
-		//	application.createCylinder(info);
-		//}
+		MeshDrawcall* drawcall_3 = application.createDrawcall();
+		drawcall_3->rasterizer_mode = RasterizerMode::SOLID;
 
 		/*{
-			CreateUV_SphereInfo info;
-			info.transform.pos = { 0, 0, 0 };
-			info.diameter = 1.0f;
+			CreateTriangleInfo info;
+			info.transform.pos = { 0, -2, 0 };
 
-			info.vertical_sides = 10;
-			info.horizontal_sides = 10;
-
-			info.material.albedo_color = { 1, 0, 0 };
-			info.material.roughness = 0.3f;
-			info.material.metallic = 0.1f;
-
-			application.createUV_Sphere(info);
+			application.createTriangleMesh(info, nullptr, drawcall_2);
 		}*/
+		
+		/*{
+			CreateQuadInfo info;
+			info.transform.pos = { 0, -4, 0 };
 
-		MeshDrawcall& new_drawcall = application.createDrawcall();
-		new_drawcall.rasterizer_mode = RasterizerMode::SOLID_WITH_WIREFRAME_FRONT_NONE;
+			application.createQuadMesh(info, nullptr, drawcall_2);
+		}
+		
 		{
+			CreateCubeInfo info;
+			info.transform.pos = { 0, -6, 0};
+
+			application.createCubeMesh(info, nullptr, drawcall_2);
+		}
+
+		{
+			CreateCylinderInfo info;
+			info.transform.pos = { 0, -8, 0 };
+
+			info.vertical_sides = 2;
+			info.horizontal_sides = 15;
+
+			application.createCylinder(info, nullptr, drawcall_2);
+		}*/
+		
+		/*{
 			CreateUV_SphereInfo info;
 			info.transform.pos = { 0, 0, 0 };
 			info.diameter = 1.0f;
@@ -199,11 +173,8 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 			info.vertical_sides = 15;
 			info.horizontal_sides = 15;
 
-			MeshInstance& inst = application.createUV_Sphere(info, nullptr, &new_drawcall);
-			inst.pbr_material.albedo_color = { 1, 0, 0 };
-			inst.pbr_material.roughness = 0.3f;
-			inst.pbr_material.metallic = 0.1f;
-		}
+			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcall_2);
+		}*/
 
 		/*uint32_t rows = 7;
 		uint32_t cols = 7;
@@ -217,16 +188,40 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 				info.vertical_sides = 40;
 				info.horizontal_sides = 80;
 
-				info.material.albedo_color = { 1, 0, 0 };
-				info.material.roughness = (float)col / (cols - 1);
-				info.material.metallic = (float)row / (rows - 1);
-
-				application.createUV_Sphere(info);
+				MeshInstance& inst = application.createUV_Sphere(info);
+				inst.pbr_material.albedo_color = { 1, 0, 0 };
+				inst.pbr_material.roughness = (float)col / (cols - 1);
+				inst.pbr_material.metallic = (float)row / (rows - 1);
 			}
 		}*/
 
-		application.setCameraFocus(glm::vec3(0, 0, 0));
-		application.setCameraPosition(0, 0, 10);
+		{
+			io::FilePath path;
+			path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
+
+			GLTF_ImporterSettings settings;
+			settings.dest_drawcall = drawcall_1;
+
+			std::vector<MeshInstance*> new_instances;
+
+			err_stack = application.importMeshesFromGLTF_File(path, settings, &new_instances);
+			if (err_stack.isBad()) {
+				err_stack.debugPrint();
+				return 1;
+			}
+
+			for (MeshInstance*& inst : new_instances) {
+				inst = application.copyInstance(inst);
+				inst->pos.x = 100;
+				application.transferToDrawcall(inst, drawcall_2);
+			}
+
+			for (MeshInstance*& inst : new_instances) {
+				inst = application.copyInstance(inst);
+				inst->pos.x = 200;
+				application.transferToDrawcall(inst, drawcall_1);
+			}
+		}
 	}
 
 	nui::Instance instance;

@@ -2,11 +2,24 @@ struct VertexInput
 {
 	float4 dx_pos : SV_POSITION;
 	float3 normal : NORMAL;
+	float tess_edge : TESSELLATION_EDGE;
+	float tess_edge_dir : TESSELLATION_EDGE_DIR;
 	
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
 	float metallic : METALLIC;
 	float specular : SPECULAR;
+	
+	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
+	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
+	float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
+	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
+	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
+	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+};
+
+struct PixelOutput {
+	float4 color : SV_Target0;
 };
 
 struct CameraLight {
@@ -27,11 +40,6 @@ cbuffer FrameUniforms : register(b0)
 	CameraLight lights[8];
 	float ambient_intensity;
 };
-
-cbuffer DrawcallUniforms : register(b1)
-{
-	float flip_surface_normal;
-}
 
 static const float PI = 3.14159265f;
 
@@ -72,9 +80,9 @@ float3 fresnelSchlick(float cosTheta, float3 F0)
 	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-float4 main(VertexInput input) : SV_TARGET
+PixelOutput main(VertexInput input)
 {
-	float3 surface_normal = input.normal * flip_surface_normal;
+	float3 surface_normal = input.normal;
 	
 	float roughness = input.roughness;
 	float metallic  = input.metallic;
@@ -128,5 +136,8 @@ float4 main(VertexInput input) : SV_TARGET
 	float3 ambient = ambient_intensity * input.albedo_color;
 	float3 color = Lo + ambient;
 	
-	return float4(color, 1.);
+	PixelOutput output;
+	output.color = float4(color, 1.);
+	
+	return output;
 }

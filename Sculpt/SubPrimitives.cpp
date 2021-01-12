@@ -560,7 +560,7 @@ uint32_t SculptMesh::addTris(uint32_t v0, uint32_t v1, uint32_t v2)
 		ls[i]->poly = new_poly_idx;
 	}
 
-	// Calculate quad normals
+	// Calculate tris normal
 	Vertex* vertex_0 = &verts[ls[0]->target_v];
 	Vertex* vertex_1 = &verts[ls[1]->target_v];
 	Vertex* vertex_2 = &verts[ls[2]->target_v];
@@ -628,6 +628,46 @@ void SculptMesh::setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, u
 	new_poly.normal = glm::normalize((new_poly.tess_normals[0] + new_poly.tess_normals[1]) / 2.f);
 	new_poly.inner_loop = ls_idx[0];
 	new_poly.is_tris = 0;
+}
+
+void SculptMesh::setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
+	uint32_t v0, uint32_t v1, uint32_t v2)
+{
+	uint32_t new_poly_idx = tris;
+	Poly& new_poly = polys[new_poly_idx];
+
+	uint32_t ls_idx[3];
+	ls_idx[0] = setLoop(l0, v0, v1);
+	ls_idx[1] = setLoop(l1, v1, v2);
+	ls_idx[2] = setLoop(l2, v2, v0);
+
+	Loop* ls[3];
+	ls[0] = &loops[ls_idx[0]];
+	ls[1] = &loops[ls_idx[1]];
+	ls[2] = &loops[ls_idx[2]];
+
+	// Register poly to loops
+	ls[0]->poly_next_loop = ls_idx[1];
+	ls[0]->poly_prev_loop = ls_idx[2];
+
+	ls[1]->poly_next_loop = ls_idx[2];
+	ls[1]->poly_prev_loop = ls_idx[0];
+
+	ls[2]->poly_next_loop = ls_idx[0];
+	ls[2]->poly_prev_loop = ls_idx[1];
+
+	for (uint8_t i = 0; i < 3; i++) {
+		ls[i]->poly = new_poly_idx;
+	}
+
+	// Calculate tris normal
+	Vertex* vertex_0 = &verts[ls[0]->target_v];
+	Vertex* vertex_1 = &verts[ls[1]->target_v];
+	Vertex* vertex_2 = &verts[ls[2]->target_v];
+
+	new_poly.normal = calcWindingNormal(vertex_0, vertex_1, vertex_2);
+	new_poly.inner_loop = ls_idx[0];
+	new_poly.is_tris = 1;
 }
 
 uint32_t SculptMesh::addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3)

@@ -157,12 +157,16 @@ namespace scme {
 		uint32_t addTris(uint32_t v0, uint32_t v1, uint32_t v2);
 
 		/* assemble the quad using blank loops and existing vertices */
-		void setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, uint32_t l3,
-			uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
+		void setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
+			uint32_t v0, uint32_t v1, uint32_t v2);
 
 		/* creates a new quad from existing vertices, creates new loops between the vertices
 		if they are not already present */
 		uint32_t addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
+
+		/* assemble the quad using blank loops and existing vertices */
+		void setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, uint32_t l3,
+			uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
 		//void stichVerticesToVertex(Vertex* v, std::vector<Vertex*>& vertices, bool loop = false);
 		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
@@ -184,8 +188,7 @@ namespace scme {
 		void createAsCylinder(float height, float diameter, uint32_t vertical_sides, uint32_t horizontal_sides, bool capped = true);
 		void createAsUV_Sphere(float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
 
-		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-		//	bool flip_winding = false);
+		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
 		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
 		//	bool flip_winding = false);
 

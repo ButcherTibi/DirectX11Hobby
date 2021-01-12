@@ -345,42 +345,48 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-//void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-//	bool flip_winding)
-//{
-//	VertexBoundingBox& root = aabbs.front();
-//	uint32_t old_size = root.vs.size();
-//	root.vs.resize(old_size + positions.size());
-//
-//	std::vector<Vertex>& vs = root.vs;
-//
-//	for (uint32_t i = 0; i < positions.size(); i++) {
-//
-//		Vertex& v = vs[old_size + i];
-//		v.pos = positions[i];
-//		v.normal = normals[i];
-//	}
-//
-//	if (flip_winding) {
-//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-//
-//			uint32_t idx_0 = old_size + indexes[i];
-//			uint32_t idx_1 = old_size + indexes[i + 1];
-//			uint32_t idx_2 = old_size + indexes[i + 2];
-//			addTrisNormalWinding(&vs[idx_2], &vs[idx_1], &vs[idx_0]);
-//		}
-//	}
-//	else {
-//		for (uint32_t i = 0; i < indexes.size(); i += 3) {
-//
-//			uint32_t idx_0 = old_size + indexes[i];
-//			uint32_t idx_1 = old_size + indexes[i + 1];
-//			uint32_t idx_2 = old_size + indexes[i + 2];
-//			addTrisNormalWinding(&vs[idx_0], &vs[idx_1], &vs[idx_2]);
-//		}
-//	}
-//}
-//
+void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals)
+{
+	verts.resize(positions.size());
+	loops.resize(indexes.size());
+	polys.resize(indexes.size() / 3);
+
+	for (uint32_t i = 0; i < positions.size(); i++) {
+
+		Vertex& v = verts[i];
+		v.pos = positions[i];
+		v.normal = normals[i];
+		v.away_loop = 0xFFFF'FFFF;
+	}
+
+	for (uint32_t i = 0; i < indexes.size(); i += 3) {
+		
+		uint32_t tris = i / 3;
+
+		uint32_t l0 = i;
+		uint32_t l1 = i + 1;
+		uint32_t l2 = i + 2;
+
+		uint32_t v0_idx = indexes[i];
+		uint32_t v1_idx = indexes[i + 1];
+		uint32_t v2_idx = indexes[i + 2];
+
+		Vertex* v0 = &verts[v0_idx];
+		Vertex* v1 = &verts[v1_idx];
+		Vertex* v2 = &verts[v2_idx];
+
+		glm::vec3 normal = (v0->normal + v1->normal + v2->normal) / 3.f;
+		glm::vec3 winding_normal = calcWindingNormal(v0, v1, v2);
+
+		if (glm::dot(normal, winding_normal) > 0) {
+			setTris(tris, l0, l1, l2, v0_idx, v1_idx, v2_idx);
+		}
+		else {
+			setTris(tris, l0, l1, l2, v2_idx, v1_idx, v0_idx);
+		}
+	}
+}
+
 //void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
 //	bool flip_winding)
 //{

@@ -43,3 +43,29 @@ DirectX::XMFLOAT4X4 dxConvert(glm::mat4& val)
 
 	return r;
 }
+
+DirectX::XMMATRIX dxConvertMatrix(glm::mat4& val)
+{
+	DirectX::XMMATRIX mat;
+	mat.r[0].m128_f32[0] = val[0][0];
+	mat.r[0].m128_f32[1] = val[0][1];
+	mat.r[0].m128_f32[2] = val[0][2];
+	mat.r[0].m128_f32[3] = val[0][3];
+
+	mat.r[1].m128_f32[0] = val[1][0];
+	mat.r[1].m128_f32[1] = val[1][1];
+	mat.r[1].m128_f32[2] = val[1][2];
+	mat.r[1].m128_f32[3] = val[1][3];
+
+	mat.r[2].m128_f32[0] = val[2][0];
+	mat.r[2].m128_f32[1] = val[2][1];
+	mat.r[2].m128_f32[2] = val[2][2];
+	mat.r[2].m128_f32[3] = val[2][3];
+
+	mat.r[3].m128_f32[0] = val[3][0];
+	mat.r[3].m128_f32[1] = val[3][1];
+	mat.r[3].m128_f32[2] = val[3][2];
+	mat.r[3].m128_f32[3] = val[3][3];
+
+	return mat;
+}

@@ -79,6 +79,12 @@ std::string asIs(char c);
 		return ErrStack(code_location, msg, hr, ErrorOrigins::WINDOWS_ERROR_HANDLE); \
 	}
 
+#define checkHResult1(hr_func) \
+	hr = hr_func; \
+	if (hr != S_OK) { \
+		return ErrStack(code_location, "no message", hr, ErrorOrigins::WINDOWS_ERROR_HANDLE); \
+	}
+
 
 #define assert_cond(param, msg) \
 	if (param != true) \

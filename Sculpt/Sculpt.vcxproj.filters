@@ -137,5 +137,11 @@
     <FxCompile Include="DimWireframePS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
+    <FxCompile Include="WireframeWithTessellation.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="MeshOutputDepthPS.hlsl">
+      <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

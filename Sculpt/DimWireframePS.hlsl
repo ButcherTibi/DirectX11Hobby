@@ -2,6 +2,8 @@ struct VertexInput
 {
 	float4 dx_pos : SV_POSITION;
 	float3 normal : NORMAL;
+	float tess_edge : TESSELLATION_EDGE;
+	float tess_edge_dir : TESSELLATION_EDGE_DIR;
 	
 	float3 albedo_color : ALBEDO_COLOR;
 	float roughness : ROUGHNESS;
@@ -10,6 +12,10 @@ struct VertexInput
 	
 	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
 	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
+	float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
+	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
+	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
+	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
 };
 
 struct CameraLight {
@@ -31,23 +37,28 @@ cbuffer FrameUniforms : register(b0)
 	float ambient_intensity;
 };
 
-cbuffer DrawcallUniforms : register(b1)
+cbuffer DrawcallUniforms: register(b1)
 {
-	float flip_surface_normal;
+	uint instance_id;
 }
 
-Texture2D<float> mesh_depth_tex;
+Texture2D<float> mesh_mask_tex;
 
+// [earlydepthstencil]
 float4 main(VertexInput input) : SV_TARGET
 {
-	float mesh_depth = mesh_depth_tex.Load(input.dx_pos.xyz);
-	float wireframe_depth = input.dx_pos.z;
+	float mesh_mask_depth = mesh_mask_tex.Load(input.dx_pos.xyz);
+	float depth = input.dx_pos.z;
 	
-	// back
-	if (wireframe_depth >= mesh_depth) {
-		return float4(input.wireframe_back_color);
+	if (mesh_mask_depth != 0 && input.tess_edge != 1) {
+		
+		if (depth < mesh_mask_depth) {
+			return float4(input.wireframe_back_color);
+		}
+		return float4(input.wireframe_front_color, 1);
 	}
 	
-	// front
-	return float4(input.wireframe_front_color, 1.);
+	
+	discard;
+	return float4(1, 0, 1, 1);
 }
