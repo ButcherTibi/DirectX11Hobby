@@ -162,8 +162,8 @@ namespace nui {
 
 	public:
 		glm::uvec2 pos;  // where to render surface on screen
-		ElementSize width;
-		ElementSize height;
+		ElementSize width;  // not used
+		ElementSize height;  // not used
 
 		RenderingSurfaceCallback gpu_callback;
 		void* user_data;

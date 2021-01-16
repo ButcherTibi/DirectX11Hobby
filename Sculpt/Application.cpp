@@ -105,7 +105,7 @@ MeshDrawcall* Application::createDrawcall(std::string& name)
 		new_drawcall->name = "New Drawcall";
 	}
 
-	new_drawcall->rasterizer_mode = RasterizerMode::SOLID;
+	new_drawcall->rasterizer_mode = DisplayMode::SOLID;
 	new_drawcall->is_back_culled = false;
 	new_drawcall->show_aabbs = false;
 

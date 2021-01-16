@@ -34,11 +34,12 @@ so that one object changing only rewrites a single buffer
 struct MeshDrawcall;
 
 
-enum class RasterizerMode {
+enum class DisplayMode {
 	SOLID,
-	//SOLID_WITH_WIREFRAME_FRONT,
-	SOLID_WITH_WIREFRAME_NONE
-	//WIREFRANE_FRONT,
+	SOLID_WITH_WIREFRAME_FRONT,
+	SOLID_WITH_WIREFRAME_NONE,
+	WIREFRANE,
+	WIREFRANE_PURE,
 };
 // RasterizerState
 // solid front
@@ -82,7 +83,7 @@ struct MeshWireframeColors {
 	glm::vec3 front_color = { 0.0f, 1.0f, 0.0f };
 	glm::vec4 back_color = { 0.0f, 0.33f, 0.0f, 1.0f };
 	glm::vec3 tesselation_front_color = { 0.0f, 1.0f, 0.0f };
-	glm::vec4 tesselation_back_color = { 0.0f, 1.0f, 0.0f, 0.25f };
+	glm::vec4 tesselation_back_color = { 0.0f, 0.33f, 0.0f, 1.0f };
 	float tesselation_split_count = 4.0f;
 	float tesselation_gap = 0.5f;
 };
@@ -138,7 +139,7 @@ struct MeshDrawcall {
 
 	std::vector<MeshInstanceSet> mesh_instance_sets;
 	
-	RasterizerMode rasterizer_mode;
+	DisplayMode rasterizer_mode;
 	bool is_back_culled;
 	bool show_aabbs;  // not implemented
 };
@@ -210,7 +211,7 @@ public:
 
 	std::list<MeshInBuffers> meshes;
 
-	uint32_t instance_id;
+	uint32_t instance_id;  // TODO: unused
 	std::list<MeshInstance> instances;
 
 	std::list<MeshDrawcall> drawcalls;

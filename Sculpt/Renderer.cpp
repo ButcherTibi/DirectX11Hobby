@@ -604,59 +604,21 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 		// Vertex Shader
 		{
-			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/MeshVS.cso", mesh_vs_cso));
+			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/MeshVS.cso", shader_cso));
 
-			checkHResult(dev5->CreateVertexShader(mesh_vs_cso.data(), mesh_vs_cso.size(), nullptr,
+			checkHResult(dev5->CreateVertexShader(shader_cso.data(), shader_cso.size(), nullptr,
 				mesh_vs.GetAddressOf()),
 				"failed to create mesh vertex shader");
-		}
 
-		// Pixel Shader
-		{
-			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/MeshPS.cso", mesh_ps_cso));
-
-			checkHResult(dev5->CreatePixelShader(mesh_ps_cso.data(), mesh_ps_cso.size(), nullptr,
-				mesh_ps.GetAddressOf()),
-				"failed to create mesh pixel shader");
-		}
-
-		// Mesh Pixel Shader with depth output
-		{
-			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/MeshOutputDepthPS.cso", mesh_output_depth_ps_cso));
-
-			checkHResult(dev5->CreatePixelShader(mesh_output_depth_ps_cso.data(), mesh_output_depth_ps_cso.size(), nullptr,
-				mesh_output_depth_ps.GetAddressOf()),
-				"failed to create mesh output depth pixel shader");
-		}
-
-		// Wireframe Pixel Shader
-		{
-			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/DimWireframePS.cso", dim_wireframe_ps_cso));
-
-			checkHResult(dev5->CreatePixelShader(dim_wireframe_ps_cso.data(), dim_wireframe_ps_cso.size(), nullptr,
-				dim_wireframe_ps.GetAddressOf()),
-				"failed to create wireframe pixel shader");
-		}
-
-		// Wireframe With Tesselation Pixel Shader
-		{
-			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/WireframeWithTessellation.cso", wireframe_with_tessellation_ps_cso));
-
-			checkHResult(dev5->CreatePixelShader(wireframe_with_tessellation_ps_cso.data(),wireframe_with_tessellation_ps_cso.size(), nullptr,
-				wireframe_with_tesselation_ps.GetAddressOf()),
-				"failed to create wireframe with tesselation pixel shader");
-		}
-
-		// Vertex Input Layout
-		{
+			// Vertex Input Layout
 			auto vertex_elems = GPU_MeshVertex::getInputLayout();
 			auto instance_elems = GPU_MeshInstance::getInputLayout();
 
 			std::vector<D3D11_INPUT_ELEMENT_DESC> elems;
 			elems.resize(vertex_elems.size() + instance_elems.size());
-			
+
 			uint32_t idx = 0;
-			for (D3D11_INPUT_ELEMENT_DESC& elem: vertex_elems) {
+			for (D3D11_INPUT_ELEMENT_DESC& elem : vertex_elems) {
 				elems[idx++] = elem;
 			}
 
@@ -665,9 +627,49 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			}
 
 			checkHResult(dev5->CreateInputLayout(elems.data(), elems.size(),
-				mesh_vs_cso.data(), mesh_vs_cso.size(), mesh_il.GetAddressOf()),
+				shader_cso.data(), shader_cso.size(), mesh_il.GetAddressOf()),
 				"failed to create mesh vertex input layout");
 		}
+
+		// PBR Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/MeshPS.cso"), dev5,
+			mesh_ps.GetAddressOf(), &shader_cso));
+
+		// PBR Pixel Shader with depth output
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/MeshOutputDepthPS.cso"), dev5,
+			mesh_output_depth_ps.GetAddressOf(), &shader_cso));
+
+		// Front Wireframe Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/FrontWirePS.cso"), dev5,
+			front_wire_ps.GetAddressOf(), &shader_cso));
+
+		// Front Wireframe With Tesselation Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/FrontWireTessPS.cso"), dev5,
+			front_wire_tess_ps.GetAddressOf(), &shader_cso));
+
+		// See Thru Wireframe Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/SeeThruWirePS.cso"), dev5,
+			see_thru_wire_ps.GetAddressOf(), &shader_cso));
+
+		// See Thru Wireframe With Tesselation Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/SeeThruWireTessPS.cso"), dev5,
+			see_thru_wire_tess_ps.GetAddressOf(), &shader_cso));
+
+		// Wireframe Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/WirePS.cso"), dev5,
+			wire_ps.GetAddressOf(), &shader_cso));
+
+		// Wireframe With Tesselation Pixel Shader
+		checkErrStack1(dx11::createPixelShaderFromPath(
+			std::string("Sculpt/CompiledShaders/WireTessPS.cso"), dev5,
+			wire_tess_ps.GetAddressOf(), &shader_cso));
 
 		// Mesh Rasterization State
 		{
@@ -683,8 +685,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MultisampleEnable = false;
 			desc.AntialiasedLineEnable = false;
 
-			checkHResult(dev5->CreateRasterizerState(&desc, fill_front_rs.GetAddressOf()),
-				"failed to create raster state");
+			checkHResult1(dev5->CreateRasterizerState(&desc, fill_front_rs.GetAddressOf()));
 
 			desc.CullMode = D3D11_CULL_NONE;
 			checkHResult1(dev5->CreateRasterizerState(&desc, fill_none_rs.GetAddressOf()));
@@ -692,13 +693,17 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.FillMode = D3D11_FILL_WIREFRAME;
 			desc.CullMode = D3D11_CULL_BACK;
 			desc.DepthBias = 100'000;  // TODO: make this a setting
-			checkHResult(dev5->CreateRasterizerState(&desc, wireframe_bias_rs.GetAddressOf()),
-				"failed to create raster state");
+			checkHResult1(dev5->CreateRasterizerState(&desc, wireframe_bias_rs.GetAddressOf()));
 
-			// Wireframe Rasterizer State
+			desc.FillMode = D3D11_FILL_WIREFRAME;
 			desc.CullMode = D3D11_CULL_NONE;
-			checkHResult(dev5->CreateRasterizerState(&desc, wireframe_none_bias_rs.GetAddressOf()),
-				"failed to create raster state");
+			desc.DepthBias = 100'000;
+			checkHResult1(dev5->CreateRasterizerState(&desc, wireframe_none_bias_rs.GetAddressOf()));
+
+			desc.FillMode = D3D11_FILL_WIREFRAME;
+			desc.CullMode = D3D11_CULL_NONE;
+			desc.DepthBias = 0;
+			checkHResult1(dev5->CreateRasterizerState(&desc, wire_rs.GetAddressOf()));
 		}
 
 		// Mesh Blend States
@@ -818,6 +823,8 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 	for (MeshDrawcall& drawcall : application.drawcalls) {
 
+		lazyUnbind(de_ctx3);
+
 		// skip empty drawcalls
 		if (!drawcall.mesh_instance_sets.size()) {
 			continue;
@@ -845,7 +852,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		}
 
 		switch (drawcall.rasterizer_mode) {
-		case RasterizerMode::SOLID: {
+		case DisplayMode::SOLID: {
 
 			/* Overview
 			- Draw the meshes using the PBR mesh shader*/
@@ -913,8 +920,126 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			}
 			break;
 		}
+		
+		case DisplayMode::SOLID_WITH_WIREFRAME_FRONT: {
 
-		case RasterizerMode::SOLID_WITH_WIREFRAME_NONE: {
+			/* Overview
+			- Draw the meshes using the PBR mesh shader
+			- Draw the wireframe on top offset by depth bias */
+
+			lazyUnbind(de_ctx3);
+
+			// Input Assembly
+			{
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				std::array<ID3D11Buffer*, 2> buffers = {
+					vbuff.buff.Get(), instabuff.buff.Get()
+				};
+				std::array<uint32_t, 2> strides = {
+					sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+				};
+				std::array<uint32_t, 2> offsets = {
+					0, 0
+				};
+				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+			}
+
+			// Vertex Shader
+			{
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+			}
+
+			// Rasterization
+			if (drawcall.is_back_culled) {
+				de_ctx3->RSSetState(fill_front_rs.Get());
+			}
+			else {
+				de_ctx3->RSSetState(fill_none_rs.Get());
+			}
+
+			// Pixel Shader
+			{
+				std::array<ID3D11Buffer*, 1> buffers = {
+					frame_ubuff.buff.Get()
+				};
+				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+
+				de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+			}
+
+			// Output Merger
+			{
+				float blend_factor[4] = { 1, 1, 1, 1 };
+				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+
+				std::array<ID3D11RenderTargetView*, 1> rtvs = {
+					event.compose_rtv
+				};
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+			}
+
+			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+			}
+
+			// Draw the wireframe on top offset by depth bias
+
+			lazyUnbind(de_ctx3);
+
+			// Vertex Shader
+			{
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+			}
+
+			// Rasterization
+			de_ctx3->RSSetState(wireframe_bias_rs.Get());
+
+			// Pixel Shader
+			{
+				switch (application.shading_normal) {
+				case ShadingNormal::VERTEX:
+				case ShadingNormal::POLY: {
+					de_ctx3->PSSetShader(front_wire_ps.Get(), nullptr, 0);
+					break;
+				}
+				case ShadingNormal::TESSELATION: {
+					de_ctx3->PSSetShader(front_wire_tess_ps.Get(), nullptr, 0);
+					break;
+				}
+				}
+			}
+
+			// Output Merger
+			{
+				float blend_factor[4] = { 1, 1, 1, 1 };
+				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+
+				std::array<ID3D11RenderTargetView*, 1> rtvs = {
+					event.compose_rtv
+				};
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+			}
+
+			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+			}
+
+			break;
+		}
+
+		case DisplayMode::SOLID_WITH_WIREFRAME_NONE: {
 
 			/* Overview
 			- clear the mesh depth tex
@@ -996,22 +1121,6 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 			lazyUnbind(de_ctx3);
 
-			// Input Assembly
-			{
-				de_ctx3->IASetInputLayout(mesh_il.Get());
-
-				std::array<ID3D11Buffer*, 2> buffers = {
-					vbuff.buff.Get(), instabuff.buff.Get()
-				};
-				std::array<uint32_t, 2> strides = {
-					sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
-				};
-				std::array<uint32_t, 2> offsets = {
-					0, 0
-				};
-				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
-			}
-
 			// Vertex Shader
 			{
 				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
@@ -1036,11 +1145,11 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				switch (application.shading_normal) {
 				case ShadingNormal::VERTEX:
 				case ShadingNormal::POLY: {
-					de_ctx3->PSSetShader(dim_wireframe_ps.Get(), nullptr, 0);
+					de_ctx3->PSSetShader(see_thru_wire_ps.Get(), nullptr, 0);
 					break;
 				}
 				case ShadingNormal::TESSELATION: {
-					de_ctx3->PSSetShader(wireframe_with_tesselation_ps.Get(), nullptr, 0);
+					de_ctx3->PSSetShader(see_thru_wire_tess_ps.Get(), nullptr, 0);
 					break;
 				}
 				}
@@ -1057,6 +1166,78 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 					event.compose_rtv, nullptr
 				};
 				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_dsv.Get());
+			}
+
+			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
+
+				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
+			}
+
+			break;
+		}
+
+		case DisplayMode::WIREFRANE_PURE: {
+
+			lazyUnbind(de_ctx3);
+
+			// Input Assembly
+			{
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				std::array<ID3D11Buffer*, 2> buffers = {
+					vbuff.buff.Get(), instabuff.buff.Get()
+				};
+				std::array<uint32_t, 2> strides = {
+					sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+				};
+				std::array<uint32_t, 2> offsets = {
+					0, 0
+				};
+				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+			}
+
+			// Vertex Shader
+			{
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+			}
+
+			// Rasterization
+			de_ctx3->RSSetState(wire_rs.Get());
+
+			// Pixel Shader
+			{
+				std::array<ID3D11Buffer*, 1> buffers = {
+					frame_ubuff.buff.Get()
+				};
+				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+
+				switch (application.shading_normal) {
+				case ShadingNormal::VERTEX:
+				case ShadingNormal::POLY: {
+					de_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
+					break;
+				}
+				case ShadingNormal::TESSELATION: {
+					de_ctx3->PSSetShader(wire_tess_ps.Get(), nullptr, 0);
+					break;
+				}
+				}
+			}
+
+			// Output Merger
+			{
+				float blend_factor[4] = { 1, 1, 1, 1 };
+				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+
+				std::array<ID3D11RenderTargetView*, 1> rtvs = {
+					event.compose_rtv
+				};
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {

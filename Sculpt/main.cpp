@@ -79,11 +79,11 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		// Drawcalls
 		application.last_used_drawcall = &application.drawcalls.emplace_back();
 		application.last_used_drawcall->name = "Root Drawcall";
-		application.last_used_drawcall->rasterizer_mode = RasterizerMode::SOLID;
+		application.last_used_drawcall->rasterizer_mode = DisplayMode::SOLID;
 		application.last_used_drawcall->show_aabbs = false;
 
 		// Shading
-		application.shading_normal = ShadingNormal::VERTEX;
+		application.shading_normal = ShadingNormal::TESSELATION;
 
 		// Lighting
 		application.lights[0].normal = toNormal(45, 45);
@@ -125,101 +125,63 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		application.setCameraPosition(0, 0, 10);
 		application.setCameraFocus(glm::vec3(0, 0, 0));
 
-		MeshDrawcall* drawcall_1 = application.createDrawcall();
-		drawcall_1->rasterizer_mode = RasterizerMode::SOLID;
+		MeshDrawcall* drawcalls[5];
 
-		MeshDrawcall* drawcall_2 = application.createDrawcall();
-		drawcall_2->rasterizer_mode = RasterizerMode::SOLID_WITH_WIREFRAME_NONE;
-
-		MeshDrawcall* drawcall_3 = application.createDrawcall();
-		drawcall_3->rasterizer_mode = RasterizerMode::SOLID;
-
-		/*{
-			CreateTriangleInfo info;
-			info.transform.pos = { 0, -2, 0 };
-
-			application.createTriangleMesh(info, nullptr, drawcall_2);
-		}*/
-		
-		/*{
-			CreateQuadInfo info;
-			info.transform.pos = { 0, -4, 0 };
-
-			application.createQuadMesh(info, nullptr, drawcall_2);
-		}
-		
-		{
-			CreateCubeInfo info;
-			info.transform.pos = { 0, -6, 0};
-
-			application.createCubeMesh(info, nullptr, drawcall_2);
+		for (MeshDrawcall*& drawcall : drawcalls) {
+			drawcall = application.createDrawcall();
 		}
 
-		{
-			CreateCylinderInfo info;
-			info.transform.pos = { 0, -8, 0 };
+		drawcalls[0]->rasterizer_mode = DisplayMode::SOLID;
+		drawcalls[1]->rasterizer_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+		drawcalls[2]->rasterizer_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
+		drawcalls[3]->rasterizer_mode = DisplayMode::WIREFRANE_PURE;
+		drawcalls[4]->rasterizer_mode = DisplayMode::WIREFRANE_PURE;	
 
-			info.vertical_sides = 2;
-			info.horizontal_sides = 15;
-
-			application.createCylinder(info, nullptr, drawcall_2);
-		}*/
-		
-		/*{
-			CreateUV_SphereInfo info;
-			info.transform.pos = { 0, 0, 0 };
-			info.diameter = 1.0f;
-
-			info.vertical_sides = 15;
-			info.horizontal_sides = 15;
-
-			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcall_2);
-		}*/
-
-		/*uint32_t rows = 7;
-		uint32_t cols = 7;
-		for (uint32_t row = 0; row < rows; row += 1) {
-			for (uint32_t col = 0; col < cols; col += 1) {
-
-				CreateUV_SphereInfo info;
-				info.transform.pos = { col * 2, row * 2, 0 };
-				info.diameter = 1;
-
-				info.vertical_sides = 40;
-				info.horizontal_sides = 80;
-
-				MeshInstance& inst = application.createUV_Sphere(info);
-				inst.pbr_material.albedo_color = { 1, 0, 0 };
-				inst.pbr_material.roughness = (float)col / (cols - 1);
-				inst.pbr_material.metallic = (float)row / (rows - 1);
-			}
-		}*/
+		std::vector<MeshInstance*> new_instances;
 
 		{
 			io::FilePath path;
 			path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
 
 			GLTF_ImporterSettings settings;
-			settings.dest_drawcall = drawcall_1;
-
-			std::vector<MeshInstance*> new_instances;
+			settings.dest_drawcall = drawcalls[0];
 
 			err_stack = application.importMeshesFromGLTF_File(path, settings, &new_instances);
 			if (err_stack.isBad()) {
 				err_stack.debugPrint();
 				return 1;
 			}
+		}
+
+		float sphere_y = 250.f;
+		float sphere_diameter = 50.f;
+		float spacing = 100;
+		{
+			CreateUV_SphereInfo info;
+			info.transform.pos = { 0, sphere_y, 0 };
+			info.diameter = sphere_diameter;
+
+			info.vertical_sides = 15;
+			info.horizontal_sides = 15;
+
+			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcalls[0]);
+		}
+
+		for (uint32_t i = 1; i < 5; i++) {
+
+			CreateUV_SphereInfo info;
+			info.transform.pos = { i * spacing, sphere_y, 0 };
+			info.diameter = sphere_diameter;
+
+			info.vertical_sides = 15;
+			info.horizontal_sides = 15;
+
+			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcalls[i]);
 
 			for (MeshInstance*& inst : new_instances) {
 				inst = application.copyInstance(inst);
-				inst->pos.x = 100;
-				application.transferToDrawcall(inst, drawcall_2);
-			}
-
-			for (MeshInstance*& inst : new_instances) {
-				inst = application.copyInstance(inst);
-				inst->pos.x = 200;
-				application.transferToDrawcall(inst, drawcall_1);
+				inst->pos.x = i * spacing;
+				application.transferToDrawcall(inst, drawcalls[i]);
 			}
 		}
 	}

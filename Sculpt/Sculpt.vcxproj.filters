@@ -134,14 +134,26 @@
     <FxCompile Include="MeshPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
-    <FxCompile Include="DimWireframePS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="WireframeWithTessellation.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
     <FxCompile Include="MeshOutputDepthPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="SeeThruWirePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="FrontWirePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="FrontWireTessPS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="SeeThruWireTessPS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="WirePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="WireTessPS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

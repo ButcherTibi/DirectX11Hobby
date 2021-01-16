@@ -11,11 +11,7 @@ public:
 	float viewport_width;
 	float viewport_height;
 
-	std::vector<char> mesh_vs_cso;
-	std::vector<char> mesh_ps_cso;
-	std::vector<char> mesh_output_depth_ps_cso;
-	std::vector<char> dim_wireframe_ps_cso;
-	std::vector<char> wireframe_with_tessellation_ps_cso;
+	std::vector<char> shader_cso;
 
 	// Update
 	bool load_vertices;
@@ -61,13 +57,18 @@ public:
 
 	ComPtr<ID3D11RasterizerState> fill_front_rs;
 	ComPtr<ID3D11RasterizerState> fill_none_rs;
+	ComPtr<ID3D11RasterizerState> wire_rs;
 	ComPtr<ID3D11RasterizerState> wireframe_bias_rs;
 	ComPtr<ID3D11RasterizerState> wireframe_none_bias_rs;
 
 	ComPtr<ID3D11PixelShader> mesh_ps;
 	ComPtr<ID3D11PixelShader> mesh_output_depth_ps;
-	ComPtr<ID3D11PixelShader> dim_wireframe_ps;
-	ComPtr<ID3D11PixelShader> wireframe_with_tesselation_ps;
+	ComPtr<ID3D11PixelShader> front_wire_ps;
+	ComPtr<ID3D11PixelShader> front_wire_tess_ps;
+	ComPtr<ID3D11PixelShader> see_thru_wire_ps;
+	ComPtr<ID3D11PixelShader> see_thru_wire_tess_ps;
+	ComPtr<ID3D11PixelShader> wire_ps;
+	ComPtr<ID3D11PixelShader> wire_tess_ps;
 
 	ComPtr<ID3D11DepthStencilState> greater_dss;
 

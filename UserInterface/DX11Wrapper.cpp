@@ -4,6 +4,8 @@
 // Header
 #include "DX11Wrapper.hpp"
 
+#include "FilePath.hpp"
+
 
 using namespace dx11;
 
@@ -140,4 +142,27 @@ ErrStack dx11::resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t 
 		"failed to resize texture 2D");
 
 	return ErrStack();
+}
+
+ErrStack dx11::createPixelShaderFromPath(std::string& path_to_file, ID3D11Device5* device,
+	ID3D11PixelShader** r_pixel_shader,
+	std::vector<char>* read_buffer)
+{
+	ErrStack err_stack;
+	HRESULT hr;
+
+	std::vector<char> empty_vec;
+
+	if (read_buffer == nullptr) {
+		read_buffer = &empty_vec;
+	}
+
+	checkErrStack(io::readLocalFile(path_to_file, *read_buffer),
+		"failed to read compiled pixel shader code from path");
+
+	checkHResult(device->CreatePixelShader(read_buffer->data(), read_buffer->size(), nullptr,
+		r_pixel_shader),
+		"failed to create pixel shader");
+	
+	return err_stack;
 }

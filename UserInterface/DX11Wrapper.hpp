@@ -41,4 +41,8 @@ namespace dx11 {
 
 	ErrStack resizeTexture2D(ID3D11Device5* dev, uint32_t new_width, uint32_t new_height,
 		ComPtr<ID3D11Texture2D>& tex);
+
+	ErrStack createPixelShaderFromPath(std::string& path_to_file, ID3D11Device5* device,
+		ID3D11PixelShader** r_pixel_shader,
+		std::vector<char>* read_buffer = nullptr);
 }
