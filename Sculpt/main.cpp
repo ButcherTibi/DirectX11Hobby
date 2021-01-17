@@ -80,7 +80,7 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		application.last_used_drawcall = &application.drawcalls.emplace_back();
 		application.last_used_drawcall->name = "Root Drawcall";
 		application.last_used_drawcall->rasterizer_mode = DisplayMode::SOLID;
-		application.last_used_drawcall->show_aabbs = false;
+		application.last_used_drawcall->_debug_show_octree = false;
 
 		// Shading
 		application.shading_normal = ShadingNormal::TESSELATION;
@@ -125,26 +125,27 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		application.setCameraPosition(0, 0, 10);
 		application.setCameraFocus(glm::vec3(0, 0, 0));
 
-		MeshDrawcall* drawcalls[5];
+		MeshDrawcall* drawcalls[4];
 
-		for (MeshDrawcall*& drawcall : drawcalls) {
-			drawcall = application.createDrawcall();
-		}
+		drawcalls[0] = application.createDrawcall();
+		drawcalls[1] = application.createDrawcall();
+		drawcalls[2] = application.createDrawcall();
+		drawcalls[3] = application.createDrawcall();
 
 		drawcalls[0]->rasterizer_mode = DisplayMode::SOLID;
+		drawcalls[0]->_debug_show_octree = true;
+
 		drawcalls[1]->rasterizer_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
 		drawcalls[2]->rasterizer_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
 		drawcalls[3]->rasterizer_mode = DisplayMode::WIREFRANE_PURE;
-		drawcalls[4]->rasterizer_mode = DisplayMode::WIREFRANE_PURE;	
 
 		std::vector<MeshInstance*> new_instances;
-
 		{
 			io::FilePath path;
 			path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
 
 			GLTF_ImporterSettings settings;
-			settings.dest_drawcall = drawcalls[0];
+			settings.max_vertices_in_AABB = 128;
 
 			err_stack = application.importMeshesFromGLTF_File(path, settings, &new_instances);
 			if (err_stack.isBad()) {
@@ -152,11 +153,24 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 				return 1;
 			}
 		}
+		
+		uint32_t target_inst = 4;
 
-		float sphere_y = 250.f;
+		for (uint32_t i = 0; i < new_instances.size(); i++) {
+
+			if (i == target_inst) {
+				application.transferToDrawcall(new_instances[target_inst], drawcalls[0]);
+			}
+			else {
+				application.deleteInstance(new_instances[i]);
+			}
+		}
+
+		/*float sphere_y = 250.f;
 		float sphere_diameter = 50.f;
-		float spacing = 100;
-		{
+		float spacing = 100;*/
+
+		/*{
 			CreateUV_SphereInfo info;
 			info.transform.pos = { 0, sphere_y, 0 };
 			info.diameter = sphere_diameter;
@@ -165,25 +179,27 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 			info.horizontal_sides = 15;
 
 			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcalls[0]);
-		}
+		}*/
 
-		for (uint32_t i = 1; i < 5; i++) {
+		/*for (uint32_t i = 1; i < 4; i++) {
 
-			CreateUV_SphereInfo info;
-			info.transform.pos = { i * spacing, sphere_y, 0 };
-			info.diameter = sphere_diameter;
+			{
+				CreateUV_SphereInfo info;
+				info.transform.pos = { i * spacing, sphere_y, 0 };
+				info.diameter = sphere_diameter;
 
-			info.vertical_sides = 15;
-			info.horizontal_sides = 15;
+				info.vertical_sides = 15;
+				info.horizontal_sides = 15;
 
-			MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcalls[i]);
+				MeshInstance* inst = application.createUV_Sphere(info, nullptr, drawcalls[i]);
+			}
 
 			for (MeshInstance*& inst : new_instances) {
 				inst = application.copyInstance(inst);
 				inst->pos.x = i * spacing;
 				application.transferToDrawcall(inst, drawcalls[i]);
 			}
-		}
+		}*/
 	}
 
 	nui::Instance instance;

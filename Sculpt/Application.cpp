@@ -10,6 +10,31 @@
 
 Application application;
 
+void Application::_deleteFromDrawcall(MeshInstance* instance)
+{
+	auto& mesh_instance_sets = instance->parent_drawcall->mesh_instance_sets;
+
+	for (uint32_t i = 0; i < mesh_instance_sets.size(); i++) {
+
+		MeshInstanceSet& mesh_instance_set = mesh_instance_sets[i];
+		if (mesh_instance_set.mesh == instance->parent_mesh) {
+
+			for (uint32_t j = 0; j < mesh_instance_set.instances.size(); j++) {
+
+				MeshInstance* instance = mesh_instance_set.instances[j];
+				if (instance == instance) {
+
+					mesh_instance_set.instances.erase(mesh_instance_set.instances.begin() + j);
+
+					if (!mesh_instance_set.instances.size()) {
+						mesh_instance_sets.erase(mesh_instance_sets.begin() + i);
+					}
+				}
+			}
+		}
+	}
+}
+
 MeshInBuffers* Application::createMesh()
 {
 	MeshInBuffers& new_mesh = this->meshes.emplace_back();
@@ -18,8 +43,7 @@ MeshInBuffers* Application::createMesh()
 	sculpt_mesh.max_vertices_in_AABB = 1024;
 
 	new_mesh.mesh_vertex_start = 0xFFFF'FFFF;
-	new_mesh.aabb_vertex_start = 0xFFFF'FFFF;
-	new_mesh.aabb_index_start = 0xFFFF'FFFF;
+	new_mesh.aabbs_vertex_start = 0xFFFF'FFFF;
 
 	return &new_mesh;
 }
@@ -37,6 +61,7 @@ MeshInstance* Application::createInstance(MeshInBuffers* mesh, MeshLayer* dest_l
 
 	assignInstanceToLayer(new_instance, dest_layer);
 	transferToDrawcall(new_instance, parent_drawcall);
+	mesh->child_instances.insert(new_instance);
 
 	return new_instance;
 }
@@ -57,8 +82,46 @@ MeshInstance* Application::copyInstance(MeshInstance* source, MeshLayer* dest_la
 
 	assignInstanceToLayer(new_instance, dest_layer);
 	transferToDrawcall(new_instance, source->parent_drawcall);
+	source->parent_mesh->child_instances.insert(new_instance);
 
 	return new_instance;
+}
+
+void Application::deleteInstance(MeshInstance* inst)
+{
+	// remove from layers
+	for (MeshLayer& layer : layers) {
+		layer.instances.erase(inst);
+	}
+
+	// remove from drawcall
+	_deleteFromDrawcall(inst);
+
+	uint32_t child_instances_of_mesh = 0;
+
+	// remove from mesh
+	inst->parent_mesh->child_instances.erase(inst);
+
+	// remove mesh if that instance was the only one
+	if (!inst->parent_mesh->child_instances.size())
+	{
+		for (auto it = meshes.begin(); it != meshes.end(); it++) {
+
+			if (&(*it) == inst->parent_mesh) {
+				meshes.erase(it);
+				break;
+			}
+		}
+	}
+
+	// remove instance
+	for (auto it = instances.begin(); it != instances.end(); it++) {
+
+		if (&(*it) == inst) {
+			instances.erase(it);
+			break;
+		}
+	}
 }
 
 void Application::assignInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer)
@@ -107,7 +170,7 @@ MeshDrawcall* Application::createDrawcall(std::string& name)
 
 	new_drawcall->rasterizer_mode = DisplayMode::SOLID;
 	new_drawcall->is_back_culled = false;
-	new_drawcall->show_aabbs = false;
+	new_drawcall->_debug_show_octree = false;
 
 	return new_drawcall;
 }
@@ -268,7 +331,7 @@ MeshInstance* Application::createCylinder(CreateCylinderInfo& info,
 
 	MeshInBuffers* new_mesh = createMesh();
 	new_mesh->mesh.createAsCylinder(info.height, info.diameter,
-		info.vertical_sides, info.horizontal_sides, info.with_caps);
+		info.rows, info.columns, info.with_caps);
 
 	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
 	new_instance->pos = info.transform.pos;
@@ -292,7 +355,8 @@ MeshInstance* Application::createUV_Sphere(CreateUV_SphereInfo& info,
 	}
 
 	MeshInBuffers* new_mesh = createMesh();
-	new_mesh->mesh.createAsUV_Sphere(info.diameter, info.vertical_sides, info.horizontal_sides);
+	new_mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns,
+		info.max_vertices_in_AABB);
 
 	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
 	new_instance->pos = info.transform.pos;
@@ -340,7 +404,8 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 
 			if (gltf_prim.indexes.size()) {
 				if (gltf_prim.normals.size()) {
-					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals);
+					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals,
+						settings.max_vertices_in_AABB);
 				}
 				else {
 					//new_mesh->addFromLists(prim.indexes, prim.positions, true);
@@ -475,16 +540,16 @@ void Application::pivotCameraAroundY(float deg_x, float deg_y)
 	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } * camera_quat_inv);
 
 	glm::quat delta_rot = { 1, 0, 0, 0 };
-	delta_rot = glm::rotate(delta_rot, toRad(deg_x), camera_right);
-	delta_rot = glm::rotate(delta_rot, toRad(deg_y), { 0, 1, 0 });
+	delta_rot = glm::rotate(delta_rot, toRad(deg_y), camera_right);
+	delta_rot = glm::rotate(delta_rot, toRad(deg_x), { 0, 1, 0 });
 	delta_rot = glm::normalize(delta_rot);
 
 	camera_pos = (camera_pos - camera_focus) * delta_rot;
 	this->camera_pos += camera_focus;
 
 	glm::quat reverse_rot = camera_quat_inv;
-	reverse_rot = glm::rotate(reverse_rot, toRad(deg_x), camera_right);
-	reverse_rot = glm::rotate(reverse_rot, toRad(deg_y), { 0, 1, 0 });
+	reverse_rot = glm::rotate(reverse_rot, toRad(deg_y), camera_right);
+	reverse_rot = glm::rotate(reverse_rot, toRad(deg_x), { 0, 1, 0 });
 
 	this->camera_quat_inv = reverse_rot;
 

@@ -8,6 +8,11 @@
 using namespace scme;
 
 
+bool VertexBoundingBox::is_unused()
+{
+	return verts.size() - deleted_count == 0 && children[0] == 0xFFFF'FFFF;
+}
+
 void SculptMesh::calcVertexNormal(Vertex* vertex)
 {
 	// Vertex& vertex = verts[v];
@@ -73,25 +78,25 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 	Vertex& vertex = verts[vertex_idx];
 
 	uint32_t now_count = 1;
-	uint32_t now_aabbs[64];
+	uint32_t now_aabbs[8] = {
+		start_aabb
+	};
 
 	uint32_t next_count = 0;
-	uint32_t next_aabbs[64];
-
-	now_aabbs[0] = start_aabb;
+	uint32_t next_aabbs[8];
 
 	do {
 		for (uint32_t i = 0; i < now_count; i++) {
 
 			uint32_t aabb_idx = now_aabbs[i];
-			VertexBoundingBox& aabb = aabbs[aabb_idx];
+			VertexBoundingBox* aabb = &aabbs[aabb_idx];
 
-			if (aabb.aabb.isPositionInside(vertex.pos)) {
-
-				uint32_t child_vertex_count = aabb.verts.size() - aabb.deleted_count;
+			if (aabb->aabb.isPositionInside(vertex.pos)) {
 
 				// Leaf
-				if (child_vertex_count) {
+				if (aabb->children[0] == 0xFFFF'FFFF) {
+
+					uint32_t child_vertex_count = aabb->verts.size() - aabb->deleted_count;
 
 					// leaf not full
 					if (child_vertex_count < max_vertices_in_AABB) {
@@ -101,15 +106,16 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 					}
 					// Subdivide
 					else {
-						uint32_t idx = aabbs.size();
+						uint32_t base_idx = aabbs.size();
 						aabbs.resize(aabbs.size() + 8);
 
-						glm::vec3& min = aabb.aabb.min;
-						glm::vec3& max = aabb.aabb.max;
+						aabb = &aabbs[aabb_idx];  // old AABB pointer invalidated because octrees resize
+						glm::vec3& min = aabb->aabb.min;
+						glm::vec3& max = aabb->aabb.max;
 
-						float x_mid = (aabb.aabb.max.x + aabb.aabb.min.x) / 2.0f;
-						float y_mid = (aabb.aabb.max.y + aabb.aabb.min.y) / 2.0f;
-						float z_mid = (aabb.aabb.max.z + aabb.aabb.min.z) / 2.0f;
+						float x_mid = (aabb->aabb.max.x + aabb->aabb.min.x) / 2.0f;
+						float y_mid = (aabb->aabb.max.y + aabb->aabb.min.y) / 2.0f;
+						float z_mid = (aabb->aabb.max.z + aabb->aabb.min.z) / 2.0f;
 
 						/*	Top Down View
 								   +------+------+   ^
@@ -123,79 +129,79 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 
 						{
 							// Top Forward Left
-							AxisBoundingBox3D& box_0 = aabbs[idx].aabb;
-							box_0.max = { x_mid, max.y, min.z };
+							AxisBoundingBox3D& box_0 = aabbs[base_idx].aabb;
+							box_0.max = { x_mid, max.y, max.z };
 							box_0.min = { min.x, y_mid, z_mid };
 
 							// Top Forward Right
-							AxisBoundingBox3D& box_1 = aabbs[idx + 1].aabb;
-							box_1.max = { max.x, max.y, min.z };
+							AxisBoundingBox3D& box_1 = aabbs[base_idx + 1].aabb;
+							box_1.max = { max.x, max.y, max.z };
 							box_1.min = { x_mid, y_mid, z_mid };
 
 							// Top Backward Left
-							AxisBoundingBox3D& box_2 = aabbs[idx + 2].aabb;
+							AxisBoundingBox3D& box_2 = aabbs[base_idx + 2].aabb;
 							box_2.max = { x_mid, max.y, z_mid };
-							box_2.min = { min.x, y_mid, max.z };
+							box_2.min = { min.x, y_mid, min.z };
 
 							// Top Backward Right
-							AxisBoundingBox3D& box_3 = aabbs[idx + 3].aabb;
+							AxisBoundingBox3D& box_3 = aabbs[base_idx + 3].aabb;
 							box_3.max = { max.x, max.y, z_mid };
-							box_3.min = { x_mid, y_mid, max.z };
+							box_3.min = { x_mid, y_mid, min.z };
 						}
 
 						{
 							// Bot Forward Left
-							AxisBoundingBox3D& box_0 = aabbs[idx + 4].aabb;
-							box_0.max = { x_mid, y_mid, min.z };
+							AxisBoundingBox3D& box_0 = aabbs[base_idx + 4].aabb;
+							box_0.max = { x_mid, y_mid, max.z };
 							box_0.min = { min.x, min.y, z_mid };
 
 							// Bot Forward Right
-							AxisBoundingBox3D& box_1 = aabbs[idx + 5].aabb;
-							box_1.max = { max.x, y_mid, min.z };
+							AxisBoundingBox3D& box_1 = aabbs[base_idx + 5].aabb;
+							box_1.max = { max.x, y_mid, max.z };
 							box_1.min = { x_mid, min.y, z_mid };
 
 							// Bot Backward Left
-							AxisBoundingBox3D& box_2 = aabbs[idx + 6].aabb;
+							AxisBoundingBox3D& box_2 = aabbs[base_idx + 6].aabb;
 							box_2.max = { x_mid, y_mid, z_mid };
-							box_2.min = { min.x, min.y, max.z };
+							box_2.min = { min.x, min.y, min.z };
 
 							// Bot Backward Right
-							AxisBoundingBox3D& box_3 = aabbs[idx + 7].aabb;
+							AxisBoundingBox3D& box_3 = aabbs[base_idx + 7].aabb;
 							box_3.max = { max.x, y_mid, z_mid };
-							box_3.min = { x_mid, min.y, max.z };
+							box_3.min = { x_mid, min.y, min.z };
 						}
 
 						bool found = false;
 
 						for (uint8_t i = 0; i < 8; i++) {
 
-							uint32_t child_aabb_idx = idx + i;
-							aabb.children[i] = child_aabb_idx;
+							uint32_t child_aabb_idx = base_idx + i;
+							aabb->children[i] = child_aabb_idx;
 
 							VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
 							child_aabb.parent = aabb_idx;
+							child_aabb.children[0] = 0xFFFF'FFFF;
 							child_aabb.deleted_count = 0;
 							child_aabb.verts.reserve(max_vertices_in_AABB / 4);
+							child_aabb._debug_show_tesselation = false;
 
 							// transfer the vertex to one of child AABBs
 							if (!found && child_aabb.aabb.isPositionInside(vertex.pos)) {
-
-								vertex.aabb = child_aabb_idx;
-								vertex.idx_in_aabb = child_aabb.verts.size();
-
-								child_aabb.verts.push_back(vertex_idx);
+								transferVertexToAABB(vertex_idx, child_aabb_idx);
 								found = true;
 							}
 						}
 
+						assert_cond(found == true, "vertex was not found in subdivided leaf");
+
 						// transfer the rest of vertices of the parent to children
-						for (uint32_t aabb_vertex_idx : aabb.verts) {
+						for (uint32_t aabb_vertex_idx : aabb->verts) {
 
 							Vertex& aabb_vertex = verts[aabb_vertex_idx];
 
 							for (uint8_t i = 0; i < 8; i++) {
 
-								uint32_t child_aabb_idx = idx + i;
+								uint32_t child_aabb_idx = base_idx + i;
 								VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
 
 								if (child_aabb.aabb.isPositionInside(aabb_vertex.pos)) {
@@ -210,17 +216,18 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 						}
 
 						// remove vertices from parent
-						aabb.deleted_count = 0;
-						aabb.verts.clear();
+						aabb->deleted_count = 0;
+						aabb->verts.clear();
 						return;
 					}
 				}
 				// Schedule recursive call
 				else {
 					for (uint8_t i = 0; i < 8; i++) {
-						next_aabbs[next_count] = aabb.children[i];
+						next_aabbs[next_count] = aabb->children[i];
 						next_count++;
 					}
+					break;
 				}
 			}
 		}
@@ -229,11 +236,10 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 		now_count = next_count;
 		next_count = 0;
 
-		// TODO: 
-		// searched_aabbs.push_back(now_aabbs[0].parent)
-		// now_aabbs.push_back(now_aabbs[0].parent.parent)
-		// 
-		// if aabb not in searched_aabbs then . . .
+		// TODO:
+		// - merge upward
+		// - expand upward
+		// - seek upward
 	}
 	while (now_count);
 }

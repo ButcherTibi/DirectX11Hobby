@@ -27,6 +27,7 @@ public:
 	// bool isSphereIsect();
 };
 
+void calcMax(glm::vec3& pos, float& r_max);
 
 float toRad(float degree);
 

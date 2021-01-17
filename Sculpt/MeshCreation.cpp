@@ -18,20 +18,23 @@ void SculptMesh::createAsTriangle(float size)
 	for (uint8_t i = 0; i < 3; i++) {
 		verts[i].normal = { 0, 0, 1 };
 		verts[i].away_loop = 0xFFFF'FFFF;
+		verts[i].aabb = 0xFFFF'FFFF;
 	}
 
 	addTris(0, 1, 2);
 
-	VertexBoundingBox& aabb = aabbs.emplace_back();
-	aabb.parent = 0xFFFF'FFFF;
-	aabb.aabb.max = { half, half, half };
-	aabb.aabb.min = { -half, -half, -half };
+	this->max_vertices_in_AABB = 3;
 
-	aabb.deleted_count = 0;
-	aabb.verts.resize(3);
-	aabb.verts[0] = 0;
-	aabb.verts[1] = 1;
-	aabb.verts[2] = 2;
+	VertexBoundingBox& octree = aabbs.emplace_back();
+	octree.parent = 0xFFFF'FFFF;
+	octree.children[0] = 0xFFFF'FFFF;
+	octree.aabb.max = { half, half, half };
+	octree.aabb.min = { -half, -half, -half };
+	octree.deleted_count = 0;
+
+	for (uint32_t i = 0; i < verts.size(); i++) {
+		registerVertexToAABBs(i, 0);
+	}
 }
 
 void SculptMesh::createAsQuad(float size)
@@ -47,13 +50,23 @@ void SculptMesh::createAsQuad(float size)
 	for (uint8_t i = 0; i < 4; i++) {
 		verts[i].normal = { 0, 0, 1 };
 		verts[i].away_loop = 0xFFFF'FFFF;
+		verts[i].aabb = 0xFFFF'FFFF;
 	}
 
 	addQuad(0, 1, 2, 3);
 
-	VertexBoundingBox& aabb = aabbs.emplace_back();
-	aabb.parent = 0xFFFF'FFFF;
-	aabb.verts.resize(4);
+	this->max_vertices_in_AABB = 1;
+
+	VertexBoundingBox& octree = aabbs.emplace_back();
+	octree.parent = 0xFFFF'FFFF;
+	octree.children[0] = 0xFFFF'FFFF;
+	octree.aabb.max = { half, half, half };
+	octree.aabb.min = { -half, -half, -half };
+	octree.deleted_count = 0;
+
+	for (uint32_t i = 0; i < verts.size(); i++) {
+		registerVertexToAABBs(i, 0);
+	}
 }
 
 /*
@@ -99,10 +112,6 @@ void SculptMesh::createAsCube(float size)
 	for (uint8_t i = 0; i < 8; i++) {
 		calcVertexNormal(&verts[i]);
 	}
-
-	VertexBoundingBox& aabb = aabbs.emplace_back();
-	aabb.parent = 0xFFFF'FFFF;
-	aabb.verts.resize(8);
 }
 
 void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols, bool capped)
@@ -226,8 +235,27 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
+void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
+	uint32_t max_vertices_AABB)
 {
+	assert_cond(rows > 1, "");
+	assert_cond(cols > 1, "");
+
+	float radius = diameter / 2.f;
+
+	// AABB
+	{
+		this->max_vertices_in_AABB = max_vertices_AABB;
+
+		VertexBoundingBox& octree = aabbs.emplace_back();
+		octree.parent = 0xFFFF'FFFF;
+		octree.children[0] = 0xFFFF'FFFF;
+		octree.aabb.max = { radius, radius, radius };
+		octree.aabb.min = { -radius, -radius, -radius };
+		octree.deleted_count = 0;
+		octree._debug_show_tesselation = false;
+	}
+
 	uint32_t vertex_count = rows * cols + 2;
 	uint32_t quad_count = (rows - 1) * cols;
 	uint32_t tris_count = cols * 2;
@@ -240,8 +268,6 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 
 	polys.reserve(quad_count + tris_count);
 	polys.resize(quad_count);
-
-	float radius = diameter / 2.f;
 
 	for (uint32_t row = 0; row < rows; row++) {
 
@@ -261,8 +287,8 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			x = sin(Pi * m / M) * cos(2Pi * n / N);
 			y = sin(Pi * m / M) * sin(2Pi * n / N);
 			z = cos(Pi * m / M);*/
-
-			Vertex& v = verts[row_offset + col];
+			uint32_t v_idx = row_offset + col;
+			Vertex& v = verts[v_idx];
 
 			float col_ratio = ((float)col / cols) * (2.f * glm::pi<float>());
 			float cosine = std::cosf(col_ratio);
@@ -272,6 +298,9 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			v.pos.z = -(sine * row_radius);
 			v.pos.y = y;
 			v.away_loop = 0xFFFF'FFFF;
+			v.aabb = 0xFFFF'FFFF;
+
+			registerVertexToAABBs(v_idx, 0);
 		}
 	}
 
@@ -282,10 +311,15 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			rim[col] = col;
 		}
 
-		Vertex& top_vertex = verts[verts.size() - 2];
+		uint32_t v_idx = verts.size() - 2;
+		Vertex& top_vertex = verts[v_idx];
 		top_vertex.pos = { 0, radius, 0};
+		top_vertex.away_loop = 0xFFFF'FFFF;
+		top_vertex.aabb = 0xFFFF'FFFF;
 
 		stichVerticesToVertexLooped(rim, verts.size() - 2);
+
+		registerVertexToAABBs(v_idx, 0);
 	}
 
 	// bot cap
@@ -300,8 +334,12 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 
 		Vertex& bot_vertex = verts.back();
 		bot_vertex.pos = { 0, -radius, 0 };
+		bot_vertex.away_loop = 0xFFFF'FFFF;
+		bot_vertex.aabb = 0xFFFF'FFFF;
 
 		stichVerticesToVertexLooped(rim, verts.size() - 1);
+
+		registerVertexToAABBs(verts.size() - 1, 0);
 	}
 
 	// Create Quads
@@ -345,11 +383,14 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals)
+void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
+	uint32_t max_vertices_AABB)
 {
 	verts.resize(positions.size());
 	loops.resize(indexes.size());
 	polys.resize(indexes.size() / 3);
+
+	float root_aabb_size = 0;
 
 	for (uint32_t i = 0; i < positions.size(); i++) {
 
@@ -357,6 +398,26 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 		v.pos = positions[i];
 		v.normal = normals[i];
 		v.away_loop = 0xFFFF'FFFF;
+		v.aabb = 0xFFFF'FFFF;
+
+		calcMax(v.pos, root_aabb_size);
+	}
+
+	// AABBs
+	{
+		this->max_vertices_in_AABB = max_vertices_AABB;
+
+		VertexBoundingBox& aabb = aabbs.emplace_back();
+		aabb.parent = 0xFFFF'FFFF;
+		aabb.children[0] = 0xFFFF'FFFF;
+		aabb.aabb.min = { -root_aabb_size, -root_aabb_size, -root_aabb_size };
+		aabb.aabb.max = { root_aabb_size, root_aabb_size, root_aabb_size };
+		aabb.deleted_count = 0;
+		aabb._debug_show_tesselation = false;
+
+		for (uint32_t i = 0; i < verts.size(); i++) {
+			registerVertexToAABBs(i, 0);
+		}
 	}
 
 	for (uint32_t i = 0; i < indexes.size(); i += 3) {

@@ -19,6 +19,7 @@ DirectX::XMFLOAT4 dxConvert(glm::quat& value);
 DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
 DirectX::XMMATRIX dxConvertMatrix(glm::mat4& value);
 
+
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT3 normal;
@@ -39,32 +40,6 @@ struct GPU_MeshVertex {
 
 		elems[3].SemanticName = "TESSELLATION_EDGE_DIR";
 		elems[3].Format = DXGI_FORMAT_R32_FLOAT;
-
-		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
-			elem.SemanticIndex = 0;
-			elem.InputSlot = 0;
-			elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-			elem.InstanceDataStepRate = 0;
-		}
-
-		return elems;
-	}
-};
-
-
-struct GPU_AABB_Vertex {
-	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT3 color;
-
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
-	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
-		elems[0].SemanticName = "POSITION";
-		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-		elems[1].SemanticName = "COLOR";
-		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;

@@ -32,6 +32,7 @@ so that one object changing only rewrites a single buffer
 
 // Forward
 struct MeshDrawcall;
+struct MeshInstance;
 
 
 enum class DisplayMode {
@@ -41,12 +42,6 @@ enum class DisplayMode {
 	WIREFRANE,
 	WIREFRANE_PURE,
 };
-// RasterizerState
-// solid front
-// solid back
-// wireframe none
-// solid and wireframe front
-// solid and wireframe back
 
 /* which subprimitive holds the surface data to respond to the light */
 namespace ShadingNormal {
@@ -96,11 +91,11 @@ struct MeshInBuffers {
 	uint32_t mesh_vertex_start;
 	uint32_t mesh_vertex_count;
 
-	// AABBs
-	uint32_t aabb_vertex_start;
-	uint32_t aabb_vertex_count;
-	uint32_t aabb_index_start;
-	uint32_t aabb_index_count;
+	// Octree
+	uint32_t aabbs_vertex_start;
+	uint32_t aabbs_vertex_count;
+
+	std::set<MeshInstance*> child_instances;
 };
 
 
@@ -141,7 +136,7 @@ struct MeshDrawcall {
 	
 	DisplayMode rasterizer_mode;
 	bool is_back_culled;
-	bool show_aabbs;  // not implemented
+	bool _debug_show_octree;
 };
 
 
@@ -181,8 +176,8 @@ struct CreateCylinderInfo {
 	float diameter = 1.0f;
 	float height = 1.0f;
 
-	uint32_t vertical_sides = 2;
-	uint32_t horizontal_sides = 3;
+	uint32_t rows = 2;
+	uint32_t columns = 3;
 	bool with_caps = true;
 };
 
@@ -190,13 +185,17 @@ struct CreateUV_SphereInfo {
 	MeshTransform transform;
 	float diameter = 1.0f;
 
-	uint32_t vertical_sides = 2;
-	uint32_t horizontal_sides = 3;
+	uint32_t rows = 2;
+	uint32_t columns = 3;
+
+	uint32_t max_vertices_in_AABB = 1024;
 };
 
 struct GLTF_ImporterSettings {
 	MeshLayer* dest_layer = nullptr;
 	MeshDrawcall* dest_drawcall = nullptr;
+
+	uint32_t max_vertices_in_AABB = 1024;
 };
 
 
@@ -242,11 +241,16 @@ public:
 	float camera_dolly_sensitivity;
 
 public:
+	// returns true if mesh is without instances
+	void _deleteFromDrawcall(MeshInstance* inst);
+
+public:
 	MeshInBuffers* createMesh();
 
 	// Instances
 	MeshInstance* createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall);
 	MeshInstance* copyInstance(MeshInstance* source, MeshLayer* dest_layer = nullptr);
+	void deleteInstance(MeshInstance* inst);
 
 	void assignInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
 	void searchForInstances(std::string& search, std::vector<MeshInstanceSearchResult>& r_results);

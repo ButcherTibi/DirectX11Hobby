@@ -48,12 +48,13 @@ public:
 	dx11::Buffer frame_ubuff;
 	dx11::Buffer drawcall_ubuff;
 
-	dx11::Buffer aabbs_vbuff;
-	dx11::Buffer aabbs_ibuff;
+	dx11::Buffer octree_vbuff;
+	// dx11::Buffer octree_ibuff;
 
 	ComPtr<ID3D11InputLayout> mesh_il;
 
 	ComPtr<ID3D11VertexShader> mesh_vs;
+	ComPtr<ID3D11VertexShader> octree_vs;
 
 	ComPtr<ID3D11RasterizerState> fill_front_rs;
 	ComPtr<ID3D11RasterizerState> fill_none_rs;

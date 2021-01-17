@@ -49,6 +49,11 @@ namespace scme {
 
 		uint32_t deleted_count;
 		std::vector<uint32_t> verts;
+
+		bool _debug_show_tesselation;  // TODO:
+
+	public:
+		bool is_unused();
 	};
 
 
@@ -102,27 +107,15 @@ namespace scme {
 		uint32_t max_vertices_in_AABB;
 
 	public:
-		// Vertex ///////////////////////////////////////////////////
-
-		void calcVertexNormal(Vertex* vertex);
+		// Axis Aligned Bounding Box ////////////////////////////////
 
 		void transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
 
 		void registerVertexToAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
 
-		// addLoneVertex(GPU_Vertex new_vertex)
-		// addLoneVertices(GPU_Vertex[] new_vertices)
+		// Vertex ///////////////////////////////////////////////////
 
-		// addVertices(CPU_Vertex new_vertices)
-
-		// attachVertex(existing_vertex, new_vertex)
-		// attachVertex(existing_vertices, new_vertex)
-		// attachVertices(existing_vertex, new_vertices)
-
-		// boundVerticesTogether
-		// boundVerticesSeparated
-
-		// redistributeRootVertices
+		void calcVertexNormal(Vertex* vertex);
 
 		// Loop ////////////////////////////////////////////////////
 
@@ -144,7 +137,7 @@ namespace scme {
 
 		uint32_t addLoop(uint32_t src_vertex, uint32_t target_vertex);
 
-		////////////////////////////////////////////////////////////
+		// Poly ////////////////////////////////////////////////////
 
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
@@ -185,10 +178,12 @@ namespace scme {
 		void createAsTriangle(float size);
 		void createAsQuad(float size);
 		void createAsCube(float size);
-		void createAsCylinder(float height, float diameter, uint32_t vertical_sides, uint32_t horizontal_sides, bool capped = true);
-		void createAsUV_Sphere(float diameter, uint32_t vertical_sides, uint32_t horizontal_sides);
+		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped = true);
+		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns,
+			uint32_t max_vertices_in_AABB);
 
-		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
+		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
+			uint32_t max_vertices_in_AABB);
 		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
 		//	bool flip_winding = false);
 

@@ -17,8 +17,7 @@ ErrStack MeshRenderer::loadVertices()
 
 	uint32_t mesh_vi = 0;
 	uint32_t mesh_insta_idx = 0;
-	uint32_t aabb_vi = 0;
-	uint32_t aabb_idx = 0;
+	uint32_t octree_vi = 0;
 
 	// Count
 	{
@@ -40,9 +39,8 @@ ErrStack MeshRenderer::loadVertices()
 
 				mesh_insta_idx += mesh_instances.instances.size();
 
-				if (drawcall.show_aabbs) {
-					aabb_vi += mesh.aabbs.size() * 8;
-					aabb_idx += mesh.aabbs.size() * 36;
+				if (drawcall._debug_show_octree) {
+					octree_vi += mesh.aabbs.size() * 36;
 				}
 			}
 		}
@@ -55,22 +53,18 @@ ErrStack MeshRenderer::loadVertices()
 		checkErrStack1(instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), 0, mesh_instabuff_mem));
 	}
 	
-	void* aabb_vbuff_mem;
-	void* aabb_ibuff_mem;
-	if (aabb_vi) {
-		checkErrStack1(aabbs_vbuff.beginLoad(aabb_vi * sizeof(GPU_AABB_Vertex), 0, aabb_vbuff_mem));
-		checkErrStack1(aabbs_ibuff.beginLoad(aabb_idx * sizeof(uint32_t), 0, aabb_ibuff_mem));
+	void* octree_vbuff_mem;
+	if (octree_vi) {
+		checkErrStack1(octree_vbuff.beginLoad(octree_vi * sizeof(GPU_MeshVertex), 0, octree_vbuff_mem));
 	}
 
 	mesh_vi = 0;
 	mesh_insta_idx = 0;
-	aabb_vi = 0;
-	aabb_idx = 0;
+	octree_vi = 0;
 
-	GPU_MeshVertex gpu_verts[6];
-	GPU_AABB_Vertex gpu_aabb_verts[8];
-	uint32_t gpu_aabb_indexes[36];
-	GPU_MeshInstance gpu_inst;	
+	GPU_MeshVertex gpu_verts[36];
+	GPU_MeshInstance gpu_inst;
+	DirectX::XMFLOAT3 gpu_aabbs_positions[8];
 
 	for (MeshDrawcall& drawcall : application.drawcalls) {
 		
@@ -231,96 +225,149 @@ ErrStack MeshRenderer::loadVertices()
 				mesh_in_buff->mesh_vertex_count = mesh_vi - mesh_in_buff->mesh_vertex_start;
 			}
 
-			// Load AABBs vertices
-			if (drawcall.show_aabbs && mesh_in_buff->aabb_vertex_start == 0xFFFF'FFFF)
+			// Load Octree vertices
+			if (drawcall._debug_show_octree && mesh_in_buff->aabbs_vertex_start == 0xFFFF'FFFF)
 			{
-				mesh_in_buff->aabb_vertex_start = aabb_vi;
-				mesh_in_buff->aabb_index_start = aabb_idx;
+				mesh_in_buff->aabbs_vertex_start = octree_vi;
 
-				for (VertexBoundingBox& aabb : mesh.aabbs) {
+				for (VertexBoundingBox& octree : mesh.aabbs) {
 
-					glm::vec3& min = aabb.aabb.min;
-					glm::vec3& max = aabb.aabb.max;
+					if (octree.is_unused()) {
+
+						std::memset(gpu_verts, 0, 36 * sizeof(GPU_MeshVertex));
+						std::memcpy(((GPU_MeshVertex*)octree_vbuff_mem) + octree_vi,
+							gpu_verts, 36 * sizeof(GPU_MeshVertex));
+
+						octree_vi += 36;
+
+						continue;
+					}
+
+					glm::vec3& min = octree.aabb.min;
+					glm::vec3& max = octree.aabb.max;
 
 					// Forward (Classic winding)
-					gpu_aabb_verts[0].pos = dxConvert(glm::vec3{ min.x, max.y, max.z });  // top left
-					gpu_aabb_verts[1].pos = dxConvert(glm::vec3{ max.x, max.y, max.z });  // top right
-					gpu_aabb_verts[2].pos = dxConvert(glm::vec3{ max.x, min.y, max.z });  // bot right
-					gpu_aabb_verts[3].pos = dxConvert(glm::vec3{ min.x, min.y, max.z });  // bot left
+					gpu_aabbs_positions[0] = dxConvert(glm::vec3{ min.x, max.y, max.z });  // top left
+					gpu_aabbs_positions[1] = dxConvert(glm::vec3{ max.x, max.y, max.z });  // top right
+					gpu_aabbs_positions[2] = dxConvert(glm::vec3{ max.x, min.y, max.z });  // bot right
+					gpu_aabbs_positions[3] = dxConvert(glm::vec3{ min.x, min.y, max.z });  // bot left
 
 					// Backward
-					gpu_aabb_verts[4].pos = dxConvert(glm::vec3{ min.x, max.y, min.z });  // top left
-					gpu_aabb_verts[5].pos = dxConvert(glm::vec3{ max.x, max.y, min.z });  // top right
-					gpu_aabb_verts[6].pos = dxConvert(glm::vec3{ max.x, min.y, min.z });  // bot right
-					gpu_aabb_verts[7].pos = dxConvert(glm::vec3{ min.x, min.y, min.z });  // bot left
-
-					std::memcpy(((GPU_AABB_Vertex*)vertex_buff_mem) + aabb_vi,
-						gpu_aabb_verts, 8 * sizeof(GPU_AABB_Vertex));
-
-					aabb_vi += 8;
+					gpu_aabbs_positions[4] = dxConvert(glm::vec3{ min.x, max.y, min.z });  // top left
+					gpu_aabbs_positions[5] = dxConvert(glm::vec3{ max.x, max.y, min.z });  // top right
+					gpu_aabbs_positions[6] = dxConvert(glm::vec3{ max.x, min.y, min.z });  // bot right
+					gpu_aabbs_positions[7] = dxConvert(glm::vec3{ min.x, min.y, min.z });  // bot left
 
 					// Front Face
-					gpu_aabb_indexes[0] = 0;
-					gpu_aabb_indexes[1] = 1;
-					gpu_aabb_indexes[2] = 3;
+					gpu_verts[0].pos = gpu_aabbs_positions[0];
+					gpu_verts[1].pos = gpu_aabbs_positions[1];
+					gpu_verts[2].pos = gpu_aabbs_positions[3];
 
-					gpu_aabb_indexes[3] = 1;
-					gpu_aabb_indexes[4] = 2;
-					gpu_aabb_indexes[5] = 3;
+					gpu_verts[3].pos = gpu_aabbs_positions[1];
+					gpu_verts[4].pos = gpu_aabbs_positions[2];
+					gpu_verts[5].pos = gpu_aabbs_positions[3];
 
 					// Right Face
-					gpu_aabb_indexes[6] = 1;
-					gpu_aabb_indexes[7] = 5;
-					gpu_aabb_indexes[8] = 2;
+					gpu_verts[6].pos = gpu_aabbs_positions[1];
+					gpu_verts[7].pos = gpu_aabbs_positions[5];
+					gpu_verts[8].pos = gpu_aabbs_positions[2];
 
-					gpu_aabb_indexes[9] = 5;
-					gpu_aabb_indexes[10] = 6;
-					gpu_aabb_indexes[11] = 3;
+					gpu_verts[9] .pos = gpu_aabbs_positions[5];
+					gpu_verts[10].pos = gpu_aabbs_positions[6];
+					gpu_verts[11].pos = gpu_aabbs_positions[2];
 
 					// Back Face
-					gpu_aabb_indexes[12] = 5;
-					gpu_aabb_indexes[13] = 4;
-					gpu_aabb_indexes[14] = 6;
+					gpu_verts[12].pos = gpu_aabbs_positions[5];
+					gpu_verts[13].pos = gpu_aabbs_positions[4];
+					gpu_verts[14].pos = gpu_aabbs_positions[6];
 
-					gpu_aabb_indexes[15] = 4;
-					gpu_aabb_indexes[16] = 7;
-					gpu_aabb_indexes[17] = 6;
+					gpu_verts[15].pos = gpu_aabbs_positions[4];
+					gpu_verts[16].pos = gpu_aabbs_positions[7];
+					gpu_verts[17].pos = gpu_aabbs_positions[6];
 
 					// Left Face
-					gpu_aabb_indexes[18] = 4;
-					gpu_aabb_indexes[19] = 0;
-					gpu_aabb_indexes[20] = 7;
+					gpu_verts[18].pos = gpu_aabbs_positions[4];
+					gpu_verts[19].pos = gpu_aabbs_positions[0];
+					gpu_verts[20].pos = gpu_aabbs_positions[7];
 
-					gpu_aabb_indexes[21] = 0;
-					gpu_aabb_indexes[22] = 3;
-					gpu_aabb_indexes[23] = 7;
+					gpu_verts[21].pos = gpu_aabbs_positions[0];
+					gpu_verts[22].pos = gpu_aabbs_positions[3];
+					gpu_verts[23].pos = gpu_aabbs_positions[7];
 
 					// Top Face
-					gpu_aabb_indexes[24] = 4;
-					gpu_aabb_indexes[25] = 5;
-					gpu_aabb_indexes[26] = 0;
+					gpu_verts[24].pos = gpu_aabbs_positions[4];
+					gpu_verts[25].pos = gpu_aabbs_positions[5];
+					gpu_verts[26].pos = gpu_aabbs_positions[0];
 
-					gpu_aabb_indexes[27] = 5;
-					gpu_aabb_indexes[28] = 6;
-					gpu_aabb_indexes[29] = 0;
+					gpu_verts[27].pos = gpu_aabbs_positions[5];
+					gpu_verts[28].pos = gpu_aabbs_positions[1];
+					gpu_verts[29].pos = gpu_aabbs_positions[0];
 
 					// Back Face
-					gpu_aabb_indexes[30] = 6;
-					gpu_aabb_indexes[31] = 7;
-					gpu_aabb_indexes[32] = 2;
+					gpu_verts[30].pos = gpu_aabbs_positions[6];
+					gpu_verts[31].pos = gpu_aabbs_positions[7];
+					gpu_verts[32].pos = gpu_aabbs_positions[2];
 
-					gpu_aabb_indexes[33] = 7;
-					gpu_aabb_indexes[34] = 3;
-					gpu_aabb_indexes[35] = 2;
+					gpu_verts[33].pos = gpu_aabbs_positions[7];
+					gpu_verts[34].pos = gpu_aabbs_positions[3];
+					gpu_verts[35].pos = gpu_aabbs_positions[2];
 
-					std::memcpy(((uint32_t*)aabb_ibuff_mem) + aabb_idx, gpu_aabb_indexes,
-						36 * sizeof(uint32_t));
+					if (octree._debug_show_tesselation) {
+						for (GPU_MeshVertex& gpu_vert : gpu_verts) {
+							gpu_vert.tess_edge = 0;
+						}
+					}
+					else {
+						// Front Face
+						gpu_verts[1].tess_edge = 1;
+						gpu_verts[2].tess_edge = 1;
 
-					aabb_idx += 36;
+						gpu_verts[3].tess_edge = 1;
+						gpu_verts[5].tess_edge = 1;
+
+						// Right Face
+						gpu_verts[7].tess_edge = 1;
+						gpu_verts[8].tess_edge = 1;
+
+						gpu_verts[9].tess_edge = 1;
+						gpu_verts[11].tess_edge = 1;
+
+						// Back Face
+						gpu_verts[13].tess_edge = 1;
+						gpu_verts[14].tess_edge = 1;
+
+						gpu_verts[15].tess_edge = 1;
+						gpu_verts[17].tess_edge = 1;
+
+						// Left Face
+						gpu_verts[19].tess_edge = 1;
+						gpu_verts[20].tess_edge = 1;
+
+						gpu_verts[21].tess_edge = 1;
+						gpu_verts[23].tess_edge = 1;
+
+						// Top Face
+						gpu_verts[25].tess_edge = 1;
+						gpu_verts[26].tess_edge = 1;
+
+						gpu_verts[27].tess_edge = 1;
+						gpu_verts[29].tess_edge = 1;
+
+						// Bot Face
+						gpu_verts[31].tess_edge = 1;
+						gpu_verts[32].tess_edge = 1;
+
+						gpu_verts[27].tess_edge = 1;
+						gpu_verts[35].tess_edge = 1;
+					}
+
+					std::memcpy(((GPU_MeshVertex*)octree_vbuff_mem) + octree_vi,
+						gpu_verts, 36 * sizeof(GPU_MeshVertex));
+
+					octree_vi += 36;
 				}
 
-				mesh_in_buff->aabb_vertex_count = aabb_vi - mesh_in_buff->aabb_vertex_start;
-				mesh_in_buff->aabb_index_count = aabb_idx - mesh_in_buff->aabb_index_start;
+				mesh_in_buff->aabbs_vertex_count = octree_vi - mesh_in_buff->aabbs_vertex_start;
 			}
 
 			// Load mesh instances
@@ -364,9 +411,8 @@ ErrStack MeshRenderer::loadVertices()
 		instabuff.endLoad();
 	}
 
-	if (aabb_vi) {
-		aabbs_vbuff.endLoad();
-		aabbs_ibuff.endLoad();
+	if (octree_vi) {
+		octree_vbuff.endLoad();
 	}
 
 	// TODO: unsignal stored meshes
@@ -554,7 +600,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			checkHResult1(dev5->CreateDepthStencilView(wireframe_dtex.Get(), &view_desc, wireframe_dsv.GetAddressOf()));
 		}
 
-		// Vertex Buffer
+		// Mesh Vertex Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
 			desc.Usage = D3D11_USAGE_DYNAMIC;
@@ -566,7 +612,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			vbuff.create(dev5, im_ctx3, desc);
 		}
 
-		// Instance Buffer
+		// Mesh Instance Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
 			desc.Usage = D3D11_USAGE_DYNAMIC;  // TODO: maybe staging into default
@@ -602,7 +648,19 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			drawcall_ubuff.create(dev5, de_ctx3, desc);
 		}
 
-		// Vertex Shader
+		// Octree Vertex Buffer
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			desc.MiscFlags = 0;
+			desc.StructureByteStride = 0;
+
+			octree_vbuff.create(dev5, im_ctx3, desc);
+		}
+
+		// PBR Mesh Vertex Shader
 		{
 			checkErrStack1(io::readLocalFile("Sculpt/CompiledShaders/MeshVS.cso", shader_cso));
 
@@ -1248,6 +1306,68 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 			break;
 		}
+		}
+
+		// Draw Octree
+		if (drawcall._debug_show_octree) {
+
+			lazyUnbind(de_ctx3);
+
+			// Input Assembly
+			{
+				de_ctx3->IASetInputLayout(mesh_il.Get());
+				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				std::array<ID3D11Buffer*, 2> buffers = {
+					octree_vbuff.buff.Get(), instabuff.buff.Get()
+				};
+				std::array<uint32_t, 2> strides = {
+					sizeof(GPU_MeshVertex), sizeof(GPU_MeshInstance)
+				};
+				std::array<uint32_t, 2> offsets = {
+					0, 0
+				};
+				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+			}
+
+			// Vertex Shader
+			{
+				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+			}
+
+			// Rasterization
+			de_ctx3->RSSetState(wire_rs.Get());
+
+			// Pixel Shader
+			{
+				std::array<ID3D11Buffer*, 1> buffers = {
+					frame_ubuff.buff.Get()
+				};
+				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+
+				de_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
+			}
+
+			// Output Merger
+			{
+				float blend_factor[4] = { 1, 1, 1, 1 };
+				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+
+				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+
+				std::array<ID3D11RenderTargetView*, 1> rtvs = {
+					event.compose_rtv
+				};
+				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+			}
+
+			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
+
+				de_ctx3->DrawInstanced(
+					instance.mesh->aabbs_vertex_count, instance.mesh_insta_count,
+					instance.mesh->aabbs_vertex_start, instance.mesh_insta_start);
+			}
 		}
 	}
 

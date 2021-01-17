@@ -7,9 +7,9 @@
 
 bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
 {
-	if (min.x < pos.x && pos.x < max.x &&
-		min.y < pos.y && pos.y < max.y &&
-		min.z < pos.z && pos.z < max.z)
+	if (min.x <= pos.x && pos.x <= max.x &&
+		min.y <= pos.y && pos.y <= max.y &&
+		min.z <= pos.z && pos.z <= max.z)
 	{
 		return true;
 	}
@@ -51,6 +51,21 @@ bool AxisBoundingBox3D::isRayIsect(Ray& ray)
 
 	dist_until_isect = tmin;
 	return true;
+}
+
+void calcMax(glm::vec3& pos, float& r_max)
+{
+	if (std::abs(pos.x) > r_max) {
+		r_max = pos.x;
+	}
+	
+	if (std::abs(pos.y) > r_max) {
+		r_max = pos.y;
+	}
+
+	if (std::abs(pos.z) > r_max) {
+		r_max = pos.z;
+	}
 }
 
 float toRad(float degree)
