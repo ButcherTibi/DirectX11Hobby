@@ -91,6 +91,9 @@
     <ClCompile Include="MeshCreation.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
+    <ClCompile Include="IntersectionQueries.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Primitives.h">

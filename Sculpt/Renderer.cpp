@@ -48,10 +48,8 @@ ErrStack MeshRenderer::loadVertices()
 
 	void* vertex_buff_mem;
 	void* mesh_instabuff_mem;
-	if (mesh_vi) {
-		checkErrStack1(vbuff.beginLoad(mesh_vi * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
-		checkErrStack1(instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), 0, mesh_instabuff_mem));
-	}
+	checkErrStack1(vbuff.beginLoad(mesh_vi * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
+	checkErrStack1(instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), 0, mesh_instabuff_mem));
 	
 	void* octree_vbuff_mem;
 	if (octree_vi) {
@@ -232,7 +230,7 @@ ErrStack MeshRenderer::loadVertices()
 
 				for (VertexBoundingBox& octree : mesh.aabbs) {
 
-					if (octree.is_unused()) {
+					if (octree.isUnused()) {
 
 						std::memset(gpu_verts, 0, 36 * sizeof(GPU_MeshVertex));
 						std::memcpy(((GPU_MeshVertex*)octree_vbuff_mem) + octree_vi,

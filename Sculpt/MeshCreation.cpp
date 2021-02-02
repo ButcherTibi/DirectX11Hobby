@@ -23,14 +23,14 @@ void SculptMesh::createAsTriangle(float size)
 
 	addTris(0, 1, 2);
 
-	this->max_vertices_in_AABB = 3;
+	VertexBoundingBox& root = aabbs.emplace_back();
+	root.parent = 0xFFFF'FFFF;
+	root.children[0] = 0xFFFF'FFFF;
+	root.aabb.max = { half, half, half };
+	root.aabb.min = { -half, -half, -half };
+	root.verts_deleted_count = 0;
 
-	VertexBoundingBox& octree = aabbs.emplace_back();
-	octree.parent = 0xFFFF'FFFF;
-	octree.children[0] = 0xFFFF'FFFF;
-	octree.aabb.max = { half, half, half };
-	octree.aabb.min = { -half, -half, -half };
-	octree.deleted_count = 0;
+	root_aabb = 0;
 
 	for (uint32_t i = 0; i < verts.size(); i++) {
 		registerVertexToAABBs(i, 0);
@@ -55,14 +55,12 @@ void SculptMesh::createAsQuad(float size)
 
 	addQuad(0, 1, 2, 3);
 
-	this->max_vertices_in_AABB = 1;
-
 	VertexBoundingBox& octree = aabbs.emplace_back();
 	octree.parent = 0xFFFF'FFFF;
 	octree.children[0] = 0xFFFF'FFFF;
 	octree.aabb.max = { half, half, half };
 	octree.aabb.min = { -half, -half, -half };
-	octree.deleted_count = 0;
+	octree.verts_deleted_count = 0;
 
 	for (uint32_t i = 0; i < verts.size(); i++) {
 		registerVertexToAABBs(i, 0);
@@ -235,8 +233,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
-	uint32_t max_vertices_AABB)
+void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 {
 	assert_cond(rows > 1, "");
 	assert_cond(cols > 1, "");
@@ -245,14 +242,12 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
 
 	// AABB
 	{
-		this->max_vertices_in_AABB = max_vertices_AABB;
-
 		VertexBoundingBox& octree = aabbs.emplace_back();
 		octree.parent = 0xFFFF'FFFF;
 		octree.children[0] = 0xFFFF'FFFF;
 		octree.aabb.max = { radius, radius, radius };
 		octree.aabb.min = { -radius, -radius, -radius };
-		octree.deleted_count = 0;
+		octree.verts_deleted_count = 0;
 		octree._debug_show_tesselation = false;
 	}
 
@@ -383,8 +378,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-	uint32_t max_vertices_AABB)
+void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals)
 {
 	verts.resize(positions.size());
 	loops.resize(indexes.size());
@@ -405,15 +399,15 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 
 	// AABBs
 	{
-		this->max_vertices_in_AABB = max_vertices_AABB;
+		VertexBoundingBox& root = aabbs.emplace_back();
+		root.parent = 0xFFFF'FFFF;
+		root.children[0] = 0xFFFF'FFFF;
+		root.aabb.min = { -root_aabb_size, -root_aabb_size, -root_aabb_size };
+		root.aabb.max = { root_aabb_size, root_aabb_size, root_aabb_size };
+		root.verts_deleted_count = 0;
+		root._debug_show_tesselation = false;
 
-		VertexBoundingBox& aabb = aabbs.emplace_back();
-		aabb.parent = 0xFFFF'FFFF;
-		aabb.children[0] = 0xFFFF'FFFF;
-		aabb.aabb.min = { -root_aabb_size, -root_aabb_size, -root_aabb_size };
-		aabb.aabb.max = { root_aabb_size, root_aabb_size, root_aabb_size };
-		aabb.deleted_count = 0;
-		aabb._debug_show_tesselation = false;
+		root_aabb = 0;
 
 		for (uint32_t i = 0; i < verts.size(); i++) {
 			registerVertexToAABBs(i, 0);
@@ -446,6 +440,39 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 			setTris(tris, l0, l1, l2, v2_idx, v1_idx, v0_idx);
 		}
 	}
+}
+
+void SculptMesh::createAsLine(glm::vec3& origin, glm::vec3& direction, float length)
+{
+	glm::vec3 target = origin + direction * length;
+
+	verts.resize(3);
+	verts[0].pos = origin;
+	verts[1].pos = origin;
+	verts[2].pos = target;
+
+	VertexBoundingBox& aabb = aabbs.emplace_back();
+	aabb.parent = 0xFFFF'FFFF;
+	aabb.children[0] = 0xFFFF'FFFF;
+	aabb.aabb.min.x = std::min(origin.x, target.x);
+	aabb.aabb.min.y = std::min(origin.y, target.y);
+	aabb.aabb.min.z = std::min(origin.z, target.z);
+	aabb.aabb.max.x = std::max(origin.x, target.x);
+	aabb.aabb.max.y = std::max(origin.y, target.y);
+	aabb.aabb.max.z = std::max(origin.z, target.z);
+	aabb.children[0] = 0xFFFF'FFFF;
+	aabb.verts_deleted_count = 0;
+	aabb.verts = { 0, 1, 2 };
+
+	for (uint32_t i = 0; i < 3; i++) {
+
+		Vertex& vertex = verts[i];
+		vertex.normal = { 0.f, 0.f, 0.f };
+		vertex.away_loop = 0xFFFF'FFFF;
+		vertex.aabb = 0xFFFF'FFFF;
+	}
+
+	addTris(0, 1, 2);
 }
 
 //void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
@@ -493,11 +520,12 @@ size_t SculptMesh::getMemorySizeMegaBytes()
 {
 	size_t aabbs_size = 0;
 	for (auto& aabb : aabbs) {
-		aabbs_size += aabb.verts.size() * sizeof(Vertex) +
+		aabbs_size += aabb.verts.size() * sizeof(uint32_t) +
 			sizeof(VertexBoundingBox);
 	}
 
 	size_t size_in_bytes = aabbs_size +
+		verts.size() * sizeof(Vertex) +
 		loops.size() * sizeof(Loop) +
 		polys.size() * sizeof(Poly) +
 		sizeof(SculptMesh);

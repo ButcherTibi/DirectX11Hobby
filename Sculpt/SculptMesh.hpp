@@ -27,17 +27,24 @@ namespace scme {
 	/*
 		normal.x == 1024, normal not calculated
 		normal.y == 1024, vertex is marked as deleted
+		normal.xyz == 0, normal is unused
 		away_loop == 0xFFFF'FFFF, vertex is a point, not connected to anything
+		aabb == 0xFFFF'FFFF, vertex does not belong to any AABB
 	*/
 	struct Vertex {
 	public:
 		glm::vec3 pos;
 		glm::vec3 normal;
 
-		uint32_t away_loop;
+		uint32_t away_loop;  // any loop attached to vertex
 
 		uint32_t aabb;
 		uint32_t idx_in_aabb;
+
+	public:
+		Vertex() {};
+
+		bool isPoint();
 	};
 
 
@@ -47,13 +54,14 @@ namespace scme {
 
 		AxisBoundingBox3D aabb;
 
-		uint32_t deleted_count;
+		uint32_t verts_deleted_count;
 		std::vector<uint32_t> verts;
 
 		bool _debug_show_tesselation;  // TODO:
 
 	public:
-		bool is_unused();
+		bool isUnused();
+		bool isLeaf();
 	};
 
 
@@ -61,26 +69,31 @@ namespace scme {
 	struct Loop {
 	public:
 		uint32_t target_v;
-		uint32_t v_next_loop;
+		uint32_t v_next_loop;  // next loop around vertex
 
 		uint32_t poly;
-		uint32_t poly_next_loop;
+		uint32_t poly_next_loop;  // next loop around polygon
 		uint32_t poly_prev_loop;
 
 		uint32_t mirror_loop;
+
+		Loop() {};
 	};
 
 
 	struct Poly {
 	public:
 		glm::vec3 normal;
-		uint32_t inner_loop;
+		uint32_t inner_loop;  // any loop inside polygon
 
 		uint8_t tesselation_type : 1;
 		uint8_t is_tris : 1;
-		uint8_t _pad : 6;
+		uint8_t temp_flag_0 : 1;  // not used
+		uint8_t _pad : 5;
 
 		glm::vec3 tess_normals[2];
+
+		Poly() {};
 	};
 
 
@@ -93,6 +106,7 @@ namespace scme {
 	/* Version 3: Allocation-less primitives */
 	class SculptMesh {
 	public:
+		uint32_t root_aabb;
 		std::vector<VertexBoundingBox> aabbs;
 		
 		std::vector<Vertex> verts;
@@ -107,6 +121,12 @@ namespace scme {
 		uint32_t max_vertices_in_AABB;
 
 	public:
+		// Memory caching for intersections
+		std::vector<VertexBoundingBox*> _now_aabbs;
+		std::vector<VertexBoundingBox*> _next_aabbs;
+		std::vector<VertexBoundingBox*> _traced_aabbs;
+
+	public:
 		// Axis Aligned Bounding Box ////////////////////////////////
 
 		void transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
@@ -117,6 +137,8 @@ namespace scme {
 
 		void calcVertexNormal(Vertex* vertex);
 
+		// TODO: move vertex, register vertex if no AABB or nothing if vertex is still in its own AABB
+
 		// Loop ////////////////////////////////////////////////////
 
 		uint32_t findLoopFromTo(uint32_t src_vertex, uint32_t target_vertex);
@@ -125,11 +147,6 @@ namespace scme {
 
 		void registerLoopToMirrorLoopList(uint32_t new_loop, uint32_t existing_loop);
 
-		/* always creates a edge between existing vertices */
-		//Edge* addEdge(Vertex* v0, Vertex* v1);
-
-		/* only creates a edge if there is no edge between the vertices */
-		//Edge* addEdgeIfNone(Vertex* v0, Vertex* v1);
 
 		/* assemble a loop from vertices, unless there is already a loop
 		in which case that loop is used and returned */
@@ -141,15 +158,11 @@ namespace scme {
 
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
-		/* creates a triangle from existing vertices and edges */
-		//Poly& addTris(Vertex& v0, Vertex& v1, Vertex& v2,
-		//	Edge& e0, Edge& e1, Edge& e2);
-
 		/* creates a new triangle from existing vertices, creates new loops between the vertices 
 		if they are not already present */
 		uint32_t addTris(uint32_t v0, uint32_t v1, uint32_t v2);
 
-		/* assemble the quad using blank loops and existing vertices */
+		/* assemble the tris using blank loops and existing vertices */
 		void setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
 			uint32_t v0, uint32_t v1, uint32_t v2);
 
@@ -161,17 +174,14 @@ namespace scme {
 		void setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, uint32_t l3,
 			uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
-		//void stichVerticesToVertex(Vertex* v, std::vector<Vertex*>& vertices, bool loop = false);
 		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
 
-		// addLoneQuad
-		// addTris
-		// addQuad
-		// stichTrisToOne(existing_v, new_v0, new_v1)
-		// stichTrisToTwo(existing_v0, existing_v1, new_v)
-		// stichQuadToOne()
-		// stichQuadToTwo()
-		// stichQuadToThree()
+		// Queries ////////////////////////////////////////////
+
+		bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
+
+		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
+			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
 
 		////////////////////////////////////////////////////////////
 
@@ -179,13 +189,10 @@ namespace scme {
 		void createAsQuad(float size);
 		void createAsCube(float size);
 		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped = true);
-		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns,
-			uint32_t max_vertices_in_AABB);
+		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns);
 
-		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals,
-			uint32_t max_vertices_in_AABB);
-		//void addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
-		//	bool flip_winding = false);
+		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
+		void createAsLine(glm::vec3& origin, glm::vec3& direction, float length);
 
 		size_t getMemorySizeMegaBytes();
 	};

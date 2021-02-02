@@ -355,8 +355,7 @@ MeshInstance* Application::createUV_Sphere(CreateUV_SphereInfo& info,
 	}
 
 	MeshInBuffers* new_mesh = createMesh();
-	new_mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns,
-		info.max_vertices_in_AABB);
+	new_mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns);
 
 	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
 	new_instance->pos = info.transform.pos;
@@ -404,8 +403,7 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 
 			if (gltf_prim.indexes.size()) {
 				if (gltf_prim.normals.size()) {
-					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals,
-						settings.max_vertices_in_AABB);
+					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals);
 				}
 				else {
 					//new_mesh->addFromLists(prim.indexes, prim.positions, true);
@@ -462,6 +460,30 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 
 	return err_stack;
 }
+
+MeshInstance* Application::createLine(CreateLineInfo& info, MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
+{
+	if (dest_layer == nullptr) {
+		dest_layer = last_used_layer;
+	}
+
+	if (dest_drawcall == nullptr) {
+		dest_drawcall = last_used_drawcall;
+	}
+
+	MeshInBuffers* new_mesh = createMesh();
+	new_mesh->mesh.createAsLine(info.origin, info.direction, info.length);
+
+	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
+	new_instance->pos = { 0.f, 0.f, 0.f };
+	new_instance->rot = { 1.f, 0.f, 0.f, 0.f };
+	new_instance->scale = { 1.f, 1.f, 1.f };
+
+	this->renderer.load_vertices = true;
+
+	return new_instance;
+}
+
 
 void Application::setCameraFocus(glm::vec3& new_focus)
 {

@@ -62,7 +62,7 @@ void onCameraResetKeyDown(nui::KeyDownEvent& event)
 	application.setCameraRotation(0, 0, 0);
 }
 
-int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR pCmdLine, _In_ int nCmdShow)
+int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
 {
 	ErrStack err_stack;
 
@@ -77,10 +77,7 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 		application.instance_id = 0;
 
 		// Drawcalls
-		application.last_used_drawcall = &application.drawcalls.emplace_back();
-		application.last_used_drawcall->name = "Root Drawcall";
-		application.last_used_drawcall->rasterizer_mode = DisplayMode::SOLID;
-		application.last_used_drawcall->_debug_show_octree = false;
+		application.last_used_drawcall = application.createDrawcall(std::string("Root Drawcall"));
 
 		// Shading
 		application.shading_normal = ShadingNormal::TESSELATION;
@@ -145,24 +142,50 @@ int WINAPI WinMain(_In_ HINSTANCE hinstance, _In_opt_ HINSTANCE hPrevInstance, _
 			path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
 
 			GLTF_ImporterSettings settings;
-			settings.max_vertices_in_AABB = 128;
 
 			err_stack = application.importMeshesFromGLTF_File(path, settings, &new_instances);
 			if (err_stack.isBad()) {
 				err_stack.debugPrint();
 				return 1;
 			}
-		}
-		
-		uint32_t target_inst = 4;
 
-		for (uint32_t i = 0; i < new_instances.size(); i++) {
+			// Keep only target
+			uint32_t target_inst = 4;
 
-			if (i == target_inst) {
-				application.transferToDrawcall(new_instances[target_inst], drawcalls[0]);
+			for (uint32_t i = 0; i < new_instances.size(); i++) {
+
+				if (i == target_inst) {
+					application.transferToDrawcall(new_instances[target_inst], drawcalls[0]);
+				}
+				else {
+					application.deleteInstance(new_instances[i]);
+				}
 			}
-			else {
-				application.deleteInstance(new_instances[i]);
+
+			{
+				glm::vec3 ray_origin = { 1.0f, 120.0f, 300.f };
+				glm::vec3 ray_direction = glm::normalize(glm::vec3{ 0.0f, 0.0f, -1.0f });
+
+				CreateLineInfo info;
+				info.origin = ray_origin;
+				info.direction = ray_direction;
+				info.length = 1000.0f;
+
+				MeshInstance* inst = application.createLine(info, nullptr, drawcalls[3]);
+				inst->wireframe_colors.front_color = { 1.f, 0.f, 1.f };
+
+				uint32_t isect_poly;
+				glm::vec3 isect_point;
+
+				if (new_instances[target_inst]->parent_mesh->mesh.raycastPolys(ray_origin, ray_direction, isect_poly, isect_point)) {
+
+					printf("raycast hit in polygon = %d at { %.2f %.2f %.2f } \n",
+						isect_poly,
+						isect_point.x, isect_point.y, isect_point.z);
+				}
+				else {
+					printf("raycast miss \n");
+				}
 			}
 		}
 

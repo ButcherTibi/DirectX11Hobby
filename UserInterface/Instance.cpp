@@ -166,6 +166,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				wnd.input.mouse_delta_x = raw->data.mouse.lLastX;
 				wnd.input.mouse_delta_y = raw->data.mouse.lLastY;
 
+				// printf("mouse delta = %d %d \n", wnd.input.mouse_delta_x, wnd.input.mouse_delta_y);
 				return 0;
 			}
 

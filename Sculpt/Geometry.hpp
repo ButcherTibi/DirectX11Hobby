@@ -9,13 +9,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 
-class Ray {
-public:
-	glm::vec3 origin;
-	glm::vec3 dir;
-};
-
-
 class AxisBoundingBox3D {
 public:
 	glm::vec3 min;
@@ -23,7 +16,7 @@ public:
 
 public:
 	bool isPositionInside(glm::vec3& pos);
-	bool isRayIsect(Ray& ray);
+	bool isRayIsect(glm::vec3& origin, glm::vec3& direction);
 	// bool isSphereIsect();
 };
 

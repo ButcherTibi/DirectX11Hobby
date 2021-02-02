@@ -187,15 +187,17 @@ struct CreateUV_SphereInfo {
 
 	uint32_t rows = 2;
 	uint32_t columns = 3;
-
-	uint32_t max_vertices_in_AABB = 1024;
 };
 
 struct GLTF_ImporterSettings {
 	MeshLayer* dest_layer = nullptr;
 	MeshDrawcall* dest_drawcall = nullptr;
+};
 
-	uint32_t max_vertices_in_AABB = 1024;
+struct CreateLineInfo {
+	glm::vec3 origin = { 0.f, 0.f, 0.f};
+	glm::vec3 direction = { 0.f, 0.f, -1.0f };
+	float length = 1.0f;
 };
 
 
@@ -270,6 +272,7 @@ public:
 	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings = GLTF_ImporterSettings(),
 		std::vector<MeshInstance*>* r_instances = nullptr);
+	MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 
 	void setCameraFocus(glm::vec3& new_focus);
 	void arcballOrbitCamera(float deg_x, float deg_y);

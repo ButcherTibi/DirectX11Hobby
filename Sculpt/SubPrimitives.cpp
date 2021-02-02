@@ -2,15 +2,26 @@
 // Header
 #include "SculptMesh.hpp"
 
+// GLM
 #include <glm\geometric.hpp>
 
 
 using namespace scme;
 
 
-bool VertexBoundingBox::is_unused()
+bool Vertex::isPoint()
 {
-	return verts.size() - deleted_count == 0 && children[0] == 0xFFFF'FFFF;
+	return away_loop == 0xFFFF'FFFF;
+}
+
+bool VertexBoundingBox::isUnused()
+{
+	return verts.size() - verts_deleted_count == 0 && children[0] == 0xFFFF'FFFF;
+}
+
+bool VertexBoundingBox::isLeaf()
+{
+	return children[0] == 0xFFFF'FFFF;
 }
 
 void SculptMesh::calcVertexNormal(Vertex* vertex)
@@ -64,7 +75,7 @@ void SculptMesh::transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
 
 		VertexBoundingBox& source_aabb = aabbs[vertex->aabb];
 
-		source_aabb.deleted_count -= 1;
+		source_aabb.verts_deleted_count -= 1;
 		source_aabb.verts[vertex->idx_in_aabb] = 0xFFFF'FFFF;
 	}
 
@@ -78,14 +89,15 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 	Vertex& vertex = verts[vertex_idx];
 
 	uint32_t now_count = 1;
-	uint32_t now_aabbs[8] = {
+	std::array<uint32_t, 8> now_aabbs = {
 		start_aabb
 	};
 
 	uint32_t next_count = 0;
-	uint32_t next_aabbs[8];
+	std::array<uint32_t, 8> next_aabbs;
 
-	do {
+	while (now_count) {
+
 		for (uint32_t i = 0; i < now_count; i++) {
 
 			uint32_t aabb_idx = now_aabbs[i];
@@ -96,7 +108,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 				// Leaf
 				if (aabb->children[0] == 0xFFFF'FFFF) {
 
-					uint32_t child_vertex_count = aabb->verts.size() - aabb->deleted_count;
+					uint32_t child_vertex_count = aabb->verts.size() - aabb->verts_deleted_count;
 
 					// leaf not full
 					if (child_vertex_count < max_vertices_in_AABB) {
@@ -181,7 +193,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 							VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
 							child_aabb.parent = aabb_idx;
 							child_aabb.children[0] = 0xFFFF'FFFF;
-							child_aabb.deleted_count = 0;
+							child_aabb.verts_deleted_count = 0;
 							child_aabb.verts.reserve(max_vertices_in_AABB / 4);
 							child_aabb._debug_show_tesselation = false;
 
@@ -216,7 +228,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 						}
 
 						// remove vertices from parent
-						aabb->deleted_count = 0;
+						aabb->verts_deleted_count = 0;
 						aabb->verts.clear();
 						return;
 					}
@@ -232,7 +244,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 			}
 		}
 
-		std::memcpy(now_aabbs, next_aabbs, 8 * sizeof(uint32_t));
+		now_aabbs.swap(next_aabbs);
 		now_count = next_count;
 		next_count = 0;
 
@@ -241,7 +253,6 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 		// - expand upward
 		// - seek upward
 	}
-	while (now_count);
 }
 
 uint32_t SculptMesh::findLoopFromTo(uint32_t src_v, uint32_t target_v)
