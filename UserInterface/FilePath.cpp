@@ -247,13 +247,13 @@ template<typename T>
 ErrStack io::readFile(std::string& path, std::vector<T>& content)
 {
 	// create file handle;
-	HANDLE file_handle = CreateFile(path.data(),
+	HANDLE file_handle = CreateFileA(path.data(),
 		GENERIC_READ, // desired acces
 		0,  // share mode
 		NULL,  // security atributes
 		OPEN_EXISTING,  // disposition
 		FILE_ATTRIBUTE_NORMAL, // flags and atributes
-		NULL);
+		NULL);  // template file
 
 	if (file_handle == INVALID_HANDLE_VALUE) {
 		return ErrStack(code_location,

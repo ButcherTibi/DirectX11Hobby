@@ -103,12 +103,16 @@ namespace scme {
 	};*/
 
 
-	/* Version 3: Allocation-less primitives */
+	/* Version 3: Allocation-less primitives with AABBs down only */
 	class SculptMesh {
 	public:
 		uint32_t root_aabb;
 		std::vector<VertexBoundingBox> aabbs;
 		
+		// TODO:
+		// ScultMesh cache locality stupid solution :
+		// just store the vertices in verts vector grouped by AABB
+		// simple to mantain and fast
 		std::vector<Vertex> verts;
 
 		// vector<uint32_t> empty_edges;
@@ -181,7 +185,7 @@ namespace scme {
 		bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
 
 		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
+			uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_position);
 
 		////////////////////////////////////////////////////////////
 

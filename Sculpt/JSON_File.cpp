@@ -2,8 +2,6 @@
 // Header
 #include "JSON_File.hpp"
 
-#include <cmath>
-
 
 using namespace json;
 

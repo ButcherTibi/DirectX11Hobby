@@ -2,9 +2,6 @@
 // Header
 #include "SculptMesh.hpp"
 
-// Standard
-#include <algorithm>
-
 
 using namespace scme;
 
@@ -124,45 +121,41 @@ bool SculptMesh::raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, ui
 		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
 			v0->pos, v1->pos, v2->pos, r_point);
 	}
-	else {
-		Loop* l0 = &loops[poly->inner_loop];
-		Loop* l1 = &loops[l0->poly_next_loop];
-		Loop* l2 = &loops[l1->poly_next_loop];
-		Loop* l3 = &loops[l2->poly_next_loop];
 
-		Vertex* v0 = &verts[l0->target_v];
-		Vertex* v1 = &verts[l1->target_v];
-		Vertex* v2 = &verts[l2->target_v];
-		Vertex* v3 = &verts[l3->target_v];
+	Loop* l0 = &loops[poly->inner_loop];
+	Loop* l1 = &loops[l0->poly_next_loop];
+	Loop* l2 = &loops[l1->poly_next_loop];
+	Loop* l3 = &loops[l2->poly_next_loop];
 
-		if (poly->tesselation_type == 0) {
+	Vertex* v0 = &verts[l0->target_v];
+	Vertex* v1 = &verts[l1->target_v];
+	Vertex* v2 = &verts[l2->target_v];
+	Vertex* v3 = &verts[l3->target_v];
 
-			if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
-				v0->pos, v1->pos, v2->pos, r_point))
-			{
-				return true;
-			}
+	if (poly->tesselation_type == 0) {
 
-			return raycastTrisMollerTrumbore(ray_origin, ray_direction,
-				v0->pos, v2->pos, v2->pos, r_point);
+		if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
+			v0->pos, v1->pos, v2->pos, r_point))
+		{
+			return true;
 		}
-		else {
-			if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
-				v0->pos, v1->pos, v3->pos, r_point))
-			{
-				return true;
-			}
 
-			return raycastTrisMollerTrumbore(ray_origin, ray_direction,
-				v1->pos, v2->pos, v3->pos, r_point);
-		}
+		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
+			v0->pos, v2->pos, v2->pos, r_point);
 	}
 
-	return false;
+	if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
+		v0->pos, v1->pos, v3->pos, r_point))
+	{
+		return true;
+	}
+
+	return raycastTrisMollerTrumbore(ray_origin, ray_direction,
+		v1->pos, v2->pos, v3->pos, r_point);
 }
 
 bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-	uint32_t& r_isect_poly, glm::vec3& r_isect_position)
+	uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_position)
 {
 	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
 	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
@@ -173,6 +166,7 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 
 	traced_aabbs.clear();
 
+	// gather AABBs that intersect with ray
 	while (now_aabbs.size()) {
 		next_aabbs.clear();
 
@@ -195,7 +189,7 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 		now_aabbs.swap(next_aabbs);
 	}
 
-	// Depth sort traced AABBs
+	// Depth sort traced AABBs ( LEAF AABBs DO NOT OVERLAP so they can depth discarded )
 	std::sort(traced_aabbs.begin(), traced_aabbs.end(), [&](VertexBoundingBox* a, VertexBoundingBox* b) {
 		float dist_a = glm::distance(ray_origin, a->aabb.max);
 		float dist_b = glm::distance(ray_origin, b->aabb.max);
@@ -205,8 +199,8 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 	// Find closest triangle
 	for (VertexBoundingBox* aabb : traced_aabbs) {
 
-		float closest_distance = FLT_MAX;
 		uint32_t closest_poly;
+		float closest_distance = FLT_MAX;
 		glm::vec3 closest_isect_position;
 
 		for (uint32_t v_idx : aabb->verts) {
@@ -244,6 +238,7 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 		if (closest_distance != FLT_MAX) {
 			
 			r_isect_poly = closest_poly;
+			r_isect_distance = closest_distance;
 			r_isect_position = closest_isect_position;
 			return true;
 		}

@@ -1,3 +1,1 @@
-
-// Header
 #include "pch.h"

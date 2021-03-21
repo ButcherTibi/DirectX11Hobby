@@ -1,8 +1,7 @@
 #pragma once
 
-#include "NuiLibrary.hpp"
-// #include "Application.hpp"
 #include "GPU_ShaderTypesMesh.hpp"
+#include "NuiLibrary.hpp"
 
 
 // must release this before UI
@@ -22,13 +21,6 @@ public:
 	ID3D11DeviceContext3* im_ctx3;
 	ID3D11DeviceContext3* de_ctx3;
 
-	// Masks
-	// ComPtr<ID3D11Texture2D> instance_id_tex;
-	// ComPtr<ID3D11ShaderResourceView> instance_id_srv;
-	// ComPtr<ID3D11RenderTargetView> instance_id_rtv;
-
-	// Depth Textures
-
 	// for overall proper rendering
 	ComPtr<ID3D11Texture2D> scene_dtex;
 	ComPtr<ID3D11DepthStencilView> scene_dsv;
@@ -42,6 +34,15 @@ public:
 	/* the see thru wireframe shader must discard pixels only relative to itself */
 	ComPtr<ID3D11Texture2D> wireframe_dtex;
 	ComPtr<ID3D11DepthStencilView> wireframe_dsv;
+
+	ComPtr<ID3D11Texture2D> instance_id_mask_dtex;
+	ComPtr<ID3D11RenderTargetView> instance_id_mask_rtv;
+
+	ComPtr<ID3D11Texture2D> instance_id_staging_tex;
+
+	// poly idx and world position of pixel
+	// ComPtr<ID3D11Texture2D> poly_pos_dtex;
+	// ComPtr<ID3D11RenderTargetView> poly_pos_rtv;
 
 	dx11::Buffer vbuff;
 	dx11::Buffer instabuff;

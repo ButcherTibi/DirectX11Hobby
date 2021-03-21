@@ -8,7 +8,30 @@
 #include "Application.hpp"
 
 
-using namespace scme;
+//namespace dx11 {
+//	ErrStack createPixelShaderFromPath(std::string path_to_file, ID3D11Device5* device,
+//		ID3D11PixelShader** r_pixel_shader,
+//		std::vector<char>* read_buffer)
+//	{
+//		ErrStack err_stack;
+//		HRESULT hr;
+//
+//		std::vector<char> empty_vec;
+//
+//		if (read_buffer == nullptr) {
+//			read_buffer = &empty_vec;
+//		}
+//
+//		checkErrStack(io::readLocalFile(path_to_file, *read_buffer),
+//			"failed to read compiled pixel shader code from path");
+//
+//		checkHResult(device->CreatePixelShader(read_buffer->data(), read_buffer->size(), nullptr,
+//			r_pixel_shader),
+//			"failed to create pixel shader");
+//
+//		return err_stack;
+//	}
+//}
 
 
 ErrStack MeshRenderer::loadVertices()
@@ -25,9 +48,9 @@ ErrStack MeshRenderer::loadVertices()
 
 			for (MeshInstanceSet& mesh_instances : drawcall.mesh_instance_sets) {
 
-				SculptMesh& mesh = mesh_instances.mesh->mesh;
+				scme::SculptMesh& mesh = mesh_instances.mesh->mesh;
 
-				for (Poly& poly : mesh.polys) {
+				for (scme::Poly& poly : mesh.polys) {
 
 					if (poly.is_tris) {
 						mesh_vi += 3;
@@ -37,7 +60,13 @@ ErrStack MeshRenderer::loadVertices()
 					}
 				}
 
-				mesh_insta_idx += mesh_instances.instances.size();
+				for (MeshInstance* mesh_instance : mesh_instances.instances) {
+
+					if (mesh_instance->visible) {
+						mesh_insta_idx++;
+					}
+				}
+				// mesh_insta_idx += mesh_instances.instances.size();
 
 				if (drawcall._debug_show_octree) {
 					octree_vi += mesh.aabbs.size() * 36;
@@ -48,12 +77,12 @@ ErrStack MeshRenderer::loadVertices()
 
 	void* vertex_buff_mem;
 	void* mesh_instabuff_mem;
-	checkErrStack1(vbuff.beginLoad(mesh_vi * sizeof(GPU_MeshVertex), 0, vertex_buff_mem));
-	checkErrStack1(instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), 0, mesh_instabuff_mem));
+	vbuff.beginLoad(mesh_vi * sizeof(GPU_MeshVertex), vertex_buff_mem);
+	instabuff.beginLoad(mesh_insta_idx * sizeof(GPU_MeshInstance), mesh_instabuff_mem);
 	
 	void* octree_vbuff_mem;
 	if (octree_vi) {
-		checkErrStack1(octree_vbuff.beginLoad(octree_vi * sizeof(GPU_MeshVertex), 0, octree_vbuff_mem));
+		octree_vbuff.beginLoad(octree_vi * sizeof(GPU_MeshVertex), octree_vbuff_mem);
 	}
 
 	mesh_vi = 0;
@@ -69,24 +98,24 @@ ErrStack MeshRenderer::loadVertices()
 		for (MeshInstanceSet& mesh_instances : drawcall.mesh_instance_sets) {
 
 			MeshInBuffers* mesh_in_buff = mesh_instances.mesh;
-			SculptMesh& mesh = mesh_in_buff->mesh;
+			scme::SculptMesh& mesh = mesh_in_buff->mesh;
 
 			// Load mesh vertices
 			if (mesh_in_buff->mesh_vertex_start == 0xFFFF'FFFF) {
 
 				mesh_in_buff->mesh_vertex_start = mesh_vi;
 
-				for (Poly& poly : mesh.polys) {
+				for (scme::Poly& poly : mesh.polys) {
 
-					Loop& l0 = mesh.loops[poly.inner_loop];
-					Loop& l1 = mesh.loops[l0.poly_next_loop];
-					Loop& l2 = mesh.loops[l1.poly_next_loop];
+					scme::Loop& l0 = mesh.loops[poly.inner_loop];
+					scme::Loop& l1 = mesh.loops[l0.poly_next_loop];
+					scme::Loop& l2 = mesh.loops[l1.poly_next_loop];
 
 					if (poly.is_tris) {
 
-						Vertex* v0 = &mesh.verts[l2.target_v];
-						Vertex* v1 = &mesh.verts[l0.target_v];
-						Vertex* v2 = &mesh.verts[l1.target_v];
+						scme::Vertex* v0 = &mesh.verts[l2.target_v];
+						scme::Vertex* v1 = &mesh.verts[l0.target_v];
+						scme::Vertex* v2 = &mesh.verts[l1.target_v];
 
 						// Convert to GPU format
 						gpu_verts[0].pos = dxConvert(v0->pos);
@@ -123,14 +152,14 @@ ErrStack MeshRenderer::loadVertices()
 						mesh_vi += 3;
 					}
 					else {
-						Loop& l3 = mesh.loops[l2.poly_next_loop];
+						scme::Loop& l3 = mesh.loops[l2.poly_next_loop];
 
-						Vertex* v0 = &mesh.verts[l3.target_v];
-						Vertex* v1 = &mesh.verts[l0.target_v];
-						Vertex* v2 = &mesh.verts[l1.target_v];
-						Vertex* v3 = &mesh.verts[l2.target_v];
+						scme::Vertex* v0 = &mesh.verts[l3.target_v];
+						scme::Vertex* v1 = &mesh.verts[l0.target_v];
+						scme::Vertex* v2 = &mesh.verts[l1.target_v];
+						scme::Vertex* v3 = &mesh.verts[l2.target_v];
 
-						std::array<Vertex*, 6> tess;
+						std::array<scme::Vertex*, 6> tess;
 
 						if (poly.tesselation_type == 0) {
 
@@ -228,7 +257,7 @@ ErrStack MeshRenderer::loadVertices()
 			{
 				mesh_in_buff->aabbs_vertex_start = octree_vi;
 
-				for (VertexBoundingBox& octree : mesh.aabbs) {
+				for (scme::VertexBoundingBox& octree : mesh.aabbs) {
 
 					if (octree.isUnused()) {
 
@@ -375,28 +404,33 @@ ErrStack MeshRenderer::loadVertices()
 
 				for (MeshInstance* instance : mesh_instances.instances) {
 
-					gpu_inst.pos = dxConvert(instance->pos);
-					gpu_inst.rot = dxConvert(instance->rot);
+					if (instance->visible) {
 
-					PhysicalBasedMaterial& pbr_mat = instance->pbr_material;
-					gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
-					gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
-					gpu_inst.metallic = pbr_mat.metallic;
-					gpu_inst.specular = pbr_mat.specular;
+						gpu_inst.pos = dxConvert(instance->pos);
+						gpu_inst.rot = dxConvert(instance->rot);
 
-					MeshWireframeColors wire_colors = instance->wireframe_colors;
-					gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
-					gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
-					gpu_inst.wireframe_tess_front_color = dxConvert(wire_colors.tesselation_front_color);
-					gpu_inst.wireframe_tess_back_color = dxConvert(wire_colors.tesselation_back_color);
-					gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
-					gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
+						PhysicalBasedMaterial& pbr_mat = instance->pbr_material;
+						gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
+						gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
+						gpu_inst.metallic = pbr_mat.metallic;
+						gpu_inst.specular = pbr_mat.specular;
 
-					std::memcpy(((GPU_MeshInstance*)mesh_instabuff_mem) + mesh_insta_idx,
-						&gpu_inst, sizeof(GPU_MeshInstance)
-					);
+						MeshWireframeColors wire_colors = instance->wireframe_colors;
+						gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
+						gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
+						gpu_inst.wireframe_tess_front_color = dxConvert(wire_colors.tesselation_front_color);
+						gpu_inst.wireframe_tess_back_color = dxConvert(wire_colors.tesselation_back_color);
+						gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
+						gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
 
-					mesh_insta_idx++;
+						gpu_inst.instance_id = instance->id;
+
+						std::memcpy(((GPU_MeshInstance*)mesh_instabuff_mem) + mesh_insta_idx,
+							&gpu_inst, sizeof(GPU_MeshInstance)
+						);
+
+						mesh_insta_idx++;;
+					}
 				}
 
 				mesh_instances.mesh_insta_count = mesh_insta_idx - mesh_instances.mesh_insta_start;
@@ -473,7 +507,7 @@ ErrStack MeshRenderer::loadUniform()
 	uniform.ambient_intensity = application.ambient_intensity;
 
 	void* uniform_mem;
-	checkErrStack1(frame_ubuff.beginLoad(sizeof(GPU_MeshUniform), 0, uniform_mem));
+	frame_ubuff.beginLoad(sizeof(GPU_MeshUniform), uniform_mem);
 	{
 		std::memcpy(uniform_mem, &uniform, sizeof(GPU_MeshUniform));
 	}
@@ -598,6 +632,44 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			checkHResult1(dev5->CreateDepthStencilView(wireframe_dtex.Get(), &view_desc, wireframe_dsv.GetAddressOf()));
 		}
 
+		// Mesh Instance ID Texture
+		{
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = event.render_target_width;
+			desc.Height = event.render_target_height;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R32_UINT;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+		
+			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, instance_id_mask_dtex.GetAddressOf()));
+
+			checkHResult1(dev5->CreateRenderTargetView(instance_id_mask_dtex.Get(), nullptr, instance_id_mask_rtv.GetAddressOf()));
+		}
+
+		// Mesh Instance ID Texture for CPU read
+		{
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = event.render_target_width;
+			desc.Height = event.render_target_height;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R32_UINT;
+			desc.SampleDesc.Count = 1;
+			desc.SampleDesc.Quality = 0;
+			desc.Usage = D3D11_USAGE_STAGING;
+			desc.BindFlags = 0;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+			desc.MiscFlags = 0;
+
+			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, instance_id_staging_tex.GetAddressOf()));
+		}
+
 		// Mesh Vertex Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
@@ -688,44 +760,36 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		}
 
 		// PBR Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/MeshPS.cso"), dev5,
-			mesh_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/MeshPS.cso", dev5,
+			mesh_ps.GetAddressOf(), &shader_cso);
 
 		// PBR Pixel Shader with depth output
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/MeshOutputDepthPS.cso"), dev5,
-			mesh_output_depth_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/MeshOutputDepthPS.cso", dev5,
+			mesh_output_depth_ps.GetAddressOf(), &shader_cso);
 
 		// Front Wireframe Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/FrontWirePS.cso"), dev5,
-			front_wire_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/FrontWirePS.cso", dev5,
+			front_wire_ps.GetAddressOf(), &shader_cso);
 
 		// Front Wireframe With Tesselation Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/FrontWireTessPS.cso"), dev5,
-			front_wire_tess_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/FrontWireTessPS.cso", dev5,
+			front_wire_tess_ps.GetAddressOf(), &shader_cso);
 
 		// See Thru Wireframe Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/SeeThruWirePS.cso"), dev5,
-			see_thru_wire_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/SeeThruWirePS.cso", dev5,
+			see_thru_wire_ps.GetAddressOf(), &shader_cso);
 
 		// See Thru Wireframe With Tesselation Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/SeeThruWireTessPS.cso"), dev5,
-			see_thru_wire_tess_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/SeeThruWireTessPS.cso", dev5,
+			see_thru_wire_tess_ps.GetAddressOf(), &shader_cso);
 
 		// Wireframe Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/WirePS.cso"), dev5,
-			wire_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/WirePS.cso", dev5,
+			wire_ps.GetAddressOf(), &shader_cso);
 
 		// Wireframe With Tesselation Pixel Shader
-		checkErrStack1(dx11::createPixelShaderFromPath(
-			std::string("Sculpt/CompiledShaders/WireTessPS.cso"), dev5,
-			wire_tess_ps.GetAddressOf(), &shader_cso));
+		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/WireTessPS.cso", dev5,
+			wire_tess_ps.GetAddressOf(), &shader_cso);
 
 		// Mesh Rasterization State
 		{
@@ -875,7 +939,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	this->render_target_height = event.render_target_height;
 
 	// Command List
-	de_ctx3->ClearDepthStencilView(scene_dsv.Get(), D3D11_CLEAR_DEPTH, 0, 0);	
+	{
+		de_ctx3->ClearDepthStencilView(scene_dsv.Get(), D3D11_CLEAR_DEPTH, 0, 0);
+
+		FLOAT clear_val[4] = { 0, 0, 0, 0};
+		de_ctx3->ClearRenderTargetView(instance_id_mask_rtv.Get(), clear_val);
+	}
 
 	for (MeshDrawcall& drawcall : application.drawcalls) {
 
@@ -963,8 +1032,8 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
-				std::array<ID3D11RenderTargetView*, 1> rtvs = {
-					event.compose_rtv
+				std::array<ID3D11RenderTargetView*, 2> rtvs = {
+					event.compose_rtv, instance_id_mask_rtv.Get()
 				};
 				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
 			}
@@ -1369,11 +1438,13 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		}
 	}
 
+	// Instance ID texture readback
+	de_ctx3->CopyResource(instance_id_staging_tex.Get(), instance_id_mask_dtex.Get());
+
 	return err_stack;
 }
 
 ErrStack geometryDraw(nui::SurfaceEvent& event)
 {
-	MeshRenderer* r = (MeshRenderer*)event.user_data;
-	return r->draw(event);
+	return application.renderer.draw(event);
 }

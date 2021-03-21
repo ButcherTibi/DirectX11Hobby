@@ -1,13 +1,29 @@
-#include "pch.h"
 
 // Header
 #include "GPU_ShaderTypes.hpp"
 
 
-DirectX::XMFLOAT2 nui::toXMFloat2(glm::vec2 val)
+DirectX::XMUINT2 nui::toXM(glm::uvec2& value)
 {
-	DirectX::XMFLOAT2 dx2;
-	dx2.x = val.x;
-	dx2.y = val.y;
-	return dx2;
+	return { value.x, value.y };
+}
+
+DirectX::XMINT2 nui::toXM(glm::ivec2& value)
+{
+	return { value.x, value.y };
+}
+
+DirectX::XMINT2 nui::toXM(uint32_t x, int32_t y)
+{
+	return { (int32_t)x, (int32_t)y };
+}
+
+DirectX::XMFLOAT2 nui::toXM(glm::vec2& value)
+{
+	return { value.x, value.y };;
+}
+
+DirectX::XMFLOAT4 nui::toXM(glm::vec4& value)
+{
+	return { value.x, value.y, value.z, value.w };
 }

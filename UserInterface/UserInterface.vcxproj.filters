@@ -23,12 +23,6 @@
     <Filter Include="Source Files\Shaders">
       <UniqueIdentifier>{99d9a32f-5e39-481c-bec7-ebcd2bdf3974}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Shaders\Wrap">
-      <UniqueIdentifier>{b98445e5-2983-4445-a73c-32ad25460538}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Shaders\Chars">
-      <UniqueIdentifier>{d09dbbc3-8cea-42fc-98be-72f8b9655f0e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders\Common">
       <UniqueIdentifier>{a08948ce-7c48-4065-af34-cf634b040aec}</UniqueIdentifier>
     </Filter>
@@ -41,17 +35,17 @@
     <Filter Include="Source Files\Input">
       <UniqueIdentifier>{f77fcdef-9e5d-40a0-8504-c3e18c338fd6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Components">
-      <UniqueIdentifier>{950aa35f-d5a1-4b0b-bb2f-9ff6bc6550ac}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Components\Event">
-      <UniqueIdentifier>{88f24fa2-df4d-410f-bdb1-c7a46e041dc3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Components\Node">
-      <UniqueIdentifier>{7785ef53-ce9a-4e59-9d8f-ff4cd591bb0f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\CharacterAtlas">
       <UniqueIdentifier>{f57a30c7-5ee3-4e46-a968-673ee7040140}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Text">
+      <UniqueIdentifier>{d09dbbc3-8cea-42fc-98be-72f8b9655f0e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Rect">
+      <UniqueIdentifier>{b98445e5-2983-4445-a73c-32ad25460538}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Math">
+      <UniqueIdentifier>{778bb54a-b5f4-4381-90aa-38a961abd89f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -60,9 +54,6 @@
     </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>Source Files\Precompiled Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="TextureAtlas.hpp">
-      <Filter>Source Files\TextureAtlas</Filter>
     </ClInclude>
     <ClInclude Include="NuiLibrary.hpp">
       <Filter>Source Files</Filter>
@@ -76,17 +67,17 @@
     <ClInclude Include="Input.hpp">
       <Filter>Source Files\Input</Filter>
     </ClInclude>
-    <ClInclude Include="EventComp.hpp">
-      <Filter>Source Files\Components\Event</Filter>
-    </ClInclude>
-    <ClInclude Include="NodeComp.hpp">
-      <Filter>Source Files\Components\Node</Filter>
-    </ClInclude>
     <ClInclude Include="FilePath.hpp">
       <Filter>Source Files\FileIO</Filter>
     </ClInclude>
     <ClInclude Include="CharacterAtlas.hpp">
       <Filter>Source Files\CharacterAtlas</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureAtlas.hpp">
+      <Filter>Source Files\TextureAtlas</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicMath.h">
+      <Filter>Source Files\Math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -117,12 +108,6 @@
     <ClCompile Include="Input.cpp">
       <Filter>Source Files\Input</Filter>
     </ClCompile>
-    <ClCompile Include="EventComp.cpp">
-      <Filter>Source Files\Components\Event</Filter>
-    </ClCompile>
-    <ClCompile Include="NodeComp.cpp">
-      <Filter>Source Files\Components\Node</Filter>
-    </ClCompile>
     <ClCompile Include="Instance.cpp">
       <Filter>Source Files\Implementation</Filter>
     </ClCompile>
@@ -132,25 +117,34 @@
     <ClCompile Include="FilePath.cpp">
       <Filter>Source Files\FileIO</Filter>
     </ClCompile>
+    <ClCompile Include="Layout.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicMath.cpp">
+      <Filter>Source Files\Math</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="WrapPS.hlsl">
-      <Filter>Source Files\Shaders\Wrap</Filter>
-    </FxCompile>
-    <FxCompile Include="WrapVS.hlsl">
-      <Filter>Source Files\Shaders\Wrap</Filter>
-    </FxCompile>
-    <FxCompile Include="CharsVS.hlsl">
-      <Filter>Source Files\Shaders\Chars</Filter>
-    </FxCompile>
-    <FxCompile Include="CharsPS.hlsl">
-      <Filter>Source Files\Shaders\Chars</Filter>
-    </FxCompile>
     <FxCompile Include="AllVS.hlsl">
       <Filter>Source Files\Shaders\Common</Filter>
     </FxCompile>
     <FxCompile Include="CopyParentsMaskPS.hlsl">
       <Filter>Source Files\Shaders\CopyParentsMask</Filter>
+    </FxCompile>
+    <FxCompile Include="CharPS.hlsl">
+      <Filter>Source Files\Shaders\Text</Filter>
+    </FxCompile>
+    <FxCompile Include="CharVS.hlsl">
+      <Filter>Source Files\Shaders\Text</Filter>
+    </FxCompile>
+    <FxCompile Include="RectVS.hlsl">
+      <Filter>Source Files\Shaders\Rect</Filter>
+    </FxCompile>
+    <FxCompile Include="RectFlatFillPS.hlsl">
+      <Filter>Source Files\Shaders\Rect</Filter>
+    </FxCompile>
+    <FxCompile Include="RectLinearGradient.hlsl">
+      <Filter>Source Files\Shaders\Rect</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

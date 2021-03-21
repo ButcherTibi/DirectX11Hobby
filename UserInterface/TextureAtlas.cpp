@@ -1,6 +1,4 @@
 
-#include "pch.h"
-
 // Header
 #include "TextureAtlas.hpp"
 

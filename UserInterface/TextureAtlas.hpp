@@ -36,6 +36,14 @@ namespace nui {
 			return y1 - y0;
 		}
 
+		T getSize(uint32_t axis) {
+			if (axis) {
+				return getHeight();
+			}
+
+			return getWidth();
+		}
+
 		bool isInside(T x, T y) {
 			return (x0 <= x && x < x1) &&
 				(y0 <= y && y < y1);
@@ -59,7 +67,7 @@ namespace nui {
 
 	class TextureAtlas {
 	public:
-		std::vector<uint8_t> colors;
+		std::vector<uint8_t> colors;  // TODO: add support for multi channel
 
 		uint32_t tex_size = 0;
 

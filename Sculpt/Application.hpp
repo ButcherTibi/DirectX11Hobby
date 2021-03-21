@@ -1,36 +1,37 @@
 #pragma once
 
-// Standard
-#include <set>
-
-// GLM
-#include "glm\gtc\quaternion.hpp"
-
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
 
 
 /* TODO:
-- Surface Detail Rendering
+- camera on point rotation
+- updateaza UI
+
+- frame camera to mesh
+- selected drawcall set display mode
+- Surface Detail shading mode
 - primitive highlighting
 - compute shader mesh deform
-- import GLTF meshes
 - save mesh to file and load from file
-
-// Dependent (maybe)
-- Axis Aligned Bounding Boxes
-- ray queries
 - vert groups, edge groups, poly groups
 - partial vertex buffer updates ???
-
 - dynamic z_near and far
-- frame camera to mesh
-- handle large amount of objects changing by storing them inside many buffers
-so that one object changing only rewrites a single buffer
+- mesh LOD using the AABBs
+- MeshInstanceAABB
+- dynamic shader reloading
+- separate UI updates for CPU and GPU for
+  CPU:
+  -> map previuos frame readback textures
+  -> map buffers for change
+  GPU:
+  -> unmap textures that will be invalidated
+  -> unmap buffer to lock them into place
 */
 
 
 // Forward
+struct MeshLayer;
 struct MeshDrawcall;
 struct MeshInstance;
 
@@ -101,19 +102,22 @@ struct MeshInBuffers {
 
 /* Contains the instance data of a mesh */
 struct MeshInstance {
+	MeshLayer* parent_layer;
 	MeshDrawcall* parent_drawcall;
 	MeshInBuffers* parent_mesh;
 
 	std::string name;
+	uint32_t id;
+	bool visible;
+	bool can_collide;
 
+	// Instance Data
 	glm::vec3 pos;
 	glm::quat rot;
 	glm::vec3 scale;
 
 	PhysicalBasedMaterial pbr_material;
 	MeshWireframeColors wireframe_colors;
-	
-	uint32_t instance_id;
 };
 
 
@@ -140,7 +144,7 @@ struct MeshDrawcall {
 };
 
 
-/* Contains mesh instances or other layers, mesh instances and layers can be shared across multiple layers */
+/* Contains mesh instances and other layers */
 struct MeshLayer {
 	MeshLayer* parent;
 	std::set<MeshLayer*> children;
@@ -207,14 +211,21 @@ namespace nui {
 
 class Application {
 public:
-	MeshRenderer renderer;
-	nui::Window* window;
+	// User Interface
+	nui::Instance ui_instance;
+	nui::Window* main_window;
 
+	// Renderer
+	MeshRenderer renderer;
+
+	// Meshes
 	std::list<MeshInBuffers> meshes;
 
-	uint32_t instance_id;  // TODO: unused
+	// Instances
+	uint32_t instance_id;
 	std::list<MeshInstance> instances;
 
+	// Drawcalls
 	std::list<MeshDrawcall> drawcalls;
 	MeshDrawcall* last_used_drawcall;
 
@@ -243,6 +254,8 @@ public:
 	float camera_dolly_sensitivity;
 
 public:
+	D3D11_MAPPED_SUBRESOURCE _instance_id_mask;
+
 	// returns true if mesh is without instances
 	void _deleteFromDrawcall(MeshInstance* inst);
 
@@ -251,29 +264,47 @@ public:
 
 	// Instances
 	MeshInstance* createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall);
-	MeshInstance* copyInstance(MeshInstance* source, MeshLayer* dest_layer = nullptr);
+	MeshInstance* copyInstance(MeshInstance* source);
 	void deleteInstance(MeshInstance* inst);
 
-	void assignInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
-	void searchForInstances(std::string& search, std::vector<MeshInstanceSearchResult>& r_results);
+	void transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
+
+	void rotateInstanceAroundY(MeshInstance* mesh_instance, float radians);
+
+	void searchForInstances(std::string& keyword, std::vector<MeshInstanceSearchResult>& r_results);
 
 	// Drawcalls
 	MeshDrawcall* createDrawcall(std::string& name = std::string(""));
-	void transferToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
+	void transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
 
 	// Layers
 	MeshLayer* createLayer(std::string& name, MeshLayer* parent_layer = nullptr);
-	void parentLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
+	void transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
 
+	void setLayerVisibility(MeshLayer* layer, bool visible_state);
+
+	// Create Objects
 	MeshInstance* createTriangleMesh(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createQuadMesh(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createCubeMesh(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings = GLTF_ImporterSettings(),
+	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
 		std::vector<MeshInstance*>* r_instances = nullptr);
 	MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	
+	//
+	void lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_t& r_instance_id);
 
+	// Raycasts
+
+	/* performs a raycast in the mesh instance regardless of properties */
+	bool raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
+		uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);
+
+	MeshInstance* mouseRaycastInstances(uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);
+
+	// Camera
 	void setCameraFocus(glm::vec3& new_focus);
 	void arcballOrbitCamera(float deg_x, float deg_y);
 	void pivotCameraAroundY(float deg_x, float deg_y);

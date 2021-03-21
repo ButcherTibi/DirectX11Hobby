@@ -12,166 +12,146 @@
 
 namespace nui {
 
-	DirectX::XMFLOAT2 toXMFloat2(glm::vec2 val);
-
+	DirectX::XMUINT2 toXM(glm::uvec2& value);
+	DirectX::XMINT2 toXM(glm::ivec2& value);
+	DirectX::XMINT2 toXM(uint32_t x, int32_t y);
+	DirectX::XMFLOAT2 toXM(glm::vec2& value);
+	DirectX::XMFLOAT4 toXM(glm::vec4& value);
 
 	struct GPU_CharacterVertex {
-		DirectX::XMFLOAT2 pos;
+		DirectX::XMINT2 pos;
 		DirectX::XMFLOAT2 uv;
 
-		static std::array<D3D11_INPUT_ELEMENT_DESC, 2> getInputLayout()
+		static auto getInputLayout(uint32_t input_slot = 0)
 		{
 			std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
 			elems[0].SemanticName = "POSITION";
-			elems[0].SemanticIndex = 0;
-			elems[0].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[0].InputSlot = 0;
-			elems[0].AlignedByteOffset = 0;
-			elems[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-			elems[0].InstanceDataStepRate = 0;
+			elems[0].Format = DXGI_FORMAT_R32G32_SINT;
 
 			elems[1].SemanticName = "TEXCOORD";
-			elems[1].SemanticIndex = 0;
 			elems[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[1].InputSlot = 0;
-			elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[1].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-			elems[1].InstanceDataStepRate = 0;
+
+			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+				elem.SemanticIndex = 0;
+				elem.InputSlot = input_slot;
+				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+				elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+				elem.InstanceDataStepRate = 0;
+			}
 
 			return elems;
 		}
 	};
 
 
-	struct GPU_CharacterInstance {
+	struct GPU_TextInstance {
 		DirectX::XMFLOAT4 color;
-		DirectX::XMFLOAT2 pos;
-		float rasterized_size;
-		float size;
-		uint32_t parent_clip_mask;
 
-		static std::array<D3D11_INPUT_ELEMENT_DESC, 5> getInputLayout(uint32_t input_slot = 0)
-		{
-			std::array<D3D11_INPUT_ELEMENT_DESC, 5> elems;
-			elems[0].SemanticName = "COLOR";
-			elems[0].SemanticIndex = 0;
-			elems[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-			elems[0].InputSlot = input_slot;
-			elems[0].AlignedByteOffset = 0;
-			elems[0].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[0].InstanceDataStepRate = 1;
-
-			elems[1].SemanticName = "INSTANCE_POSITION";
-			elems[1].SemanticIndex = 0;
-			elems[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[1].InputSlot = input_slot;
-			elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[1].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[1].InstanceDataStepRate = 1;
-
-			elems[2].SemanticName = "RASTERIZED_SIZE";
-			elems[2].SemanticIndex = 0;
-			elems[2].Format = DXGI_FORMAT_R32_FLOAT;
-			elems[2].InputSlot = input_slot;
-			elems[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[2].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[2].InstanceDataStepRate = 1;
-
-			elems[3].SemanticName = "SIZE";
-			elems[3].SemanticIndex = 0;
-			elems[3].Format = DXGI_FORMAT_R32_FLOAT;
-			elems[3].InputSlot = input_slot;
-			elems[3].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[3].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[3].InstanceDataStepRate = 1;
-
-			elems[4].SemanticName = "PARENT_CLIP_ID";
-			elems[4].SemanticIndex = 0;
-			elems[4].Format = DXGI_FORMAT_R32_UINT;
-			elems[4].InputSlot = input_slot;
-			elems[4].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[4].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[4].InstanceDataStepRate = 1;
-
-			return elems;
-		}
-	};
-
-
-	struct GPU_WrapVertex {
-		DirectX::XMFLOAT2 pos;
-
-		static std::array<D3D11_INPUT_ELEMENT_DESC, 1> getInputLayout()
+		static auto getInputLayout(uint32_t input_slot = 0)
 		{
 			std::array<D3D11_INPUT_ELEMENT_DESC, 1> elems;
-			elems[0].SemanticName = "POSITION";
-			elems[0].SemanticIndex = 0;
-			elems[0].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[0].InputSlot = 0;
-			elems[0].AlignedByteOffset = 0;
-			elems[0].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-			elems[0].InstanceDataStepRate = 0;
+			elems[0].SemanticName = "COLOR";
+			elems[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+				elem.SemanticIndex = 0;
+				elem.InputSlot = input_slot;
+				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+				elem.InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
+				elem.InstanceDataStepRate = 1;
+			}
 
 			return elems;
 		}
 	};
 
 
-	struct GPU_WrapInstance {
-		DirectX::XMFLOAT2 pos;
-		DirectX::XMFLOAT2 size;
-		DirectX::XMFLOAT4 color;
-		uint32_t parent_clip_id;
-		uint32_t child_clip_id;
+	struct GPU_RectVertex {
+		DirectX::XMINT2 pos;
+		DirectX::XMFLOAT2 uv;
 
-		static std::array<D3D11_INPUT_ELEMENT_DESC, 5> getInputLayout(uint32_t input_slot = 0)
+		static auto getInputLayout(uint32_t input_slot = 0)
 		{
-			std::array<D3D11_INPUT_ELEMENT_DESC, 5> elems;
-			elems[0].SemanticName = "INSTANCE_POSITION";
-			elems[0].SemanticIndex = 0;
-			elems[0].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[0].InputSlot = input_slot;
-			elems[0].AlignedByteOffset = 0;
-			elems[0].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[0].InstanceDataStepRate = 1;
+			std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
+			elems[0].SemanticName = "POSITION";
+			elems[0].Format = DXGI_FORMAT_R32G32_SINT;
 
-			elems[1].SemanticName = "SIZE";
-			elems[1].SemanticIndex = 0;
+			elems[1].SemanticName = "TEXCOORD";
 			elems[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-			elems[1].InputSlot = input_slot;
-			elems[1].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[1].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[1].InstanceDataStepRate = 1;
 
-			elems[2].SemanticName = "COLOR";
-			elems[2].SemanticIndex = 0;
-			elems[2].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-			elems[2].InputSlot = input_slot;
-			elems[2].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[2].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[2].InstanceDataStepRate = 1;
-
-			elems[3].SemanticName = "PARENT_CLIP_ID";
-			elems[3].SemanticIndex = 0;
-			elems[3].Format = DXGI_FORMAT_R32_UINT;
-			elems[3].InputSlot = input_slot;
-			elems[3].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[3].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[3].InstanceDataStepRate = 1;
-
-			elems[4].SemanticName = "CHILD_CLIP_ID";
-			elems[4].SemanticIndex = 0;
-			elems[4].Format = DXGI_FORMAT_R32_UINT;
-			elems[4].InputSlot = input_slot;
-			elems[4].AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-			elems[4].InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-			elems[4].InstanceDataStepRate = 1;
+			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+				elem.SemanticIndex = 0;
+				elem.InputSlot = input_slot;
+				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+				elem.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+				elem.InstanceDataStepRate = 0;
+			}
 
 			return elems;
 		}
 	};
 
-	struct GPU_CommonsUniform {
-		DirectX::XMFLOAT4 screen_size;
+
+	namespace GPU_RectDrawcallFields {
+		enum {
+			POSITION_SIZE,
+			COLORS,
+			COLOR_LENGHTS,
+			GRADIENT_ANGLE
+		};
+	}
+
+	/*struct GPU_RectInstance {
+		DirectX::XMFLOAT4 color_0;
+		DirectX::XMFLOAT4 color_1;
+		DirectX::XMFLOAT4 color_2;
+
+		float color_0_length;
+		float color_1_length;
+		float color_2_length;
+
+		static auto getInputLayout(uint32_t input_slot = 0)
+		{
+			std::array<D3D11_INPUT_ELEMENT_DESC, 6> elems;
+			elems[0].SemanticName = "color_0_";
+			elems[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+			elems[1].SemanticName = "color_1_";
+			elems[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+			elems[2].SemanticName = "color_2_";
+			elems[2].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+			elems[3].SemanticName = "COLOR_0_LENGTH";
+			elems[3].Format = DXGI_FORMAT_R32_FLOAT;
+
+			elems[4].SemanticName = "COLOR_1_LENGTH";
+			elems[4].Format = DXGI_FORMAT_R32_FLOAT;
+
+			elems[5].SemanticName = "COLOR_2_LENGTH";
+			elems[5].Format = DXGI_FORMAT_R32_FLOAT;
+
+			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+				elem.SemanticIndex = 0;
+				elem.InputSlot = input_slot;
+				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+				elem.InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
+				elem.InstanceDataStepRate = 1;
+			}
+
+			return elems;
+		}
+	};*/
+
+
+/* WARNING: All structs below are HLSL binary compatible with shader constant buffer */
+#pragma pack(16)
+
+	struct GPU_Constants {
+		DirectX::XMINT2 screen_size;
+		uint32_t _pad0[2];
+		//--------------------------------
 	};
 }
+
+#pragma pack()

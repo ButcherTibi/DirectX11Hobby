@@ -48,31 +48,30 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level2</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(SolutionDir)UserInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <ForcedIncludeFiles>stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <DisableSpecificWarnings>%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4201;4239;4267;4701;4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <CompileAsManaged>false</CompileAsManaged>
       <EnableModules>false</EnableModules>
       <SupportJustMyCode>true</SupportJustMyCode>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>SculptPCH.hpp</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>SculptPCH.hpp;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>UserInterface.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>UserInterface.lib;kernel32.lib;user32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <OptimizeReferences>false</OptimizeReferences>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
-      <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
     <PostBuildEvent>
       <Command>XCOPY </Command>
@@ -87,30 +86,30 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level2</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(SolutionDir)UserInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
-      <ForcedIncludeFiles>stdafx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <DisableSpecificWarnings>%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4201;4239;4267;4701;4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <EnableModules>false</EnableModules>
       <CompileAsManaged>false</CompileAsManaged>
       <DebugInformationFormat>None</DebugInformationFormat>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>SculptPCH.hpp</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>SculptPCH.hpp;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <OptimizeReferences>false</OptimizeReferences>
-      <AdditionalDependencies>UserInterface.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>UserInterface.lib;kernel32.lib;user32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
@@ -134,14 +133,12 @@
     <ClCompile Include="GLTF_File.cpp" />
     <ClCompile Include="GPU_ShaderTypesMesh.cpp" />
     <ClCompile Include="JSON_File.cpp" />
-    <ClCompile Include="LinkageMesh.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshOps.cpp" />
-    <ClCompile Include="Primitives.cpp" />
+    <ClCompile Include="RenderDocIntegration.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="MeshCreation.cpp" />
     <ClCompile Include="stb_image.cpp" />
-    <ClCompile Include="stdafx.cpp">
+    <ClCompile Include="SculptPCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -153,12 +150,11 @@
     <ClInclude Include="GLTF_File.hpp" />
     <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
     <ClInclude Include="JSON_File.hpp" />
+    <ClInclude Include="RenderDocIntegration.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="SculptMesh.hpp" />
     <ClInclude Include="stb_image.h" />
-    <ClInclude Include="Primitives.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="Meshes.h" />
+    <ClInclude Include="SculptPCH.hpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="FrontWireTessPS.hlsl">

@@ -394,7 +394,17 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 		v.away_loop = 0xFFFF'FFFF;
 		v.aabb = 0xFFFF'FFFF;
 
-		calcMax(v.pos, root_aabb_size);
+		if (std::abs(v.pos.x) > root_aabb_size) {
+			root_aabb_size = v.pos.x;
+		}
+
+		if (std::abs(v.pos.y) > root_aabb_size) {
+			root_aabb_size = v.pos.y;
+		}
+
+		if (std::abs(v.pos.z) > root_aabb_size) {
+			root_aabb_size = v.pos.z;
+		}
 	}
 
 	// AABBs

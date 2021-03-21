@@ -1,5 +1,3 @@
-#include "pch.h"
-
 // Header
 #include "NuiLibrary.hpp"
 
@@ -9,22 +7,37 @@ using namespace nui;
 
 ElementSize& ElementSize::operator=(int32_t size_px)
 {
-	this->type = ElementSizeType::ABSOLUTE_SIZE;
-	this->size = (float)size_px;
+	this->type = ElementSizeType::ABSOLUTE;
+	this->absolute_size = (uint32_t)size_px;
 	return *this;
 }
 
 ElementSize& ElementSize::operator=(float percentage)
 {
-	this->type = ElementSizeType::RELATIVE_SIZE;
-	this->size = percentage / 100.0f;
+	this->type = ElementSizeType::RELATIVE;
+	this->relative_size = percentage / 100.f;
 	return *this;
 }
 
-void ElementSize::setAbsolute(float size_px)
+ElementPosition& ElementPosition::operator=(int32_t size_px)
 {
-	this->type = ElementSizeType::ABSOLUTE_SIZE;
-	this->size = size_px;
+	this->type = ElementPositionType::ABSOLUTE;
+	this->absolute_pos = size_px;
+	return *this;
+}
+
+ElementPosition& ElementPosition::operator=(float percentage)
+{
+	this->type = ElementPositionType::RELATIVE;
+	this->relative_pos = percentage / 100.0f;
+	return *this;
+}
+
+ElementZ_Index& ElementZ_Index::operator=(int32_t new_z_index)
+{
+	this->type = ElementZ_IndexType::SET;
+	this->z_index = new_z_index;
+	return *this;
 }
 
 Color::Color() {}
@@ -113,51 +126,4 @@ void Color::setRGBA_UNORM(float r, float g, float b, float a)
 	this->rgba.g = g;
 	this->rgba.b = b;
 	this->rgba.a = a;
-}
-
-Root* Node::createRoot()
-{
-	return std::get_if<Root>(&elem);
-}
-
-Wrap* Node::createWrap()
-{
-	return &elem.emplace<Wrap>();
-}
-
-Text* Node::createText()
-{
-	return &elem.emplace<Text>();
-}
-
-Surface* Node::createSurface()
-{
-	return &elem.emplace<Surface>();
-}
-
-EventComp* Node::getCommonEventComponent()
-{
-	switch (elem.index()) {
-	case ElementType::ROOT: {
-		Root* root = std::get_if<Root>(&elem);
-		return dynamic_cast<EventComp*>(root);
-	}
-
-	case ElementType::WRAP: {
-		Wrap* wrap = std::get_if<Wrap>(&elem);
-		return dynamic_cast<EventComp*>(wrap);
-	}
-
-	case ElementType::TEXT: {
-		Text* text = std::get_if<Text>(&elem);
-		return dynamic_cast<EventComp*>(text);
-	}
-
-	case ElementType::SURFACE: {
-		Surface* surf = std::get_if<Surface>(&elem);
-		return dynamic_cast<EventComp*>(surf);
-	}
-	}
-
-	return nullptr;
 }

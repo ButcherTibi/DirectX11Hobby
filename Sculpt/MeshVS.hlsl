@@ -20,6 +20,8 @@ struct VertexIn
 	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
 	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
 	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+	
+	uint instance_id : INSTANCE_ID;
 };
 
 struct CameraLight
@@ -62,6 +64,10 @@ struct VertexOut
 	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
 	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
 	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+	
+	uint instance_id : INSTANCE_ID;
+	float3 world_pos : WORLD_POS;
+
 	//// Debug
 	//float3 camera_pos : DEBUG_camera_pos;
 	//float4 camera_quat : DEBUG_camera_quat;
@@ -107,14 +113,19 @@ VertexOut main(VertexIn input)
 {
 	VertexOut output;
 	
+	// World Position
 	float3 pos = input.pos;
 	pos = quatRotate(pos, input.inst_rot);
 	pos += input.inst_pos;
 	
+	output.world_pos = pos;
+	
+	// Camera Position
 	pos -= camera_pos;
 	pos = quatRotate(pos, camera_quat_inv);
 	
-	float4 persp = mul(perspective, float4(pos, 1.f)); // perspective transform
+	// Viewport Position
+	float4 persp = mul(perspective, float4(pos, 1.f));  // perspective transform
 	//persp.z /= z_far;
 	output.dx_pos = persp;
 
@@ -134,6 +145,8 @@ VertexOut main(VertexIn input)
 	output.wireframe_tess_back_color = input.wireframe_tess_back_color;
 	output.wireframe_tess_split_count = input.wireframe_tess_split_count;
 	output.wireframe_tess_gap = input.wireframe_tess_gap;
+	
+	output.instance_id = input.instance_id;
 	
 	// Debug
 	//output.camera_pos = camera_pos;

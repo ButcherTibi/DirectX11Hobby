@@ -2,8 +2,6 @@
 // Header
 #include "Geometry.hpp"
 
-#include <glm\ext\quaternion_transform.hpp>
-
 
 bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
 {
@@ -53,24 +51,9 @@ bool AxisBoundingBox3D::isRayIsect(glm::vec3& origin, glm::vec3& direction)
 	return true;
 }
 
-void calcMax(glm::vec3& pos, float& r_max)
-{
-	if (std::abs(pos.x) > r_max) {
-		r_max = pos.x;
-	}
-	
-	if (std::abs(pos.y) > r_max) {
-		r_max = pos.y;
-	}
-
-	if (std::abs(pos.z) > r_max) {
-		r_max = pos.z;
-	}
-}
-
 float toRad(float degree)
 {
-	return degree * (M_PI / 180.0f);
+	return (float)(degree * (M_PI / 180.));
 }
 
 glm::vec3 toNormal(float nord, float east)
@@ -80,4 +63,14 @@ glm::vec3 toNormal(float nord, float east)
 	rot = glm::normalize(rot);
 	
 	return glm::vec3(0, 0, -1) * rot;
+}
+
+float remapAboveTo01(float half_to_one)
+{
+	return (half_to_one - 0.5f) * 2.f;
+}
+
+float remapBelowTo01(float zero_to_half)
+{
+	return 1.f - (zero_to_half * 2.f);
 }

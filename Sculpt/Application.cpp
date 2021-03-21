@@ -2,13 +2,12 @@
 // Header
 #include "Application.hpp"
 
-// Standard
-#include <algorithm>
-
-#include "glm\gtx\matrix_decompose.hpp"
+// Mine
+#include "Geometry.hpp"
 
 
 Application application;
+
 
 void Application::_deleteFromDrawcall(MeshInstance* instance)
 {
@@ -21,8 +20,8 @@ void Application::_deleteFromDrawcall(MeshInstance* instance)
 
 			for (uint32_t j = 0; j < mesh_instance_set.instances.size(); j++) {
 
-				MeshInstance* instance = mesh_instance_set.instances[j];
-				if (instance == instance) {
+				MeshInstance* existing_instance = mesh_instance_set.instances[j];
+				if (existing_instance == instance) {
 
 					mesh_instance_set.instances.erase(mesh_instance_set.instances.begin() + j);
 
@@ -51,28 +50,30 @@ MeshInBuffers* Application::createMesh()
 MeshInstance* Application::createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall)
 {
 	MeshInstance* new_instance = &this->instances.emplace_back();
+	new_instance->parent_layer = nullptr;
 	new_instance->parent_drawcall = nullptr;
 	new_instance->parent_mesh = mesh;
-	new_instance->name = "New Instance";
+	
+	new_instance->id = instance_id;
+	instance_id++;
+
+	new_instance->visible = true;
+	new_instance->can_collide = true;
 	new_instance->pos = { 0.f, 0.f, 0.f };
 	new_instance->rot = { 1.f, 0.f, 0.f, 0.f };
 	new_instance->scale = { 1.f, 1.f, 1.f };
-	new_instance->instance_id = instance_id++;
 
-	assignInstanceToLayer(new_instance, dest_layer);
-	transferToDrawcall(new_instance, parent_drawcall);
+	transferInstanceToLayer(new_instance, dest_layer);
+	transferInstanceToDrawcall(new_instance, parent_drawcall);
 	mesh->child_instances.insert(new_instance);
 
 	return new_instance;
 }
 
-MeshInstance* Application::copyInstance(MeshInstance* source, MeshLayer* dest_layer)
+MeshInstance* Application::copyInstance(MeshInstance* source)
 {
-	if (dest_layer == nullptr) {
-		dest_layer = last_used_layer;
-	}
-
 	MeshInstance* new_instance = &this->instances.emplace_back();
+	new_instance->parent_layer = nullptr;
 	new_instance->parent_drawcall = nullptr;
 	new_instance->parent_mesh = source->parent_mesh;
 	new_instance->name = source->name + " copy";
@@ -80,8 +81,8 @@ MeshInstance* Application::copyInstance(MeshInstance* source, MeshLayer* dest_la
 	new_instance->rot = source->rot;
 	new_instance->scale = source->scale;
 
-	assignInstanceToLayer(new_instance, dest_layer);
-	transferToDrawcall(new_instance, source->parent_drawcall);
+	transferInstanceToLayer(new_instance, source->parent_layer);
+	transferInstanceToDrawcall(new_instance, source->parent_drawcall);
 	source->parent_mesh->child_instances.insert(new_instance);
 
 	return new_instance;
@@ -96,8 +97,6 @@ void Application::deleteInstance(MeshInstance* inst)
 
 	// remove from drawcall
 	_deleteFromDrawcall(inst);
-
-	uint32_t child_instances_of_mesh = 0;
 
 	// remove from mesh
 	inst->parent_mesh->child_instances.erase(inst);
@@ -124,25 +123,37 @@ void Application::deleteInstance(MeshInstance* inst)
 	}
 }
 
-void Application::assignInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer)
+void Application::transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer)
 {
+	// unparent from original layer
+	if (mesh_instance->parent_layer != nullptr) {
+
+		MeshLayer* parent = mesh_instance->parent_layer;
+		parent->instances.erase(mesh_instance);
+	}
+
+	mesh_instance->parent_layer = dest_layer;
 	dest_layer->instances.insert(mesh_instance);
-	last_used_layer = dest_layer;
 }
 
-void Application::searchForInstances(std::string& search, std::vector<MeshInstanceSearchResult>& r_results)
+void Application::rotateInstanceAroundY(MeshInstance* mesh_instance, float radians)
+{
+	mesh_instance->rot = glm::rotate(mesh_instance->rot, radians, { 0.f, 1.f, 0.f });
+}
+
+void Application::searchForInstances(std::string& keyword, std::vector<MeshInstanceSearchResult>& r_results)
 {
 	for (MeshInstance& instance : instances) {
 
-		if (instance.name[0] == search[0]) {
+		if (instance.name[0] == keyword[0]) {
 
 			MeshInstanceSearchResult& new_result = r_results.emplace_back();
 			new_result.instance = &instance;
 			new_result.char_count = 1;
 
-			for (uint32_t char_idx = 1; char_idx < search.size(); char_idx++) {
+			for (uint32_t char_idx = 1; char_idx < keyword.size(); char_idx++) {
 
-				if (instance.name[char_idx] == search[char_idx]) {
+				if (instance.name[char_idx] == keyword[char_idx]) {
 					new_result.char_count += 1;
 				}
 				else {
@@ -175,7 +186,7 @@ MeshDrawcall* Application::createDrawcall(std::string& name)
 	return new_drawcall;
 }
 
-void Application::transferToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall)
+void Application::transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall)
 {
 	if (mesh_instance->parent_drawcall != nullptr) {
 
@@ -235,15 +246,34 @@ MeshLayer* Application::createLayer(std::string& name, MeshLayer* parent_layer)
 		new_layer->name = "New Layer";
 	}
 
-	parentLayer(new_layer, parent_layer);
+	transferLayer(new_layer, parent_layer);
 
 	return new_layer;
 }
 
-void Application::parentLayer(MeshLayer* child_layer, MeshLayer* parent_layer)
+void Application::transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer)
 {
+	if (child_layer->parent != nullptr) {
+
+		child_layer->parent->children.erase(child_layer);
+	}
+
 	child_layer->parent = parent_layer;
 	parent_layer->children.insert(child_layer);
+}
+
+void Application::setLayerVisibility(MeshLayer* layer, bool visible_state)
+{
+	bool can_collide = visible_state ? false : true;
+
+	for (MeshInstance* instance : layer->instances) {
+		instance->visible = visible_state;
+		instance->can_collide = can_collide;
+	}
+
+	for (MeshLayer* child_layer : layer->children) {
+		setLayerVisibility(child_layer, visible_state);
+	}
 }
 
 MeshInstance* Application::createTriangleMesh(CreateTriangleInfo& info,
@@ -428,7 +458,7 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 		MeshLayer* new_layer = new_layers[i];
 
 		for (uint64_t child_node : node.children) {
-			parentLayer(new_layers[child_node], new_layer);
+			transferLayer(new_layers[child_node], new_layer);
 		}
 
 		if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
@@ -484,6 +514,149 @@ MeshInstance* Application::createLine(CreateLineInfo& info, MeshLayer* dest_laye
 	return new_instance;
 }
 
+void Application::lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_t& r_instance_id)
+{
+	// TODO: optimize for multi lookup
+
+	// Map
+	renderer.im_ctx3->Map(renderer.instance_id_staging_tex.Get(), 0, D3D11_MAP_READ, 0, &_instance_id_mask);
+
+	uint32_t idx = (pixel_y * _instance_id_mask.RowPitch) + (pixel_x * 4);
+	
+	uint32_t r = *(((uint8_t*)_instance_id_mask.pData) + idx);
+	uint32_t g = *(((uint8_t*)_instance_id_mask.pData) + idx + 1);
+	uint32_t b = *(((uint8_t*)_instance_id_mask.pData) + idx + 2);
+	uint32_t a = *(((uint8_t*)_instance_id_mask.pData) + idx + 3);
+
+	r_instance_id = (a << 24) | (b << 16) | (g << 8) | r;
+
+	// Unmap
+	renderer.im_ctx3->Unmap(renderer.instance_id_staging_tex.Get(), 0);
+}
+
+bool Application::raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
+	uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point)
+{
+	glm::vec3 local_ray_origin = ray_origin - mesh_instance->pos;
+	local_ray_origin = local_ray_origin * mesh_instance->rot;
+
+	glm::vec3 local_ray_dir = ray_direction * mesh_instance->rot;
+	
+	// debug
+	if (false) {
+
+		for (MeshDrawcall& drawcall : drawcalls) {
+			if (drawcall.name == "wire pure") {
+
+				CreateLineInfo info;
+				info.origin = local_ray_origin;
+				info.direction = local_ray_dir;
+				info.length = 100.f;
+				
+				MeshInstance* inst = createLine(info, nullptr, &drawcall);
+				inst->wireframe_colors.front_color = { 1.f, 1, 1 };
+
+				break;
+			}
+		}
+	}
+
+	scme::SculptMesh& mesh = mesh_instance->parent_mesh->mesh;
+
+	return mesh.raycastPolys(local_ray_origin, local_ray_dir, r_isect_poly, r_isect_distance, r_isect_point);
+}
+
+struct RaytraceResult {
+	uint32_t poly;
+	glm::vec3 point;
+	MeshInstance* instance;
+};
+
+MeshInstance* Application::mouseRaycastInstances(uint32_t& r_isect_poly, float& r_isect_distance,
+	glm::vec3& r_isect_point)
+{
+	// TODO:
+	// AABB for mesh instances with the raytrace optimization
+	// frustrum culling
+	// use instance mask pixels to find first mesh
+	
+	glm::vec3 ray_direction = camera_forward;
+
+	nui::Window* window = application.main_window;
+	float x_amount = (float)window->input.mouse_x / window->surface_width;
+	float y_amount = 1.f - ((float)window->input.mouse_y / window->surface_height);
+	float aspect_ratio = (float)window->surface_width / window->surface_height;
+	float half_fov = toRad(camera_field_of_view) / 2.f;
+
+	if (x_amount > 0.5f) {
+		x_amount = remapAboveTo01(x_amount);
+		ray_direction = glm::rotateY(ray_direction, -x_amount * half_fov * aspect_ratio);
+	}
+	else {
+		x_amount = remapBelowTo01(x_amount);
+		ray_direction = glm::rotateY(ray_direction, x_amount * half_fov * aspect_ratio);
+	}
+
+	if (y_amount > 0.5f) {
+		y_amount = remapAboveTo01(y_amount);
+		ray_direction = glm::rotateX(ray_direction, y_amount * half_fov);
+	}
+	else {
+		y_amount = remapBelowTo01(y_amount);
+		ray_direction = glm::rotateX(ray_direction, -y_amount * half_fov);
+	}
+
+	printf("ray dir = %.2f %.2f, %.2f \n",
+		ray_direction.x, ray_direction.y, ray_direction.z);
+
+
+
+	r_isect_distance = FLT_MAX;
+	MeshInstance* r_isect_instance = nullptr;
+
+	for (MeshInstance& instance : instances) {
+
+		if (instance.visible) {
+
+			uint32_t isect_poly;
+			float isect_distance;
+			glm::vec3 isect_point;
+
+			if (application.raycast(&instance, camera_pos, ray_direction,
+				isect_poly, isect_distance, isect_point))
+			{
+				if (isect_distance < r_isect_distance) {
+
+					r_isect_poly = isect_poly;
+					r_isect_distance = isect_distance;
+					r_isect_point = isect_point;
+					r_isect_instance = &instance;
+				}
+			}
+		}
+	}
+
+	//// debug
+	//if (true) {
+
+	//	for (MeshDrawcall& drawcall : drawcalls) {
+	//		if (drawcall.name == "wire pure") {
+
+	//			CreateLineInfo info;
+	//			info.origin = ray_origin;
+	//			info.direction = ray_direction;
+	//			info.length = 10.f;
+
+	//			MeshInstance* inst = createLine(info, nullptr, &drawcall);
+	//			inst->wireframe_colors.front_color = { 1, 1, 1 };
+
+	//			break;
+	//		}
+	//	}
+	//}
+
+	return r_isect_instance;
+}
 
 void Application::setCameraFocus(glm::vec3& new_focus)
 {
@@ -534,8 +707,8 @@ mesh.rot = glm::normalize(mesh.rot);*/
 
 void Application::arcballOrbitCamera(float deg_x, float deg_y)
 {
-	glm::vec3 camera_right = glm::normalize(glm::vec3{ 1, 0, 0 } *camera_quat_inv);
-	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } *camera_quat_inv);
+	glm::vec3 camera_right = glm::normalize(glm::vec3{ 1, 0, 0 } * camera_quat_inv);
+	glm::vec3 camera_up = glm::normalize(glm::vec3{ 0, 1, 0 } * camera_quat_inv);
 
 	glm::quat delta_rot = { 1, 0, 0, 0 };
 	delta_rot = glm::rotate(delta_rot, toRad(deg_y), camera_right);
@@ -595,7 +768,7 @@ void Application::panCamera(float amount_x, float amount_y)
 
 void Application::dollyCamera(float amount)
 {
-	glm::vec3 camera_forward = glm::normalize(glm::vec3{ 0, 0, -1 } * camera_quat_inv);
+	// glm::vec3 camera_forward_axis = glm::normalize(glm::vec3{ 0, 0, -1 } * camera_quat_inv);
 
 	float dist = glm::distance(camera_focus, camera_pos);
 	if (!dist) {

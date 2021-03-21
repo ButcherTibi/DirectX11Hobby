@@ -107,19 +107,21 @@ namespace nui {
 	}
 	
 	struct KeyState {
-		uint16_t virtual_key;
-
 		bool is_down;
-		bool first_message;
-		bool first_frame;
-		bool last_frame;
 		SteadyTime start_time;
 		SteadyTime end_time;
+		bool down_transition;
+		bool up_transition;
 
 	public:
-		uint64_t getDurationMiliSeconds();
+		uint64_t getDuration_ms();
 	};
 
+	// Note to self:
+	// If hold down a key the keyboard will not send a key down event every frame, so to measure key down time
+	// start the timer on key down and stop only on key up event.
+	// DO NOT extend time on each key down event or else a weird ~500 time delay will occur as the keyboard repeat function buffer
+	// fills up and generates a key down message
 	class Input {
 	public:
 		// this list contains non-existent, reserved, unused virtual key codes
@@ -130,23 +132,16 @@ namespace nui {
 		uint16_t mouse_y;
 
 		// Mouse Delta Unbuffered
-		int32_t mouse_delta_x;
+		int32_t mouse_delta_x;  // TODO: sum frame inputs instead of keep last
 		int32_t mouse_delta_y;
 
 		// Mouse Wheel
 		int16_t mouse_wheel_delta;
 
 	public:
-
 		void setKeyDownState(uint32_t wParam, uint32_t lParam);
 		void setKeyUpState(uint32_t wParam);
 
-		/* the Window Message Key Down events are not called every frame as such the end_time may lag behind */
-		void startFrame();
-
 		void debugPrint();
-
-		/* unsets the first_frame set by WinProc */
-		void endFrame();
 	};
 }

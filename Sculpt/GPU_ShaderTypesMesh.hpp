@@ -70,9 +70,11 @@ struct GPU_MeshInstance {
 	float wireframe_tess_split_count;
 	float wireframe_tess_gap;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 12> getInputLayout(uint32_t input_slot = 1)
+	uint32_t instance_id;
+
+	static auto getInputLayout(uint32_t input_slot = 1)
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 12> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 13> elems;
 		elems[0].SemanticName = "INSTANCE_POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
@@ -108,6 +110,9 @@ struct GPU_MeshInstance {
 
 		elems[11].SemanticName = "WIREFRAME_TESS_GAP";
 		elems[11].Format = DXGI_FORMAT_R32_FLOAT;
+
+		elems[12].SemanticName = "INSTANCE_ID";
+		elems[12].Format = DXGI_FORMAT_R32_UINT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;

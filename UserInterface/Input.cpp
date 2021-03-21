@@ -1,5 +1,3 @@
-#include "pch.h"
-
 // Header
 #include "Input.hpp"
 
@@ -7,28 +5,26 @@
 using namespace nui;
 
 
-uint64_t KeyState::getDurationMiliSeconds()
+uint64_t KeyState::getDuration_ms()
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 }
 
+#pragma warning(disable : 4100)
 void Input::setKeyDownState(uint32_t wParam, uint32_t lParam)
 {
 	KeyState& key = key_list[wParam];
 
-	if (key.is_down) {
-		key.end_time = std::chrono::steady_clock::now();
-	}
 	// key changed from UP to DOWN
-	else {
+	if (!key.is_down) {
 		key.is_down = true;
-		key.first_frame = true;
 		key.start_time = std::chrono::steady_clock::now();
-		key.end_time = key.start_time;
+		key.down_transition = true;
 	}
 
-	key.first_message = !(lParam & (1 << 30));
+	// key was already DOWN do nothing
 }
+#pragma warning(default : 4100)
 
 void Input::setKeyUpState(uint32_t wParam)
 {
@@ -37,22 +33,10 @@ void Input::setKeyUpState(uint32_t wParam)
 	// key changed from DOWN to UP
 	if (key.is_down) {
 		key.is_down = false;
-		key.last_frame = true;
+		key.up_transition = true;
 	}
-}
 
-void Input::startFrame()
-{
-	for (uint16_t virtual_key = 0; virtual_key < key_list.size(); virtual_key++) {
-
-		KeyState& key = key_list[virtual_key];
-		if (key.is_down) {
-
-			if (!key.first_frame) {
-				key.end_time = std::chrono::steady_clock::now();
-			}
-		}
-	}
+	// key was already UP do nothing
 }
 
 void Input::debugPrint()
@@ -62,24 +46,8 @@ void Input::debugPrint()
 		KeyState& key = key_list[virtual_key];
 		if (key.is_down) {
 
-			printf("key down = %X for %f first_frame %d \n", key.virtual_key,
-				fsec_cast(key.end_time - key.start_time),
-				key.first_frame);
+			printf("key down = %X for %f ms \n", virtual_key,
+				fsec_cast(key.end_time - key.start_time));
 		}
-	}
-}
-
-void Input::endFrame()
-{
-	mouse_delta_x = 0;
-	mouse_delta_y = 0;
-
-	mouse_wheel_delta = 0;
-
-	for (uint16_t virtual_key = 0; virtual_key < key_list.size(); virtual_key++) {
-
-		KeyState& key = key_list[virtual_key];
-		key.first_frame = false;
-		key.last_frame = false;
 	}
 }

@@ -90,3 +90,23 @@ std::string asIs(char c);
 	if (param != true) \
 		printf("%s %s%s%s %s \n", code_location, \
 			"WARNING: assertion failed for condition (", #param, ") isn't true, ", msg);
+
+
+/* Exceptions */
+struct DirectX11Exception : std::exception {
+	HRESULT hresult;  // the result handle of the DirectX11 call
+	std::string message;  // message writen by hand by the programer at call site
+
+	DirectX11Exception() = delete;
+	DirectX11Exception(HRESULT hr, std::string msg);
+};
+
+void throwDX11(HRESULT hresult);
+void throwDX11(HRESULT hresult, const char* message);
+
+struct WindowsException : std::exception {
+	std::string programer_message;
+	std::string api_message;
+
+	WindowsException(std::string message_on_error);
+};

@@ -16,10 +16,14 @@ struct VertexInput
 	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
 	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
 	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+	
+	nointerpolation uint instance_id : INSTANCE_ID;
+	float3 world_pos : WORLD_POS;
 };
 
 struct PixelOutput {
 	float4 color : SV_Target0;
+	uint instance_id : SV_Target1;
 };
 
 struct CameraLight {
@@ -138,6 +142,7 @@ PixelOutput main(VertexInput input)
 	
 	PixelOutput output;
 	output.color = float4(color, 1.);
+	output.instance_id = input.instance_id;
 	
 	return output;
 }

@@ -5,9 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Source Files\Mesh">
-      <UniqueIdentifier>{db273801-5239-4134-9a5f-eb598bc972e4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\ThirdParty">
       <UniqueIdentifier>{a262b940-e443-4e56-b65a-7e9d9126f61f}</UniqueIdentifier>
     </Filter>
@@ -44,20 +41,11 @@
     <Filter Include="Source Files\Shaders\Wireframe">
       <UniqueIdentifier>{105ac79a-fc73-4fb7-8f16-dbc1fd1550be}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Tooling">
+      <UniqueIdentifier>{6102eb5c-179a-44f6-b654-6aebc06ef0f9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Primitives.cpp">
-      <Filter>Source Files\Mesh</Filter>
-    </ClCompile>
-    <ClCompile Include="MeshOps.cpp">
-      <Filter>Source Files\Mesh</Filter>
-    </ClCompile>
-    <ClCompile Include="LinkageMesh.cpp">
-      <Filter>Source Files\Mesh</Filter>
-    </ClCompile>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files\Precompiled Headers</Filter>
-    </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClCompile>
@@ -94,17 +82,14 @@
     <ClCompile Include="IntersectionQueries.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
+    <ClCompile Include="SculptPCH.cpp">
+      <Filter>Source Files\Precompiled Headers</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderDocIntegration.cpp">
+      <Filter>Source Files\Tooling</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Primitives.h">
-      <Filter>Source Files\Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="Meshes.h">
-      <Filter>Source Files\Mesh</Filter>
-    </ClInclude>
-    <ClInclude Include="stdafx.h">
-      <Filter>Source Files\Precompiled Headers</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
@@ -128,6 +113,12 @@
     </ClInclude>
     <ClInclude Include="Application.hpp">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SculptPCH.hpp">
+      <Filter>Source Files\Precompiled Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderDocIntegration.hpp">
+      <Filter>Source Files\Tooling</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

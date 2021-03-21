@@ -1,6 +1,4 @@
 
-#include "pch.h"
-
 // Header
 #include "ErrorStack.hpp"
 
@@ -92,13 +90,13 @@ std::string getLastError()
 		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL,
 		GetLastError(),
-		LANG_SYSTEM_DEFAULT,
+		0,
 		(LPSTR)&buffer,
 		0,
 		NULL
 	);
 
-	std::string error_msg = std::string(buffer);
+	std::string error_msg = buffer;
 
 	LocalFree(buffer);
 
@@ -116,4 +114,30 @@ std::string asIs(char c)
 	}
 
 	return "'" + std::string(1, c) + "'";
+}
+
+DirectX11Exception::DirectX11Exception(HRESULT hr, std::string msg)
+{
+	this->hresult = hr;
+	this->message = msg;
+}
+
+void throwDX11(HRESULT hresult)
+{
+	if (hresult != S_OK) {
+		throw DirectX11Exception(hresult, "exception message not set");
+	}
+}
+
+void throwDX11(HRESULT hresult, const char* message)
+{
+	if (hresult != S_OK) {
+		throw DirectX11Exception(hresult, std::string(message));
+	}
+}
+
+WindowsException::WindowsException(std::string message_on_error)
+{
+	this->programer_message = message_on_error;
+	this->api_message = getLastError();
 }

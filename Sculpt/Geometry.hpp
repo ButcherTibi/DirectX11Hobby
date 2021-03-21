@@ -20,8 +20,10 @@ public:
 	// bool isSphereIsect();
 };
 
-void calcMax(glm::vec3& pos, float& r_max);
-
 float toRad(float degree);
 
 glm::vec3 toNormal(float nord, float east);
+
+float remapAboveTo01(float half_to_one);
+
+float remapBelowTo01(float zero_to_half);

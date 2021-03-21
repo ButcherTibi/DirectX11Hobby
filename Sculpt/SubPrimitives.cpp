@@ -2,9 +2,6 @@
 // Header
 #include "SculptMesh.hpp"
 
-// GLM
-#include <glm\geometric.hpp>
-
 
 using namespace scme;
 
@@ -185,7 +182,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 
 						bool found = false;
 
-						for (uint8_t i = 0; i < 8; i++) {
+						for (i = 0; i < 8; i++) {
 
 							uint32_t child_aabb_idx = base_idx + i;
 							aabb->children[i] = child_aabb_idx;
@@ -211,7 +208,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 
 							Vertex& aabb_vertex = verts[aabb_vertex_idx];
 
-							for (uint8_t i = 0; i < 8; i++) {
+							for (i = 0; i < 8; i++) {
 
 								uint32_t child_aabb_idx = base_idx + i;
 								VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
@@ -235,7 +232,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 				}
 				// Schedule recursive call
 				else {
-					for (uint8_t i = 0; i < 8; i++) {
+					for (i = 0; i < 8; i++) {
 						next_aabbs[next_count] = aabb->children[i];
 						next_count++;
 					}
@@ -415,7 +412,6 @@ void SculptMesh::registerLoopToSourceVertexList(uint32_t away_loop_idx, uint32_t
 	}
 	else {
 		Loop& old_loop = loops[vertex.away_loop];
-		Loop& next_loop = loops[old_loop.v_next_loop];
 
 		// new ---> next
 		new_loop.v_next_loop = old_loop.v_next_loop;
@@ -439,14 +435,14 @@ uint32_t SculptMesh::setLoop(uint32_t loop, uint32_t src_v, uint32_t target_v)
 	uint32_t new_loop_idx;
 	Loop* new_loop = nullptr;
 
-	uint32_t existing_loop = findLoopFromTo(src_v, target_v);
-	if (existing_loop != 0xFFFF'FFFF) {
+	uint32_t existing_loop_idx = findLoopFromTo(src_v, target_v);
+	if (existing_loop_idx != 0xFFFF'FFFF) {
 
 		// reuse wire into loop
-		Loop* loop = &loops[existing_loop];
-		if (loop->poly == 0xFFFF'FFFF) {
-			new_loop_idx = existing_loop;
-			new_loop = loop;
+		Loop* existing_loop = &loops[existing_loop_idx];
+		if (existing_loop->poly == 0xFFFF'FFFF) {
+			new_loop_idx = existing_loop_idx;
+			new_loop = existing_loop;
 		}
 	}
 
@@ -460,14 +456,14 @@ uint32_t SculptMesh::setLoop(uint32_t loop, uint32_t src_v, uint32_t target_v)
 
 	registerLoopToSourceVertexList(new_loop_idx, src_v);
 
-	if (existing_loop != 0xFFFF'FFFF) {
-		registerLoopToMirrorLoopList(new_loop_idx, existing_loop);
+	if (existing_loop_idx != 0xFFFF'FFFF) {
+		registerLoopToMirrorLoopList(new_loop_idx, existing_loop_idx);
 	}
 	else {
-		existing_loop = findLoopFromTo(target_v, src_v);
+		existing_loop_idx = findLoopFromTo(target_v, src_v);
 
-		if (existing_loop != 0xFFFF'FFFF) {
-			registerLoopToMirrorLoopList(new_loop_idx, existing_loop);
+		if (existing_loop_idx != 0xFFFF'FFFF) {
+			registerLoopToMirrorLoopList(new_loop_idx, existing_loop_idx);
 		}
 		else {
 			new_loop->mirror_loop = new_loop_idx;

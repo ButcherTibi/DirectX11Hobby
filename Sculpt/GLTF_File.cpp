@@ -139,7 +139,6 @@ ErrStack Structure::_loadIndexesFromBuffer(uint64_t acc_idx,
 	try {
 		Accessor& acc = accessors[acc_idx];
 		BufferView& buff_view = buffer_views[acc.buffer_view];
-		Buffer& buffer = buffers[buff_view.buffer];
 		base64::BitVector& bin_buffer = bin_buffs[buff_view.buffer];
 
 		if (acc.type != Types::scalar) {
@@ -187,7 +186,6 @@ ErrStack Structure::_loadVec3FromBuffer(uint64_t acc_idx,
 	try {
 		Accessor& acc = accessors[acc_idx];
 		BufferView& buff_view = buffer_views[acc.buffer_view];
-		Buffer& buffer = buffers[buff_view.buffer];
 		base64::BitVector& bin_buffer = bin_buffs[buff_view.buffer];
 
 		if (acc.type != Types::vec3) {
