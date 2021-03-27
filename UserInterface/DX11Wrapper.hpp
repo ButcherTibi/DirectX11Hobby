@@ -92,6 +92,9 @@ namespace dx11 {
 		D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 		ComPtr<ID3D11ShaderResourceView> srv;
 
+		D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
+		ComPtr<ID3D11DepthStencilView> dsv;
+
 		D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
 		ComPtr<ID3D11RenderTargetView> rtv;
 
@@ -99,6 +102,7 @@ namespace dx11 {
 		void create(ID3D11Device5* dev, ID3D11DeviceContext3* ctx, D3D11_TEXTURE2D_DESC& desc);
 		
 		void createShaderResourceView(D3D11_SHADER_RESOURCE_VIEW_DESC& desc);
+		void createDepthStencilView(D3D11_DEPTH_STENCIL_VIEW_DESC& desc);
 		void createRenderTargetView(D3D11_RENDER_TARGET_VIEW_DESC& desc);
 
 		void resize(uint32_t width, uint32_t height);
@@ -107,6 +111,7 @@ namespace dx11 {
 
 		ID3D11Texture2D* get();
 		ID3D11ShaderResourceView* getSRV();
+		ID3D11DepthStencilView* getDSV();
 		ID3D11RenderTargetView* getRTV();
 	};
 

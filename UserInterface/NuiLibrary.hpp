@@ -8,7 +8,7 @@
 #include <variant>
 #include <atomic>
 #include <chrono>
-#include <set>
+#include <list>
 #include <map>
 
 // GLM
@@ -22,8 +22,6 @@
 
 
 /* TODO:
-- maybe create high-level UI elements, complete menu with submenus and modifiable orientation
-- the DirectX 11 character atlas texture does NOT resize with atlas
 - 60fps limit
 - fullscreen support
 - handle Alt, F10
@@ -39,18 +37,16 @@ namespace nui {
 	struct Text;
 	struct RelativeWrap;
 	struct Grid;
-	struct RenderingSurface;
 
 	// Typedefs
-	typedef std::variant<Root, Text, RelativeWrap, Grid, RenderingSurface> StoredElement;
+	typedef std::variant<Root, Text, RelativeWrap, Grid> StoredElement;
 
 	namespace ElementType {
 		enum {
 			ROOT,
 			TEXT,
 			RELATIVE_WRAP,
-			GRID,
-			RENDERING_SURFACE
+			GRID
 		};
 	}
 
@@ -139,6 +135,9 @@ namespace nui {
 	struct ColorStep {
 		Color color;
 		float pos;
+
+		ColorStep() = default;
+		ColorStep(Color& new_color);
 	};
 
 
@@ -149,6 +148,7 @@ namespace nui {
 		// STRIPE
 		// SMOOTHSTEP MULTI
 		// QUADRATIC/CUBIC BEZIER MULTI
+		RENDERING_SURFACE
 	};
 
 
@@ -265,8 +265,10 @@ namespace nui {
 
 		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 
-		// Transitions
+		// Other
+		void beginMouseDelta();
 
+		float getInsideDuration();
 
 	public:
 		// Internal
@@ -274,7 +276,7 @@ namespace nui {
 
 		StoredElement* _parent;
 		StoredElement* _self;
-		std::set<StoredElement*> _children;
+		std::list<StoredElement*> _children;
 
 		std::array<uint32_t, 2> _size;
 		std::array<int32_t, 2> _position;
@@ -323,6 +325,22 @@ namespace nui {
 	Element* getElementBase(StoredElement* elem);
 
 
+	struct SurfaceEvent {
+		// Resource
+		ID3D11Device5* dev5;
+		ID3D11DeviceContext3* im_ctx3;
+
+		uint32_t render_target_width;
+		uint32_t render_target_height;
+		ID3D11RenderTargetView* compose_rtv;
+
+		// Drawcall
+		glm::uvec2 viewport_pos;
+		glm::uvec2 viewport_size;
+	};
+
+	typedef void(*RenderingSurfaceCallback)(Window* window, StoredElement* source, SurfaceEvent& event, void* user_data);
+
 	struct BackgroundElement : Element {
 		BackgroundColoring coloring;
 		std::vector<ColorStep> colors;
@@ -331,6 +349,8 @@ namespace nui {
 		void setColorTransition(Color& end_color, uint32_t idx, uint32_t duration);
 		void setColorPositionTransition(float end_position, uint32_t idx, uint32_t duration);
 		void setGradientAngleTransition(float end_gradient, uint32_t duration);
+
+		void setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data = nullptr);
 
 	public:
 		BackgroundAnimated _anim;
@@ -345,7 +365,13 @@ namespace nui {
 		DirectX::XMFLOAT2 _center;
 		float _gradient_angle;
 
+		// Events
+		SurfaceEvent _surface_event;
+		RenderingSurfaceCallback _onRenderingSurface;
+		void* _surface_event_user_data;
+
 	public:
+		void _init();
 		void _generateGPU_Data(uint32_t& rect_verts_idx, uint32_t& rect_idxs_idx);
 		void _draw();
 	};
@@ -391,47 +417,26 @@ namespace nui {
 	};
 
 
-	struct SurfaceEvent {
-		RenderingSurface* surface;
-		void* user_data;
-
-		// Resource
-		ID3D11Device5* dev5;
-		ID3D11DeviceContext3* im_ctx3;
-		ID3D11DeviceContext3* de_ctx3;
-
-		uint32_t render_target_width;
-		uint32_t render_target_height;
-		ID3D11RenderTargetView* compose_rtv;
-
-		// Drawcall
-		glm::uvec2 viewport_pos;
-		glm::uvec2 viewport_size;
-	};
-
-	typedef ErrStack(*RenderingSurfaceCallback)(SurfaceEvent& event);
-
-	struct RenderingSurface : Element {
-	public:
-		SurfaceEvent _event;
-
-	public:
-		glm::uvec2 pos;  // where to render surface on screen
-		ElementSize width;  // not used
-		ElementSize height;  // not used
-
-		RenderingSurfaceCallback gpu_callback;
-		void* user_data;
-
-	public:
-	};
-
-
 	struct WindowMessages {
 		bool should_close;
 		bool is_minimized;
 	};
 
+	struct GridLine {
+		uint32_t end_idx;
+		uint32_t count;
+
+		uint32_t line_length;
+		uint32_t line_thickness;
+	};
+
+	struct LayoutMemoryCache {
+		std::vector<StoredElement*> stored_elems_0;
+		std::vector<StoredElement*> stored_elems_1;
+		std::vector<StoredElement*> stored_elems_2;
+
+		std::vector<GridLine> lines;
+	};
 
 	class Window {
 	public:
@@ -454,8 +459,16 @@ namespace nui {
 		// Elements
 		std::list<StoredElement> elements;
 
+		LayoutMemoryCache layout_mem_cache;
+
 		// Z Index sorted list of elements
 		std::map<int32_t, std::list<StoredElement*>> render_stacks;
+
+		int32_t delta_trap_top;
+		int32_t delta_trap_bot;
+		int32_t delta_trap_left;
+		int32_t delta_trap_right;
+		Element* delta_owner_elem;
 
 		// DirectX 11
 		ComPtr<IDXGISwapChain1> swapchain1;
@@ -502,6 +515,7 @@ namespace nui {
 
 		// Event
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void endMouseDelta();
 
 		// Window
 		RECT getClientRectangle();
@@ -514,7 +528,7 @@ namespace nui {
 	};
 
 	 
-	extern std::set<Window*> _created_windows;
+	extern std::list<Window*> _created_windows;
 
 
 	struct WindowCreateInfo {

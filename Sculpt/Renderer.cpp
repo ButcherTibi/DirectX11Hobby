@@ -8,32 +8,6 @@
 #include "Application.hpp"
 
 
-//namespace dx11 {
-//	ErrStack createPixelShaderFromPath(std::string path_to_file, ID3D11Device5* device,
-//		ID3D11PixelShader** r_pixel_shader,
-//		std::vector<char>* read_buffer)
-//	{
-//		ErrStack err_stack;
-//		HRESULT hr;
-//
-//		std::vector<char> empty_vec;
-//
-//		if (read_buffer == nullptr) {
-//			read_buffer = &empty_vec;
-//		}
-//
-//		checkErrStack(io::readLocalFile(path_to_file, *read_buffer),
-//			"failed to read compiled pixel shader code from path");
-//
-//		checkHResult(device->CreatePixelShader(read_buffer->data(), read_buffer->size(), nullptr,
-//			r_pixel_shader),
-//			"failed to create pixel shader");
-//
-//		return err_stack;
-//	}
-//}
-
-
 ErrStack MeshRenderer::loadVertices()
 {
 	ErrStack err_stack;
@@ -73,6 +47,10 @@ ErrStack MeshRenderer::loadVertices()
 				}
 			}
 		}
+	}
+
+	if (!mesh_vi) {
+		return err_stack;
 	}
 
 	void* vertex_buff_mem;
@@ -541,13 +519,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 		dev5 = event.dev5;
 		im_ctx3 = event.im_ctx3;
-		de_ctx3 = event.de_ctx3;
+
+		render_target_width = 0;
+		render_target_height = 0;
 		
 		load_vertices = true;
 		load_uniform = true;
-
-		this->render_target_width = event.render_target_width;
-		this->render_target_height = event.render_target_height;
 
 		// Scene Depth Resource
 		{
@@ -564,14 +541,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 
-			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, scene_dtex.GetAddressOf()));
+			scene_dtex.create(dev5, im_ctx3, desc);
 
 			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
 			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
 			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 			view_desc.Texture2D.MipSlice = 0;
 
-			checkHResult1(dev5->CreateDepthStencilView(scene_dtex.Get(), &view_desc, scene_dsv.GetAddressOf()));
+			scene_dtex.createDepthStencilView(view_desc);
 		}
 
 		// Mesh Depth Mash Resource
@@ -589,14 +566,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 
-			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, mesh_mask_dtex.GetAddressOf()));
+			mesh_mask_dtex.create(dev5, im_ctx3, desc);
 
 			D3D11_RENDER_TARGET_VIEW_DESC rtv_desc = {};
 			rtv_desc.Format = DXGI_FORMAT_R32_FLOAT;
 			rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
 			rtv_desc.Texture2D.MipSlice = 0;
 
-			checkHResult1(dev5->CreateRenderTargetView(mesh_mask_dtex.Get(), &rtv_desc, mesh_mask_rtv.GetAddressOf()));
+			mesh_mask_dtex.createRenderTargetView(rtv_desc);
 
 			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 			srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
@@ -604,7 +581,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			srv_desc.Texture2D.MostDetailedMip = 0;
 			srv_desc.Texture2D.MipLevels = 1;
 
-			checkHResult1(dev5->CreateShaderResourceView(mesh_mask_dtex.Get(), &srv_desc, mesh_mask_srv.GetAddressOf()));
+			mesh_mask_dtex.createShaderResourceView(srv_desc);
 		}
 
 		// Wireframe Depth Texture
@@ -622,14 +599,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 
-			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, wireframe_dtex.GetAddressOf()));
+			wireframe_dtex.create(dev5, im_ctx3, desc);
 
 			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
 			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
 			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
 			view_desc.Texture2D.MipSlice = 0;
 
-			checkHResult1(dev5->CreateDepthStencilView(wireframe_dtex.Get(), &view_desc, wireframe_dsv.GetAddressOf()));
+			wireframe_dtex.createDepthStencilView(view_desc);
 		}
 
 		// Mesh Instance ID Texture
@@ -647,9 +624,14 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = 0;
 			desc.MiscFlags = 0;
 		
-			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, instance_id_mask_dtex.GetAddressOf()));
+			instance_id_mask_dtex.create(dev5, im_ctx3, desc);
 
-			checkHResult1(dev5->CreateRenderTargetView(instance_id_mask_dtex.Get(), nullptr, instance_id_mask_rtv.GetAddressOf()));
+			D3D11_RENDER_TARGET_VIEW_DESC rtv_desc = {};
+			rtv_desc.Format = DXGI_FORMAT_R32_UINT;
+			rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+			rtv_desc.Texture2D.MipSlice = 0;
+
+			instance_id_mask_dtex.createRenderTargetView(rtv_desc);
 		}
 
 		// Mesh Instance ID Texture for CPU read
@@ -667,7 +649,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 			desc.MiscFlags = 0;
 
-			checkHResult1(dev5->CreateTexture2D(&desc, nullptr, instance_id_staging_tex.GetAddressOf()));
+			instance_id_staging_tex.create(dev5, im_ctx3, desc);
 		}
 
 		// Mesh Vertex Buffer
@@ -715,7 +697,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			desc.MiscFlags = 0;
 			desc.StructureByteStride = 0;
 
-			drawcall_ubuff.create(dev5, de_ctx3, desc);
+			drawcall_ubuff.create(dev5, im_ctx3, desc);
 		}
 
 		// Octree Vertex Buffer
@@ -896,59 +878,32 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		load_uniform = false;
 	}
 
-	/*if (render_target_width != event.render_target_width ||
+	if (render_target_width != event.render_target_width ||
 		render_target_height != event.render_target_height)
 	{
-		mesh_depth_view->Release();
-		wireframe_depth_view->Release();
-
-		mesh_depth_srv->Release();
-
-		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, mesh_depth_tex));
-		checkErrStack1(dx11::resizeTexture2D(dev5, event.render_target_width, event.render_target_height, wireframe_depth_tex));
-
-		{
-			D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
-			view_desc.Format = DXGI_FORMAT_D32_FLOAT;
-			view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-			view_desc.Texture2D.MipSlice = 0;
-
-			checkHResult(dev5->CreateDepthStencilView(mesh_depth_tex.Get(), &view_desc, mesh_depth_view.GetAddressOf()),
-				"failed to rereate mesh depth view");
-
-			checkHResult(dev5->CreateDepthStencilView(wireframe_depth_tex.Get(), &view_desc, wireframe_depth_view.GetAddressOf()),
-				"failed to rereate wireframe depth view");
-		}
-
-		{
-			D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-			srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
-			srv_desc.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
-			srv_desc.Texture2D.MostDetailedMip = 0;
-			srv_desc.Texture2D.MipLevels = 1;
-
-			checkHResult(dev5->CreateShaderResourceView(mesh_depth_tex.Get(), &srv_desc, mesh_depth_srv.GetAddressOf()),
-				"failed to create mesh SRV");
-		}
+		scene_dtex.resize(event.render_target_width, event.render_target_height);
+		mesh_mask_dtex.resize(event.render_target_width, event.render_target_height);
+		wireframe_dtex.resize(event.render_target_width, event.render_target_height);
+		instance_id_mask_dtex.resize(event.render_target_width, event.render_target_height);
+		instance_id_staging_tex.resize(event.render_target_width, event.render_target_height);
 
 		checkErrStack1(loadUniform());
-		load_uniform = false;
-	}*/
 
-	this->render_target_width = event.render_target_width;
-	this->render_target_height = event.render_target_height;
+		this->render_target_width = event.render_target_width;
+		this->render_target_height = event.render_target_height;
+	}
 
 	// Command List
 	{
-		de_ctx3->ClearDepthStencilView(scene_dsv.Get(), D3D11_CLEAR_DEPTH, 0, 0);
+		im_ctx3->ClearDepthStencilView(scene_dtex.getDSV(), D3D11_CLEAR_DEPTH, 0, 0);
 
 		FLOAT clear_val[4] = { 0, 0, 0, 0};
-		de_ctx3->ClearRenderTargetView(instance_id_mask_rtv.Get(), clear_val);
+		im_ctx3->ClearRenderTargetView(instance_id_mask_dtex.getRTV(), clear_val);
 	}
 
 	for (MeshDrawcall& drawcall : application.drawcalls) {
 
-		lazyUnbind(de_ctx3);
+		lazyUnbind(im_ctx3);
 
 		// skip empty drawcalls
 		if (!drawcall.mesh_instance_sets.size()) {
@@ -965,7 +920,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			viewport.MinDepth = 0;
 			viewport.MaxDepth = 1;
 
-			de_ctx3->RSSetViewports(1, &viewport);
+			im_ctx3->RSSetViewports(1, &viewport);
 
 			D3D11_RECT sccissor;
 			sccissor.left = event.viewport_pos.x;
@@ -973,7 +928,7 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			sccissor.right = event.viewport_pos.x + event.viewport_size.x;
 			sccissor.bottom = event.viewport_pos.y + event.viewport_size.y;
 
-			de_ctx3->RSSetScissorRects(1, &sccissor);
+			im_ctx3->RSSetScissorRects(1, &sccissor);
 		}
 
 		switch (drawcall.rasterizer_mode) {
@@ -982,12 +937,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			/* Overview
 			- Draw the meshes using the PBR mesh shader*/
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Input Assembly
 			{
-				de_ctx3->IASetInputLayout(mesh_il.Get());
-				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				im_ctx3->IASetInputLayout(mesh_il.Get());
+				im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> buffers = {
 					vbuff.buff.Get(), instabuff.buff.Get()
@@ -998,21 +953,21 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				im_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
 			}
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
 			if (drawcall.is_back_culled) {
-				de_ctx3->RSSetState(fill_front_rs.Get());
+				im_ctx3->RSSetState(fill_front_rs.Get());
 			}
 			else {
-				de_ctx3->RSSetState(fill_none_rs.Get());
+				im_ctx3->RSSetState(fill_none_rs.Get());
 			}
 
 			// Pixel Shader
@@ -1020,27 +975,27 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<ID3D11Buffer*, 1> buffers = {
 					frame_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				im_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
 
-				de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+				im_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
 			}
 
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 2> rtvs = {
-					event.compose_rtv, instance_id_mask_rtv.Get()
+					event.compose_rtv, instance_id_mask_dtex.getRTV()
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 			break;
@@ -1052,12 +1007,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			- Draw the meshes using the PBR mesh shader
 			- Draw the wireframe on top offset by depth bias */
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Input Assembly
 			{
-				de_ctx3->IASetInputLayout(mesh_il.Get());
-				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				im_ctx3->IASetInputLayout(mesh_il.Get());
+				im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> buffers = {
 					vbuff.buff.Get(), instabuff.buff.Get()
@@ -1068,21 +1023,21 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				im_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
 			}
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
 			if (drawcall.is_back_culled) {
-				de_ctx3->RSSetState(fill_front_rs.Get());
+				im_ctx3->RSSetState(fill_front_rs.Get());
 			}
 			else {
-				de_ctx3->RSSetState(fill_none_rs.Get());
+				im_ctx3->RSSetState(fill_none_rs.Get());
 			}
 
 			// Pixel Shader
@@ -1090,53 +1045,53 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<ID3D11Buffer*, 1> buffers = {
 					frame_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				im_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
 
-				de_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
+				im_ctx3->PSSetShader(mesh_ps.Get(), nullptr, 0);
 			}
 
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 1> rtvs = {
 					event.compose_rtv
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 
 			// Draw the wireframe on top offset by depth bias
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
-			de_ctx3->RSSetState(wireframe_bias_rs.Get());
+			im_ctx3->RSSetState(wireframe_bias_rs.Get());
 
 			// Pixel Shader
 			{
 				switch (application.shading_normal) {
 				case ShadingNormal::VERTEX:
 				case ShadingNormal::POLY: {
-					de_ctx3->PSSetShader(front_wire_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(front_wire_ps.Get(), nullptr, 0);
 					break;
 				}
 				case ShadingNormal::TESSELATION: {
-					de_ctx3->PSSetShader(front_wire_tess_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(front_wire_tess_ps.Get(), nullptr, 0);
 					break;
 				}
 				}
@@ -1145,19 +1100,19 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 1> rtvs = {
 					event.compose_rtv
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 
@@ -1171,21 +1126,21 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			- draw the solid mesh but run the pixel shader with early depth test and record the resulting depth
 			in mesh depth tex */
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Clear Mesh Mask depth texture
 			{
 				float clear[4] = {
 					0.f, 0.f, 0.f, 0.f
 				};
-				de_ctx3->ClearRenderTargetView(mesh_mask_rtv.Get(), clear);
+				im_ctx3->ClearRenderTargetView(mesh_mask_dtex.getRTV(), clear);
 			}
 
-			de_ctx3->ClearDepthStencilView(wireframe_dsv.Get(), D3D11_CLEAR_DEPTH, 0, 0);
+			im_ctx3->ClearDepthStencilView(wireframe_dtex.getDSV(), D3D11_CLEAR_DEPTH, 0, 0);
 
 			// Input Assembly
-			de_ctx3->IASetInputLayout(mesh_il.Get());
-			de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			im_ctx3->IASetInputLayout(mesh_il.Get());
+			im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			{
 				std::array<ID3D11Buffer*, 2> buffs = {
 					vbuff.buff.Get(), instabuff.buff.Get()
@@ -1196,21 +1151,21 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				de_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
+				im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
 			}
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
 			if (drawcall.is_back_culled) {
-				de_ctx3->RSSetState(fill_front_rs.Get());
+				im_ctx3->RSSetState(fill_front_rs.Get());
 			}
 			else {
-				de_ctx3->RSSetState(fill_none_rs.Get());
+				im_ctx3->RSSetState(fill_none_rs.Get());
 			}
 
 			// Pixel Shader
@@ -1218,63 +1173,63 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<ID3D11Buffer*, 1> buffs = {
 					frame_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffs.size(), buffs.data());
+				im_ctx3->PSSetConstantBuffers(0, buffs.size(), buffs.data());
 
-				de_ctx3->PSSetShader(mesh_output_depth_ps.Get(), nullptr, 0);
+				im_ctx3->PSSetShader(mesh_output_depth_ps.Get(), nullptr, 0);
 			}
 
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 2> rtvs = {
-					event.compose_rtv, mesh_mask_rtv.Get()
+					event.compose_rtv, mesh_mask_dtex.getRTV()
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 
 			// Draw the wireframe ONLY for the mesh mask depth tex
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}		
 
 			// Rasterization
-			de_ctx3->RSSetState(wireframe_none_bias_rs.Get());
+			im_ctx3->RSSetState(wireframe_none_bias_rs.Get());
 
 			// Pixel Shader
 			{
 				std::array<ID3D11Buffer*, 2> buffs = {
 					frame_ubuff.buff.Get(), drawcall_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffs.size(), buffs.data());
+				im_ctx3->PSSetConstantBuffers(0, buffs.size(), buffs.data());
 
 				std::array<ID3D11ShaderResourceView*, 1> srvs = {
-					mesh_mask_srv.Get()
+					mesh_mask_dtex.getSRV()
 				};
-				de_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());
+				im_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());
 
 				switch (application.shading_normal) {
 				case ShadingNormal::VERTEX:
 				case ShadingNormal::POLY: {
-					de_ctx3->PSSetShader(see_thru_wire_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(see_thru_wire_ps.Get(), nullptr, 0);
 					break;
 				}
 				case ShadingNormal::TESSELATION: {
-					de_ctx3->PSSetShader(see_thru_wire_tess_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(see_thru_wire_tess_ps.Get(), nullptr, 0);
 					break;
 				}
 				}
@@ -1282,20 +1237,20 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 			// Output Merger
 			{
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(blend_target_0_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(blend_target_0_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
 				std::array<ID3D11RenderTargetView*, 2> rtvs = {
 					event.compose_rtv, nullptr
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 
@@ -1304,12 +1259,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 
 		case DisplayMode::WIREFRANE_PURE: {
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Input Assembly
 			{
-				de_ctx3->IASetInputLayout(mesh_il.Get());
-				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				im_ctx3->IASetInputLayout(mesh_il.Get());
+				im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> buffers = {
 					vbuff.buff.Get(), instabuff.buff.Get()
@@ -1320,33 +1275,33 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				im_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
 			}
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
-			de_ctx3->RSSetState(wire_rs.Get());
+			im_ctx3->RSSetState(wire_rs.Get());
 
 			// Pixel Shader
 			{
 				std::array<ID3D11Buffer*, 1> buffers = {
 					frame_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				im_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
 
 				switch (application.shading_normal) {
 				case ShadingNormal::VERTEX:
 				case ShadingNormal::POLY: {
-					de_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
 					break;
 				}
 				case ShadingNormal::TESSELATION: {
-					de_ctx3->PSSetShader(wire_tess_ps.Get(), nullptr, 0);
+					im_ctx3->PSSetShader(wire_tess_ps.Get(), nullptr, 0);
 					break;
 				}
 				}
@@ -1355,19 +1310,19 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 1> rtvs = {
 					event.compose_rtv
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
+				im_ctx3->DrawInstanced(instance.mesh->mesh_vertex_count, instance.mesh_insta_count,
 					instance.mesh->mesh_vertex_start, instance.mesh_insta_start);
 			}
 
@@ -1378,12 +1333,12 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Draw Octree
 		if (drawcall._debug_show_octree) {
 
-			lazyUnbind(de_ctx3);
+			lazyUnbind(im_ctx3);
 
 			// Input Assembly
 			{
-				de_ctx3->IASetInputLayout(mesh_il.Get());
-				de_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				im_ctx3->IASetInputLayout(mesh_il.Get());
+				im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				std::array<ID3D11Buffer*, 2> buffers = {
 					octree_vbuff.buff.Get(), instabuff.buff.Get()
@@ -1394,44 +1349,44 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 				std::array<uint32_t, 2> offsets = {
 					0, 0
 				};
-				de_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
+				im_ctx3->IASetVertexBuffers(0, buffers.size(), buffers.data(), strides.data(), offsets.data());
 			}
 
 			// Vertex Shader
 			{
-				de_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
-				de_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
+				im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+				im_ctx3->VSSetShader(mesh_vs.Get(), nullptr, 0);
 			}
 
 			// Rasterization
-			de_ctx3->RSSetState(wire_rs.Get());
+			im_ctx3->RSSetState(wire_rs.Get());
 
 			// Pixel Shader
 			{
 				std::array<ID3D11Buffer*, 1> buffers = {
 					frame_ubuff.buff.Get()
 				};
-				de_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
+				im_ctx3->PSSetConstantBuffers(0, buffers.size(), buffers.data());
 
-				de_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
+				im_ctx3->PSSetShader(wire_ps.Get(), nullptr, 0);
 			}
 
 			// Output Merger
 			{
 				float blend_factor[4] = { 1, 1, 1, 1 };
-				de_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
+				im_ctx3->OMSetBlendState(mesh_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
-				de_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
+				im_ctx3->OMSetDepthStencilState(greater_dss.Get(), 1);
 
 				std::array<ID3D11RenderTargetView*, 1> rtvs = {
 					event.compose_rtv
 				};
-				de_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dsv.Get());
+				im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 			}
 
 			for (MeshInstanceSet& instance : drawcall.mesh_instance_sets) {
 
-				de_ctx3->DrawInstanced(
+				im_ctx3->DrawInstanced(
 					instance.mesh->aabbs_vertex_count, instance.mesh_insta_count,
 					instance.mesh->aabbs_vertex_start, instance.mesh_insta_start);
 			}
@@ -1439,12 +1394,17 @@ ErrStack MeshRenderer::draw(nui::SurfaceEvent& event)
 	}
 
 	// Instance ID texture readback
-	de_ctx3->CopyResource(instance_id_staging_tex.Get(), instance_id_mask_dtex.Get());
+	im_ctx3->CopyResource(instance_id_staging_tex.get(), instance_id_mask_dtex.get());
 
 	return err_stack;
 }
 
-ErrStack geometryDraw(nui::SurfaceEvent& event)
+void geometryDraw(nui::Window* window, nui::StoredElement* source, nui::SurfaceEvent& event, void* user_data)
 {
-	return application.renderer.draw(event);
+	ErrStack err_stack = application.renderer.draw(event);
+
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		throw std::exception();
+	};
 }

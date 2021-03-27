@@ -19,26 +19,18 @@ public:
 public:
 	ID3D11Device5* dev5 = nullptr;
 	ID3D11DeviceContext3* im_ctx3;
-	ID3D11DeviceContext3* de_ctx3;
 
 	// for overall proper rendering
-	ComPtr<ID3D11Texture2D> scene_dtex;
-	ComPtr<ID3D11DepthStencilView> scene_dsv;
-	// ComPtr<ID3D11ShaderResourceView> scene_depth_srv;
+	dx11::Texture scene_dtex;
 
 	/* created by the solid mesh shader to be compared by the wireframe shader to restrict wireframe only to specific drawcall */ 
-	ComPtr<ID3D11Texture2D> mesh_mask_dtex;
-	ComPtr<ID3D11RenderTargetView> mesh_mask_rtv;
-	ComPtr<ID3D11ShaderResourceView> mesh_mask_srv;
+	dx11::Texture mesh_mask_dtex;
 
 	/* the see thru wireframe shader must discard pixels only relative to itself */
-	ComPtr<ID3D11Texture2D> wireframe_dtex;
-	ComPtr<ID3D11DepthStencilView> wireframe_dsv;
+	dx11::Texture wireframe_dtex;
 
-	ComPtr<ID3D11Texture2D> instance_id_mask_dtex;
-	ComPtr<ID3D11RenderTargetView> instance_id_mask_rtv;
-
-	ComPtr<ID3D11Texture2D> instance_id_staging_tex;
+	dx11::Texture instance_id_mask_dtex;
+	dx11::Texture instance_id_staging_tex;
 
 	// poly idx and world position of pixel
 	// ComPtr<ID3D11Texture2D> poly_pos_dtex;
@@ -87,4 +79,4 @@ public:
 	ErrStack draw(nui::SurfaceEvent& event);
 };
 
-ErrStack geometryDraw(nui::SurfaceEvent& event);
+void geometryDraw(nui::Window* window, nui::StoredElement* source, nui::SurfaceEvent& event, void* user_data);

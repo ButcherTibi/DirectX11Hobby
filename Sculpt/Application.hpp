@@ -1,5 +1,8 @@
 #pragma once
 
+// Standard
+#include <set>  // TODO: replace with unordered set
+
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
 
@@ -293,7 +296,7 @@ public:
 		std::vector<MeshInstance*>* r_instances = nullptr);
 	MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
-	//
+	// What mesh instance is under pixel
 	void lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_t& r_instance_id);
 
 	// Raycasts

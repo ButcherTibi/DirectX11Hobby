@@ -86,13 +86,17 @@ std::string asIs(char c);
 	}
 
 
-#define assert_cond(param, msg) \
-	if (param != true) \
-		printf("%s %s%s%s %s \n", code_location, \
-			"WARNING: assertion failed for condition (", #param, ") isn't true, ", msg);
-
-
 /* Exceptions */
+
+inline void assert_cond(bool condition, const char* msg) {
+#ifndef NDEBUG  // or _DEBUG
+	if (condition != true) {
+		throw std::exception(msg);
+	}
+#endif
+}
+
+
 struct DirectX11Exception : std::exception {
 	HRESULT hresult;  // the result handle of the DirectX11 call
 	std::string message;  // message writen by hand by the programer at call site
@@ -103,6 +107,7 @@ struct DirectX11Exception : std::exception {
 
 void throwDX11(HRESULT hresult);
 void throwDX11(HRESULT hresult, const char* message);
+
 
 struct WindowsException : std::exception {
 	std::string programer_message;

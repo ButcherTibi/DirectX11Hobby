@@ -519,7 +519,7 @@ void Application::lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_
 	// TODO: optimize for multi lookup
 
 	// Map
-	renderer.im_ctx3->Map(renderer.instance_id_staging_tex.Get(), 0, D3D11_MAP_READ, 0, &_instance_id_mask);
+	renderer.im_ctx3->Map(renderer.instance_id_staging_tex.get(), 0, D3D11_MAP_READ, 0, &_instance_id_mask);
 
 	uint32_t idx = (pixel_y * _instance_id_mask.RowPitch) + (pixel_x * 4);
 	
@@ -531,7 +531,7 @@ void Application::lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_
 	r_instance_id = (a << 24) | (b << 16) | (g << 8) | r;
 
 	// Unmap
-	renderer.im_ctx3->Unmap(renderer.instance_id_staging_tex.Get(), 0);
+	renderer.im_ctx3->Unmap(renderer.instance_id_staging_tex.get(), 0);
 }
 
 bool Application::raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,

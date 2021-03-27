@@ -2,12 +2,12 @@
 // Header
 #include "NuiLibrary.hpp"
 
-// Standard
-#include <unordered_set>
-
 // GLM
 #include "glm\vec3.hpp"
 #include "glm\common.hpp"
+
+// Mine
+#include "UniqueVector.hpp"
 
 
 using namespace nui;
@@ -22,6 +22,8 @@ Element* nui::getElementBase(StoredElement* elem)
 		return std::get_if<Text>(elem);
 	case ElementType::RELATIVE_WRAP:
 		return std::get_if<RelativeWrap>(elem);
+	case ElementType::GRID:
+		return std::get_if<Grid>(elem);
 	}
 
 	return nullptr;
@@ -34,27 +36,19 @@ struct PassedElement {
 	StoredElement* elem;
 };
 
-//float lerp3(float a, float v0, float v1, float v2)
-//{
-//	if (v0 < a && a < v1) {
-//		return glm::mix(v0, v1, a);
-//	}
-//
-//	return glm::mix(v1, v2, a);
-//}
-
-#pragma warning( disable : 4701)
+//#pragma warning(4701 : disable)
 void Window::_updateCPU()
 {
 	// SteadyTime& now = instance->frame_start_time;
 
-	std::vector<StoredElement*> now_elems;
-	std::vector<StoredElement*> next_elems;
-
 	// Events
 	{
-		now_elems.resize(1);
-		now_elems[0] = &elements.front();
+		std::vector<StoredElement*>& now_elems = layout_mem_cache.stored_elems_0;
+		std::vector<StoredElement*>& next_elems = layout_mem_cache.stored_elems_1;
+
+		now_elems = {
+			&elements.front()
+		};
 
 		next_elems.clear();
 
@@ -69,8 +63,8 @@ void Window::_updateCPU()
 				int32_t left = elem->_position[0];
 				int32_t right = left + elem->_size[0];
 
-				if (left < input.mouse_x && input.mouse_x < right &&
-					top < input.mouse_y && input.mouse_y < bot)
+				if (left <= input.mouse_x && input.mouse_x < right &&
+					top <= input.mouse_y && input.mouse_y < bot)
 				{
 					elem->_emitInsideEvents();
 
@@ -101,8 +95,10 @@ void Window::_updateCPU()
 	}
 
 	// Counting
-	std::vector<StoredElement*> leafs;
+	std::vector<StoredElement*>& leafs = layout_mem_cache.stored_elems_2;
 	{
+		leafs.clear();
+
 		uint32_t char_verts_count = 0;
 		uint32_t char_idxs_count = 0;
 		uint32_t text_inst_count = 0;
@@ -182,6 +178,12 @@ void Window::_updateCPU()
 
 	// Top Down Pass for elements that depend on parents
 	{
+		std::vector<StoredElement*>& now_elems = layout_mem_cache.stored_elems_0;
+		std::vector<StoredElement*>& next_elems = layout_mem_cache.stored_elems_1;
+
+		now_elems.clear();
+		next_elems.clear();
+
 		Element* root = std::get_if<Root>(&elements.front());
 		root->_size[0] = surface_width;
 		root->_size[1] = surface_height;
@@ -189,8 +191,6 @@ void Window::_updateCPU()
 		for (StoredElement* child : root->_children) {
 			now_elems.push_back(child);
 		}
-
-		next_elems.clear();
 
 		while (now_elems.size()) {
 
@@ -212,15 +212,18 @@ void Window::_updateCPU()
 
 	// Down Up Pass for elements that depend on children (starts from leafs)
 	{
+		std::vector<StoredElement*>& now_elems = layout_mem_cache.stored_elems_0;
+		std::vector<StoredElement*>& next_elems = layout_mem_cache.stored_elems_1;
+
+		now_elems.swap(leafs);
+		next_elems.clear();
+
 		uint32_t char_verts_idx = 0;
 		uint32_t char_idxs_idx = 0;
 		uint32_t text_inst_idx = 0;
 
 		uint32_t rect_verts_idx = 0;
 		uint32_t rect_idxs_idx = 0;
-
-		now_elems = leafs;
-		next_elems.clear();
 
 		while (now_elems.size()) {
 
@@ -387,7 +390,7 @@ void Window::_updateCPU()
 					text->_index_count = char_idxs_idx - text->_index_start_idx;
 
 					if (text->_parent != nullptr) {
-						next_elems.push_back(text->_parent);
+						emplaceBackUnique(next_elems, text->_parent);
 					}
 					break;
 				}
@@ -442,7 +445,7 @@ void Window::_updateCPU()
 					rel->BackgroundElement::_generateGPU_Data(rect_verts_idx, rect_idxs_idx);
 
 					if (rel->_parent != nullptr) {
-						next_elems.push_back(rel->_parent);
+						emplaceBackUnique(next_elems, rel->_parent);
 					}
 
 					break;
@@ -451,10 +454,250 @@ void Window::_updateCPU()
 				case ElementType::GRID: {
 					auto grid = std::get_if<Grid>(now_elem);
 
+					auto calc_child_positions = [&](uint32_t x_axis, uint32_t y_axis) {
+
+						std::vector<GridLine>& lines = layout_mem_cache.lines;
+						lines.clear();
+
+						uint32_t line_max_length;
+
+						switch (grid->size[x_axis].type) {
+						case ElementSizeType::ABSOLUTE:
+						case ElementSizeType::RELATIVE: {
+							line_max_length = grid->_size[x_axis];
+							break;
+						}
+
+						case ElementSizeType::FIT: {
+							line_max_length = 0xFFFF'FFFF;
+							break;
+						}
+						default:
+							throw std::exception();
+						}
+
+						// Group items into lines
+						uint32_t width = 0;
+						uint32_t height = 0;
+						{
+							int32_t x = 0;
+							uint32_t line_thickness = 0;
+							uint32_t child_idx = 0;
+							uint32_t child_count = 0;
+
+							for (StoredElement* child : grid->_children) {
+
+								Element* child_elem = getElementBase(child);
+
+								if ((x + child_elem->_size[x_axis] < line_max_length) ||
+									child == grid->_children.front())
+								{
+									x += child_elem->_size[x_axis];
+
+									if (child_elem->_size[y_axis] > line_thickness) {
+										line_thickness = child_elem->_size[y_axis];
+									}
+								}
+								// element does not fit in current line so place to next
+								else {
+									GridLine& new_line = lines.emplace_back();
+									new_line.end_idx = child_idx;
+									new_line.count = child_count;
+									new_line.line_length = x;
+									new_line.line_thickness = line_thickness;
+
+									height += line_thickness;
+
+									x = child_elem->_size[x_axis];
+									line_thickness = child_elem->_size[y_axis];
+
+									child_count = 0;
+								}
+
+								if (x > (int32_t)width) {
+									width = x;
+								}
+
+								child_idx++;
+								child_count++;
+							}
+
+							GridLine& new_line = lines.emplace_back();
+							new_line.end_idx = child_idx;
+							new_line.count = child_count;
+							new_line.line_length = x;
+							new_line.line_thickness = line_thickness;
+
+							height += line_thickness;
+						}
+
+						// Calculate X positions of items
+						{
+							int32_t x;
+							int32_t step = 0;
+
+							switch (grid->items_spacing) {
+							case GridSpacing::START: {
+								x = 0;
+								break;
+							}
+
+							case GridSpacing::END: {
+								x = grid->_size[x_axis] - lines.front().line_length;
+								break;
+							}
+
+							case GridSpacing::CENTER: {
+								x = (grid->_size[x_axis] - lines.front().line_length) / 2;
+								break;
+							}
+
+							case GridSpacing::SPACE_BETWEEN: {
+
+								x = 0;
+								GridLine& first_line = lines.front();
+								if (first_line.count > 1) {
+									step = (grid->_size[x_axis] - first_line.line_length) / (first_line.count - 1);
+								}
+								break;
+							}
+							default:
+								throw std::exception();
+							}
+
+							uint32_t item_idx = 0;
+							uint32_t line_idx = 0;
+
+							for (StoredElement* child : grid->_children) {
+
+								Element* child_elem = getElementBase(child);
+								GridLine* line = &lines[line_idx];
+
+								if (item_idx < line->end_idx) {
+									child_elem->_position[x_axis] = x;
+									x += child_elem->_size[x_axis] + step;
+								}
+								else {
+									switch (grid->items_spacing) {
+									case GridSpacing::START: {
+										x = 0;
+										break;
+									}
+
+									case GridSpacing::END: {
+										x = grid->_size[x_axis] - line->line_length;
+										break;
+									}
+
+									case GridSpacing::CENTER: {
+										x = (grid->_size[x_axis] - line->line_length) / 2;
+										break;
+									}
+
+									case GridSpacing::SPACE_BETWEEN: {
+										x = 0;
+
+										line = &lines[line_idx + 1];
+
+										if (line->count > 1) {
+											step = (grid->_size[x_axis] - line->line_length) / (line->count - 1);
+										}
+										else {
+											step = 0;
+										}
+										break;
+									}
+									}
+
+									child_elem->_position[x_axis] = x;
+									x += child_elem->_size[x_axis] + step;
+
+									line_idx++;
+								}
+
+								item_idx++;
+							}
+						}
+
+						// Calculate Y positions of lines
+						{
+							int32_t y;
+							uint32_t step = 0;
+
+							switch (grid->lines_spacing) {
+							case GridSpacing::START: {
+								y = 0;
+								break;
+							}
+
+							case GridSpacing::END: {
+								y = grid->_size[y_axis] - height;
+								break;
+							}
+
+							case GridSpacing::CENTER: {
+								y = (grid->_size[y_axis] - height) / 2;
+								break;
+							}
+
+							case GridSpacing::SPACE_BETWEEN: {
+								y = 0;
+								if (lines.size() > 1) {
+									step = (grid->_size[y_axis] - height) / (lines.size() - 1);
+								}
+								break;
+							}
+							default:
+								throw std::exception();
+							}
+							
+							uint32_t item_idx = 0;
+							uint32_t line_idx = 0;
+
+							for (StoredElement* child : grid->_children) {
+
+								Element* child_elem = getElementBase(child);
+								GridLine& line = lines[line_idx];
+
+								if (item_idx < line.end_idx) {
+									child_elem->_position[y_axis] = y;
+								}
+								else {
+									y += lines[line_idx].line_thickness + step;
+									child_elem->_position[y_axis] = y;
+
+									line_idx++;
+								}
+
+								item_idx++;
+							}
+						}
+
+						if (grid->size[x_axis].type == ElementSizeType::FIT) {
+							grid->_size[x_axis] = width;
+						}
+
+						if (grid->size[y_axis].type == ElementSizeType::FIT) {
+							grid->_size[y_axis] = height;
+						}
+					};
+
+					switch (grid->orientation) {
+					case GridOrientation::ROW: {
+						calc_child_positions(0, 1);
+						break;
+					}
+
+					case GridOrientation::COLUMN: {
+						calc_child_positions(1, 0);
+						break;
+					}
+					}
+
 					grid->BackgroundElement::_generateGPU_Data(rect_verts_idx, rect_idxs_idx);
 
 					if (grid->_parent != nullptr) {
-						next_elems.push_back(grid->_parent);
+						emplaceBackUnique(next_elems, grid->_parent);
 					}
 					break;
 				}
@@ -570,7 +813,7 @@ void Window::_updateCPU()
 				}
 				else {
 					auto iter = render_stacks.find(elem->z_index.z_index);
-					
+
 					// create new stack
 					if (iter == render_stacks.end()) {
 
@@ -605,6 +848,34 @@ void Window::_updateCPU()
 		}
 	}
 
+	// Mouse Delta Trap
+	if (delta_owner_elem != nullptr) {
+
+		int32_t local_top = delta_owner_elem->_position[1];
+		int32_t local_bot = local_top + delta_owner_elem->_size[1];
+		int32_t local_left = delta_owner_elem->_position[0];
+		int32_t local_right = local_left + delta_owner_elem->_size[0];
+
+		RECT client_rect = getClientRectangle();
+		RECT new_rect;
+		new_rect.top = client_rect.top + local_top;
+		new_rect.bottom = client_rect.top + local_bot;
+		new_rect.left = client_rect.left + local_left;
+		new_rect.right = client_rect.left + local_right;
+
+		// reapply mouse trap if position or size of the element changes
+		// or if window position changes because ClipCursor is Global Screen coordinate not client
+		if (new_rect.top != delta_trap_top ||
+			new_rect.bottom != delta_trap_bot ||
+			new_rect.left != delta_trap_left ||
+			new_rect.right != delta_trap_right)
+		{
+			ClipCursor(&new_rect);
+		}
+		
+		
+	}
+
 	// Constant buffer data
 	{
 		glm::ivec2 screen_size = { surface_width, surface_height };
@@ -621,4 +892,4 @@ void Window::_updateCPU()
 		viewport.MaxDepth = 1;
 	}
 }
-#pragma warning( default : 4701)
+//#pragma warning(4701 : default)

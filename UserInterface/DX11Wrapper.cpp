@@ -232,6 +232,11 @@ void dx11::Texture::createShaderResourceView(D3D11_SHADER_RESOURCE_VIEW_DESC& de
 	this->srv_desc = desc;
 }
 
+void dx11::Texture::createDepthStencilView(D3D11_DEPTH_STENCIL_VIEW_DESC& desc)
+{
+	this->dsv_desc = desc;
+}
+
 void dx11::Texture::createRenderTargetView(D3D11_RENDER_TARGET_VIEW_DESC& desc)
 {
 	this->rtv_desc = desc;
@@ -254,15 +259,9 @@ void dx11::Texture::resize(uint32_t width, uint32_t height)
 	else if (tex_desc.Width != width || tex_desc.Height != height) {
 
 		// child views are now invalid
-		if (srv != nullptr) {
-			srv->Release();
-			srv = nullptr;
-		}
-
-		if (rtv != nullptr) {
-			rtv->Release();
-			rtv = nullptr;
-		}
+		srv = nullptr;
+		dsv = nullptr;
+		rtv = nullptr;
 
 		tex->Release();
 		create_tex();
@@ -344,6 +343,15 @@ ID3D11ShaderResourceView* dx11::Texture::getSRV()
 	}
 
 	return srv.Get();
+}
+
+ID3D11DepthStencilView* dx11::Texture::getDSV()
+{
+	if (dsv == nullptr) {
+		throwDX11(dev5->CreateDepthStencilView(get(), &dsv_desc, dsv.GetAddressOf()));
+	}
+	
+	return dsv.Get();
 }
 
 ID3D11RenderTargetView* dx11::Texture::getRTV()

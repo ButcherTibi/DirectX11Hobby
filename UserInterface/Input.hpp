@@ -3,13 +3,18 @@
 // Standard
 #include <chrono>
 
-using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
-
-// will output float of second in duration
-#define fsec_cast(duration_ns) \
-	std::chrono::duration<float, std::ratio<1>>(duration_ns).count()
-
 namespace nui {
+
+	using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
+
+	//#define fsec_cast(duration_ns) \
+	//	std::chrono::duration<float, std::ratio<1>>(duration_ns).count()
+
+	// will output float of second in duration
+	inline float fsec_cast(std::chrono::nanoseconds duration_ns)
+	{
+		return std::chrono::duration<float, std::ratio<1>>(duration_ns).count();
+	}
 
 	namespace VirtualKeys {
 		enum : uint16_t {

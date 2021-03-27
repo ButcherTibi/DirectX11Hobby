@@ -47,6 +47,9 @@
     <Filter Include="Source Files\Math">
       <UniqueIdentifier>{778bb54a-b5f4-4381-90aa-38a961abd89f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\CustomContainers">
+      <UniqueIdentifier>{5aaeb23a-2ca8-4232-ae17-fb41d11d3b37}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
@@ -78,6 +81,9 @@
     </ClInclude>
     <ClInclude Include="BasicMath.h">
       <Filter>Source Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="UniqueVector.hpp">
+      <Filter>Source Files\CustomContainers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -122,6 +128,9 @@
     </ClCompile>
     <ClCompile Include="BasicMath.cpp">
       <Filter>Source Files\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="UniqueVector.cpp">
+      <Filter>Source Files\CustomContainers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

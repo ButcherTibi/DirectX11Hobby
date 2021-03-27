@@ -35,11 +35,10 @@ void Window::_render()
 		text_instabuff.load(text_instances.data(), sizeof(GPU_TextInstance) * text_instances.size());
 	}
 
-	// Rect Character Vertices
-	rect_vbuff.load(rect_verts.data(), sizeof(GPU_RectVertex) * rect_verts.size());
-
-	// Rect Character Indexes
-	rect_idxbuff.load(rect_idxs.data(), sizeof(uint32_t) * rect_idxs.size());
+	if (rect_verts.size()) {
+		rect_vbuff.load(rect_verts.data(), sizeof(GPU_RectVertex) * rect_verts.size());
+		rect_idxbuff.load(rect_idxs.data(), sizeof(uint32_t) * rect_idxs.size());
+	}
 
 	// Load Constant Buffer
 	cbuff.load(&gpu_constants, sizeof(GPU_Constants));

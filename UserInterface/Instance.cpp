@@ -9,7 +9,7 @@
 using namespace nui;
 
 
-std::set<Window*> nui::_created_windows;
+std::list<Window*> nui::_created_windows;
 
 
 void Instance::create()
@@ -372,7 +372,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				w->input.mouse_delta_x = raw->data.mouse.lLastX;
 				w->input.mouse_delta_y = raw->data.mouse.lLastY;
 
-				// printf("mouse delta = %d %d \n", wnd->input.mouse_delta_x, wnd->input.mouse_delta_y);
+				// printf("mouse delta = %d %d \n", w->input.mouse_delta_x, w->input.mouse_delta_y);
 				return 0;
 			}
 
@@ -452,9 +452,8 @@ bool Instance::_bruteForceCreateSwapchain(Window& w, ComPtr<IDXGISwapChain1>& sw
 
 						HRESULT hr = factory7->CreateSwapChainForHwnd(dev5.Get(), w.hwnd,
 							&desc, nullptr, nullptr, swapchain1.GetAddressOf());
+
 						if (hr == S_OK) {
-
-
 							return true;
 						}
 					}
@@ -469,7 +468,7 @@ bool Instance::_bruteForceCreateSwapchain(Window& w, ComPtr<IDXGISwapChain1>& sw
 Window* Instance::createWindow(WindowCreateInfo& info)
 {
 	Window& w = this->windows.emplace_back();
-	_created_windows.insert(&w);
+	_created_windows.push_back(&w);
 
 	w.instance = this;
 
@@ -567,6 +566,11 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		root._parent = nullptr;
 		root._self = &root_elem;
 		root.Element::_init();
+	}
+
+	// Delta Trap
+	{
+		w.delta_owner_elem = nullptr;
 	}
 
 	// Swapchain
