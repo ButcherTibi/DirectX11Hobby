@@ -131,12 +131,25 @@ namespace dx11 {
 		std::vector<char>* read_buffer = nullptr);
 
 
-	class FrameAttachmentsSelection {
-		// set textures
-		// set rtv
-		// set srv
-		// set dtex
-		// set dsv
+	class RasterizerState {
+	public:
+		ID3D11Device5* dev5;
+
+		D3D11_RASTERIZER_DESC desc;
+		ComPtr<ID3D11RasterizerState> rasterizer_state;
+
+		bool has_new_state;
+
+	public:
+		void create(ID3D11Device5* dev, D3D11_RASTERIZER_DESC& desc);
+
+		void setFillMode(D3D11_FILL_MODE fill_mode);
+
+		void setCullMode(D3D11_CULL_MODE cull_mode);
+
+		void setDepthBias(int32_t depth_bias);
+
+		ID3D11RasterizerState* get();
 	};
 
 

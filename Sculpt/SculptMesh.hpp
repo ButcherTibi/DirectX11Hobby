@@ -36,13 +36,15 @@ namespace scme {
 		glm::vec3 pos;
 		glm::vec3 normal;
 
-		uint32_t away_loop;  // any loop attached to vertex
+		uint32_t away_loop;  // any loop attached to vertex that is pointing away from it
 
 		uint32_t aabb;
 		uint32_t idx_in_aabb;
 
 	public:
 		Vertex() {};
+
+		void init();
 
 		bool isPoint();
 	};
@@ -69,13 +71,14 @@ namespace scme {
 	struct Loop {
 	public:
 		uint32_t target_v;
+		// source_v is obtained from the previous loop around the polygon
 		uint32_t v_next_loop;  // next loop around vertex
 
-		uint32_t poly;
+		uint32_t poly;  // each loop can only belong to ONE polygon
 		uint32_t poly_next_loop;  // next loop around polygon
 		uint32_t poly_prev_loop;
 
-		uint32_t mirror_loop;
+		uint32_t mirror_loop;  // next loop that is parallel i.e the loop of the adjacent polygon
 
 		Loop() {};
 	};
@@ -83,11 +86,14 @@ namespace scme {
 
 	struct Poly {
 	public:
+		// the normal of the triangle or 
+		// the average normal of the 2 triangles composing the quad
 		glm::vec3 normal;
+
 		uint32_t inner_loop;  // any loop inside polygon
 
-		uint8_t tesselation_type : 1;
-		uint8_t is_tris : 1;
+		uint8_t tesselation_type : 1;  // split from 0 to 2 or from 1 to 3
+		uint8_t is_tris : 1;  // is it a triangle or quad
 		uint8_t temp_flag_0 : 1;  // not used
 		uint8_t _pad : 5;
 
@@ -137,30 +143,44 @@ namespace scme {
 
 		void registerVertexToAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
 
+
+		// Internal Data Structures for sub primitive ///////////////
+
+		// iterate loops around the src vertex, until a loop is found pointing to target vertex
+		uint32_t findLoopFromTo(uint32_t src_vertex, uint32_t target_vertex);
+
+		// creates or appends to the loop list around the vertex
+		void registerLoopToSourceVertexList(uint32_t away_loop, uint32_t vertex);
+
+		// // creates or appends to the mirror list of the loop
+		void registerLoopToMirrorLoopList(uint32_t new_loop, uint32_t existing_loop);
+
+
 		// Vertex ///////////////////////////////////////////////////
 
+		// calculates vertex normal based on the average normals of the connected polygons
 		void calcVertexNormal(Vertex* vertex);
 
 		// TODO: move vertex, register vertex if no AABB or nothing if vertex is still in its own AABB
 
+
 		// Loop ////////////////////////////////////////////////////
 
-		uint32_t findLoopFromTo(uint32_t src_vertex, uint32_t target_vertex);
+		// create a loop starting from source to target
+		uint32_t createLoop(uint32_t src_vertex, uint32_t target_vertex);
 
-		void registerLoopToSourceVertexList(uint32_t away_loop, uint32_t vertex);
+		void setLoop(uint32_t existing_loop, uint32_t src_vertex, uint32_t target_vertex);
 
-		void registerLoopToMirrorLoopList(uint32_t new_loop, uint32_t existing_loop);
-
-
-		/* assemble a loop from vertices, unless there is already a loop
-		in which case that loop is used and returned */
-		uint32_t setLoop(uint32_t loop, uint32_t src_vertex, uint32_t target_vertex);
-
+		// creates or returns existing loop from source to target
 		uint32_t addLoop(uint32_t src_vertex, uint32_t target_vertex);
+
 
 		// Poly ////////////////////////////////////////////////////
 
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
+
+		// unused
+		void calcPolyNormal(Poly* poly);
 
 		/* creates a new triangle from existing vertices, creates new loops between the vertices 
 		if they are not already present */
@@ -170,8 +190,8 @@ namespace scme {
 		void setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
 			uint32_t v0, uint32_t v1, uint32_t v2);
 
-		/* creates a new quad from existing vertices, creates new loops between the vertices
-		if they are not already present */
+		// creates a new quad from existing vertices, creates new loops between the vertices
+		// if they are not already present
 		uint32_t addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
 		/* assemble the quad using blank loops and existing vertices */
@@ -180,12 +200,14 @@ namespace scme {
 
 		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
 
+
 		// Queries ////////////////////////////////////////////
 
 		bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
 
 		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 			uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_position);
+
 
 		////////////////////////////////////////////////////////////
 

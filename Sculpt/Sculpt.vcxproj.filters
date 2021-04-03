@@ -44,6 +44,9 @@
     <Filter Include="Source Files\Tooling">
       <UniqueIdentifier>{6102eb5c-179a-44f6-b654-6aebc06ef0f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\Headers">
+      <UniqueIdentifier>{23b69d5c-faa1-4a5f-b2a4-662b16f1b5d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -149,5 +152,13 @@
     <FxCompile Include="WireTessPS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
+    <FxCompile Include="MeshDepthOnlyPS.hlsl">
+      <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="MeshPixelIn.hlsli">
+      <Filter>Source Files\Shaders\Headers</Filter>
+    </None>
   </ItemGroup>
 </Project>

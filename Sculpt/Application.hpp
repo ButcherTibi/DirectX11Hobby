@@ -112,7 +112,7 @@ struct MeshInstance {
 	std::string name;
 	uint32_t id;
 	bool visible;
-	bool can_collide;
+	// bool can_collide;
 
 	// Instance Data
 	glm::vec3 pos;
@@ -141,7 +141,7 @@ struct MeshDrawcall {
 
 	std::vector<MeshInstanceSet> mesh_instance_sets;
 	
-	DisplayMode rasterizer_mode;
+	DisplayMode display_mode;
 	bool is_back_culled;
 	bool _debug_show_octree;
 };
@@ -237,7 +237,7 @@ public:
 	MeshLayer* last_used_layer;
 
 	// Shading
-	uint32_t shading_normal = ShadingNormal::POLY;
+	uint32_t shading_normal;
 
 	// Lighting
 	std::array<CameraLight, 8> lights;
@@ -287,9 +287,9 @@ public:
 	void setLayerVisibility(MeshLayer* layer, bool visible_state);
 
 	// Create Objects
-	MeshInstance* createTriangleMesh(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createQuadMesh(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createCubeMesh(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createTriangle(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createQuad(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstance* createCube(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,

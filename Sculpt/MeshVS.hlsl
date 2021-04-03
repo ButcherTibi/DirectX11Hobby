@@ -126,7 +126,6 @@ VertexOut main(VertexIn input)
 	
 	// Viewport Position
 	float4 persp = mul(perspective, float4(pos, 1.f));  // perspective transform
-	//persp.z /= z_far;
 	output.dx_pos = persp;
 
 	// Output

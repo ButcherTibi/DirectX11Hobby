@@ -158,8 +158,8 @@ T AnimatedProperty<T>::calculate(SteadyTime& now)
 			return end;
 		}
 		else {
-			float elapsed = fsec_cast(now - start_time);
-			float total = fsec_cast(end_time - start_time);
+			float elapsed = (float)(now - start_time).count();
+			float total = (float)(end_time - start_time).count();
 
 			return glm::mix(start, end, elapsed / (total));
 		}
@@ -179,7 +179,7 @@ void Element::setMouseEnterEvent(EventCallback callback, void* user_data)
 	this->_mouse_enter_user_data = user_data;
 }
 
-void Element::setMouseHoverEvent(MouseHoverCallback callback, void* user_data)
+void Element::setMouseHoverEvent(EventCallback callback, void* user_data)
 {
 	this->_onMouseHover = callback;
 	this->_mouse_hover_user_data = user_data;
@@ -422,7 +422,11 @@ float Element::getInsideDuration()
 	if (_window->instance->frame_start_time < _mouse_enter_time) {
 		return 0;
 	}
-	return fsec_cast(_window->instance->frame_start_time - _mouse_enter_time);
+
+	auto now = _window->instance->frame_start_time;
+
+	return (float)std::chrono::duration_cast<std::chrono::milliseconds>(
+		now - _mouse_enter_time).count();
 }
 
 void Element::_init()
@@ -462,7 +466,7 @@ void Element::_emitInsideEvents()
 	}
 
 	if (_onMouseHover != nullptr) {
-		this->_onMouseHover(_window, _self, fsec_cast(now - _mouse_enter_time), _mouse_hover_user_data);
+		this->_onMouseHover(_window, _self, _mouse_hover_user_data);
 	}
 
 	if (_onMouseMove != nullptr) {

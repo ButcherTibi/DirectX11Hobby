@@ -88,6 +88,14 @@ std::string asIs(char c);
 
 /* Exceptions */
 
+inline void assert_cond(bool condition) {
+#ifndef NDEBUG  // or _DEBUG
+	if (condition != true) {
+		throw std::exception();
+	}
+#endif
+}
+
 inline void assert_cond(bool condition, const char* msg) {
 #ifndef NDEBUG  // or _DEBUG
 	if (condition != true) {

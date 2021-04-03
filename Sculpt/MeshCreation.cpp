@@ -159,6 +159,14 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 
 	if (capped) {
 
+		Vertex& top_vertex = verts[verts.size() - 2];
+		top_vertex.pos = { 0, 0, 0 };
+		top_vertex.init();
+
+		Vertex& bot_vertex = verts.back();
+		bot_vertex.pos = { 0, -height, 0 };
+		bot_vertex.init();
+
 		// top cap
 		std::vector<uint32_t> rim(cols);
 		{
@@ -178,9 +186,6 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 				v = row_offset + col;
 				col--;
 			}
-
-			Vertex& bot_vertex = verts.back();
-			bot_vertex.pos.y = -height;
 
 			stichVerticesToVertexLooped(rim, verts.size() - 1);
 		}

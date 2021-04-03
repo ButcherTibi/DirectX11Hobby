@@ -3,41 +3,6 @@ My attempts to make something . . .
 UserInterface is meant to be a UI library using the DirectX 11 API.
 Sculpt is a test application that uses the library.
 
-### User Interface
-
----
-
-The UI is build using a graph of elements that are attached to each other in a parent child relationship.
-
-**Wrap**
-Is a container of other UI elements, all child components have their position relative to wrap, children that fall outside of the wrap element can be clipped by setting the `overflow` property to `Overflow::CLIP`.
-The size of the element can be specified in absolute, relative units or as `ElementSizeType::FIT` meaning it will resize itself to fit its children.
-
-
-**Text**
-Is a text label that supports adjusting its size, line height and color.
-
-**Surface**
-Is a element  for rendering outside of the library using special surface events that hold relevant rendering context eg. Device, DeviceContext, Shader Resource Views, Render Target Views, viewport size and position etc.
-
-Elements have components attached to them to add additional functionallity.
-
-**NodeComp**
-Is a component present on all UI elements and is responsable for enabling further attaching by other componets.
-
-**EventComp**
-Is the event handling component for the following events:
-- mouse enter
-- mouse hover
-- mouse move
-- mouse leave
-- mouse delta capture begin
-- mouse delta capture begin
-- mouse delta capture end
-- key down
-- key held down
-- key up
-
 ### Other Stuff
 
 ---

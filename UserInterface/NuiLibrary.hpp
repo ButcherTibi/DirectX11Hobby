@@ -173,7 +173,6 @@ namespace nui {
 	// Events /////////////////////////////////////////////////////////////////
 
 	typedef void (*EventCallback)(Window* window, StoredElement* source, void* user_data);
-	typedef void (*MouseHoverCallback)(Window* window, StoredElement* source, float duration, void* user_data);
 
 	enum class MouseEventState {
 		OUTSIDE,
@@ -250,7 +249,7 @@ namespace nui {
 
 		// Events
 		void setMouseEnterEvent(EventCallback callback, void* user_data = nullptr);
-		void setMouseHoverEvent(MouseHoverCallback callback, void* user_data = nullptr);
+		void setMouseHoverEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseMoveEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseLeaveEvent(EventCallback callback, void* user_data = nullptr);
@@ -288,7 +287,7 @@ namespace nui {
 		void* _mouse_enter_user_data;
 		SteadyTime _mouse_enter_time;
 
-		MouseHoverCallback _onMouseHover;
+		EventCallback _onMouseHover;
 		void* _mouse_hover_user_data;
 
 		EventCallback _onMouseMove;
@@ -543,8 +542,9 @@ namespace nui {
 		
 		// Timing
 		SteadyTime frame_start_time;
-		SteadyTime frame_end_time;
+		//SteadyTime prev_frame_start_time;
 		float delta_time;  // the total duration between this frame and previous
+		uint32_t min_frame_duration_ms;
 
 		// DirectX 11 Context
 		ComPtr<IDXGIFactory2> factory2;

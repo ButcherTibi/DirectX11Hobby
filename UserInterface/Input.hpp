@@ -7,13 +7,9 @@ namespace nui {
 
 	using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
 
-	//#define fsec_cast(duration_ns) \
-	//	std::chrono::duration<float, std::ratio<1>>(duration_ns).count()
-
-	// will output float of second in duration
-	inline float fsec_cast(std::chrono::nanoseconds duration_ns)
+	inline uint32_t toMs(std::chrono::nanoseconds duration_ns)
 	{
-		return std::chrono::duration<float, std::ratio<1>>(duration_ns).count();
+		return (uint32_t)std::chrono::duration_cast<std::chrono::milliseconds>(duration_ns).count();
 	}
 
 	namespace VirtualKeys {

@@ -46,8 +46,8 @@ void Input::debugPrint()
 		KeyState& key = key_list[virtual_key];
 		if (key.is_down) {
 
-			printf("key down = %X for %f ms \n", virtual_key,
-				fsec_cast(key.end_time - key.start_time));
+			printf("key down = %X for %d ms \n", virtual_key,
+				toMs(key.end_time - key.start_time));
 		}
 	}
 }

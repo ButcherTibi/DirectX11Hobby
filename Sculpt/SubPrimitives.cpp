@@ -6,6 +6,12 @@
 using namespace scme;
 
 
+void Vertex::init()
+{
+	away_loop = 0xFFFF'FFFF;
+	aabb = 0xFFFF'FFFF;
+}
+
 bool Vertex::isPoint()
 {
 	return away_loop == 0xFFFF'FFFF;
@@ -406,9 +412,8 @@ void SculptMesh::registerLoopToSourceVertexList(uint32_t away_loop_idx, uint32_t
 	// if vertex is point then vertex loop list is unused
 	if (vertex.away_loop == 0xFFFF'FFFF) {
 
-		vertex.away_loop = away_loop_idx;
-
 		new_loop.v_next_loop = away_loop_idx;
+		vertex.away_loop = away_loop_idx;
 	}
 	else {
 		Loop& old_loop = loops[vertex.away_loop];
@@ -426,99 +431,105 @@ void SculptMesh::registerLoopToMirrorLoopList(uint32_t new_loop_idx, uint32_t ex
 	Loop& new_loop = loops[new_loop_idx];
 	Loop& existing_loop = loops[existing_loop_idx];
 
-	new_loop.mirror_loop = existing_loop.mirror_loop;
-	existing_loop.mirror_loop = new_loop_idx;
+	// if existing loop mirror list is empty
+	if (existing_loop.mirror_loop == 0xFFFF'FFFF) {
+		new_loop.mirror_loop = existing_loop_idx;
+		existing_loop.mirror_loop = new_loop_idx;
+	}
+	else {
+		new_loop.mirror_loop = existing_loop.mirror_loop;
+		existing_loop.mirror_loop = new_loop_idx;
+	}
 }
 
-uint32_t SculptMesh::setLoop(uint32_t loop, uint32_t src_v, uint32_t target_v)
+uint32_t SculptMesh::createLoop(uint32_t src_v, uint32_t target_v)
 {
-	uint32_t new_loop_idx;
-	Loop* new_loop = nullptr;
-
-	uint32_t existing_loop_idx = findLoopFromTo(src_v, target_v);
-	if (existing_loop_idx != 0xFFFF'FFFF) {
-
-		// reuse wire into loop
-		Loop* existing_loop = &loops[existing_loop_idx];
-		if (existing_loop->poly == 0xFFFF'FFFF) {
-			new_loop_idx = existing_loop_idx;
-			new_loop = existing_loop;
-		}
-	}
-
-	if (new_loop == nullptr) {
-		new_loop_idx = loop;
-		new_loop = &loops[new_loop_idx];
-
-		new_loop->target_v = target_v;
-		new_loop->v_next_loop = new_loop_idx;
-	}
+	uint32_t new_loop_idx = (uint32_t)loops.size();
+	Loop* new_loop = &loops.emplace_back();
+	new_loop->target_v = src_v;
+	new_loop->poly = 0xFFFF'FFFF;
 
 	registerLoopToSourceVertexList(new_loop_idx, src_v);
 
-	if (existing_loop_idx != 0xFFFF'FFFF) {
-		registerLoopToMirrorLoopList(new_loop_idx, existing_loop_idx);
+	uint32_t reverse_loop = findLoopFromTo(target_v, src_v);
+	if (reverse_loop != 0xFFFF'FFFF) {
+
+		registerLoopToMirrorLoopList(new_loop_idx, reverse_loop);
 	}
 	else {
-		existing_loop_idx = findLoopFromTo(target_v, src_v);
-
-		if (existing_loop_idx != 0xFFFF'FFFF) {
-			registerLoopToMirrorLoopList(new_loop_idx, existing_loop_idx);
-		}
-		else {
-			new_loop->mirror_loop = new_loop_idx;
-		}
+		new_loop->mirror_loop = 0xFFFF'FFFF;
 	}
 
 	return new_loop_idx;
+}
+
+void SculptMesh::setLoop(uint32_t existing_loop_idx, uint32_t src_v, uint32_t target_v)
+{
+	Loop* existing_loop = &loops[existing_loop_idx];
+	existing_loop->target_v = src_v;
+	existing_loop->poly = 0xFFFF'FFFF;
+
+	registerLoopToSourceVertexList(existing_loop_idx, src_v);
+
+	uint32_t reverse_loop = findLoopFromTo(target_v, src_v);
+	if (reverse_loop != 0xFFFF'FFFF) {
+
+	}
+	else {
+		existing_loop->mirror_loop = 0xFFFF'FFFF;
+	}
 }
 
 uint32_t SculptMesh::addLoop(uint32_t src_v, uint32_t target_v)
 {
-	uint32_t new_loop_idx;
-	Loop* new_loop = nullptr;
-
 	uint32_t existing_loop = findLoopFromTo(src_v, target_v);
-	if (existing_loop != 0xFFFF'FFFF) {
-
-		// reuse wire into loop
-		Loop* loop = &loops[existing_loop];
-		if (loop->poly == 0xFFFF'FFFF) {
-			new_loop_idx = existing_loop;
-			new_loop = loop;
-		}
+	if (existing_loop == 0xFFFF'FFFF) {
+		return createLoop(src_v, target_v);
 	}
-
-	if (new_loop == nullptr) {
-		new_loop_idx = (uint32_t)loops.size();
-		new_loop = &loops.emplace_back();
-
-		new_loop->target_v = target_v;
-		new_loop->v_next_loop = new_loop_idx;
-	}
-
-	registerLoopToSourceVertexList(new_loop_idx, src_v);
-
-	if (existing_loop != 0xFFFF'FFFF) {
-		registerLoopToMirrorLoopList(new_loop_idx, existing_loop);
-	}
-	else {
-		existing_loop = findLoopFromTo(target_v, src_v);
-
-		if (existing_loop != 0xFFFF'FFFF) {
-			registerLoopToMirrorLoopList(new_loop_idx, existing_loop);
-		}
-		else {
-			new_loop->mirror_loop = new_loop_idx;
-		}
-	}
-
-	return new_loop_idx;
+	
+	return existing_loop;
 }
 
 glm::vec3 SculptMesh::calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2)
 {
 	return -glm::normalize(glm::cross(v1->pos - v0->pos, v2->pos - v0->pos));
+}
+
+void SculptMesh::calcPolyNormal(Poly* poly)
+{
+	if (poly->is_tris) {
+
+	}
+	else {
+		std::array<Vertex*, 4> quad_vs;
+
+		uint32_t i = 0;
+		uint32_t loop_idx = poly->inner_loop;
+		Loop* loop = &loops[loop_idx];
+
+		do {
+			quad_vs[i] = &verts[loop->target_v];
+			i++;
+
+			loop_idx = loop->v_next_loop;
+			loop = &loops[loop_idx];
+		}
+		while (loop_idx != poly->inner_loop);
+
+		if (glm::distance(quad_vs[0]->pos, quad_vs[2]->pos) < glm::distance(quad_vs[1]->pos, quad_vs[3]->pos)) {
+
+			poly->tesselation_type = 0;
+			poly->tess_normals[0] = calcWindingNormal(quad_vs[0], quad_vs[1], quad_vs[2]);
+			poly->tess_normals[1] = calcWindingNormal(quad_vs[0], quad_vs[2], quad_vs[3]);
+		}
+		else {
+			poly->tesselation_type = 1;
+			poly->tess_normals[0] = calcWindingNormal(quad_vs[0], quad_vs[1], quad_vs[3]);
+			poly->tess_normals[1] = calcWindingNormal(quad_vs[1], quad_vs[2], quad_vs[3]);
+		}
+
+		poly->normal = glm::normalize((poly->tess_normals[0] + poly->tess_normals[1]) / 2.f);
+	}
 }
 
 //Poly& SculptMesh::addTris(Vertex& v0, Vertex& v1, Vertex& v2,
@@ -549,7 +560,7 @@ uint32_t SculptMesh::addTris(uint32_t v0, uint32_t v1, uint32_t v2)
 	uint32_t new_poly_idx = (uint32_t)this->polys.size();
 	Poly& new_poly = this->polys.emplace_back();
 
-	uint32_t ls_idx[4];
+	uint32_t ls_idx[3];
 	ls_idx[0] = addLoop(v0, v1);
 	ls_idx[1] = addLoop(v1, v2);
 	ls_idx[2] = addLoop(v2, v0);
@@ -590,41 +601,42 @@ void SculptMesh::setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, u
 {
 	uint32_t new_poly_idx = quad;
 	Poly& new_poly = polys[new_poly_idx];
+	new_poly.inner_loop = l0;
+	new_poly.is_tris = 0;
 
-	uint32_t ls_idx[4];
-	ls_idx[0] = setLoop(l0, v0, v1);
-	ls_idx[1] = setLoop(l1, v1, v2);
-	ls_idx[2] = setLoop(l2, v2, v3);
-	ls_idx[3] = setLoop(l3, v3, v0);
+	setLoop(l0, v0, v1);
+	setLoop(l1, v1, v2);
+	setLoop(l2, v2, v3);
+	setLoop(l3, v3, v0);
 
 	Loop* ls[4];
-	ls[0] = &loops[ls_idx[0]];
-	ls[1] = &loops[ls_idx[1]];
-	ls[2] = &loops[ls_idx[2]];
-	ls[3] = &loops[ls_idx[3]];
+	ls[0] = &loops[l0];
+	ls[1] = &loops[l1];
+	ls[2] = &loops[l2];
+	ls[3] = &loops[l3];
 
 	// Register poly to loops
-	ls[0]->poly_next_loop = ls_idx[1];
-	ls[0]->poly_prev_loop = ls_idx[3];
+	ls[0]->poly_next_loop = l1;
+	ls[0]->poly_prev_loop = l3;
 
-	ls[1]->poly_next_loop = ls_idx[2];
-	ls[1]->poly_prev_loop = ls_idx[0];
+	ls[1]->poly_next_loop = l2;
+	ls[1]->poly_prev_loop = l0;
 
-	ls[2]->poly_next_loop = ls_idx[3];
-	ls[2]->poly_prev_loop = ls_idx[1];
+	ls[2]->poly_next_loop = l3;
+	ls[2]->poly_prev_loop = l1;
 
-	ls[3]->poly_next_loop = ls_idx[0];
-	ls[3]->poly_prev_loop = ls_idx[2];
+	ls[3]->poly_next_loop = l0;
+	ls[3]->poly_prev_loop = l2;
 
 	for (uint8_t i = 0; i < 4; i++) {
 		ls[i]->poly = new_poly_idx;
 	}
 
 	// Calculate quad normals
-	Vertex*vertex_0 = &verts[ls[0]->target_v];
-	Vertex*vertex_1 = &verts[ls[1]->target_v];
-	Vertex*vertex_2 = &verts[ls[2]->target_v];
-	Vertex*vertex_3 = &verts[ls[3]->target_v];
+	Vertex* vertex_0 = &verts[ls[0]->target_v];
+	Vertex* vertex_1 = &verts[ls[1]->target_v];
+	Vertex* vertex_2 = &verts[ls[2]->target_v];
+	Vertex* vertex_3 = &verts[ls[3]->target_v];
 
 	if (glm::distance(vertex_0->pos, vertex_2->pos) < glm::distance(vertex_1->pos, vertex_3->pos)) {
 
@@ -639,8 +651,6 @@ void SculptMesh::setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, u
 	}
 
 	new_poly.normal = glm::normalize((new_poly.tess_normals[0] + new_poly.tess_normals[1]) / 2.f);
-	new_poly.inner_loop = ls_idx[0];
-	new_poly.is_tris = 0;
 }
 
 void SculptMesh::setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
@@ -649,25 +659,24 @@ void SculptMesh::setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
 	uint32_t new_poly_idx = tris;
 	Poly& new_poly = polys[new_poly_idx];
 
-	uint32_t ls_idx[3];
-	ls_idx[0] = setLoop(l0, v0, v1);
-	ls_idx[1] = setLoop(l1, v1, v2);
-	ls_idx[2] = setLoop(l2, v2, v0);
+	setLoop(l0, v0, v1);
+	setLoop(l1, v1, v2);
+	setLoop(l2, v2, v0);
 
 	Loop* ls[3];
-	ls[0] = &loops[ls_idx[0]];
-	ls[1] = &loops[ls_idx[1]];
-	ls[2] = &loops[ls_idx[2]];
+	ls[0] = &loops[l0];
+	ls[1] = &loops[l1];
+	ls[2] = &loops[l2];
 
 	// Register poly to loops
-	ls[0]->poly_next_loop = ls_idx[1];
-	ls[0]->poly_prev_loop = ls_idx[2];
+	ls[0]->poly_next_loop = l1;
+	ls[0]->poly_prev_loop = l2;
 
-	ls[1]->poly_next_loop = ls_idx[2];
-	ls[1]->poly_prev_loop = ls_idx[0];
+	ls[1]->poly_next_loop = l2;
+	ls[1]->poly_prev_loop = l0;
 
-	ls[2]->poly_next_loop = ls_idx[0];
-	ls[2]->poly_prev_loop = ls_idx[1];
+	ls[2]->poly_next_loop = l0;
+	ls[2]->poly_prev_loop = l1;
 
 	for (uint8_t i = 0; i < 3; i++) {
 		ls[i]->poly = new_poly_idx;
@@ -679,7 +688,7 @@ void SculptMesh::setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
 	Vertex* vertex_2 = &verts[ls[2]->target_v];
 
 	new_poly.normal = calcWindingNormal(vertex_0, vertex_1, vertex_2);
-	new_poly.inner_loop = ls_idx[0];
+	new_poly.inner_loop = l0;
 	new_poly.is_tris = 1;
 }
 

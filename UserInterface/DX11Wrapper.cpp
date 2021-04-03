@@ -437,3 +437,48 @@ void dx11::createPixelShaderFromPath(std::string path_to_file, ID3D11Device5* de
 		r_pixel_shader),
 		"failed to create pixel shader");
 }
+
+void dx11::RasterizerState::create(ID3D11Device5* new_dev, D3D11_RASTERIZER_DESC& new_desc)
+{
+	this->dev5 = new_dev;
+	this->desc = new_desc;
+
+	this->has_new_state = true;
+}
+
+void dx11::RasterizerState::setFillMode(D3D11_FILL_MODE fill_mode)
+{
+	if (desc.FillMode != fill_mode) {
+		desc.FillMode = fill_mode;
+		has_new_state = true;
+	}
+}
+
+void dx11::RasterizerState::setCullMode(D3D11_CULL_MODE cull_mode)
+{
+	if (desc.CullMode != cull_mode) {
+		desc.CullMode = cull_mode;
+		has_new_state = true;
+	}
+}
+
+void dx11::RasterizerState::setDepthBias(int32_t depth_bias)
+{
+	if (desc.DepthBias != depth_bias) {
+		desc.DepthBias = depth_bias;
+		has_new_state = true;
+	}
+}
+
+ID3D11RasterizerState* dx11::RasterizerState::get()
+{
+	if (has_new_state == true) {
+
+		rasterizer_state = nullptr;
+		throwDX11(dev5->CreateRasterizerState(&desc, rasterizer_state.GetAddressOf()));
+
+		this->has_new_state = false;
+	}
+	
+	return rasterizer_state.Get();
+}

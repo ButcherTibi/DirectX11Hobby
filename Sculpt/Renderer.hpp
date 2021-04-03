@@ -29,12 +29,13 @@ public:
 	/* the see thru wireframe shader must discard pixels only relative to itself */
 	dx11::Texture wireframe_dtex;
 
-	dx11::Texture instance_id_mask_dtex;
+	// Mesh Instance ID of pixels
+	dx11::Texture instance_id_mask_tex;
 	dx11::Texture instance_id_staging_tex;
 
-	// poly idx and world position of pixel
-	// ComPtr<ID3D11Texture2D> poly_pos_dtex;
-	// ComPtr<ID3D11RenderTargetView> poly_pos_rtv;
+	// Poly idx and World position of pixels
+	dx11::Texture poly_pos_tex;
+	//dx11::Texture poly_pos_staging_tex;
 
 	dx11::Buffer vbuff;
 	dx11::Buffer instabuff;
@@ -49,14 +50,16 @@ public:
 	ComPtr<ID3D11VertexShader> mesh_vs;
 	ComPtr<ID3D11VertexShader> octree_vs;
 
-	ComPtr<ID3D11RasterizerState> fill_front_rs;
-	ComPtr<ID3D11RasterizerState> fill_none_rs;
-	ComPtr<ID3D11RasterizerState> wire_rs;
-	ComPtr<ID3D11RasterizerState> wireframe_bias_rs;
-	ComPtr<ID3D11RasterizerState> wireframe_none_bias_rs;
+	// Rasterizer State
+	dx11::RasterizerState mesh_rs;
+	dx11::RasterizerState mesh_none_rs;
+	dx11::RasterizerState wire_bias_rs;
+	dx11::RasterizerState wire_none_bias_rs;
+	dx11::RasterizerState wire_none_rs;
 
 	ComPtr<ID3D11PixelShader> mesh_ps;
 	ComPtr<ID3D11PixelShader> mesh_output_depth_ps;
+	ComPtr<ID3D11PixelShader> mesh_depth_only_ps;
 	ComPtr<ID3D11PixelShader> front_wire_ps;
 	ComPtr<ID3D11PixelShader> front_wire_tess_ps;
 	ComPtr<ID3D11PixelShader> see_thru_wire_ps;
@@ -64,15 +67,18 @@ public:
 	ComPtr<ID3D11PixelShader> wire_ps;
 	ComPtr<ID3D11PixelShader> wire_tess_ps;
 
-	ComPtr<ID3D11DepthStencilState> greater_dss;
+	ComPtr<ID3D11DepthStencilState> depth_stencil;
 
-	ComPtr<ID3D11BlendState> mesh_bs;
+	ComPtr<ID3D11BlendState> blendless_bs;
 	ComPtr<ID3D11BlendState> blend_target_0_bs;
 
 	uint32_t render_target_width;
 	uint32_t render_target_height;
 
 public:
+	void configureMeshInputAssembly();
+	void configureMeshVertexShader();
+
 	ErrStack loadVertices();
 	ErrStack loadUniform();
 

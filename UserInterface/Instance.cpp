@@ -2,6 +2,9 @@
 // Header
 #include "NuiLibrary.hpp"
 
+// Windows
+#include <TlHelp32.h>
+
 // Mine
 #include "FilePath.hpp"
 
@@ -29,6 +32,9 @@ void Instance::create()
 			throw WindowsException("failed to register mouse raw input device");
 		};
 	}
+
+	// Frame Rate
+	min_frame_duration_ms = 16;
 
 	// Factory
 	throwDX11(CreateDXGIFactory2(0, IID_PPV_ARGS(factory2.GetAddressOf())),
@@ -312,7 +318,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 
 			case WM_MOUSEWHEEL: {
-				w->input.mouse_wheel_delta = GET_WHEEL_DELTA_WPARAM(wParam);
+				w->input.mouse_wheel_delta += GET_WHEEL_DELTA_WPARAM(wParam);
 				return 0;
 			}
 
@@ -369,8 +375,8 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 
 				RAWINPUT* raw = (RAWINPUT*)raw_input.data();
-				w->input.mouse_delta_x = raw->data.mouse.lLastX;
-				w->input.mouse_delta_y = raw->data.mouse.lLastY;
+				w->input.mouse_delta_x += raw->data.mouse.lLastX;
+				w->input.mouse_delta_y += raw->data.mouse.lLastY;
 
 				// printf("mouse delta = %d %d \n", w->input.mouse_delta_x, w->input.mouse_delta_y);
 				return 0;
@@ -667,8 +673,13 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 
 void Instance::update()
 {
-	frame_start_time = std::chrono::steady_clock::now();
-	delta_time = fsec_cast(frame_start_time - frame_end_time);
+	{
+		SteadyTime now = std::chrono::steady_clock::now();
+
+		delta_time = (float)std::chrono::duration_cast<std::chrono::milliseconds>(
+			now - frame_start_time).count();
+		frame_start_time = now;
+	}
 
 	// Input
 	for (Window& window : windows) {	
@@ -713,8 +724,16 @@ void Instance::update()
 		window._render();
 	}
 
-	// active frame time ended
-	// TODO: sleep for remainder, try thread sleep
+	// Frame Rate
+	{
+		SteadyTime target_end_time = frame_start_time + std::chrono::milliseconds(min_frame_duration_ms);
+		SteadyTime now = std::chrono::steady_clock::now();
 
-	frame_end_time = std::chrono::steady_clock::now();
+		// finished up early
+		if (now < target_end_time) {
+
+			auto sleep_duration = std::chrono::duration_cast<std::chrono::milliseconds>(target_end_time - now);
+			Sleep((uint32_t)sleep_duration.count());
+		}
+	}
 }

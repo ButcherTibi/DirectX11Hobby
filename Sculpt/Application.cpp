@@ -58,7 +58,6 @@ MeshInstance* Application::createInstance(MeshInBuffers* mesh, MeshLayer* dest_l
 	instance_id++;
 
 	new_instance->visible = true;
-	new_instance->can_collide = true;
 	new_instance->pos = { 0.f, 0.f, 0.f };
 	new_instance->rot = { 1.f, 0.f, 0.f, 0.f };
 	new_instance->scale = { 1.f, 1.f, 1.f };
@@ -77,9 +76,14 @@ MeshInstance* Application::copyInstance(MeshInstance* source)
 	new_instance->parent_drawcall = nullptr;
 	new_instance->parent_mesh = source->parent_mesh;
 	new_instance->name = source->name + " copy";
+	new_instance->id = instance_id;
+	instance_id++;
+	new_instance->visible = source->visible;
 	new_instance->pos = source->pos;
 	new_instance->rot = source->rot;
 	new_instance->scale = source->scale;
+	new_instance->pbr_material = source->pbr_material;
+	new_instance->wireframe_colors = source->wireframe_colors;
 
 	transferInstanceToLayer(new_instance, source->parent_layer);
 	transferInstanceToDrawcall(new_instance, source->parent_drawcall);
@@ -179,7 +183,7 @@ MeshDrawcall* Application::createDrawcall(std::string& name)
 		new_drawcall->name = "New Drawcall";
 	}
 
-	new_drawcall->rasterizer_mode = DisplayMode::SOLID;
+	new_drawcall->display_mode = DisplayMode::SOLID;
 	new_drawcall->is_back_culled = false;
 	new_drawcall->_debug_show_octree = false;
 
@@ -264,11 +268,8 @@ void Application::transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer)
 
 void Application::setLayerVisibility(MeshLayer* layer, bool visible_state)
 {
-	bool can_collide = visible_state ? false : true;
-
 	for (MeshInstance* instance : layer->instances) {
 		instance->visible = visible_state;
-		instance->can_collide = can_collide;
 	}
 
 	for (MeshLayer* child_layer : layer->children) {
@@ -276,7 +277,7 @@ void Application::setLayerVisibility(MeshLayer* layer, bool visible_state)
 	}
 }
 
-MeshInstance* Application::createTriangleMesh(CreateTriangleInfo& info,
+MeshInstance* Application::createTriangle(CreateTriangleInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
 	if (dest_layer == nullptr) {
@@ -300,7 +301,7 @@ MeshInstance* Application::createTriangleMesh(CreateTriangleInfo& info,
 	return new_instance;
 }
 
-MeshInstance* Application::createQuadMesh(CreateQuadInfo& info,
+MeshInstance* Application::createQuad(CreateQuadInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
 	if (dest_layer == nullptr) {
@@ -324,7 +325,7 @@ MeshInstance* Application::createQuadMesh(CreateQuadInfo& info,
 	return new_instance;
 }
 
-MeshInstance* Application::createCubeMesh(CreateCubeInfo& info,
+MeshInstance* Application::createCube(CreateCubeInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
 	if (dest_layer == nullptr) {
