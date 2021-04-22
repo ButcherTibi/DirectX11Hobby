@@ -9,10 +9,10 @@ float4 main(PixelIn input) : SV_TARGET
 	float mesh_depth = mesh_depth_tex.Load(input.dx_pos.xyz);
 	float wireframe_depth = input.dx_pos.z;
 	
-	if (mesh_depth != 0) {
+	if (mesh_depth < 1.) {
 		
 		// back
-		if (wireframe_depth < mesh_depth) {
+		if (wireframe_depth > mesh_depth) {
 		
 			// tesselation edge
 			if (input.tess_edge >= 1) {

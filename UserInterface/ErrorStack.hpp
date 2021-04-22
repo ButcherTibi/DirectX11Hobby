@@ -6,15 +6,6 @@
 #include <vector>
 
 
-#define code_location \
-	("ln = " + std::to_string(__LINE__) + \
-	" fn = " + __func__ + \
-	" in file " + __FILE__).c_str()
-
-#define varName(variabile) \
-	#variabile
-
-
 enum class ErrorOrigins {
 	NOT_SPECIFIED,
 	VULKAN_ERROR_CODE,
@@ -32,7 +23,7 @@ struct Error {
 	ErrorOrigins origin = ErrorOrigins::NOT_SPECIFIED;
 };
 
-	
+
 class ErrStack {
 public:
 	std::vector<Error> error_stack;
@@ -52,9 +43,19 @@ public:
 	void debugPrint();
 };
 
+
 std::string getLastError();
 
 std::string asIs(char c);
+
+
+#define code_location \
+	("ln = " + std::to_string(__LINE__) + \
+	" fn = " + __func__ + \
+	" in file " + __FILE__).c_str()
+
+#define varName(variabile) \
+	#variabile
 
 
 #define checkErrStack(err_func, msg) \
@@ -118,8 +119,10 @@ void throwDX11(HRESULT hresult, const char* message);
 
 
 struct WindowsException : std::exception {
-	std::string programer_message;
 	std::string api_message;
+	std::string message;
 
 	WindowsException(std::string message_on_error);
 };
+
+// void throwErrStack(ErrStack err_stack);

@@ -47,6 +47,9 @@
     <Filter Include="Source Files\Shaders\Headers">
       <UniqueIdentifier>{23b69d5c-faa1-4a5f-b2a4-662b16f1b5d4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\CustomContainers">
+      <UniqueIdentifier>{5bfba903-7901-497e-8180-9cf024e3fe73}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -123,36 +126,15 @@
     <ClInclude Include="RenderDocIntegration.hpp">
       <Filter>Source Files\Tooling</Filter>
     </ClInclude>
+    <ClInclude Include="DeferredVector.hpp">
+      <Filter>Source Files\CustomContainers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="MeshVS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
     <FxCompile Include="MeshPS.hlsl">
-      <Filter>Source Files\Shaders\Mesh</Filter>
-    </FxCompile>
-    <FxCompile Include="MeshOutputDepthPS.hlsl">
-      <Filter>Source Files\Shaders\Mesh</Filter>
-    </FxCompile>
-    <FxCompile Include="SeeThruWirePS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="FrontWirePS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="FrontWireTessPS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="SeeThruWireTessPS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="WirePS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="WireTessPS.hlsl">
-      <Filter>Source Files\Shaders\Wireframe</Filter>
-    </FxCompile>
-    <FxCompile Include="MeshDepthOnlyPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
   </ItemGroup>

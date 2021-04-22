@@ -1,7 +1,8 @@
 #pragma once
 
 // Standard
-#include <set>  // TODO: replace with unordered set
+#include <unordered_set>
+#include <list>
 
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
@@ -9,7 +10,6 @@
 
 /* TODO:
 - camera on point rotation
-- updateaza UI
 
 - frame camera to mesh
 - selected drawcall set display mode
@@ -34,9 +34,15 @@
 
 
 // Forward
+namespace nui {
+	class Window;
+}
+
 struct MeshLayer;
 struct MeshDrawcall;
+struct MeshInstanceSet;
 struct MeshInstance;
+struct Mesh;
 
 
 enum class DisplayMode {
@@ -44,7 +50,7 @@ enum class DisplayMode {
 	SOLID_WITH_WIREFRAME_FRONT,
 	SOLID_WITH_WIREFRAME_NONE,
 	WIREFRANE,
-	WIREFRANE_PURE,
+	WIREFRAME_PURE
 };
 
 /* which subprimitive holds the surface data to respond to the light */
@@ -64,13 +70,37 @@ struct CameraLight {
 	float intensity;
 };
 
+// how to display a set of instances of a mesh
+struct MeshDrawcall {
+	std::string name;
 
+	DisplayMode display_mode;
+	bool is_back_culled;
+	bool _debug_show_octree;
+};
+
+
+enum class ModifiedInstanceType {
+	UPDATE,
+	DELETED
+};
+
+// What instance was modified and what was modified
+struct ModifiedMeshInstance {
+	uint32_t idx;  // 0xFFFF'FFFF to mark as deleted
+
+	ModifiedInstanceType type;
+};
+
+
+// Size and position of a instance
 struct MeshTransform {
 	glm::vec3 pos = { .0f, .0f, .0f };
 	glm::quat rot = { 1.0f, .0f, .0f, .0f };
 	glm::vec3 scale = { 1.0f, 1.0f, 1.0f };
 };
 
+// The apperance of the material beloging to a mesh
 struct PhysicalBasedMaterial {
 	glm::vec3 albedo_color = { 1.0f, 0.0f, 0.0f };
 	float roughness = 0.3f;
@@ -78,94 +108,77 @@ struct PhysicalBasedMaterial {
 	float specular = 0.04f;
 };
 
+// Coloring of a instance's wireframe
 struct MeshWireframeColors {
 	glm::vec3 front_color = { 0.0f, 1.0f, 0.0f };
-	glm::vec4 back_color = { 0.0f, 0.33f, 0.0f, 1.0f };
+	glm::vec4 back_color = { 0.0f, 0.20f, 0.0f, 1.0f };
 	glm::vec3 tesselation_front_color = { 0.0f, 1.0f, 0.0f };
-	glm::vec4 tesselation_back_color = { 0.0f, 0.33f, 0.0f, 1.0f };
+	glm::vec4 tesselation_back_color = { 0.0f, 0.20f, 0.0f, 1.0f };
 	float tesselation_split_count = 4.0f;
 	float tesselation_gap = 0.5f;
 };
 
 
-/* Contains a mesh and where to look for it in the vertex and index buffer for it */
-struct MeshInBuffers {
-	scme::SculptMesh mesh;
-
-	uint32_t mesh_vertex_start;
-	uint32_t mesh_vertex_count;
-
-	// Octree
-	uint32_t aabbs_vertex_start;
-	uint32_t aabbs_vertex_count;
-
-	std::set<MeshInstance*> child_instances;
-};
-
-
-/* Contains the instance data of a mesh */
+// A copy of a mesh with slightly different look
 struct MeshInstance {
+	MeshInstanceSet* instance_set;
+	uint32_t index_in_buffer;
 	MeshLayer* parent_layer;
-	MeshDrawcall* parent_drawcall;
-	MeshInBuffers* parent_mesh;
 
-	std::string name;
-	uint32_t id;
-	bool visible;
+	std::string name;  // user given name
+	//uint32_t id;  
+	bool visible;  // whether to render or not
 	// bool can_collide;
 
 	// Instance Data
-	glm::vec3 pos;
-	glm::quat rot;
-	glm::vec3 scale;
+	MeshTransform transform;
 
 	PhysicalBasedMaterial pbr_material;
 	MeshWireframeColors wireframe_colors;
+
+public:
+	// Scheduling methods
+	// Each of the below methods will schedule the renderer to update data on the GPU
+	// Avoid calling more than one method
+
+	void markFullUpdate();
 };
 
 
+// Instances of mesh to rendered with a certain drawcall
 struct MeshInstanceSet {
-	MeshInBuffers* mesh;
+	Mesh* parent_mesh;
 
-	uint32_t mesh_insta_start;
-	uint32_t mesh_insta_count;
+	MeshDrawcall* drawcall;  // with what settings to render this set of instances
 
-	std::vector<MeshInstance*> instances;
+	DeferredVector<MeshInstance> instances;  // the instances of the mesh to be rendered in one drawcall
+	std::vector<ModifiedMeshInstance> modified_instances;
+	dx11::ArrayBuffer<GPU_MeshInstance> gpu_instances;
 };
 
 
-/* Contains mesh instances to be rendered in a specific way,
-instances cannot be shared across drawcalls*/
-struct MeshDrawcall {
-	std::string name;
+// Vertices and indexes of geometry
+struct Mesh {
+	scme::SculptMesh mesh;
 
-	std::vector<MeshInstanceSet> mesh_instance_sets;
-	
-	DisplayMode display_mode;
-	bool is_back_culled;
-	bool _debug_show_octree;
+	std::list<MeshInstanceSet> sets;
 };
 
 
-/* Contains mesh instances and other layers */
 struct MeshLayer {
 	MeshLayer* parent;
-	std::set<MeshLayer*> children;
+	std::unordered_set<MeshLayer*> children;
 
 	std::string name;
-	std::set<MeshInstance*> instances;
+	std::unordered_set<MeshInstance*> instances;
 };
 
 
-struct MeshInstanceSearchResult {
-	MeshInstance* instance;
-	uint32_t char_count;
-};
-
+// Mesh Creation Parameters
 
 struct CreateTriangleInfo {
 	MeshTransform transform;
-	float size = 1;
+	float size = 1.f;
 };
 
 struct CreateQuadInfo {
@@ -175,13 +188,13 @@ struct CreateQuadInfo {
 
 struct CreateCubeInfo {
 	MeshTransform transform;
-	float size = 1;
+	float size = 1.f;
 };
 
 struct CreateCylinderInfo {
 	MeshTransform transform;
-	float diameter = 1.0f;
-	float height = 1.0f;
+	float diameter = 1.f;
+	float height = 1.f;
 
 	uint32_t rows = 2;
 	uint32_t columns = 3;
@@ -208,10 +221,6 @@ struct CreateLineInfo {
 };
 
 
-namespace nui {
-	class Window;
-}
-
 class Application {
 public:
 	// User Interface
@@ -222,11 +231,7 @@ public:
 	MeshRenderer renderer;
 
 	// Meshes
-	std::list<MeshInBuffers> meshes;
-
-	// Instances
-	uint32_t instance_id;
-	std::list<MeshInstance> instances;
+	std::list<Mesh> meshes;
 
 	// Drawcalls
 	std::list<MeshDrawcall> drawcalls;
@@ -257,64 +262,90 @@ public:
 	float camera_dolly_sensitivity;
 
 public:
-	D3D11_MAPPED_SUBRESOURCE _instance_id_mask;
-
-	// returns true if mesh is without instances
-	void _deleteFromDrawcall(MeshInstance* inst);
+	// TODO: what happens if the last used drawcall is deleted
+	// void setLastUsedDrawcall();
 
 public:
-	MeshInBuffers* createMesh();
 
 	// Instances
-	MeshInstance* createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall);
-	MeshInstance* copyInstance(MeshInstance* source);
-	void deleteInstance(MeshInstance* inst);
+
+	MeshInstance* copyInstance(MeshInstance* source, MeshDrawcall* dest_drawcall = nullptr);
+
+	//void deleteInstance(MeshInstance* inst);
 
 	void transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
 
+	// Copies Instance from one set to another set of the same Mesh that has a set with the
+	// destination drawcall. If the set with the destination drawcall does not exist it is created
+	// 
+	// Returns pointer to instance allocated on a different instance set of the same mesh
+	// Warning: passed in pointer is invalidated
+	//MeshInstance* transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
+
 	void rotateInstanceAroundY(MeshInstance* mesh_instance, float radians);
 
-	void searchForInstances(std::string& keyword, std::vector<MeshInstanceSearchResult>& r_results);
 
 	// Drawcalls
-	MeshDrawcall* createDrawcall(std::string& name = std::string(""));
-	void transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
+
+	// Creates a drawcall to be associated with instances
+	MeshDrawcall* createDrawcall();
+
+	// Deletes a drawcall and moves instances to the last used drawcall
+	//void deleteDrawcall();
+
 
 	// Layers
-	MeshLayer* createLayer(std::string& name, MeshLayer* parent_layer = nullptr);
+
+	// Creates a new orfan layer
+	MeshLayer* createLayer();
+
 	void transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
 
+	// Recursivelly sets all instances of a layer as invisible
 	void setLayerVisibility(MeshLayer* layer, bool visible_state);
 
+
 	// Create Objects
+	MeshInstance* createEmptyMesh(MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createTriangle(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createQuad(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createCube(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	/*MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
 		std::vector<MeshInstance*>* r_instances = nullptr);
 	MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
-	// What mesh instance is under pixel
-	void lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_t& r_instance_id);
 
 	// Raycasts
 
-	/* performs a raycast in the mesh instance regardless of properties */
+	// performs a raycast in the instance regardless of properties
 	bool raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
 		uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);
 
-	MeshInstance* mouseRaycastInstances(uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);
+	MeshInstance* mouseRaycastInstances(uint32_t& r_isect_poly, glm::vec3& r_isect_point);*/
+
 
 	// Camera
+
 	void setCameraFocus(glm::vec3& new_focus);
+
 	void arcballOrbitCamera(float deg_x, float deg_y);
+
 	void pivotCameraAroundY(float deg_x, float deg_y);
+
 	void panCamera(float amount_x, float amount_y);
+
 	void dollyCamera(float amount);
+
 	void setCameraPosition(float x, float y, float z);
+
 	void setCameraRotation(float x, float y, float z);
+
+
+	// Scene
+
+	void resetToHardcodedStartup();
 };
 
 extern Application application;

@@ -138,6 +138,13 @@ void throwDX11(HRESULT hresult, const char* message)
 
 WindowsException::WindowsException(std::string message_on_error)
 {
-	this->programer_message = message_on_error;
+	this->message = message_on_error;
 	this->api_message = getLastError();
 }
+
+//void throwErrStack(ErrStack err_stack)
+//{
+//	if (err_stack.isBad()) {
+//		throw std::exception();
+//	}
+//}

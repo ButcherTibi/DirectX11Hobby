@@ -4,128 +4,110 @@
 
 // Mine
 #include "Geometry.hpp"
+#include "GLTF_File.hpp"
 
 
 Application application;
 
 
-void Application::_deleteFromDrawcall(MeshInstance* instance)
+void MeshInstance::markFullUpdate()
 {
-	auto& mesh_instance_sets = instance->parent_drawcall->mesh_instance_sets;
+	ModifiedMeshInstance& modified_inst = instance_set->modified_instances.emplace_back();
+	modified_inst.idx = index_in_buffer;
+	modified_inst.type = ModifiedInstanceType::UPDATE;
+}
 
-	for (uint32_t i = 0; i < mesh_instance_sets.size(); i++) {
+MeshInstance* Application::copyInstance(MeshInstance* source, MeshDrawcall* dest_drawcall)
+{
+	MeshInstanceSet* instance_set = nullptr;
 
-		MeshInstanceSet& mesh_instance_set = mesh_instance_sets[i];
-		if (mesh_instance_set.mesh == instance->parent_mesh) {
-
-			for (uint32_t j = 0; j < mesh_instance_set.instances.size(); j++) {
-
-				MeshInstance* existing_instance = mesh_instance_set.instances[j];
-				if (existing_instance == instance) {
-
-					mesh_instance_set.instances.erase(mesh_instance_set.instances.begin() + j);
-
-					if (!mesh_instance_set.instances.size()) {
-						mesh_instance_sets.erase(mesh_instance_sets.begin() + i);
-					}
-				}
-			}
-		}
+	if (dest_drawcall == nullptr) {	
+		instance_set = source->instance_set;
 	}
-}
+	else {
+		Mesh* mesh = source->instance_set->parent_mesh;
+		for (MeshInstanceSet& set : mesh->sets) {
 
-MeshInBuffers* Application::createMesh()
-{
-	MeshInBuffers& new_mesh = this->meshes.emplace_back();
-
-	scme::SculptMesh& sculpt_mesh = new_mesh.mesh;
-	sculpt_mesh.max_vertices_in_AABB = 1024;
-
-	new_mesh.mesh_vertex_start = 0xFFFF'FFFF;
-	new_mesh.aabbs_vertex_start = 0xFFFF'FFFF;
-
-	return &new_mesh;
-}
-
-MeshInstance* Application::createInstance(MeshInBuffers* mesh, MeshLayer* dest_layer, MeshDrawcall* parent_drawcall)
-{
-	MeshInstance* new_instance = &this->instances.emplace_back();
-	new_instance->parent_layer = nullptr;
-	new_instance->parent_drawcall = nullptr;
-	new_instance->parent_mesh = mesh;
-	
-	new_instance->id = instance_id;
-	instance_id++;
-
-	new_instance->visible = true;
-	new_instance->pos = { 0.f, 0.f, 0.f };
-	new_instance->rot = { 1.f, 0.f, 0.f, 0.f };
-	new_instance->scale = { 1.f, 1.f, 1.f };
-
-	transferInstanceToLayer(new_instance, dest_layer);
-	transferInstanceToDrawcall(new_instance, parent_drawcall);
-	mesh->child_instances.insert(new_instance);
-
-	return new_instance;
-}
-
-MeshInstance* Application::copyInstance(MeshInstance* source)
-{
-	MeshInstance* new_instance = &this->instances.emplace_back();
-	new_instance->parent_layer = nullptr;
-	new_instance->parent_drawcall = nullptr;
-	new_instance->parent_mesh = source->parent_mesh;
-	new_instance->name = source->name + " copy";
-	new_instance->id = instance_id;
-	instance_id++;
-	new_instance->visible = source->visible;
-	new_instance->pos = source->pos;
-	new_instance->rot = source->rot;
-	new_instance->scale = source->scale;
-	new_instance->pbr_material = source->pbr_material;
-	new_instance->wireframe_colors = source->wireframe_colors;
-
-	transferInstanceToLayer(new_instance, source->parent_layer);
-	transferInstanceToDrawcall(new_instance, source->parent_drawcall);
-	source->parent_mesh->child_instances.insert(new_instance);
-
-	return new_instance;
-}
-
-void Application::deleteInstance(MeshInstance* inst)
-{
-	// remove from layers
-	for (MeshLayer& layer : layers) {
-		layer.instances.erase(inst);
-	}
-
-	// remove from drawcall
-	_deleteFromDrawcall(inst);
-
-	// remove from mesh
-	inst->parent_mesh->child_instances.erase(inst);
-
-	// remove mesh if that instance was the only one
-	if (!inst->parent_mesh->child_instances.size())
-	{
-		for (auto it = meshes.begin(); it != meshes.end(); it++) {
-
-			if (&(*it) == inst->parent_mesh) {
-				meshes.erase(it);
+			if (set.drawcall == dest_drawcall) {
+				instance_set = &set;
 				break;
 			}
 		}
 	}
 
-	// remove instance
-	for (auto it = instances.begin(); it != instances.end(); it++) {
+	uint32_t index_in_buffer;
+	MeshInstance& new_instance = instance_set->instances.emplace(index_in_buffer);
+	new_instance = *source;
+	new_instance.instance_set = instance_set;
+	new_instance.index_in_buffer = index_in_buffer;
+	new_instance.parent_layer = nullptr;
 
-		if (&(*it) == inst) {
-			instances.erase(it);
-			break;
-		}
-	}
+	transferInstanceToLayer(&new_instance, source->parent_layer);
+
+	return &new_instance;
 }
+
+//void Application::deleteInstance(MeshInstance* inst)
+//{
+//	// delete from parent layer
+//	inst->parent_layer->instances.erase(inst);
+//
+//	for (MeshInstanceSet& set : inst->parent_mesh->sets) {
+//
+//		if (set.drawcall = inst->parent_drawcall) {
+//
+//			//set.instances.erase(inst->instance_index_in_set);
+//		}
+//	}
+//}
+
+//MeshInstance* Application::transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall)
+//{
+//	last_used_drawcall = dest_drawcall;
+//
+//	if (mesh_instance->parent_drawcall == dest_drawcall) {
+//		return mesh_instance;
+//	}
+//
+//	Mesh* mesh = mesh_instance->parent_mesh;
+//	MeshInstanceSet* dest_set = nullptr;
+//
+//	// find or create destination instance set
+//	{
+//		for (MeshInstanceSet& set : mesh->sets) {
+//			if (set.drawcall == dest_drawcall) {
+//				dest_set = &set;
+//				break;
+//			}
+//		}
+//
+//		if (dest_set == nullptr) {
+//			MeshInstanceSet& new_set = mesh->sets.emplace_back();
+//			new_set.drawcall = dest_drawcall;
+//		}
+//	}
+//	
+//	// create new instance
+//	uint32_t instance_index_in_set;
+//	MeshInstance& new_instance = dest_set->instances.emplace(instance_index_in_set);
+//	new_instance = *mesh_instance;
+//	new_instance.instance_index_in_set = instance_index_in_set;
+//	new_instance.parent_drawcall = dest_drawcall;
+//
+//	// delete old instance
+//	if (mesh_instance->parent_drawcall != nullptr) {
+//		
+//		for (MeshInstanceSet& set : mesh->sets) {
+//			if (set.drawcall == mesh_instance->parent_drawcall) {
+//				
+//				set.instances.erase(mesh_instance->instance_index_in_set);
+//				break;
+//			}
+//		}
+//	}
+//
+//	return &new_instance;
+//}
 
 void Application::transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer)
 {
@@ -142,47 +124,12 @@ void Application::transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer
 
 void Application::rotateInstanceAroundY(MeshInstance* mesh_instance, float radians)
 {
-	mesh_instance->rot = glm::rotate(mesh_instance->rot, radians, { 0.f, 1.f, 0.f });
+	mesh_instance->transform.rot = glm::rotate(mesh_instance->transform.rot, radians, { 0.f, 1.f, 0.f });
 }
 
-void Application::searchForInstances(std::string& keyword, std::vector<MeshInstanceSearchResult>& r_results)
-{
-	for (MeshInstance& instance : instances) {
-
-		if (instance.name[0] == keyword[0]) {
-
-			MeshInstanceSearchResult& new_result = r_results.emplace_back();
-			new_result.instance = &instance;
-			new_result.char_count = 1;
-
-			for (uint32_t char_idx = 1; char_idx < keyword.size(); char_idx++) {
-
-				if (instance.name[char_idx] == keyword[char_idx]) {
-					new_result.char_count += 1;
-				}
-				else {
-					break;
-				}
-			}
-		}
-	}
-
-	// sort results
-	std::sort(r_results.begin(), r_results.end(), [](MeshInstanceSearchResult& a, MeshInstanceSearchResult& b) {
-		return a.char_count > b.char_count;
-	});
-}
-
-MeshDrawcall* Application::createDrawcall(std::string& name)
+MeshDrawcall* Application::createDrawcall()
 {
 	MeshDrawcall* new_drawcall = &drawcalls.emplace_back();
-	if (name != "") {
-		new_drawcall->name = name;
-	}
-	else {
-		new_drawcall->name = "New Drawcall";
-	}
-
 	new_drawcall->display_mode = DisplayMode::SOLID;
 	new_drawcall->is_back_culled = false;
 	new_drawcall->_debug_show_octree = false;
@@ -190,75 +137,16 @@ MeshDrawcall* Application::createDrawcall(std::string& name)
 	return new_drawcall;
 }
 
-void Application::transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall)
+MeshLayer* Application::createLayer()
 {
-	if (mesh_instance->parent_drawcall != nullptr) {
-
-		auto& mesh_instance_sets = mesh_instance->parent_drawcall->mesh_instance_sets;
-
-		for (uint32_t i = 0; i < mesh_instance_sets.size(); i++) {
-
-			MeshInstanceSet& mesh_instance_set = mesh_instance_sets[i];
-			if (mesh_instance_set.mesh == mesh_instance->parent_mesh) {
-
-				for (uint32_t j = 0; j < mesh_instance_set.instances.size(); j++) {
-
-					MeshInstance* instance = mesh_instance_set.instances[j];
-					if (instance == mesh_instance) {
-
-						mesh_instance_set.instances.erase(mesh_instance_set.instances.begin() + j);
-
-						if (!mesh_instance_set.instances.size()) {
-							mesh_instance_sets.erase(mesh_instance_sets.begin() + i);
-						}
-					}
-				}
-			}
-		}
-	}
-
-	mesh_instance->parent_drawcall = dest_drawcall;
-	last_used_drawcall = dest_drawcall;
-
-	// add to existing set of mesh instances
-	for (MeshInstanceSet& mesh_instances : dest_drawcall->mesh_instance_sets) {
-		if (mesh_instances.mesh == mesh_instance->parent_mesh) {
-			mesh_instances.mesh_insta_start = 0xFFFF'FFFF;
-			mesh_instances.instances.push_back(mesh_instance);
-			return;
-		}
-	}
-
-	// else create a new set of mesh instances
-	MeshInstanceSet& mesh_instances = dest_drawcall->mesh_instance_sets.emplace_back();
-	mesh_instances.mesh = mesh_instance->parent_mesh;
-	mesh_instances.mesh_insta_start = 0xFFFF'FFFF;
-	mesh_instances.instances.push_back(mesh_instance);
-}
-
-MeshLayer* Application::createLayer(std::string& name, MeshLayer* parent_layer)
-{
-	if (parent_layer == nullptr) {
-		parent_layer = last_used_layer;
-	}
-
 	MeshLayer* new_layer = &this->layers.emplace_back();
-	if (name != "") {
-		new_layer->name = name;
-	}
-	else {
-		new_layer->name = "New Layer";
-	}
-
-	transferLayer(new_layer, parent_layer);
-
+	new_layer->parent = nullptr;
 	return new_layer;
 }
 
 void Application::transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer)
 {
 	if (child_layer->parent != nullptr) {
-
 		child_layer->parent->children.erase(child_layer);
 	}
 
@@ -277,8 +165,7 @@ void Application::setLayerVisibility(MeshLayer* layer, bool visible_state)
 	}
 }
 
-MeshInstance* Application::createTriangle(CreateTriangleInfo& info,
-	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
+MeshInstance* Application::createEmptyMesh(MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
 	if (dest_layer == nullptr) {
 		dest_layer = last_used_layer;
@@ -288,15 +175,39 @@ MeshInstance* Application::createTriangle(CreateTriangleInfo& info,
 		dest_drawcall = last_used_drawcall;
 	}
 
-	MeshInBuffers* new_mesh = createMesh();
-	new_mesh->mesh.createAsTriangle(info.size);
+	Mesh& new_mesh = this->meshes.emplace_back();
 
-	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
-	new_instance->pos = info.transform.pos;
-	new_instance->rot = info.transform.rot;
-	new_instance->scale = info.transform.scale;
+	scme::SculptMesh& sculpt_mesh = new_mesh.mesh;
+	sculpt_mesh.gpu_triangles_srv = nullptr;
+	sculpt_mesh.max_vertices_in_AABB = 1024;
 
-	this->renderer.load_vertices = true;
+	MeshInstanceSet& new_set = new_mesh.sets.emplace_back();
+	new_set.parent_mesh = &new_mesh;
+	new_set.drawcall = dest_drawcall;
+
+	uint32_t index_in_buffer;
+	MeshInstance& new_instance = new_set.instances.emplace(index_in_buffer);
+	new_instance.instance_set = &new_set;
+	new_instance.index_in_buffer = index_in_buffer;
+	new_instance.parent_layer = nullptr;
+
+	new_instance.visible = true;
+
+	new_instance.markFullUpdate();
+
+	transferInstanceToLayer(&new_instance, dest_layer);
+
+	return &new_instance;
+}
+
+MeshInstance* Application::createTriangle(CreateTriangleInfo& info,
+	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
+{
+	MeshInstance* new_instance = createEmptyMesh(dest_layer, dest_drawcall);
+	new_instance->transform = info.transform;
+
+	Mesh* mesh = new_instance->instance_set->parent_mesh;
+	mesh->mesh.createAsTriangle(info.size);
 
 	return new_instance;
 }
@@ -304,23 +215,11 @@ MeshInstance* Application::createTriangle(CreateTriangleInfo& info,
 MeshInstance* Application::createQuad(CreateQuadInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	if (dest_layer == nullptr) {
-		dest_layer = last_used_layer;
-	}
+	MeshInstance* new_instance = createEmptyMesh(dest_layer, dest_drawcall);
+	new_instance->transform = info.transform;
 
-	if (dest_drawcall == nullptr) {
-		dest_drawcall = last_used_drawcall;
-	}
-
-	MeshInBuffers* new_mesh = createMesh();
-	new_mesh->mesh.createAsQuad(info.size);
-
-	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
-	new_instance->pos = info.transform.pos;
-	new_instance->rot = info.transform.rot;
-	new_instance->scale = info.transform.scale;
-
-	this->renderer.load_vertices = true;
+	Mesh* mesh = new_instance->instance_set->parent_mesh;
+	mesh->mesh.createAsQuad(info.size);
 
 	return new_instance;
 }
@@ -328,27 +227,15 @@ MeshInstance* Application::createQuad(CreateQuadInfo& info,
 MeshInstance* Application::createCube(CreateCubeInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	if (dest_layer == nullptr) {
-		dest_layer = last_used_layer;
-	}
+	MeshInstance* new_instance = createEmptyMesh(dest_layer, dest_drawcall);
+	new_instance->transform = info.transform;
 
-	if (dest_drawcall == nullptr) {
-		dest_drawcall = last_used_drawcall;
-	}
-
-	MeshInBuffers* new_mesh = createMesh();
-	new_mesh->mesh.createAsCube(info.size);
-
-	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
-	new_instance->pos = info.transform.pos;
-	new_instance->rot = info.transform.rot;
-	new_instance->scale = info.transform.scale;
-
-	this->renderer.load_vertices = true;
+	Mesh* mesh = new_instance->instance_set->parent_mesh;
+	mesh->mesh.createAsCube(info.size);
 
 	return new_instance;
 }
-
+/*
 MeshInstance* Application::createCylinder(CreateCylinderInfo& info,
 	MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
@@ -360,7 +247,7 @@ MeshInstance* Application::createCylinder(CreateCylinderInfo& info,
 		dest_drawcall = last_used_drawcall;
 	}
 
-	MeshInBuffers* new_mesh = createMesh();
+	MeshInBuffer* new_mesh = createMesh();
 	new_mesh->mesh.createAsCylinder(info.height, info.diameter,
 		info.rows, info.columns, info.with_caps);
 
@@ -368,8 +255,6 @@ MeshInstance* Application::createCylinder(CreateCylinderInfo& info,
 	new_instance->pos = info.transform.pos;
 	new_instance->rot = info.transform.rot;
 	new_instance->scale = info.transform.scale;
-
-	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
@@ -385,15 +270,13 @@ MeshInstance* Application::createUV_Sphere(CreateUV_SphereInfo& info,
 		dest_drawcall = last_used_drawcall;
 	}
 
-	MeshInBuffers* new_mesh = createMesh();
+	MeshInBuffer* new_mesh = createMesh();
 	new_mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns);
 
 	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
 	new_instance->pos = info.transform.pos;
 	new_instance->rot = info.transform.rot;
 	new_instance->scale = info.transform.scale;
-
-	this->renderer.load_vertices = true;
 
 	return new_instance;
 }
@@ -420,7 +303,7 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 	}
 
 	// Meshes
-	std::vector<MeshInBuffers*> new_meshes(structure.meshes.size());
+	std::vector<MeshInBuffer*> new_meshes(structure.meshes.size());
 
 	for (uint32_t i = 0; i < structure.meshes.size(); i++) {
 
@@ -464,7 +347,7 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 
 		if (node.mesh != 0xFFFF'FFFF'FFFF'FFFF) {
 
-			MeshInBuffers* new_mesh = new_meshes[node.mesh];
+			MeshInBuffer* new_mesh = new_meshes[node.mesh];
 			MeshInstance* new_instance = createInstance(new_mesh, new_layer, settings.dest_drawcall);
 			new_instance->name = node.name;
 
@@ -487,8 +370,6 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 		}
 	}
 
-	this->renderer.load_vertices = true;
-
 	return err_stack;
 }
 
@@ -502,7 +383,7 @@ MeshInstance* Application::createLine(CreateLineInfo& info, MeshLayer* dest_laye
 		dest_drawcall = last_used_drawcall;
 	}
 
-	MeshInBuffers* new_mesh = createMesh();
+	MeshInBuffer* new_mesh = createMesh();
 	new_mesh->mesh.createAsLine(info.origin, info.direction, info.length);
 
 	MeshInstance* new_instance = createInstance(new_mesh, dest_layer, dest_drawcall);
@@ -510,29 +391,7 @@ MeshInstance* Application::createLine(CreateLineInfo& info, MeshLayer* dest_laye
 	new_instance->rot = { 1.f, 0.f, 0.f, 0.f };
 	new_instance->scale = { 1.f, 1.f, 1.f };
 
-	this->renderer.load_vertices = true;
-
 	return new_instance;
-}
-
-void Application::lookupInstanceMask(uint32_t pixel_x, uint32_t pixel_y, uint32_t& r_instance_id)
-{
-	// TODO: optimize for multi lookup
-
-	// Map
-	renderer.im_ctx3->Map(renderer.instance_id_staging_tex.get(), 0, D3D11_MAP_READ, 0, &_instance_id_mask);
-
-	uint32_t idx = (pixel_y * _instance_id_mask.RowPitch) + (pixel_x * 4);
-	
-	uint32_t r = *(((uint8_t*)_instance_id_mask.pData) + idx);
-	uint32_t g = *(((uint8_t*)_instance_id_mask.pData) + idx + 1);
-	uint32_t b = *(((uint8_t*)_instance_id_mask.pData) + idx + 2);
-	uint32_t a = *(((uint8_t*)_instance_id_mask.pData) + idx + 3);
-
-	r_instance_id = (a << 24) | (b << 16) | (g << 8) | r;
-
-	// Unmap
-	renderer.im_ctx3->Unmap(renderer.instance_id_staging_tex.get(), 0);
 }
 
 bool Application::raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
@@ -567,97 +426,88 @@ bool Application::raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, gl
 	return mesh.raycastPolys(local_ray_origin, local_ray_dir, r_isect_poly, r_isect_distance, r_isect_point);
 }
 
-struct RaytraceResult {
-	uint32_t poly;
-	glm::vec3 point;
-	MeshInstance* instance;
-};
-
-MeshInstance* Application::mouseRaycastInstances(uint32_t& r_isect_poly, float& r_isect_distance,
-	glm::vec3& r_isect_point)
+MeshInstance* Application::mouseRaycastInstances(uint32_t& r_isect_poly, glm::vec3& r_isect_point)
 {
 	// TODO:
 	// AABB for mesh instances with the raytrace optimization
 	// frustrum culling
 	// use instance mask pixels to find first mesh
-	
-	glm::vec3 ray_direction = camera_forward;
 
 	nui::Window* window = application.main_window;
-	float x_amount = (float)window->input.mouse_x / window->surface_width;
-	float y_amount = 1.f - ((float)window->input.mouse_y / window->surface_height);
-	float aspect_ratio = (float)window->surface_width / window->surface_height;
-	float half_fov = toRad(camera_field_of_view) / 2.f;
 
-	if (x_amount > 0.5f) {
-		x_amount = remapAboveTo01(x_amount);
-		ray_direction = glm::rotateY(ray_direction, -x_amount * half_fov * aspect_ratio);
+	glm::vec3& ray_origin = camera_pos;
+	glm::vec3 ray_direction = camera_forward;
+	{
+
+		float x_amount = (float)window->input.mouse_x / window->surface_width;
+		float y_amount = 1.f - ((float)window->input.mouse_y / window->surface_height);
+		float aspect_ratio = (float)window->surface_width / window->surface_height;
+		float half_fov = toRad(camera_field_of_view) / 2.f;
+
+		// rotate camera vector left
+		if (x_amount > 0.5f) {
+			x_amount = remapAboveTo01(x_amount);
+			ray_direction = glm::rotateY(ray_direction, -x_amount * half_fov * aspect_ratio);
+		}
+		else {
+			// rotate camera vector right
+			x_amount = remapBelowTo01(x_amount);
+			ray_direction = glm::rotateY(ray_direction, x_amount * half_fov * aspect_ratio);
+		}
+
+		// rotate camera vector up
+		if (y_amount > 0.5f) {
+			y_amount = remapAboveTo01(y_amount);
+			ray_direction = glm::rotateX(ray_direction, y_amount * half_fov);
+		}
+		else {
+			// rotate camera vector down
+			y_amount = remapBelowTo01(y_amount);
+			ray_direction = glm::rotateX(ray_direction, -y_amount * half_fov);
+		}
+
+		// Perspective Distort
+		glm::mat4x4 persp = glm::perspectiveFovRH_ZO(camera_field_of_view,
+			(float)window->surface_width, (float)window->surface_height,
+			camera_z_near, camera_z_far);
+
+		ray_direction = persp * glm::vec4(ray_direction, 1.f);
 	}
-	else {
-		x_amount = remapBelowTo01(x_amount);
-		ray_direction = glm::rotateY(ray_direction, x_amount * half_fov * aspect_ratio);
+
+	uint32_t instance_id;
+	renderer.instance_poly_id_staging_tex.readbackAtPixel(window->input.mouse_x, window->input.mouse_y,
+		instance_id, r_isect_poly);
+
+	if (instance_id == 0) {
+		return nullptr;
 	}
 
-	if (y_amount > 0.5f) {
-		y_amount = remapAboveTo01(y_amount);
-		ray_direction = glm::rotateX(ray_direction, y_amount * half_fov);
-	}
-	else {
-		y_amount = remapBelowTo01(y_amount);
-		ray_direction = glm::rotateX(ray_direction, -y_amount * half_fov);
-	}
-
-	printf("ray dir = %.2f %.2f, %.2f \n",
-		ray_direction.x, ray_direction.y, ray_direction.z);
-
-
-
-	r_isect_distance = FLT_MAX;
-	MeshInstance* r_isect_instance = nullptr;
-
+	MeshInstance* mesh_instance;
 	for (MeshInstance& instance : instances) {
+		if (instance.id == instance_id) {
+			mesh_instance = &instance;
+			break;
+		}
+	}
 
-		if (instance.visible) {
+	scme::SculptMesh& mesh = mesh_instance->parent_mesh->mesh;
+	mesh.raycastPoly(ray_origin, ray_direction, r_isect_poly, r_isect_point);
 
-			uint32_t isect_poly;
-			float isect_distance;
-			glm::vec3 isect_point;
+	if constexpr (false) {
 
-			if (application.raycast(&instance, camera_pos, ray_direction,
-				isect_poly, isect_distance, isect_point))
-			{
-				if (isect_distance < r_isect_distance) {
+		for (MeshInstance& instance : instances) {
+			if (instance.name == "Debug Line") {
 
-					r_isect_poly = isect_poly;
-					r_isect_distance = isect_distance;
-					r_isect_point = isect_point;
-					r_isect_instance = &instance;
-				}
+				scme::SculptMesh& line_mesh = instance.parent_mesh->mesh;
+				line_mesh.changeLineOrigin(ray_origin);
+				line_mesh.changeLineDirection(glm::vec3{ 0, 0, 1 });
+				break;
 			}
 		}
 	}
 
-	//// debug
-	//if (true) {
-
-	//	for (MeshDrawcall& drawcall : drawcalls) {
-	//		if (drawcall.name == "wire pure") {
-
-	//			CreateLineInfo info;
-	//			info.origin = ray_origin;
-	//			info.direction = ray_direction;
-	//			info.length = 10.f;
-
-	//			MeshInstance* inst = createLine(info, nullptr, &drawcall);
-	//			inst->wireframe_colors.front_color = { 1, 1, 1 };
-
-	//			break;
-	//		}
-	//	}
-	//}
-
-	return r_isect_instance;
-}
+	return mesh_instance;
+}*/
 
 void Application::setCameraFocus(glm::vec3& new_focus)
 {
@@ -799,4 +649,59 @@ void Application::setCameraRotation(float x, float y, float z)
 	this->camera_forward = glm::normalize(glm::vec3{ 0, 0, -1 } *camera_quat_inv);
 
 	renderer.load_uniform = true;
+}
+
+void Application::resetToHardcodedStartup()
+{
+	// Meshes
+	meshes.clear();
+
+	// Drawcalls
+	drawcalls.clear();
+	last_used_drawcall = createDrawcall();
+
+	// Layers
+	layers.clear();
+	last_used_layer = &layers.emplace_back();
+	last_used_layer->parent = nullptr;
+
+	// Shading
+	shading_normal = ShadingNormal::TESSELATION;
+
+	// Lighting
+	lights[0].normal = toNormal(45, 45);
+	lights[0].color = { 1, 1, 1 };
+	lights[0].intensity = 1.f;
+
+	lights[1].normal = toNormal(-45, 45);
+	lights[1].color = { 1, 1, 1 };
+	lights[1].intensity = 1.f;
+
+	lights[2].normal = toNormal(45, -45);
+	lights[2].color = { 1, 1, 1 };
+	lights[2].intensity = 1.f;
+
+	lights[3].normal = toNormal(-45, -45);
+	lights[3].color = { 1, 1, 1 };
+	lights[3].intensity = 1.f;
+
+	lights[4].intensity = 0.f;
+	lights[5].intensity = 0.f;
+	lights[6].intensity = 0.f;
+	lights[7].intensity = 0.f;
+
+	ambient_intensity = 0.03f;
+
+	// Camera
+	camera_focus = { 0, 0, 0 };
+	camera_field_of_view = 15.f;
+	camera_z_near = 0.1f;
+	camera_z_far = 100'000.f;
+	camera_pos = { 0, 0, 0 };
+	camera_quat_inv = { 1, 0, 0, 0 };
+	camera_forward = { 0, 0, -1 };
+
+	camera_orbit_sensitivity = 0.01f;
+	camera_pan_sensitivity = 0.0001f;
+	camera_dolly_sensitivity = 0.001f;
 }

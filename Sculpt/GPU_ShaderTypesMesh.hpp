@@ -23,23 +23,15 @@ DirectX::XMMATRIX dxConvertMatrix(glm::mat4& value);
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT3 normal;
-	float tess_edge;
-	float tess_edge_dir;
 
-	static std::array<D3D11_INPUT_ELEMENT_DESC, 4> getInputLayout()
+	static auto getInputLayout()
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 4> elems;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
 		elems[0].SemanticName = "POSITION";
 		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
 		elems[1].SemanticName = "NORMAL";
 		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-		elems[2].SemanticName = "TESSELLATION_EDGE";
-		elems[2].Format = DXGI_FORMAT_R32_FLOAT;
-
-		elems[3].SemanticName = "TESSELLATION_EDGE_DIR";
-		elems[3].Format = DXGI_FORMAT_R32_FLOAT;
 
 		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
 			elem.SemanticIndex = 0;
@@ -51,6 +43,11 @@ struct GPU_MeshVertex {
 
 		return elems;
 	}
+};
+
+
+struct GPU_MeshTriangle {
+	DirectX::XMFLOAT3 normal;
 };
 
 
@@ -157,7 +154,9 @@ struct GPU_MeshUniform {
 	GPU_CameraLight lights[8];
 	//--------------------------------
 	float ambient_intensity;
-	uint32_t _pad_3[3];
+	uint32_t shading_normal;
+	uint32_t _pad_3[2];
+	//--------------------------------
 };
 
 struct GPU_DrawcallUniform {

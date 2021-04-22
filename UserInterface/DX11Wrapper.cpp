@@ -10,6 +10,7 @@ void dx11::Buffer::create(ID3D11Device5* device, ID3D11DeviceContext3* context, 
 	this->dev = device;
 	this->ctx3 = context;
 	this->init_desc = desc;
+	this->buff = nullptr;
 }
 
 void dx11::Buffer::_ensureSize(size_t size)
@@ -68,6 +69,24 @@ void dx11::Buffer::beginLoad(size_t total_load_size, void*& mapped_mem)
 }
 
 void dx11::Buffer::endLoad()
+{
+	ctx3->Unmap(buff.Get(), 0);
+}
+
+void dx11::Buffer::mapForWrite(size_t total_load_size, void*& mapped_mem)
+{
+	_ensureSize(total_load_size);
+
+	D3D11_MAPPED_SUBRESOURCE mapped;
+	HRESULT hr = ctx3->Map(buff.Get(), 0, D3D11_MAP_WRITE, 0, &mapped);
+	if (hr != S_OK) {
+		throw DirectX11Exception(hr, "failed to map buffer");
+	}
+
+	mapped_mem = mapped.pData;
+}
+
+void dx11::Buffer::unmap()
 {
 	ctx3->Unmap(buff.Get(), 0);
 }
@@ -223,8 +242,12 @@ void dx11::Texture::create(ID3D11Device5* dev, ID3D11DeviceContext3* ctx, D3D11_
 	this->dev5 = dev;
 	this->ctx3 = ctx;
 	this->tex_desc = new_desc;
+	this->tex = nullptr;
+	this->mapped.pData = nullptr;
 
 	this->srv = nullptr;
+	this->dsv = nullptr;
+	this->rtv = nullptr;
 }
 
 void dx11::Texture::createShaderResourceView(D3D11_SHADER_RESOURCE_VIEW_DESC& desc)
@@ -263,6 +286,7 @@ void dx11::Texture::resize(uint32_t width, uint32_t height)
 		dsv = nullptr;
 		rtv = nullptr;
 
+		ensureUnmapped();
 		tex->Release();
 		create_tex();
 	}
@@ -281,13 +305,13 @@ void dx11::Texture::load(void* data)
 		printf(code_location);
 	}
 
-	D3D11_MAPPED_SUBRESOURCE mapped;
-	HRESULT hr = ctx3->Map(tex.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+	D3D11_MAPPED_SUBRESOURCE load_mapped;
+	HRESULT hr = ctx3->Map(tex.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &load_mapped);
 	if (hr != S_OK) {
 		throw DirectX11Exception(hr, "failed to map texture");
 	}
 
-	std::memcpy(mapped.pData, data, load_size);
+	std::memcpy(load_mapped.pData, data, load_size);
 
 	ctx3->Unmap(tex.Get(), 0);
 }
@@ -331,15 +355,39 @@ void dx11::Texture::load(void* data, uint32_t width, uint32_t height)
 	}
 }
 
+void dx11::Texture::readbackAtPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g)
+{
+	if (mapped.pData == nullptr) {
+		throwDX11(ctx3->Map(tex.Get(), 0, D3D11_MAP_READ, 0, &mapped));
+	}
+
+	uint32_t idx = (y * mapped.RowPitch) + (x * 8);
+
+	std::array<uint32_t, 2> rg;
+	std::memcpy(rg.data(), ((uint8_t*)mapped.pData) + idx, 8);
+
+	r = rg[0];
+	g = rg[1];
+}
+
+void dx11::Texture::ensureUnmapped()
+{
+	if (mapped.pData != nullptr) {
+		ctx3->Unmap(tex.Get(), 0);
+		mapped.pData = nullptr;
+	}
+}
+
 ID3D11Texture2D* dx11::Texture::get()
 {
+	ensureUnmapped();
 	return tex.Get();
 }
 
 ID3D11ShaderResourceView* dx11::Texture::getSRV()
 {
 	if (srv == nullptr) {
-		throwDX11(dev5->CreateShaderResourceView(get(), &srv_desc, srv.GetAddressOf()));
+		throwDX11(dev5->CreateShaderResourceView(tex.Get(), &srv_desc, srv.GetAddressOf()));
 	}
 
 	return srv.Get();
@@ -348,7 +396,7 @@ ID3D11ShaderResourceView* dx11::Texture::getSRV()
 ID3D11DepthStencilView* dx11::Texture::getDSV()
 {
 	if (dsv == nullptr) {
-		throwDX11(dev5->CreateDepthStencilView(get(), &dsv_desc, dsv.GetAddressOf()));
+		throwDX11(dev5->CreateDepthStencilView(tex.Get(), &dsv_desc, dsv.GetAddressOf()));
 	}
 	
 	return dsv.Get();
@@ -357,7 +405,7 @@ ID3D11DepthStencilView* dx11::Texture::getDSV()
 ID3D11RenderTargetView* dx11::Texture::getRTV()
 {
 	if (rtv == nullptr) {
-		throwDX11(dev5->CreateRenderTargetView(get(), &rtv_desc, rtv.GetAddressOf()));
+		throwDX11(dev5->CreateRenderTargetView(tex.Get(), &rtv_desc, rtv.GetAddressOf()));
 	}
 
 	return rtv.Get();

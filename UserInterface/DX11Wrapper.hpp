@@ -22,7 +22,7 @@ namespace dx11 {
 		ID3D11DeviceContext3* ctx3;
 		D3D11_BUFFER_DESC init_desc;
 
-		ComPtr<ID3D11Buffer> buff = nullptr;
+		ComPtr<ID3D11Buffer> buff;
 
 	public:
 		void _ensureSize(size_t size);
@@ -32,13 +32,135 @@ namespace dx11 {
 
 		void load(void* data, size_t load_size);
 
-		void beginLoad(size_t total_load_size, void*& mapped_buffer);
-
+		void beginLoad(size_t total_load_size, void*& mapped_mem);
 		void endLoad();
+
+		void mapForWrite(size_t total_load_size, void*& mapped_mem);
+		void unmap();
 
 		ID3D11Buffer* get();
 
 		size_t getMemorySizeMegaBytes();
+	};
+
+	
+	template<typename GPU_T>
+	class ArrayBuffer {
+	public:
+		ID3D11Device5* dev;
+		ID3D11DeviceContext3* ctx3;
+		D3D11_BUFFER_DESC init_desc;
+
+		ID3D11Buffer* buff = nullptr;
+
+		D3D11_MAPPED_SUBRESOURCE mapped_mem;
+
+	public:
+		void create(ID3D11Device5* device, ID3D11DeviceContext3* context, D3D11_BUFFER_DESC& desc)
+		{
+			this->dev = device;
+			this->ctx3 = context;
+			this->init_desc = desc;
+		}
+
+		// creates a new buffer, copying the data to the new buffer
+		// size is the number of elements
+		void resize(size_t new_size)
+		{
+			size_t new_size_bytes = new_size * sizeof(GPU_T);
+
+			// fresh buffer
+			if (buff == nullptr) {
+
+				init_desc.ByteWidth = new_size_bytes;
+				throwDX11(dev->CreateBuffer(&init_desc, NULL, &buff));
+			}
+			else if (init_desc.ByteWidth < new_size_bytes) {
+
+				ID3D11Buffer* new_buff;
+				{
+					D3D11_BUFFER_DESC desc = init_desc;
+					desc.ByteWidth = new_size_bytes;
+
+					throwDX11(dev->CreateBuffer(&init_desc, NULL, &new_buff));
+				}
+
+				D3D11_BOX src_box = {};
+				src_box.left = 0;
+				src_box.right = init_desc.ByteWidth;
+				src_box.top = 0;
+				src_box.bottom = 1;
+				src_box.front = 0;
+				src_box.back = 1;
+
+				ctx3->CopySubresourceRegion(new_buff, 0,
+					0, 0, 0,
+					buff, 0,
+					&src_box);
+
+				buff->Release();
+
+				buff = new_buff;
+
+				init_desc.ByteWidth = new_size_bytes;
+			}
+		}
+
+		// resizeDiscard
+
+		/*void mapForWrite()
+		{
+			throwDX11(ctx3->Map(buff, 0, D3D11_MAP_WRITE, 0, &mapped_mem));
+		}*/
+		
+		void update(uint32_t index, GPU_T& vertex)
+		{
+			assert_cond(index * sizeof(GPU_T) < init_desc.ByteWidth, "out of range");
+
+			//std::memcpy((GPU_T*)(mapped_mem.pData) + index, &vertex, sizeof(GPU_T));
+
+			D3D11_BOX src_box = {};
+			src_box.left = sizeof(GPU_T) * index;
+			src_box.right = src_box.left + sizeof(GPU_T);
+			src_box.top = 0;
+			src_box.bottom = 1;
+			src_box.front = 0;
+			src_box.back = 1;
+
+			ctx3->UpdateSubresource(buff, 0, &src_box, &vertex, 0, 0);
+		}
+
+		/*void set(uint32_t index, size_t field_offset, void* data, size_t field_size)
+		{
+			assert_cond((index * sizeof(GPU_T)) + field_offset < init_desc.ByteWidth, "out of range");
+
+			std::memcpy((GPU_T*)(mapped_mem.pData).pData + index + field_offset, data, field_size);
+		}*/
+
+		// void get
+
+		/*void unmap()
+		{
+			ctx3->Unmap(buff, 0);
+			mapped_mem.pData = nullptr;
+		}*/
+
+		ID3D11Buffer* get()
+		{
+			return buff;
+		}
+
+		uint32_t size()
+		{
+			return init_desc.ByteWidth / sizeof(GPU_T);
+		}
+
+		~ArrayBuffer()
+		{
+			if (buff != nullptr) {
+				buff->Release();
+			}
+		}
 	};
 
 
@@ -81,14 +203,20 @@ namespace dx11 {
 	};
 
 
+	// TODO: StructuredBuffer
+
+
 	class Texture {
 	public:
 		ID3D11Device5* dev5;
 		ID3D11DeviceContext3* ctx3;
 		
 		D3D11_TEXTURE2D_DESC tex_desc;
-		ComPtr<ID3D11Texture2D> tex = nullptr;
+		ComPtr<ID3D11Texture2D> tex;
 		
+		// Mapped
+		D3D11_MAPPED_SUBRESOURCE mapped;
+
 		D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 		ComPtr<ID3D11ShaderResourceView> srv;
 
@@ -109,6 +237,11 @@ namespace dx11 {
 		void load(void* data);
 		void load(void* data, uint32_t width, uint32_t height);
 
+		void readbackAtPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g);
+
+		void ensureUnmapped();
+
+		// calls ensure unmapped
 		ID3D11Texture2D* get();
 		ID3D11ShaderResourceView* getSRV();
 		ID3D11DepthStencilView* getDSV();

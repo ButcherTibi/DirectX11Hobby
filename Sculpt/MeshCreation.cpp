@@ -8,20 +8,22 @@ using namespace scme;
 
 void SculptMesh::createAsTriangle(float size)
 {
-	verts.resize(3);
+	verts.resize(4);
 
 	float half = size / 2;
-	verts[0].pos = { 0, half, 0 };
-	verts[1].pos = { half, -half, 0 };
-	verts[2].pos = { -half, -half, 0 };
+	verts[1].pos = { 0, half, 0 };
+	verts[2].pos = { half, -half, 0 };
+	verts[3].pos = { -half, -half, 0 };
 
-	for (uint8_t i = 0; i < 3; i++) {
+	for (uint8_t i = 1; i < 4; i++) {
 		verts[i].normal = { 0, 0, 1 };
 		verts[i].away_loop = 0xFFFF'FFFF;
 		verts[i].aabb = 0xFFFF'FFFF;
+
+		markVertexFullUpdate(i);
 	}
 
-	addTris(0, 1, 2);
+	addTris(1, 2, 3);
 
 	VertexBoundingBox& root = aabbs.emplace_back();
 	root.parent = 0xFFFF'FFFF;
@@ -32,28 +34,29 @@ void SculptMesh::createAsTriangle(float size)
 
 	root_aabb = 0;
 
-	for (uint32_t i = 0; i < verts.size(); i++) {
+	for (uint32_t i = 1; i < verts.size(); i++) {
 		registerVertexToAABBs(i, 0);
 	}
 }
 
 void SculptMesh::createAsQuad(float size)
 {
-	verts.resize(4);
+	verts.resize(5);
 
 	float half = size / 2;
-	verts[0].pos = { -half, half, 0 };
-	verts[1].pos = { half, half, 0 };
-	verts[2].pos = { half, -half, 0 };
-	verts[3].pos = { -half, -half, 0 };
+	verts[1].pos = { -half, half, 0 };
+	verts[2].pos = { half, half, 0 };
+	verts[3].pos = { half, -half, 0 };
+	verts[4].pos = { -half, -half, 0 };
 
-	for (uint8_t i = 0; i < 4; i++) {
+	for (uint8_t i = 1; i < 5; i++) {
 		verts[i].normal = { 0, 0, 1 };
-		verts[i].away_loop = 0xFFFF'FFFF;
-		verts[i].aabb = 0xFFFF'FFFF;
+		verts[i].init();
+
+		markVertexFullUpdate(i);
 	}
 
-	addQuad(0, 1, 2, 3);
+	addQuad(1, 2, 3, 4);
 
 	VertexBoundingBox& octree = aabbs.emplace_back();
 	octree.parent = 0xFFFF'FFFF;
@@ -62,7 +65,9 @@ void SculptMesh::createAsQuad(float size)
 	octree.aabb.min = { -half, -half, -half };
 	octree.verts_deleted_count = 0;
 
-	for (uint32_t i = 0; i < verts.size(); i++) {
+	root_aabb = 0;
+
+	for (uint32_t i = 1; i < verts.size(); i++) {
 		registerVertexToAABBs(i, 0);
 	}
 }
@@ -80,35 +85,50 @@ void SculptMesh::createAsQuad(float size)
 
 void SculptMesh::createAsCube(float size)
 {
-	verts.resize(8);
+	verts.resize(9);
 
 	float half = size / 2;
 
 	// Front
-	verts[0].pos = { -half,  half, half };
-	verts[1].pos = {  half,  half, half };
-	verts[2].pos = {  half, -half, half };
-	verts[3].pos = { -half, -half, half };
+	verts[1].pos = { -half,  half, half };
+	verts[2].pos = {  half,  half, half };
+	verts[3].pos = {  half, -half, half };
+	verts[4].pos = { -half, -half, half };
 	
 	// Back
-	verts[4].pos = { -half,  half, -half };
-	verts[5].pos = {  half,  half, -half };
-	verts[6].pos = {  half, -half, -half };
-	verts[7].pos = { -half, -half, -half };
+	verts[5].pos = { -half,  half, -half };
+	verts[6].pos = {  half,  half, -half };
+	verts[7].pos = {  half, -half, -half };
+	verts[8].pos = { -half, -half, -half };
 
-	for (uint8_t i = 0; i < 8; i++) {
-		verts[i].away_loop = 0xFFFF'FFFF;
+	for (uint8_t i = 1; i < verts.size(); i++) {
+		verts[i].init();
+
+		markVertexFullUpdate(i);
 	}
 
-	addQuad(0, 1, 2, 3);  // front
-	addQuad(1, 5, 6, 2);  // right
-	addQuad(5, 4, 7, 6);  // back
-	addQuad(4, 0, 3, 7);  // left
-	addQuad(0, 4, 5, 1);  // top
-	addQuad(3, 2, 6, 7);  // bot
+	addQuad(1, 2, 3, 4);  // front
+	addQuad(2, 6, 7, 3);  // right
+	addQuad(6, 5, 8, 7);  // back
+	addQuad(5, 1, 4, 8);  // left
+	addQuad(1, 5, 6, 2);  // top
+	addQuad(4, 3, 7, 8);  // bot
 
-	for (uint8_t i = 0; i < 8; i++) {
+	for (uint8_t i = 1; i < verts.size(); i++) {
 		calcVertexNormal(&verts[i]);
+	}
+
+	VertexBoundingBox& octree = aabbs.emplace_back();
+	octree.parent = 0xFFFF'FFFF;
+	octree.children[0] = 0xFFFF'FFFF;
+	octree.aabb.max = { half, half, half };
+	octree.aabb.min = { -half, -half, -half };
+	octree.verts_deleted_count = 0;
+
+	root_aabb = 0;
+
+	for (uint32_t i = 1; i < verts.size(); i++) {
+		registerVertexToAABBs(i, 0);
 	}
 }
 
@@ -488,6 +508,22 @@ void SculptMesh::createAsLine(glm::vec3& origin, glm::vec3& direction, float len
 	}
 
 	addTris(0, 1, 2);
+}
+
+void SculptMesh::changeLineOrigin(glm::vec3& new_origin)
+{
+	verts[0].pos = new_origin;
+	verts[1].pos = new_origin;
+}
+
+void SculptMesh::changeLineDirection(glm::vec3& new_direction)
+{
+	glm::vec3& origin = verts[0].pos;
+	float length = glm::distance(verts[0].pos, verts[2].pos);
+
+	glm::vec3 target = origin + new_direction * length;
+
+	verts[2].pos = target;
 }
 
 //void SculptMesh::addFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,

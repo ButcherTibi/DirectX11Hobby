@@ -1,6 +1,5 @@
 #pragma once
 
-#include "GPU_ShaderTypesMesh.hpp"
 #include "NuiLibrary.hpp"
 
 
@@ -13,7 +12,6 @@ public:
 	std::vector<char> shader_cso;
 
 	// Update
-	bool load_vertices;
 	bool load_uniform;
 
 public:
@@ -29,21 +27,8 @@ public:
 	/* the see thru wireframe shader must discard pixels only relative to itself */
 	dx11::Texture wireframe_dtex;
 
-	// Mesh Instance ID of pixels
-	dx11::Texture instance_id_mask_tex;
-	dx11::Texture instance_id_staging_tex;
-
-	// Poly idx and World position of pixels
-	dx11::Texture poly_pos_tex;
-	//dx11::Texture poly_pos_staging_tex;
-
-	dx11::Buffer vbuff;
-	dx11::Buffer instabuff;
+	//dx11::ConstantBuffer frame_ubuff;
 	dx11::Buffer frame_ubuff;
-	dx11::Buffer drawcall_ubuff;
-
-	dx11::Buffer octree_vbuff;
-	// dx11::Buffer octree_ibuff;
 
 	ComPtr<ID3D11InputLayout> mesh_il;
 
@@ -76,13 +61,14 @@ public:
 	uint32_t render_target_height;
 
 public:
-	void configureMeshInputAssembly();
-	void configureMeshVertexShader();
+	// Internal
+	void loadVertices();
+	void loadUniform();
 
-	ErrStack loadVertices();
-	ErrStack loadUniform();
+public:
+	void setWireframeDepthBias(int depth_bias);
 
-	ErrStack draw(nui::SurfaceEvent& event);
+	void draw(nui::SurfaceEvent& event);
 };
 
 void geometryDraw(nui::Window* window, nui::StoredElement* source, nui::SurfaceEvent& event, void* user_data);

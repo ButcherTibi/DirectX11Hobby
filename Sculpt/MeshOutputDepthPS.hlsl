@@ -4,7 +4,7 @@
 struct PixelOutput {
 	float4 color : SV_Target0;
 	float depth_mask : SV_Target1;
-	uint instance_id : SV_Target2;
+	uint2 instance_poly_id : SV_Target2;
 };
 
 cbuffer FrameUniforms : register(b0)
@@ -30,7 +30,8 @@ PixelOutput main(PixelIn input)
 	PixelOutput output;
 	output.color = float4(pbr_color, 1.);
 	output.depth_mask = input.dx_pos.z;
-	output.instance_id = input.instance_id;
+	output.instance_poly_id[0] = input.instance_id;
+	output.instance_poly_id[1] = input.poly_id;
 	
 	return output;
 }

@@ -3,6 +3,8 @@
 #include "NuiLibrary.hpp"
 #include "Application.hpp"
 
+#include "DeferredVector.hpp"
+
 
 void renderDocTriggerCapture(nui::Window* window, nui::StoredElement* source, void* user_data)
 {
@@ -12,20 +14,10 @@ void renderDocTriggerCapture(nui::Window* window, nui::StoredElement* source, vo
 void onMouseMove(nui::Window* window, nui::StoredElement* source, void* user_data)
 {
 	/*uint32_t isect_poly;
-	float isect_distance;
 	glm::vec3 isect_point;
-
-	MeshInstance* inst = application.mouseRaycastInstances(isect_poly, isect_distance, isect_point);
-	if (inst != nullptr) {
-		printf("HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH \n");
+	if (application.mouseRaycastInstances(isect_poly, isect_point) != nullptr) {
+		printf("point = %.3f %.3f %.3f \n", isect_point.x, isect_point.y, isect_point.z);
 	}*/
-
-	uint32_t x = application.main_window->input.mouse_x;
-	uint32_t y = application.main_window->input.mouse_y;
-	uint32_t id;
-	application.lookupInstanceMask(x, y, id);
-
-	printf("%d \n", id);
 }
 
 void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void* user_data)
@@ -74,176 +66,200 @@ void onCameraDollyScroll(nui::Window* window, nui::StoredElement* source, void* 
 	application.dollyCamera(window->input.mouse_wheel_delta * application.camera_dolly_sensitivity);
 }
 
+void changeShadingNormal(nui::Window* window, nui::StoredElement* source, void* user_data)
+{
+	application.shading_normal = (application.shading_normal + 1) % 3;
+
+	switch (application.shading_normal)	{
+	case ShadingNormal::VERTEX: {
+		printf("Shading Normal = VERTEX \n");
+		break;
+	}
+	case ShadingNormal::POLY: {
+		printf("Shading Normal = POLY \n");
+		break;
+	}
+	case ShadingNormal::TESSELATION: {
+		printf("Shading Normal = TESSELATION \n");
+		break;
+	}
+	}
+}
+
 //void onCameraResetKeyDown(nui::KeyDownEvent& event)
 //{
 //	application.setCameraPosition(0, 0, 10);
 //	application.setCameraRotation(0, 0, 0);
 //}
+//
+//void createTestScene_01()
+//{
+//	application.shading_normal = ShadingNormal::TESSELATION;
+//
+//	std::array<MeshDrawcall*, 10> drawcalls;
+//	for (MeshDrawcall*& drawcall : drawcalls) {
+//		drawcall = application.createDrawcall();
+//	}
+//
+//	drawcalls[0]->display_mode = DisplayMode::SOLID;
+//	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+//	drawcalls[2]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
+//	drawcalls[3]->display_mode = DisplayMode::WIREFRANE;
+//	drawcalls[4]->display_mode = DisplayMode::WIREFRANE;
+//
+//	drawcalls[5]->display_mode = DisplayMode::SOLID;
+//	drawcalls[5]->is_back_culled = true;
+//
+//	drawcalls[6]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+//	drawcalls[6]->is_back_culled = true;
+//
+//	drawcalls[7]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
+//	drawcalls[7]->is_back_culled = true;
+//
+//	drawcalls[8]->display_mode = DisplayMode::WIREFRANE;
+//	drawcalls[8]->is_back_culled = true;
+//
+//	drawcalls[9]->display_mode = DisplayMode::WIREFRANE;
+//	drawcalls[9]->is_back_culled = true;
+//
+//	std::array<MeshInstance*, 5> primitives;
+//
+//	float gap_space = 120;
+//	float primitive_size = 50;
+//
+//	// Triangle
+//	{
+//		CreateTriangleInfo info;
+//		info.size = primitive_size;
+//		info.transform.pos.x = 0;
+//
+//		primitives[0] = application.createTriangle(info, nullptr, drawcalls[0]);
+//	}
+//	
+//	// Quad
+//	{
+//		CreateQuadInfo info;
+//		info.size = primitive_size;
+//		info.transform.pos.x = gap_space;
+//
+//		primitives[1] = application.createQuad(info, nullptr, drawcalls[1]);
+//	}
+//
+//	// Cube
+//	{
+//		CreateCubeInfo info;
+//		info.size = primitive_size;
+//		info.transform.pos.x = gap_space * 2;
+//
+//		primitives[2] = application.createCube(info, nullptr, drawcalls[2]);
+//	}
+//
+//	// Cylinder
+//	{
+//		CreateCylinderInfo info;
+//		info.transform.pos.x = gap_space * 3;
+//		info.diameter = primitive_size;
+//		info.height = primitive_size;
+//		info.rows = 16;
+//		info.columns = 16;
+//
+//		primitives[3] = application.createCylinder(info, nullptr, drawcalls[3]);
+//	}
+//
+//	// Sphere
+//	{
+//		CreateUV_SphereInfo info;
+//		info.transform.pos.x = gap_space * 4;
+//		info.diameter = primitive_size;
+//		info.rows = 16;
+//		info.columns = 16;
+//		
+//		primitives[4] = application.createUV_Sphere(info, nullptr, drawcalls[4]);
+//	}
+//
+//	auto move_meshes = [](std::vector<MeshInstance*>& instances, glm::vec3 pos) {
+//		for (MeshInstance* inst : instances) {
+//			inst->pos = pos;
+//		}
+//	};
+//
+//	float meshes_y = -250;
+//
+//	// Loaded Mesh
+//	std::vector<MeshInstance*> meshes;
+//	{
+//		io::FilePath path;
+//		path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
+//
+//		GLTF_ImporterSettings settings;
+//		settings.dest_drawcall = drawcalls[0];
+//
+//		ErrStack err_stack = application.importMeshesFromGLTF_File(path, settings, &meshes);
+//		if (err_stack.isBad()) {
+//			err_stack.debugPrint();
+//			throw std::exception();
+//		}
+//
+//		move_meshes(meshes, { 0, meshes_y, 0 });
+//	}
+//
+//	for (uint32_t i = 1; i < 5; i++) {
+//
+//		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
+//
+//		for (MeshInstance* inst : meshes) {
+//
+//			MeshInstance* derive = application.copyInstance(inst);
+//			derive->pos = new_pos;
+//
+//			application.transferInstanceToDrawcall(derive, drawcalls[i]);
+//		}
+//	}
+//
+//	meshes_y -= 100;
+//
+//	// Duplicates
+//	{
+//		for (uint32_t i = 0; i < 5; i++) {
+//
+//			glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
+//
+//			MeshInstance* derive = application.copyInstance(primitives[1]);
+//			derive->pos = new_pos;
+//
+//			application.transferInstanceToDrawcall(derive, drawcalls[5 + i]);
+//		}
+//	}
+//
+//	meshes_y -= 250;
+//
+//	for (uint32_t i = 0; i < 5; i++) {
+//
+//		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
+//
+//		for (MeshInstance* inst : meshes) {
+//
+//			MeshInstance* derive = application.copyInstance(inst);
+//			derive->pos = new_pos;
+//
+//			application.transferInstanceToDrawcall(derive, drawcalls[5 + i]);
+//		}
+//	}
+//
+//	// Camera positions
+//	glm::vec2 center = { gap_space * (primitives.size() / 2), 0 };
+//
+//	application.setCameraPosition(center.x, center.y, 2000);
+//	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+//}
 
-void createTestScene_01()
+void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, void* user_data)
 {
-	application.shading_normal = ShadingNormal::TESSELATION;
+	printf("Test Scene: Create Triangle \n");
 
-	std::array<MeshDrawcall*, 10> drawcalls;
-	for (MeshDrawcall*& drawcall : drawcalls) {
-		drawcall = application.createDrawcall();
-	}
+	application.resetToHardcodedStartup();
 
-	drawcalls[0]->display_mode = DisplayMode::SOLID;
-	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
-	drawcalls[2]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
-	drawcalls[3]->display_mode = DisplayMode::WIREFRANE;
-	drawcalls[4]->display_mode = DisplayMode::WIREFRANE_PURE;
-
-	drawcalls[5]->display_mode = DisplayMode::SOLID;
-	drawcalls[5]->is_back_culled = true;
-
-	drawcalls[6]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
-	drawcalls[6]->is_back_culled = true;
-
-	drawcalls[7]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
-	drawcalls[7]->is_back_culled = true;
-
-	drawcalls[8]->display_mode = DisplayMode::WIREFRANE;
-	drawcalls[8]->is_back_culled = true;
-
-	drawcalls[9]->display_mode = DisplayMode::WIREFRANE_PURE;
-	drawcalls[9]->is_back_culled = true;
-
-	std::array<MeshInstance*, 5> primitives;
-
-	float gap_space = 120;
-	float primitive_size = 50;
-
-	// Triangle
-	{
-		CreateTriangleInfo info;
-		info.size = primitive_size;
-		info.transform.pos.x = 0;
-
-		primitives[0] = application.createTriangle(info, nullptr, drawcalls[0]);
-	}
-	
-	// Quad
-	{
-		CreateQuadInfo info;
-		info.size = primitive_size;
-		info.transform.pos.x = gap_space;
-
-		primitives[1] = application.createQuad(info, nullptr, drawcalls[1]);
-	}
-
-	// Cube
-	{
-		CreateCubeInfo info;
-		info.size = primitive_size;
-		info.transform.pos.x = gap_space * 2;
-
-		primitives[2] = application.createCube(info, nullptr, drawcalls[2]);
-	}
-
-	// Cylinder
-	{
-		CreateCylinderInfo info;
-		info.transform.pos.x = gap_space * 3;
-		info.diameter = primitive_size;
-		info.height = primitive_size;
-		info.rows = 16;
-		info.columns = 16;
-
-		primitives[3] = application.createCylinder(info, nullptr, drawcalls[3]);
-	}
-
-	// Sphere
-	{
-		CreateUV_SphereInfo info;
-		info.transform.pos.x = gap_space * 4;
-		info.diameter = primitive_size;
-		info.rows = 16;
-		info.columns = 16;
-		
-		primitives[4] = application.createUV_Sphere(info, nullptr, drawcalls[4]);
-	}
-
-	auto move_meshes = [](std::vector<MeshInstance*>& instances, glm::vec3 pos) {
-		for (MeshInstance* inst : instances) {
-			inst->pos = pos;
-		}
-	};
-
-	float meshes_y = -250;
-
-	// Loaded Mesh
-	std::vector<MeshInstance*> meshes;
-	{
-		io::FilePath path;
-		path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
-
-		GLTF_ImporterSettings settings;
-		settings.dest_drawcall = drawcalls[0];
-
-		ErrStack err_stack = application.importMeshesFromGLTF_File(path, settings, &meshes);
-		if (err_stack.isBad()) {
-			err_stack.debugPrint();
-			throw std::exception();
-		}
-
-		move_meshes(meshes, { 0, meshes_y, 0 });
-	}
-
-	for (uint32_t i = 1; i < 5; i++) {
-
-		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-
-		for (MeshInstance* inst : meshes) {
-
-			MeshInstance* copy = application.copyInstance(inst);
-			copy->pos = new_pos;
-
-			application.transferInstanceToDrawcall(copy, drawcalls[i]);
-		}
-	}
-
-	meshes_y -= 100;
-
-	// Duplicates
-	{
-		for (uint32_t i = 0; i < 5; i++) {
-
-			glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-
-			MeshInstance* copy = application.copyInstance(primitives[1]);
-			copy->pos = new_pos;
-
-			application.transferInstanceToDrawcall(copy, drawcalls[5 + i]);
-		}
-	}
-
-	meshes_y -= 250;
-
-	for (uint32_t i = 0; i < 5; i++) {
-
-		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-
-		for (MeshInstance* inst : meshes) {
-
-			MeshInstance* copy = application.copyInstance(inst);
-			copy->pos = new_pos;
-
-			application.transferInstanceToDrawcall(copy, drawcalls[5 + i]);
-		}
-	}
-
-	// Camera positions
-	glm::vec2 center = { gap_space * (primitives.size() / 2), 0 };
-
-	application.setCameraPosition(center.x, center.y, 2000);
-	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
-}
-
-void createTestScene_Triangle()
-{
-	application.shading_normal = ShadingNormal::TESSELATION;
+	application.shading_normal = ShadingNormal::POLY;
 
 	MeshDrawcall* drawcall = application.createDrawcall();
 	drawcall->display_mode = DisplayMode::SOLID;
@@ -251,18 +267,130 @@ void createTestScene_Triangle()
 	// Triangle
 	{
 		CreateTriangleInfo info;
-		info.size = 1;
-		info.transform.pos.x = 0;
-
 		application.createTriangle(info, nullptr, drawcall);
 	}
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
 
-	application.setCameraPosition(center.x, center.y, 5);
+	application.setCameraPosition(center.x, center.y, 10);
 	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
 }
+
+void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void* user_data)
+{
+	printf("Test Scene: Create Quad \n");
+
+	application.resetToHardcodedStartup();
+
+	application.shading_normal = ShadingNormal::POLY;
+
+	MeshDrawcall* drawcall = application.createDrawcall();
+	drawcall->display_mode = DisplayMode::SOLID;
+
+	// Triangle
+	{
+		CreateQuadInfo info;
+		application.createQuad(info, nullptr, drawcall);
+	}
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+
+	application.setCameraPosition(center.x, center.y, 10);
+	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+}
+
+void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void* user_data)
+{
+	printf("Test Scene: Create Cube \n");
+
+	application.resetToHardcodedStartup();
+
+	application.shading_normal = ShadingNormal::POLY;
+
+	MeshDrawcall* drawcall = application.createDrawcall();
+	drawcall->display_mode = DisplayMode::SOLID;
+	drawcall->is_back_culled = true;
+
+	// Triangle
+	{
+		CreateCubeInfo info;
+		application.createCube(info, nullptr, drawcall);
+	}
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+
+	application.setCameraPosition(center.x, center.y, 10);
+	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+}
+
+void createTestScene_DeleteVertex(nui::Window* window, nui::StoredElement* source, void* user_data)
+{
+	printf("Test Scene: Delete Vertex \n");
+
+	application.resetToHardcodedStartup();
+
+	application.shading_normal = ShadingNormal::POLY;
+
+	MeshDrawcall* drawcall = application.createDrawcall();
+	drawcall->display_mode = DisplayMode::SOLID;
+
+	// Triangle
+	{
+		CreateQuadInfo info;
+		MeshInstance* inst = application.createQuad(info, nullptr, drawcall);
+		
+		scme::SculptMesh& mesh = inst->instance_set->parent_mesh->mesh;
+	}
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+
+	application.setCameraPosition(center.x, center.y, 10);
+	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+}
+
+//
+//void createTestScene_Cube()
+//{
+//	application.shading_normal = ShadingNormal::TESSELATION;
+//
+//	MeshDrawcall* drawcall = application.createDrawcall();
+//	drawcall->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
+//
+//	// Triangle
+//	{
+//		CreateCubeInfo info;
+//		info.size = 1;
+//		info.transform.pos.x = 0;
+//
+//		application.createCube(info, nullptr, drawcall);
+//	}
+//
+//	// Camera positions
+//	glm::vec2 center = { 0, 0 };
+//
+//	application.setCameraPosition(center.x, center.y, 10);
+//	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+//}
+//
+//void createDebugLine()
+//{
+//	MeshDrawcall* drawcall = application.createDrawcall();
+//	drawcall->name = "Debug Line Drawcall";
+//	drawcall->display_mode = DisplayMode::WIREFRAME_PURE;
+//
+//	CreateLineInfo info;
+//	info.origin = { 0, 0, 0 };
+//	info.direction = { 0, 0, 1 };
+//	info.length = 1000.f;
+//
+//	MeshInstance* inst = application.createLine(info, nullptr, drawcall);
+//	inst->name = "Debug Line";
+//	inst->wireframe_colors.front_color = { 1, 0, 1 };
+//}
 
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
@@ -272,56 +400,10 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	render_doc.init();
 
 	// Application
-	{
-		// Instances
-		application.instance_id = 1;
+	application.resetToHardcodedStartup();
 
-		// Drawcalls
-		application.last_used_drawcall = application.createDrawcall();
-
-		// Layers
-		application.last_used_layer = &application.layers.emplace_back();
-		application.last_used_layer->parent = nullptr;
-
-		// Shading
-		application.shading_normal = ShadingNormal::TESSELATION;
-
-		// Lighting
-		application.lights[0].normal = toNormal(45, 45);
-		application.lights[0].color = { 1, 1, 1 };
-		application.lights[0].intensity = 1.f;
-
-		application.lights[1].normal = toNormal(-45, 45);
-		application.lights[1].color = { 1, 1, 1 };
-		application.lights[1].intensity = 1.f;
-
-		application.lights[2].normal = toNormal(45, -45);
-		application.lights[2].color = { 1, 1, 1 };
-		application.lights[2].intensity = 1.f;
-
-		application.lights[3].normal = toNormal(-45, -45);
-		application.lights[3].color = { 1, 1, 1 };
-		application.lights[3].intensity = 1.f;
-
-		application.lights[4].intensity = 0.f;
-		application.lights[5].intensity = 0.f;
-		application.lights[6].intensity = 0.f;
-		application.lights[7].intensity = 0.f;
-
-		application.ambient_intensity = 0.03f;
-
-		// Camera
-		application.camera_focus = { 0, 0, 0 };
-		application.camera_field_of_view = 15.f;
-		application.camera_z_near = 0.1f;
-		application.camera_z_far = 100'000.f;
-		application.camera_pos = { 0, 0, 0 };
-		application.camera_quat_inv = { 1, 0, 0, 0 };
-		application.camera_forward = { 0, 0, -1 };
-		application.camera_orbit_sensitivity = 0.01f;
-		application.camera_pan_sensitivity = 0.0001f;
-		application.camera_dolly_sensitivity = 0.001f;
-	}
+	//createTestScene_Triangle();
+	createTestScene_Cube(nullptr, nullptr, nullptr);
 
 	// User Interface
 	{
@@ -359,13 +441,46 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		// Camera Zoom
 		window_grid->setMouseScrollEvent(onCameraDollyScroll);
 
-		window_grid->setMouseMoveEvent(onMouseMove);
+		// Shading Normal
+		window_grid->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
+
+
+		// Test Scenes
+		window_grid->setKeyDownEvent(createTestScene_Triangle, nui::VirtualKeys::F1);
+		window_grid->setKeyDownEvent(createTestScene_Quad, nui::VirtualKeys::F2);
+		window_grid->setKeyDownEvent(createTestScene_Cube, nui::VirtualKeys::F3);
 	}
 
-	// Tests
+	// Alternative Vector
 	{
-		createTestScene_01();
-		//createTestScene_Triangle();
+
+		/*DeferredVector<GPU_MeshVertex> sparse_vector;
+		{
+			GPU_MeshVertex& ref = sparse_vector.emplace();
+			ref.poly_id = 0xBEEF'CAFE;
+		}
+		
+		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
+			printf("[%d] = %X \n", iter.index(), iter.get().poly_id);
+		}*/
+		/*
+		sparse_vector.erase(0);
+		sparse_vector.erase(1);
+		sparse_vector.erase(3);
+		sparse_vector.erase(4);
+
+		printf("\n");
+		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
+			printf("[%d] = %d \n", iter.index(), iter.get());
+		}
+
+		auto& added = sparse_vector.emplace();
+		added = 5;
+
+		printf("\n");
+		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
+			printf("[%d] = %d \n", iter.index(), iter.get());
+		}*/
 	}
 
 	application.ui_instance.min_frame_duration_ms = 16;
