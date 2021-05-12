@@ -326,9 +326,9 @@ void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void*
 	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
 }
 
-void createTestScene_DeleteVertex(nui::Window* window, nui::StoredElement* source, void* user_data)
+void createTestScene_DeletePoly(nui::Window* window, nui::StoredElement* source, void* user_data)
 {
-	printf("Test Scene: Delete Vertex \n");
+	printf("Test Scene: Delete Poly \n");
 
 	application.resetToHardcodedStartup();
 
@@ -339,10 +339,11 @@ void createTestScene_DeleteVertex(nui::Window* window, nui::StoredElement* sourc
 
 	// Triangle
 	{
-		CreateQuadInfo info;
-		MeshInstance* inst = application.createQuad(info, nullptr, drawcall);
+		CreateCubeInfo info;
+		MeshInstance* inst = application.createCube(info, nullptr, drawcall);
 		
 		scme::SculptMesh& mesh = inst->instance_set->parent_mesh->mesh;
+		mesh.deletePoly(0);
 	}
 
 	// Camera positions
@@ -352,30 +353,6 @@ void createTestScene_DeleteVertex(nui::Window* window, nui::StoredElement* sourc
 	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
 }
 
-//
-//void createTestScene_Cube()
-//{
-//	application.shading_normal = ShadingNormal::TESSELATION;
-//
-//	MeshDrawcall* drawcall = application.createDrawcall();
-//	drawcall->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
-//
-//	// Triangle
-//	{
-//		CreateCubeInfo info;
-//		info.size = 1;
-//		info.transform.pos.x = 0;
-//
-//		application.createCube(info, nullptr, drawcall);
-//	}
-//
-//	// Camera positions
-//	glm::vec2 center = { 0, 0 };
-//
-//	application.setCameraPosition(center.x, center.y, 10);
-//	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
-//}
-//
 //void createDebugLine()
 //{
 //	MeshDrawcall* drawcall = application.createDrawcall();
@@ -403,7 +380,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	application.resetToHardcodedStartup();
 
 	//createTestScene_Triangle();
-	createTestScene_Cube(nullptr, nullptr, nullptr);
+	createTestScene_Triangle(nullptr, nullptr, nullptr);
 
 	// User Interface
 	{
@@ -423,64 +400,132 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		window->setKeyDownEvent(renderDocTriggerCapture, nui::VirtualKeys::F11);
 
 		nui::Grid* window_grid = window->createGrid();
-		window_grid->size[0] = 90.f;
-		window_grid->size[1] = 90.f;
-		window_grid->coloring = nui::BackgroundColoring::RENDERING_SURFACE;
-		window_grid->setRenderingSurfaceEvent(geometryDraw);
+		window_grid->size[0] = 100.f;
+		window_grid->size[1] = 100.f;
+		window_grid->orientation = nui::GridOrientation::COLUMN;
+
+		nui::Menu* top_menu = window->createMenu(window_grid);
+		top_menu->z_index = 1;
+		top_menu->titles_background_color.setRGBA_UNORM(0.f, 0.05f, 0.05f, 1.f);
+		top_menu->select_background_color.setRGBA_UNORM(1.f, 1.f, 1.f, 0.05f);
+		{
+			uint32_t side_padding = 5;
+
+			nui::MenuItem* scene = top_menu->addItem(nullptr);
+			scene->text = "Scene";
+
+			// Scene
+			nui::MenuItem* create = top_menu->addItem(scene);
+			create->text = "New";
+
+			// New Test Scene
+			nui::MenuItem* new_test = top_menu->addItem(scene);
+			new_test->text = "New Test Scene";
+
+			nui::MenuItem* triangle_test = top_menu->addItem(new_test);
+			nui::MenuItem* quad_test = top_menu->addItem(new_test);
+			nui::MenuItem* cube_test = top_menu->addItem(new_test);
+			nui::MenuItem* cube_delete_poly_test = top_menu->addItem(new_test);
+			{
+				triangle_test->text = "Triangle";
+				quad_test->text = "Quad";
+				cube_test->text = "Cube";
+				cube_delete_poly_test->text = "Cube delete poly";
+			}
+
+			nui::MenuItem* load = top_menu->addItem(scene);
+			load->text = "Load";
+
+			nui::MenuItem* save = top_menu->addItem(scene);
+			save->text = "Save";
+
+			nui::MenuItem* save_as = top_menu->addItem(scene);
+			save_as->text = "Save as";
+
+			nui::MenuItem* instance_menu = top_menu->addItem(nullptr);
+			instance_menu->text = "Instance";
+
+			// Instance
+			nui::MenuItem* create_inst = top_menu->addItem(instance_menu);
+			create_inst->text = "Create";
+
+			nui::MenuItem* mesh_menu = top_menu->addItem(nullptr);
+			mesh_menu->text = "Mesh";
+
+			nui::MenuItem* layer_menu = top_menu->addItem(nullptr);
+			layer_menu->text = "Layer";
+
+			// Common Styles
+			std::array<nui::MenuItem*, 4> titles = {
+				scene,
+				instance_menu,
+				mesh_menu,
+				layer_menu
+			};
+
+			for (auto& title : titles) {
+				title->font_size = 17;
+				title->top_padding = 3;
+				title->bot_padding = 3;
+
+				title->left_padding = side_padding;
+				title->right_padding = side_padding;
+
+				title->menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+			}
+
+			std::array<nui::MenuItem*, 10> items = {
+				create,
+				new_test,
+				load,
+				save,
+				save_as,
+				create_inst,
+				triangle_test,
+				quad_test,
+				cube_test,
+				cube_delete_poly_test
+			};
+
+			for (auto& item : items) {
+				item->font_size = 17;
+				item->top_padding = 3;
+				item->bot_padding = 3;
+				item->left_padding = side_padding;
+				item->right_padding = side_padding;
+				item->menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+			}
+		}
+
+		// Viewport Grid
+		nui::Grid* viewport = window->createGrid(window_grid);
+		viewport->size[0] = 90.f;
+		viewport->size[1] = 90.f;
+		viewport->coloring = nui::BackgroundColoring::RENDERING_SURFACE;
+		viewport->setRenderingSurfaceEvent(geometryDraw);
 
 		// Camera Rotation
-		window_grid->setKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
-		window_grid->setKeyHeldDownEvent(onCameraOrbitKeyHeld, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
-		window_grid->setKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+		viewport->setKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+		viewport->setKeyHeldDownEvent(onCameraOrbitKeyHeld, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+		viewport->setKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
 
 		// Camera Pan
-		window_grid->setKeyDownEvent(onCameraPanKeyDown, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
-		window_grid->setKeyHeldDownEvent(onCameraPanKeyHeld, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
-		window_grid->setKeyUpEvent(onCameraPanKeyUp, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+		viewport->setKeyDownEvent(onCameraPanKeyDown, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+		viewport->setKeyHeldDownEvent(onCameraPanKeyHeld, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+		viewport->setKeyUpEvent(onCameraPanKeyUp, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
 
 		// Camera Zoom
-		window_grid->setMouseScrollEvent(onCameraDollyScroll);
+		viewport->setMouseScrollEvent(onCameraDollyScroll);
 
 		// Shading Normal
-		window_grid->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
+		viewport->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
 
 
 		// Test Scenes
-		window_grid->setKeyDownEvent(createTestScene_Triangle, nui::VirtualKeys::F1);
-		window_grid->setKeyDownEvent(createTestScene_Quad, nui::VirtualKeys::F2);
-		window_grid->setKeyDownEvent(createTestScene_Cube, nui::VirtualKeys::F3);
-	}
-
-	// Alternative Vector
-	{
-
-		/*DeferredVector<GPU_MeshVertex> sparse_vector;
-		{
-			GPU_MeshVertex& ref = sparse_vector.emplace();
-			ref.poly_id = 0xBEEF'CAFE;
-		}
-		
-		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
-			printf("[%d] = %X \n", iter.index(), iter.get().poly_id);
-		}*/
-		/*
-		sparse_vector.erase(0);
-		sparse_vector.erase(1);
-		sparse_vector.erase(3);
-		sparse_vector.erase(4);
-
-		printf("\n");
-		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
-			printf("[%d] = %d \n", iter.index(), iter.get());
-		}
-
-		auto& added = sparse_vector.emplace();
-		added = 5;
-
-		printf("\n");
-		for (auto iter = sparse_vector.begin(); iter != sparse_vector.end(); iter.next()) {
-			printf("[%d] = %d \n", iter.index(), iter.get());
-		}*/
+		viewport->setKeyDownEvent(createTestScene_Triangle, nui::VirtualKeys::F1);
+		viewport->setKeyDownEvent(createTestScene_Quad, nui::VirtualKeys::F2);
+		viewport->setKeyDownEvent(createTestScene_Cube, nui::VirtualKeys::F3);
+		viewport->setKeyDownEvent(createTestScene_DeletePoly, nui::VirtualKeys::F4);
 	}
 
 	application.ui_instance.min_frame_duration_ms = 16;

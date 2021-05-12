@@ -22,11 +22,6 @@ namespace nui {
 		int32_t advance_Y;
 
 		AtlasRegion* zone;
-
-		// Rendering
-		std::vector<GPU_CharacterVertex> verts;
-		uint32_t vertex_start_idx;  // location in the vertex buffer where to find vertices
-		uint32_t index_start_idx;  // location in the index buffer where to find indexes
 	};
 
 	struct FontSize {
@@ -37,9 +32,6 @@ namespace nui {
 		uint32_t line_spacing;
 
 		std::vector<Character> chars;
-
-		// Rendering
-		bool loaded_as_vertices;
 
 		Character* findCharacter(uint32_t unicode);
 	};

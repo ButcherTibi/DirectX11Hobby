@@ -28,17 +28,30 @@ void MeshRenderer::loadVertices()
 					gpu_verts.init_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 				}
 
-				gpu_verts.resize(sculpt_mesh.verts.size());
+				gpu_verts.resize(sculpt_mesh.verts.capacity());
 
 				for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
 
-					scme::Vertex& cpu_v = sculpt_mesh.verts[modified_v.idx];
+					switch (modified_v.state) {
+					case scme::ModifiedVertexState::UPDATE: {
+						scme::Vertex& cpu_v = sculpt_mesh.verts[modified_v.idx];
 
-					GPU_MeshVertex gpu_v;
-					gpu_v.pos = dxConvert(cpu_v.pos);
-					gpu_v.normal = dxConvert(cpu_v.normal);
+						GPU_MeshVertex gpu_v;
+						gpu_v.pos = dxConvert(cpu_v.pos);
+						gpu_v.normal = dxConvert(cpu_v.normal);
 
-					gpu_verts.update(modified_v.idx, gpu_v);
+						gpu_verts.update(modified_v.idx, gpu_v);
+						break;
+					}
+
+					case scme::ModifiedVertexState::DELETED: {
+						GPU_MeshVertex gpu_v;
+						gpu_v.normal.x = 999'999.f;
+
+						gpu_verts.update(modified_v.idx, gpu_v);
+						break;
+					}
+					}
 				}
 
 				sculpt_mesh.modified_verts.clear();
@@ -68,48 +81,71 @@ void MeshRenderer::loadVertices()
 
 					scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
 
-					scme::Loop& l0 = sculpt_mesh.loops[poly.inner_loop];
-					scme::Loop& l1 = sculpt_mesh.loops[l0.poly_next_loop];
-					scme::Loop& l2 = sculpt_mesh.loops[l1.poly_next_loop];
+					switch (modified_poly.state) {
+					case scme::ModifiedPolyState::UPDATE: {
 
-					if (poly.is_tris) {
+						scme::Edge& edge_0 = sculpt_mesh.edges[poly.edges[0]];
+						scme::Edge& edge_1 = sculpt_mesh.edges[poly.edges[1]];
+						scme::Edge& edge_2 = sculpt_mesh.edges[poly.edges[2]];
 
-						gpu_indexs.update(6 * modified_poly.idx,     l0.target_v);
-						gpu_indexs.update(6 * modified_poly.idx + 1, l1.target_v);
-						gpu_indexs.update(6 * modified_poly.idx + 2, l2.target_v);
+						uint32_t v0_idx = poly.flip_edge_0 ? edge_0.v1 : edge_0.v0;
+						uint32_t v1_idx = poly.flip_edge_1 ? edge_1.v1 : edge_1.v0;
+						uint32_t v2_idx = poly.flip_edge_2 ? edge_2.v1 : edge_2.v0;
+
+						if (poly.is_tris) {
+
+							gpu_indexs.update(6 * modified_poly.idx + 0, v0_idx);
+							gpu_indexs.update(6 * modified_poly.idx + 1, v1_idx);
+							gpu_indexs.update(6 * modified_poly.idx + 2, v2_idx);
+
+							uint32_t zero = 0;
+							gpu_indexs.update(6 * modified_poly.idx + 3, zero);
+							gpu_indexs.update(6 * modified_poly.idx + 4, zero);
+							gpu_indexs.update(6 * modified_poly.idx + 5, zero);
+						}
+						else {
+							scme::Edge& edge_3 = sculpt_mesh.edges[poly.edges[3]];
+							uint32_t v3_idx = poly.flip_edge_3 ? edge_3.v1 : edge_3.v0;
+
+							if (poly.tesselation_type == 0) {
+
+								gpu_indexs.update(6 * modified_poly.idx + 0, v0_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 1, v2_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 2, v3_idx);
+
+								gpu_indexs.update(6 * modified_poly.idx + 3, v0_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 4, v1_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 5, v2_idx);
+							}
+							else {
+								gpu_indexs.update(6 * modified_poly.idx + 0, v0_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 1, v1_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 2, v3_idx);
+
+								gpu_indexs.update(6 * modified_poly.idx + 3, v1_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 4, v2_idx);
+								gpu_indexs.update(6 * modified_poly.idx + 5, v3_idx);
+							}
+						}
+						break;
+					}
+
+					case scme::ModifiedPolyState::DELETED: {
 
 						uint32_t zero = 0;
+						gpu_indexs.update(6 * modified_poly.idx + 0, zero);
+						gpu_indexs.update(6 * modified_poly.idx + 1, zero);
+						gpu_indexs.update(6 * modified_poly.idx + 2, zero);
+
 						gpu_indexs.update(6 * modified_poly.idx + 3, zero);
 						gpu_indexs.update(6 * modified_poly.idx + 4, zero);
 						gpu_indexs.update(6 * modified_poly.idx + 5, zero);
+						break;
 					}
-					else {
-						scme::Loop& l3 = sculpt_mesh.loops[l2.poly_next_loop];
-
-						if (poly.tesselation_type == 0) {
-							
-							gpu_indexs.update(6 * modified_poly.idx,     l0.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 1, l2.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 2, l3.target_v);
-
-							gpu_indexs.update(6 * modified_poly.idx + 3, l0.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 4, l1.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 5, l2.target_v);
-						}
-						else {
-							gpu_indexs.update(6 * modified_poly.idx,     l0.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 1, l1.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 2, l3.target_v);
-
-							gpu_indexs.update(6 * modified_poly.idx + 3, l1.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 4, l2.target_v);
-							gpu_indexs.update(6 * modified_poly.idx + 5, l3.target_v);
-						}
 					}
 				}
 
 				// Triangles
-
 				if (application.shading_normal != ShadingNormal::VERTEX) {
 
 					auto& gpu_triangles = sculpt_mesh.gpu_triangles;
@@ -180,7 +216,7 @@ void MeshRenderer::loadVertices()
 						desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
 						desc.Buffer.ElementOffset = 0;
 						desc.Buffer.ElementWidth = sizeof(GPU_MeshTriangle);
-						desc.Buffer.NumElements = sculpt_mesh.gpu_triangles.size();
+						desc.Buffer.NumElements = sculpt_mesh.gpu_triangles.size();  // this may not be correct
 
 						throwDX11(dev5->CreateShaderResourceView(
 							sculpt_mesh.gpu_triangles.get(), &desc, sculpt_mesh.gpu_triangles_srv.GetAddressOf()));

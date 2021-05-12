@@ -8,13 +8,13 @@ using namespace scme;
 
 void Vertex::init()
 {
-	away_loop = 0xFFFF'FFFF;
+	edge = 0xFFFF'FFFF;
 	aabb = 0xFFFF'FFFF;
 }
 
 bool Vertex::isPoint()
 {
-	return away_loop == 0xFFFF'FFFF;
+	return edge == 0xFFFF'FFFF;
 }
 
 bool VertexBoundingBox::isUnused()
@@ -27,39 +27,89 @@ bool VertexBoundingBox::isLeaf()
 	return children[0] == 0xFFFF'FFFF;
 }
 
-void SculptMesh::calcVertexNormal(Vertex* vertex)
+uint32_t& Edge::nextEdgeOf(uint32_t vertex_idx)
 {
-	// Vertex& vertex = verts[v];
+	if (v0 == vertex_idx) {
+		return v0_next_edge;
+	}
 
-	if (vertex->away_loop == 0xFFFF'FFFF) {
+	return v1_next_edge;
+}
+
+uint32_t& Edge::prevEdgeOf(uint32_t vertex_idx)
+{
+	if (v0 == vertex_idx) {
+		return v0_prev_edge;
+	}
+
+	return v1_prev_edge;
+}
+
+void Edge::setPrevNextEdges(uint32_t vertex_idx, uint32_t prev_edge_idx, uint32_t next_edge_idx)
+{
+	if (v0 == vertex_idx) {
+		v0_prev_edge = prev_edge_idx;
+		v0_next_edge = next_edge_idx;
+	}
+	else {
+		v1_prev_edge = prev_edge_idx;
+		v1_next_edge = next_edge_idx;
+	}
+}
+
+void SculptMesh::_deleteVertexMemory(uint32_t vertex_idx)
+{
+	verts.erase(vertex_idx);
+
+	ModifiedVertex& modified_vertex = modified_verts.emplace_back();
+	modified_vertex.idx = vertex_idx;
+	modified_vertex.state = ModifiedVertexState::DELETED;
+}
+
+void SculptMesh::_deleteEdgeMemory(uint32_t edge_idx)
+{
+	edges.erase(edge_idx);
+}
+
+void SculptMesh::_deletePolyMemory(uint32_t poly_idx)
+{
+	polys.erase(poly_idx);
+
+	ModifiedPoly& modified_poly = modified_polys.emplace_back();
+	modified_poly.idx = poly_idx;
+	modified_poly.state = ModifiedPolyState::DELETED;
+}
+
+void SculptMesh::calcVertexNormal(uint32_t vertex_idx)
+{
+	Vertex* vertex = &verts[vertex_idx];
+
+	if (vertex->edge == 0xFFFF'FFFF) {
 		return;
 	}
 
 	uint32_t count = 0;
 	vertex->normal = { 0, 0, 0 };
 
-	uint32_t loop_idx = vertex->away_loop;
-	Loop* loop = &loops[loop_idx];
+	uint32_t edge_idx = vertex->edge;
+	Edge* edge = &edges[edge_idx];
 
-	// Iterate around Vertex
-	do {
-		// Iterate around Loop
-		uint32_t mirror_loop_idx = loop->mirror_loop;
-		Loop* mirror_loop = &loops[mirror_loop_idx];
-
-		do {
+	iterEdgesAroundVertexStart;
+	{
+		Poly* poly;
+		if (edge->p0 != 0xFFFF'FFFF) {
+			poly = &polys[edge->p0];
+			vertex->normal += poly->normal;
 			count++;
-			vertex->normal += polys[mirror_loop->poly].normal;
+		}
 
-			mirror_loop_idx = mirror_loop->mirror_loop;
-			mirror_loop = &loops[mirror_loop_idx];
-
-		} while (mirror_loop_idx != loop->mirror_loop);
-		
-		loop_idx = loop->v_next_loop;
-		loop = &loops[loop_idx];
+		if (edge->p1 != 0xFFFF'FFFF) {
+			poly = &polys[edge->p1];
+			vertex->normal += poly->normal;
+			count++;
+		}
 	}
-	while (loop_idx != vertex->away_loop);
+	iterEdgesAroundVertexEnd(vertex_idx, vertex->edge);
 
 	vertex->normal /= count;
 	vertex->normal = glm::normalize(vertex->normal);
@@ -74,15 +124,15 @@ void SculptMesh::markVertexFullUpdate(uint32_t vertex)
 
 void SculptMesh::deleteVertex(uint32_t vertex_idx)
 {
-	Vertex* vertex = &verts[vertex_idx];
+	//Vertex* vertex = &verts[vertex_idx];
 
-	// vertex is point
-	if (vertex->away_loop == 0xFFFF'FFFF) {
-		throw std::exception("TODO");
-		return;
-	}
+	//// vertex is point
+	//if (vertex->away_loop == 0xFFFF'FFFF) {
+	//	throw std::exception("TODO");
+	//	return;
+	//}
 
-	Loop* start_loop = &loops[vertex->away_loop];
+	//Loop* start_loop = &loops[vertex->away_loop];
 
 	// iter around vertex
 	// for each delete_loop
@@ -223,7 +273,6 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 							child_aabb.children[0] = 0xFFFF'FFFF;
 							child_aabb.verts_deleted_count = 0;
 							child_aabb.verts.reserve(max_vertices_in_AABB / 4);
-							child_aabb._debug_show_tesselation = false;
 
 							// transfer the vertex to one of child AABBs
 							if (!found && child_aabb.aabb.isPositionInside(vertex.pos)) {
@@ -283,27 +332,42 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 	}
 }
 
-uint32_t SculptMesh::findLoopFromTo(uint32_t src_v, uint32_t target_v)
-{
-	Vertex& src_vertex = verts[src_v];
 
-	// vertex is a point
-	if (src_vertex.away_loop == 0xFFFF'FFFF) {
+
+uint32_t SculptMesh::findEdgeBetween(uint32_t v0_idx, uint32_t v1_idx)
+{
+	Vertex& vertex_0 = verts[v0_idx];
+	Vertex& vertex_1 = verts[v1_idx];
+
+	if (vertex_0.edge == 0xFFFF'FFFF || vertex_1.edge == 0xFFFF'FFFF) {
 		return 0xFFFF'FFFF;
 	}
 
-	uint32_t loop_idx = src_vertex.away_loop;
-	Loop* loop = &loops[loop_idx];
+	uint32_t edge_idx = vertex_0.edge;
+	Edge* edge = &edges[edge_idx];
 
-	do {
-		if (loop->target_v == target_v) {
-			return loop_idx;
+	iterEdgesAroundVertexStart;
+	{
+		if ((edge->v0 == v0_idx && edge->v1 == v1_idx) ||
+			(edge->v0 == v1_idx && edge->v1 == v0_idx))
+		{
+			return edge_idx;
 		}
-
-		loop_idx = loop->v_next_loop;
-		loop = &loops[loop_idx];
 	}
-	while (loop_idx != src_vertex.away_loop);
+	iterEdgesAroundVertexEnd(v0_idx, vertex_0.edge);
+
+	edge_idx = vertex_1.edge;
+	edge = &edges[edge_idx];
+
+	iterEdgesAroundVertexStart;
+	{
+		if ((edge->v0 == v0_idx && edge->v1 == v1_idx) ||
+			(edge->v0 == v1_idx && edge->v1 == v0_idx))
+		{
+			return edge_idx;
+		}
+	}
+	iterEdgesAroundVertexEnd(v1_idx, vertex_1.edge);
 
 	return 0xFFFF'FFFF;
 }
@@ -316,83 +380,97 @@ glm::vec3 calcNormalForTrisPositions(Vertex* v0, Vertex* v1, Vertex* v2)
 	return glm::normalize(-glm::cross(dir_0, dir_1));
 }
 
-void SculptMesh::registerLoopToSourceVertexList(uint32_t away_loop_idx, uint32_t vertex_idx)
+void SculptMesh::registerEdgeToVertexList(uint32_t new_edge_idx, uint32_t vertex_idx)
 {
-	Loop& new_loop = loops[away_loop_idx];
+	Edge& new_edge = edges[new_edge_idx];
 	Vertex& vertex = verts[vertex_idx];
 
 	// if vertex is point then vertex loop list is unused
-	if (vertex.away_loop == 0xFFFF'FFFF) {
+	if (vertex.edge == 0xFFFF'FFFF) {
 
-		new_loop.v_next_loop = away_loop_idx;
-		vertex.away_loop = away_loop_idx;
+		new_edge.setPrevNextEdges(vertex_idx, new_edge_idx, new_edge_idx);
+		vertex.edge = new_edge_idx;
 	}
 	else {
-		Loop& old_loop = loops[vertex.away_loop];
+		uint32_t prev_edge_idx = vertex.edge;
+		Edge& prev_edge = edges[prev_edge_idx];
 
-		// new ---> next
-		new_loop.v_next_loop = old_loop.v_next_loop;
+		uint32_t next_edge_idx = prev_edge.nextEdgeOf(vertex_idx);
+		Edge& next_edge = edges[next_edge_idx];
 
-		// old ---> new
-		old_loop.v_next_loop = away_loop_idx;
+		// prev <--- new ---> next
+		new_edge.setPrevNextEdges(vertex_idx, prev_edge_idx, next_edge_idx);
+
+		// prev ---> new <--- next
+		prev_edge.nextEdgeOf(vertex_idx) = new_edge_idx;
+		next_edge.prevEdgeOf(vertex_idx) = new_edge_idx;
 	}
 }
 
-void SculptMesh::registerLoopToMirrorLoopList(uint32_t new_loop_idx, uint32_t existing_loop_idx)
+void SculptMesh::unregisterEdgeFromVertexList(Edge* delete_edge, uint32_t vertex_idx, Vertex* vertex)
 {
-	Loop& new_loop = loops[new_loop_idx];
-	Loop& existing_loop = loops[existing_loop_idx];
+	if (vertex->edge != 0xFFFF'FFFF) {
 
-	// new ---> next
-	new_loop.mirror_loop = existing_loop.mirror_loop;
+		uint32_t prev_edge_idx = delete_edge->prevEdgeOf(vertex_idx);
+		uint32_t next_edge_idx = delete_edge->nextEdgeOf(vertex_idx);
 
-	// old ---> new
-	existing_loop.mirror_loop = new_loop_idx;
+		Edge& prev_edge = edges[prev_edge_idx];
+		Edge& next_edge = edges[next_edge_idx];
+
+		// prev <---> next
+		prev_edge.nextEdgeOf(vertex_idx) = next_edge_idx;
+		next_edge.prevEdgeOf(vertex_idx) = prev_edge_idx;
+	}
 }
 
-uint32_t SculptMesh::createLoop(uint32_t src_v, uint32_t target_v)
+void SculptMesh::registerPolyToEdge(uint32_t new_poly_idx, uint32_t edge_idx)
 {
-	uint32_t new_loop_idx = (uint32_t)loops.size();
-	Loop* new_loop = &loops.emplace_back();
-	new_loop->target_v = src_v;
-	new_loop->poly = 0xFFFF'FFFF;
-
-	registerLoopToSourceVertexList(new_loop_idx, src_v);
-
-	uint32_t reverse_loop = findLoopFromTo(target_v, src_v);
-	if (reverse_loop != 0xFFFF'FFFF) {
-
-		registerLoopToMirrorLoopList(new_loop_idx, reverse_loop);
+	Edge& edge = edges[edge_idx];
+	if (edge.p0 == 0xFFFF'FFFF) {
+		edge.p0 = new_poly_idx;
 	}
 	else {
-		new_loop->mirror_loop = new_loop_idx;  // point to itself
+		edge.p1 = new_poly_idx;
 	}
+}
 
+void SculptMesh::unregisterPolyFromEdge(uint32_t delete_poly_idx, uint32_t edge_idx)
+{
+	Edge& edge = edges[edge_idx];
+	if (edge.p0 == delete_poly_idx) {
+		edge.p0 = 0xFFFF'FFFF;
+	}
+	else {
+		edge.p1 = 0xFFFF'FFFF;
+	}
+}
+
+uint32_t SculptMesh::createEdge(uint32_t v0, uint32_t v1)
+{
+	uint32_t new_loop_idx;;
+	edges.emplace(new_loop_idx);
+
+	setEdge(new_loop_idx, v0, v1);
 	return new_loop_idx;
 }
 
-void SculptMesh::setLoop(uint32_t existing_loop_idx, uint32_t src_v, uint32_t target_v)
+void SculptMesh::setEdge(uint32_t existing_edge_idx, uint32_t v0_idx, uint32_t v1_idx)
 {
-	Loop* existing_loop = &loops[existing_loop_idx];
-	existing_loop->target_v = src_v;
-	existing_loop->poly = 0xFFFF'FFFF;
+	Edge* existing_edge = &edges[existing_edge_idx];
+	existing_edge->v0 = v0_idx;
+	existing_edge->v1 = v1_idx;
+	existing_edge->p0 = 0xFFFF'FFFF;
+	existing_edge->p1 = 0xFFFF'FFFF;
 
-	registerLoopToSourceVertexList(existing_loop_idx, src_v);
-
-	uint32_t reverse_loop = findLoopFromTo(target_v, src_v);
-	if (reverse_loop != 0xFFFF'FFFF) {
-
-	}
-	else {
-		existing_loop->mirror_loop = 0xFFFF'FFFF;
-	}
+	registerEdgeToVertexList(existing_edge_idx, v0_idx);
+	registerEdgeToVertexList(existing_edge_idx, v1_idx);
 }
 
-uint32_t SculptMesh::addLoop(uint32_t src_v, uint32_t target_v)
+uint32_t SculptMesh::addEdge(uint32_t v0, uint32_t v1)
 {
-	uint32_t existing_loop = findLoopFromTo(src_v, target_v);
+	uint32_t existing_loop = findEdgeBetween(v0, v1);
 	if (existing_loop == 0xFFFF'FFFF) {
-		return createLoop(src_v, target_v);
+		return createEdge(v0, v1);
 	}
 	
 	return existing_loop;
@@ -405,7 +483,7 @@ glm::vec3 SculptMesh::calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2)
 
 void SculptMesh::recalcPolyNormal(Poly* poly)
 {
-	if (poly->is_tris) {
+	/*if (poly->is_tris) {
 
 		std::array<Vertex*, 3> tris_vs;
 
@@ -453,7 +531,7 @@ void SculptMesh::recalcPolyNormal(Poly* poly)
 		}
 
 		poly->normal = glm::normalize((poly->tess_normals[0] + poly->tess_normals[1]) / 2.f);
-	}
+	}*/
 }
 
 void SculptMesh::markPolyFullUpdate(uint32_t poly)
@@ -468,196 +546,91 @@ uint32_t SculptMesh::addTris(uint32_t v0, uint32_t v1, uint32_t v2)
 	uint32_t new_poly_idx;
 	Poly& new_poly = this->polys.emplace(new_poly_idx);
 	new_poly.is_tris = 1;
+	new_poly.edges[0] = addEdge(v0, v1);
+	new_poly.edges[1] = addEdge(v1, v2);
+	new_poly.edges[2] = addEdge(v2, v0);
 
-	uint32_t ls_idx[3];
-	ls_idx[0] = addLoop(v0, v1);
-	ls_idx[1] = addLoop(v1, v2);
-	ls_idx[2] = addLoop(v2, v0);
+	Edge* edge = &edges[new_poly.edges[0]];
+	new_poly.flip_edge_0 = edge->v0 != v0;
 
-	Loop* ls[3];
-	ls[0] = &loops[ls_idx[0]];
-	ls[1] = &loops[ls_idx[1]];
-	ls[2] = &loops[ls_idx[2]];
+	edge = &edges[new_poly.edges[1]];
+	new_poly.flip_edge_1 = edge->v0 != v1;
 
-	// Register poly to loops
-	ls[0]->poly_next_loop = ls_idx[1];
-	ls[0]->poly_prev_loop = ls_idx[2];
+	edge = &edges[new_poly.edges[2]];
+	new_poly.flip_edge_2 = edge->v0 != v2;
 
-	ls[1]->poly_next_loop = ls_idx[2];
-	ls[1]->poly_prev_loop = ls_idx[0];
-
-	ls[2]->poly_next_loop = ls_idx[0];
-	ls[2]->poly_prev_loop = ls_idx[1];
-
-	for (uint8_t i = 0; i < 3; i++) {
-		ls[i]->poly = new_poly_idx;
-	}
+	registerPolyToEdge(new_poly_idx, new_poly.edges[0]);
+	registerPolyToEdge(new_poly_idx, new_poly.edges[1]);
+	registerPolyToEdge(new_poly_idx, new_poly.edges[2]);
 
 	// Calculate tris normal
-	Vertex* vertex_0 = &verts[ls[0]->target_v];
-	Vertex* vertex_1 = &verts[ls[1]->target_v];
-	Vertex* vertex_2 = &verts[ls[2]->target_v];
-
+	Vertex* vertex_0 = &verts[v0];
+	Vertex* vertex_1 = &verts[v1];
+	Vertex* vertex_2 = &verts[v2];
 	new_poly.normal = calcWindingNormal(vertex_0, vertex_1, vertex_2);
-	new_poly.inner_loop = ls_idx[0];
 
 	markPolyFullUpdate(new_poly_idx);
 
 	return new_poly_idx;
 }
 
-void SculptMesh::setTris(uint32_t tris, uint32_t l0, uint32_t l1, uint32_t l2,
-	uint32_t v0, uint32_t v1, uint32_t v2)
+void SculptMesh::setQuad(uint32_t new_quad_idx, uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3)
 {
-	uint32_t new_poly_idx = tris;
-	Poly& new_poly = polys[new_poly_idx];
-	new_poly.is_tris = 1;
-	new_poly.inner_loop = l0;
+	Poly& new_quad = polys[new_quad_idx];
+	new_quad.is_tris = false;
+	new_quad.edges[0] = addEdge(v0, v1);
+	new_quad.edges[1] = addEdge(v1, v2);
+	new_quad.edges[2] = addEdge(v2, v3);
+	new_quad.edges[3] = addEdge(v3, v0);
 
-	setLoop(l0, v0, v1);
-	setLoop(l1, v1, v2);
-	setLoop(l2, v2, v0);
+	Edge* edge = &edges[new_quad.edges[0]];
+	new_quad.flip_edge_0 = edge->v0 != v0;
 
-	Loop* ls[3];
-	ls[0] = &loops[l0];
-	ls[1] = &loops[l1];
-	ls[2] = &loops[l2];
+	edge = &edges[new_quad.edges[1]];
+	new_quad.flip_edge_1 = edge->v0 != v1;
 
-	// Register poly to loops
-	ls[0]->poly_next_loop = l1;
-	ls[0]->poly_prev_loop = l2;
+	edge = &edges[new_quad.edges[2]];
+	new_quad.flip_edge_2 = edge->v0 != v2;
 
-	ls[1]->poly_next_loop = l2;
-	ls[1]->poly_prev_loop = l0;
+	edge = &edges[new_quad.edges[3]];
+	new_quad.flip_edge_3 = edge->v0 != v3;
 
-	ls[2]->poly_next_loop = l0;
-	ls[2]->poly_prev_loop = l1;
-
-	for (uint8_t i = 0; i < 3; i++) {
-		ls[i]->poly = new_poly_idx;
-	}
-
-	// Calculate tris normal
-	Vertex* vertex_0 = &verts[ls[0]->target_v];
-	Vertex* vertex_1 = &verts[ls[1]->target_v];
-	Vertex* vertex_2 = &verts[ls[2]->target_v];
-
-	new_poly.normal = calcWindingNormal(vertex_0, vertex_1, vertex_2);
-
-	markPolyFullUpdate(tris);
-}
-
-void SculptMesh::setQuad(uint32_t quad, uint32_t l0, uint32_t l1, uint32_t l2, uint32_t l3,
-	uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3)
-{
-	uint32_t new_poly_idx = quad;
-	Poly& new_poly = polys[new_poly_idx];
-	new_poly.inner_loop = l0;
-	new_poly.is_tris = 0;
-
-	setLoop(l0, v0, v1);
-	setLoop(l1, v1, v2);
-	setLoop(l2, v2, v3);
-	setLoop(l3, v3, v0);
-
-	Loop* ls[4];
-	ls[0] = &loops[l0];
-	ls[1] = &loops[l1];
-	ls[2] = &loops[l2];
-	ls[3] = &loops[l3];
-
-	// Register poly to loops
-	ls[0]->poly_next_loop = l1;
-	ls[0]->poly_prev_loop = l3;
-
-	ls[1]->poly_next_loop = l2;
-	ls[1]->poly_prev_loop = l0;
-
-	ls[2]->poly_next_loop = l3;
-	ls[2]->poly_prev_loop = l1;
-
-	ls[3]->poly_next_loop = l0;
-	ls[3]->poly_prev_loop = l2;
-
-	for (uint8_t i = 0; i < 4; i++) {
-		ls[i]->poly = new_poly_idx;
-	}
+	registerPolyToEdge(new_quad_idx, new_quad.edges[0]);
+	registerPolyToEdge(new_quad_idx, new_quad.edges[1]);
+	registerPolyToEdge(new_quad_idx, new_quad.edges[2]);
+	registerPolyToEdge(new_quad_idx, new_quad.edges[3]);
 
 	// Calculate quad normals
-	Vertex* vertex_0 = &verts[ls[0]->target_v];
-	Vertex* vertex_1 = &verts[ls[1]->target_v];
-	Vertex* vertex_2 = &verts[ls[2]->target_v];
-	Vertex* vertex_3 = &verts[ls[3]->target_v];
+	Vertex* vertex_0 = &verts[v0];
+	Vertex* vertex_1 = &verts[v1];
+	Vertex* vertex_2 = &verts[v2];
+	Vertex* vertex_3 = &verts[v3];
 
 	if (glm::distance(vertex_0->pos, vertex_2->pos) < glm::distance(vertex_1->pos, vertex_3->pos)) {
 
-		new_poly.tesselation_type = 0;
-		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_2);
-		new_poly.tess_normals[1] = calcWindingNormal(vertex_0, vertex_2, vertex_3);
+		new_quad.tesselation_type = 0;
+		new_quad.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_2);
+		new_quad.tess_normals[1] = calcWindingNormal(vertex_0, vertex_2, vertex_3);
 	}
 	else {
-		new_poly.tesselation_type = 1;
-		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_3);
-		new_poly.tess_normals[1] = calcWindingNormal(vertex_1, vertex_2, vertex_3);
+		new_quad.tesselation_type = 1;
+		new_quad.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_3);
+		new_quad.tess_normals[1] = calcWindingNormal(vertex_1, vertex_2, vertex_3);
 	}
 
-	new_poly.normal = glm::normalize((new_poly.tess_normals[0] + new_poly.tess_normals[1]) / 2.f);
+	new_quad.normal = glm::normalize((new_quad.tess_normals[0] + new_quad.tess_normals[1]) / 2.f);
 
-	markPolyFullUpdate(quad);
+	markPolyFullUpdate(new_quad_idx);
 }
 
 uint32_t SculptMesh::addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3)
 {
-	uint32_t new_poly_idx;
-	Poly& new_poly = this->polys.emplace(new_poly_idx);
-	new_poly.is_tris = 0;
+	uint32_t new_quad_idx;
+	polys.emplace(new_quad_idx);
+	
+	setQuad(new_quad_idx, v0, v1, v2, v3);
 
-	uint32_t ls_idx[4];
-	ls_idx[0] = addLoop(v0, v1);
-	ls_idx[1] = addLoop(v1, v2);
-	ls_idx[2] = addLoop(v2, v3);
-	ls_idx[3] = addLoop(v3, v0);
-
-	Loop* ls[4];
-	ls[0] = &loops[ls_idx[0]];
-	ls[1] = &loops[ls_idx[1]];
-	ls[2] = &loops[ls_idx[2]];
-	ls[3] = &loops[ls_idx[3]];
-
-	// Register poly to loops
-	ls[0]->poly_next_loop = ls_idx[1];
-	ls[1]->poly_next_loop = ls_idx[2];
-	ls[2]->poly_next_loop = ls_idx[3];
-	ls[3]->poly_next_loop = ls_idx[0];
-
-	for (uint8_t i = 0; i < 4; i++) {
-		ls[i]->poly = new_poly_idx;
-	}
-
-	// Calculate quad normals
-	Vertex* vertex_0 = &verts[ls[0]->target_v];
-	Vertex* vertex_1 = &verts[ls[1]->target_v];
-	Vertex* vertex_2 = &verts[ls[2]->target_v];
-	Vertex* vertex_3 = &verts[ls[3]->target_v];
-
-	if (glm::distance(vertex_0->pos, vertex_2->pos) < glm::distance(vertex_1->pos, vertex_3->pos)) {
-
-		new_poly.tesselation_type = 0;
-		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_2);
-		new_poly.tess_normals[1] = calcWindingNormal(vertex_0, vertex_2, vertex_3);
-	}
-	else {
-		new_poly.tesselation_type = 1;
-		new_poly.tess_normals[0] = calcWindingNormal(vertex_0, vertex_1, vertex_3);
-		new_poly.tess_normals[1] = calcWindingNormal(vertex_1, vertex_2, vertex_3);
-	}
-
-	new_poly.normal = glm::normalize((new_poly.tess_normals[0] + new_poly.tess_normals[1]) / 2.f);
-	new_poly.inner_loop = ls_idx[0];
-
-	markPolyFullUpdate(new_poly_idx);
-
-	return new_poly_idx;
+	return new_quad_idx;
 }
 
 void SculptMesh::stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t target)
@@ -674,7 +647,52 @@ void SculptMesh::stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, ui
 	addTris(vertices[last], target, vertices[0]);
 }
 
-void SculptMesh::deletePoly(uint32_t poly)
+void SculptMesh::deletePoly(uint32_t delete_poly_idx)
 {
-	// @HERE
+	Poly* delete_poly = &polys[delete_poly_idx];
+	
+	uint32_t count;
+	if (delete_poly->is_tris) {
+		count = 3;
+	}
+	else {
+		count = 4;
+	}
+
+	for (uint8_t i = 0; i < count; i++) {
+
+		uint32_t edge_idx = delete_poly->edges[i];
+		Edge* edge = &edges[edge_idx];
+
+		Vertex* vertex = &verts[edge->v0];
+		unregisterEdgeFromVertexList(edge, edge->v0, vertex);
+
+		if (edge->nextEdgeOf(edge->v0) == edge_idx) {
+			_deleteVertexMemory(edge->v0);
+		}
+
+		vertex = &verts[edge->v1];
+		unregisterEdgeFromVertexList(edge, edge->v1, vertex);
+
+		if (edge->nextEdgeOf(edge->v1) == edge_idx) {
+			_deleteVertexMemory(edge->v1);
+		}
+
+		// unregister poly from edge
+		// because edge is part of poly one poly reference will reference poly
+		if (edge->p0 == delete_poly_idx) {
+			edge->p0 = 0xFFFF'FFFF;
+		}
+		else {
+			edge->p1 = 0xFFFF'FFFF;
+		}
+
+		// edge is wire
+		if (edge->p0 == edge->p1) {
+			_deleteEdgeMemory(edge_idx);
+		}
+	}
+
+	// Now no edges reference the poly so we can safely delete the polygon
+	_deletePolyMemory(delete_poly_idx);
 }

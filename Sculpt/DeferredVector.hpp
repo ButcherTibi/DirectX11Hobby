@@ -374,6 +374,11 @@ public:
 		return elems[idx].elem;
 	}
 
+	T& back()
+	{
+		return elems[_last_index].elem;
+	}
+
 	SparseVectorIterator<T> begin()
 	{
 		SparseVectorIterator<T> iter;

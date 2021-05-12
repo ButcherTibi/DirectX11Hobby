@@ -10,3 +10,4 @@ float nui::toRadians(float degrees)
 {
 	return degrees * ((float)M_PI / 180.f);
 }
+

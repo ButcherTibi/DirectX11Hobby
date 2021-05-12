@@ -13,9 +13,9 @@ DirectX::XMINT2 nui::toXM(glm::ivec2& value)
 	return { value.x, value.y };
 }
 
-DirectX::XMINT2 nui::toXM(uint32_t x, int32_t y)
+DirectX::XMINT2 nui::toXM(int32_t x, int32_t y)
 {
-	return { (int32_t)x, (int32_t)y };
+	return { x, y };
 }
 
 DirectX::XMFLOAT2 nui::toXM(glm::vec2& value)

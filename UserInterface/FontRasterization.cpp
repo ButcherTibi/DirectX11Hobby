@@ -79,7 +79,6 @@ ErrStack CharacterAtlas::addSizeToFont(Font* font, uint32_t size, FontSize*& r_f
 	font_size.descender = (-metrics.descender) / 64;
 	font_size.line_spacing = metrics.height / 64;
 	font_size.chars.resize(unicode_count + 1);
-	font_size.loaded_as_vertices = false;
 
 	uint32_t i = 0;
 	for (uint32_t unicode = first_unicode; unicode <= last_unicode; unicode++) {

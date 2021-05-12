@@ -10,6 +10,7 @@
 #include <chrono>
 #include <list>
 #include <map>
+#include <unordered_set>
 
 // GLM
 #include <glm\vec4.hpp>
@@ -19,6 +20,9 @@
 #include "GPU_ShaderTypes.hpp"
 #include "CharacterAtlas.hpp"
 #include "Input.hpp"
+#include "CommonProperties.hpp"
+#include "RenderingObjects.hpp"
+#include "BasicMath.h"
 
 
 /* TODO:
@@ -28,150 +32,46 @@
 */
 
 
+// NOTES TO SELF:
+// - when dealing with graphs, most of the it's better to have a root as it makes vertical traversal symetric
+
+
+// BAD IDEAS:
+// - using instance rendering for each unicode character
+//   At first a good idea, vertex and index data computed at font sizing, only write instance data at past layout
+//   but mix in element transparency and find that you need to have one drawcall per character
+//   times the number of text elements.
+//   This sort of rendering only make sense if render whole page and not tens of small labels
+// - 
+
+
+// FORMER BAD IDEAS:
+// - Z Index property, its not that usefull and kinda confusing to have separate layout calculation but different display,
+//   making the event handling system account for it is hard and kinda slow.
+//   What do you do if you have an element that needs to extend past another like a dropdown or a menu ?
+
+
+// Version 2: Full support for flex type positioning, improved event handling and shortcuts
+// Version 3: Simplified the design and generalized the elements, separated elements from the drawing code,
+//  removed Z Index feature
 namespace nui {
 
 	// Forward declarations
 	class Instance;
 	class Window;
+	class Element;
 	struct Root;
 	struct Text;
 	struct RelativeWrap;
-	struct Grid;
+	class Grid;
+	struct MenuItem;
+	class Menu;
 
 	// Typedefs
-	typedef std::variant<Root, Text, RelativeWrap, Grid> StoredElement;
-
-	namespace ElementType {
-		enum {
-			ROOT,
-			TEXT,
-			RELATIVE_WRAP,
-			GRID
-		};
-	}
+	typedef std::variant<Root, Text, RelativeWrap, Grid, Menu> StoredElement;
 
 
-	#undef RELATIVE
-	#undef ABSOLUTE
-	enum class ElementSizeType {
-		ABSOLUTE,
-		RELATIVE,
-		FIT
-	};
-
-	struct ElementSize {
-		ElementSizeType type;
-		uint32_t absolute_size;
-		float relative_size;
-
-	public:
-		ElementSize& operator=(int32_t size_px);
-		ElementSize& operator=(float percentage);
-	};
-
-
-	enum class ElementPositionType {
-		ABSOLUTE,
-		RELATIVE,
-	};
-
-	struct ElementPosition {
-		ElementPositionType type;
-		int32_t absolute_pos;
-		float relative_pos;
-
-	public:
-		ElementPosition& operator=(int32_t size_px);
-		ElementPosition& operator=(float percentage);
-	};
-
-
-	enum class ElementZ_IndexType {
-		INHERIT,
-		SET
-	};
-
-	struct ElementZ_Index {
-		ElementZ_IndexType type;
-		int32_t z_index;
-
-	public:
-		ElementZ_Index& operator=(int32_t z_index);
-	};
-
-
-	//#undef OVERFLOW
-	//enum class Overflow {
-	//	OVERFLOW,
-	//	CLIP
-	//};
-
-
-	struct Color {
-		glm::vec4 rgba;
-
-	public:
-		Color();
-		Color(int32_t red, int32_t green, int32_t blue, uint8_t alpha = 255);
-		Color(double red, double green, double blue, double alpha = 1.0);
-		Color(float red, float green, float blue, float alpha = 1.0);
-		Color(int32_t hex_without_alpha);
-
-		static Color red();
-		static Color green();
-		static Color blue();
-
-		static Color black();
-		static Color white();
-
-		static Color cyan();
-		static Color magenta();
-		static Color yellow();
-
-		void setRGBA_UNORM(float r = 0.f, float g = 0.f, float b = 0.f, float a = 1.0f);
-	};
-
-
-	struct ColorStep {
-		Color color;
-		float pos;
-
-		ColorStep() = default;
-		ColorStep(Color& new_color);
-	};
-
-
-	enum class BackgroundColoring {
-		NONE,
-		FLAT_FILL,
-		LINEAR_GRADIENT,
-		// STRIPE
-		// SMOOTHSTEP MULTI
-		// QUADRATIC/CUBIC BEZIER MULTI
-		RENDERING_SURFACE
-	};
-
-
-	enum class GridOrientation {
-		ROW,
-		COLUMN
-	};
-
-	enum class GridSpacing {
-		START,
-		CENTER,
-		END,
-		SPACE_BETWEEN,
-	};
-
-	enum class GridSelfAlign {
-		START,
-		CENTER,
-		END,
-	};
-
-	// Events /////////////////////////////////////////////////////////////////
-
+	// Events Component /////////////////////////////////////////////////////////////////
 	typedef void (*EventCallback)(Window* window, StoredElement* source, void* user_data);
 
 	enum class MouseEventState {
@@ -200,87 +100,11 @@ namespace nui {
 		void* user_data;
 	};
 
-	// Transitions ////////////////////////////////////////////////////////////
-
-	enum class TransitionBlendFunction {
-		LINEAR,
-		// smooth step
-		// cubic bezier
-	};
-
-	template<typename T>
-	struct AnimatedProperty {
-		T start;
-		T end;
-		SteadyTime start_time;
-		SteadyTime end_time;
-		TransitionBlendFunction blend_func;
-
-		bool isAnimated();
-		T calculate(SteadyTime& now);
-	};
-
-	struct ColorStepAnimated {
-		AnimatedProperty<glm::vec4> color;
-		AnimatedProperty<float> pos;
-	};
-
-	struct BackgroundAnimated {
-		AnimatedProperty<float> gradient_angle;
-		std::array<ColorStepAnimated, 8> colors;
-	};
-
-	
-	// Common properties for all elements
-	class Element {
-	public:
-		std::array<float, 2> origin;
-		std::array<ElementPosition, 2> relative_position;  // also works under Window
-
-		// Size
-		/*glm::vec4 margins;
-		glm::vec4 borders;
-		Color border_color;
-		glm::vec4 padding;*/
-		std::array<ElementSize, 2> size;
-		
-		// Order
-		ElementZ_Index z_index;
-
-		// Events
-		void setMouseEnterEvent(EventCallback callback, void* user_data = nullptr);
-		void setMouseHoverEvent(EventCallback callback, void* user_data = nullptr);
-		void setMouseMoveEvent(EventCallback callback, void* user_data = nullptr);
-		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
-		void setMouseLeaveEvent(EventCallback callback, void* user_data = nullptr);
-
-		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
-		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
-		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
-
-		void setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
-		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
-		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
-
-		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
-
-		// Other
-		void beginMouseDelta();
-
-		float getInsideDuration();
-
+	class EventsComponent {
 	public:
 		// Internal
 		Window* _window;
 
-		StoredElement* _parent;
-		StoredElement* _self;
-		std::list<StoredElement*> _children;
-
-		std::array<uint32_t, 2> _size;
-		std::array<int32_t, 2> _position;
-
-		// Events
 		MouseEventState _mouse_event_state;
 
 		EventCallback _onMouseEnter;
@@ -309,21 +133,123 @@ namespace nui {
 
 		std::vector<Shortcut1KeyCallback> _key_ups;
 
-		// some elements, because they are inside a parent who is outside of the mouse are skipped initially when emiting events
-		bool _events_emited;
+		void _init(Window* window);
+
+		void _emitInsideEvents(StoredElement* self);
+		void _emitOutsideEvents(StoredElement* self);
+
+	public:
+		void setMouseEnterEvent(EventCallback callback, void* user_data = nullptr);
+		void setMouseHoverEvent(EventCallback callback, void* user_data = nullptr);
+		void setMouseMoveEvent(EventCallback callback, void* user_data = nullptr);
+		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
+		void setMouseLeaveEvent(EventCallback callback, void* user_data = nullptr);
+
+		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
+		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
+
+		void setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
+		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
+
+		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+
+		// Other
+		void beginMouseDelta(Element* elem);
+
+		float getInsideDuration();
+	};
+
+	struct EventsPassedElement {
+		bool allow_inside_event;  // is child allowed 
+		Element* elem;
+	};
+
+
+	// Element /////////////////////////////////////////////////////////////////
+
+	namespace ElementType {
+		enum {
+			ROOT,
+			TEXT,
+			RELATIVE_WRAP,
+			GRID,
+			MENU
+		};
+	}
+
+	struct ResourceIndexes {
+		uint32_t char_vertex_idx;
+		uint32_t char_index_idx;
+		uint32_t text_inst_idx;
+
+		uint32_t rect_vertex_idx;
+		uint32_t rect_index_idx;
+	};
+
+	class Element {
+	public:
+		Window* _window;
+
+		Element* _parent;
+		StoredElement* _self;
+		std::list<Element*> _children;
+
+		std::array<float, 2> origin;
+		std::array<ElementPosition, 2> relative_position;  // also works under Window/Root
+		std::array<int32_t, 2> _position;  // calculated position
+
+		uint32_t z_index;  // z_index is not inherited
+
+		std::array<ElementSize, 2> size;
+		std::array<uint32_t, 2> _size;  // calculated size
 
 	public:
 		void _init();
 
-		void _emitInsideEvents();
-		void _emitOutsideEvents();
+		// eg. width = 50% of parent or width = 100px
+		void _calcSizeRelativeToParent();
 
-		void _calcFirstPassSize(uint32_t axis);
+		// takes a list of next chilldren and appends it's own children if any
+		virtual void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children);
+
+		// calculate size if size requires computation
+		// Example:
+		// if element size[0] = Fit then size of the element depends on calculating the size of children
+		// if element size cannot be determined ahead of time as in the case of the Menu element
+		virtual void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents);
+
+		virtual void _generateGPU_Data();
+
+		virtual void _draw();
 	};
+
 
 	Element* getElementBase(StoredElement* elem);
 
 
+	struct Root : Element {
+		EventsComponent _events;
+
+		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+
+		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+	};
+
+
+	struct Text : Element {
+		std::string text;  // TODO: unicode
+		std::string font_family;
+		std::string font_style;
+		uint32_t font_size;  // TODO: text font size metrics
+		uint32_t line_height;
+		Color color;
+	};
+
+
+	// Background Element ///////////////////////////////////////////////////////////////////////
+	
 	struct SurfaceEvent {
 		// Resource
 		ID3D11Device5* dev5;
@@ -340,80 +266,156 @@ namespace nui {
 
 	typedef void(*RenderingSurfaceCallback)(Window* window, StoredElement* source, SurfaceEvent& event, void* user_data);
 
-	struct BackgroundElement : Element {
+	struct BackgroundElement : public Element {
 		BackgroundColoring coloring;
-		std::vector<ColorStep> colors;
-		float gradient_angle;
 
-		void setColorTransition(Color& end_color, uint32_t idx, uint32_t duration);
-		void setColorPositionTransition(float end_position, uint32_t idx, uint32_t duration);
-		void setGradientAngleTransition(float end_gradient, uint32_t duration);
+		Color background_color;
+		AnimatedProperty<glm::vec4> _background_color;
 
-		void setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data = nullptr);
-
-	public:
-		BackgroundAnimated _anim;
-
-		// Drawcall
-		dx11::IndexedDrawcallParams _drawcall;
-
-		// Instance
-		std::array<DirectX::XMFLOAT4, 8> _colors;
-		std::array<float, 8> _color_lenghts;
-
-		DirectX::XMFLOAT2 _center;
-		float _gradient_angle;
-
-		// Events
-		SurfaceEvent _surface_event;
 		RenderingSurfaceCallback _onRenderingSurface;
 		void* _surface_event_user_data;
 
+		RectRender _rect_render;
+
+		EventsComponent _events;
+
 	public:
 		void _init();
-		void _generateGPU_Data(uint32_t& rect_verts_idx, uint32_t& rect_idxs_idx);
-		void _draw();
+		void _generateGPU_Data() override;
+		void _draw() override;
+
+		void setColorTransition(Color& end_color, uint32_t duration);
+
+		void setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data = nullptr);
 	};
 
 
-	struct Root : Element {
+	// RelativeWrap ///////////////////////////////////////////////////////////////////////
 
-	};
-
-
-	struct Text : Element {
-		std::string text;  // TODO: unicode
-		std::string font_family;
-		std::string font_style;
-		uint32_t font_size;  // TODO: text font size metrics
-		uint32_t line_height;
-		Color color;
+	struct RelativeWrap : public BackgroundElement {
+		// Element does not have any properties, but children do
 
 	public:
-		// Internal
-
-		// because characters must be rendered with transparency to look good, each text must be a separate drawcall(s) and be depth sorted
-		// doing instance rendering for each letter in label is bad, so just write the vertex and index buffer by hand
-
-		// Drawcall
-		uint32_t _vertex_start_idx;
-		uint32_t _vertex_count;
-		uint32_t _index_start_idx;
-		uint32_t _index_count;
-		uint32_t _instance_start_idx;
+		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
 	};
 
 
-	struct RelativeWrap : BackgroundElement {
-		// Element does not have any properties, but children do
+	// Grid ///////////////////////////////////////////////////////////////////////////////
+
+	enum class GridOrientation {
+		ROW,
+		COLUMN
 	};
 
+	enum class GridSpacing {
+		START,
+		CENTER,
+		END,
+		SPACE_BETWEEN,
+	};
 
-	struct Grid : BackgroundElement {
+	enum class GridSelfAlign {
+		START,
+		CENTER,
+		END,
+	};
+
+	class Grid : public BackgroundElement {
+	public:
 		GridOrientation orientation;
 		GridSpacing items_spacing;
 		GridSpacing lines_spacing;
+
+	public:
+		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+
+		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
+
+		void beginMouseDelta();
 	};
+
+
+	// Menu //////////////////////////////////////////////////////////////
+
+	// Features:
+	// separators
+	// spacing between separetors
+	// spacing between text and shortcut
+	// background color
+	// arrow style
+	// arrow color
+
+
+	// Each Menu Item is both a child and parent
+	// it is a child entry of a menu
+	// and a parent title of a sub menu
+	struct MenuItem {
+		MenuItem* _parent;
+		std::list<MenuItem*> _children;
+
+		// Label
+		std::string text;
+		std::string font_family;
+		std::string font_style;
+		uint32_t font_size;
+		uint32_t line_height;
+		Color text_color;
+
+		uint32_t top_padding;
+		uint32_t bot_padding;
+		uint32_t left_padding;
+		uint32_t right_padding;
+		Box2D _label_box;
+		// EventsComponent _label_events;
+
+		// Menu
+		Color menu_background_color;
+
+		Box2D _menu_box;
+	};
+
+	class Menu : public Element {
+	public:
+		std::list<MenuItem> _items;
+
+		RectRender _menu_background_render;
+		RectRender _select_background_render;
+		TextRender _label_render;
+
+		Color titles_background_color;
+		Color select_background_color;
+
+		// contains all the visible menus
+		// first is always root the which is always rendered and does not have any events triggered
+		// every menu that is present in this list is rendered
+		std::vector<MenuItem*> _visible_menus;
+
+	public:
+		void _init();
+
+		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+
+		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+
+		void _generateGPU_Data() override;
+
+		void _draw() override;
+
+		MenuItem* addItem(MenuItem* parent);
+	};
+
+	// menu
+	// button
+	// drop down
+	// tabs
+	// tree list
+	// edit text
+	// slider
+	// context menu
 
 
 	struct WindowMessages {
@@ -421,21 +423,6 @@ namespace nui {
 		bool is_minimized;
 	};
 
-	struct GridLine {
-		uint32_t end_idx;
-		uint32_t count;
-
-		uint32_t line_length;
-		uint32_t line_thickness;
-	};
-
-	struct LayoutMemoryCache {
-		std::vector<StoredElement*> stored_elems_0;
-		std::vector<StoredElement*> stored_elems_1;
-		std::vector<StoredElement*> stored_elems_2;
-
-		std::vector<GridLine> lines;
-	};
 
 	class Window {
 	public:
@@ -458,12 +445,9 @@ namespace nui {
 		// Elements
 		std::list<StoredElement> elements;
 
-		LayoutMemoryCache layout_mem_cache;
+		std::map<uint32_t, std::list<Element*>> draw_stacks;
 
-		// Z Index sorted list of elements
-		std::map<int32_t, std::list<StoredElement*>> render_stacks;
-
-		int32_t delta_trap_top;
+		int32_t delta_trap_top;  // TODO: implement it
 		int32_t delta_trap_bot;
 		int32_t delta_trap_left;
 		int32_t delta_trap_right;
@@ -473,30 +457,7 @@ namespace nui {
 		ComPtr<IDXGISwapChain1> swapchain1;
 		ComPtr<ID3D11Texture2D> present_img;
 		ComPtr<ID3D11RenderTargetView> present_rtv;
-
-		// Atachments
-
-		// Textures
-		ComPtr<ID3D11Texture2D> chars_atlas_tex;
-		ComPtr<ID3D11ShaderResourceView> chars_atlas_srv;
-		ComPtr<ID3D11SamplerState> chars_atlas_sampler;
 	
-		// Buffers
-		std::vector<GPU_CharacterVertex> char_verts;
-		std::vector<uint32_t> char_idxs;
-		std::vector<GPU_TextInstance> text_instances;
-
-		dx11::Buffer char_vbuff;
-		dx11::Buffer char_idxbuff;
-		dx11::Buffer text_instabuff;
-		
-		std::vector<GPU_RectVertex> rect_verts;
-		std::vector<uint32_t> rect_idxs;
-
-		dx11::Buffer rect_vbuff;
-		dx11::Buffer rect_idxbuff;
-		dx11::ConstantBuffer rect_dbuff;
-
 		GPU_Constants gpu_constants;
 		dx11::Buffer cbuff;
 
@@ -505,12 +466,14 @@ namespace nui {
 
 	public:
 		void _updateCPU();
+
 		void _render();
 
 	public:
 		Text* createText(Element* parent = nullptr);
 		RelativeWrap* createRelativeWrap(Element* parent = nullptr);
 		Grid* createGrid(Element* parent = nullptr);
+		Menu* createMenu(Element* parent = nullptr);
 
 		// Event
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
@@ -555,6 +518,11 @@ namespace nui {
 		ComPtr<ID3D11DeviceContext> im_ctx1;
 		ComPtr<ID3D11DeviceContext3> im_ctx3;
 
+		// Simple Vertex Shader
+		std::vector<char> simple_vs_cso;
+		ComPtr<ID3D11VertexShader> simple_vs;
+		ComPtr<ID3D11InputLayout> simple_input_layout;
+
 		// Character Shaders
 		std::vector<char> char_vs_cso;
 		ComPtr<ID3D11VertexShader> char_vs;
@@ -562,13 +530,12 @@ namespace nui {
 
 		ComPtr<ID3D11PixelShader> char_ps;
 
-		// Rect Shaders
-		std::vector<char> rect_vs_cso;
-		ComPtr<ID3D11VertexShader> rect_vs;
-		ComPtr<ID3D11InputLayout> rect_input_layout;
+		// Gradient Rect Shaders
+		//ComPtr<ID3D11PixelShader> rect_flat_fill_ps;
+		//ComPtr<ID3D11PixelShader> rect_gradient_linear_ps;
 
-		ComPtr<ID3D11PixelShader> rect_flat_fill_ps;
-		ComPtr<ID3D11PixelShader> rect_gradient_linear_ps;
+		// Rect Shaders
+		ComPtr<ID3D11PixelShader> rect_ps;
 
 		// Character Atlas
 		CharacterAtlas char_atlas;

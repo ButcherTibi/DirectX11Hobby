@@ -105,6 +105,13 @@ VertexOut main(VertexIn vertex, InstanceIn instance)
 {
 	VertexOut output;
 	
+	// discard vertex
+	#pragma warning( disable : 3578 )
+	if (vertex.normal.x == 999999.f) {
+		output.dx_pos.w = -1.f;
+		return output;
+	}
+	
 	// World Position
 	float3 pos = vertex.pos;
 	pos = quatRotate(pos, instance.inst_rot);
@@ -119,12 +126,6 @@ VertexOut main(VertexIn vertex, InstanceIn instance)
 	
 	// Fix Depth
 	persp.z = getLerp(z_near, persp.w, z_far);
-	//persp.z = log(persp.z * 2);
-	
-	//float C = 1;
-	//persp.z = 2.0*log(persp.w * C + 1)/log(z_far * C + 1) - 1;
-	
-	//persp.z = 1.0 - persp.z;
 	persp.z *= persp.w;
 	output.dx_pos = persp;
 

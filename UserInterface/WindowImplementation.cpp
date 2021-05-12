@@ -15,7 +15,7 @@ Text* Window::createText(Element* parent)
 
 	auto& new_text = new_stored_elem.emplace<Text>();
 	new_text._window = this;
-	new_text._parent = parent->_self;
+	new_text._parent = parent;
 	new_text._self = &new_stored_elem;
 	new_text._init();
 
@@ -26,7 +26,7 @@ Text* Window::createText(Element* parent)
 	new_text.line_height = 0;
 	new_text.color.rgba = { 1, 1, 1, 1 };
 
-	parent->_children.push_back(&new_stored_elem);
+	parent->_children.push_back(&new_text);
 	return &new_text;
 }
 
@@ -40,11 +40,11 @@ RelativeWrap* Window::createRelativeWrap(Element* parent_element)
 
 	auto& new_rel = new_stored_elem.emplace<RelativeWrap>();
 	new_rel._window = this;
-	new_rel._parent = parent_element->_self;
+	new_rel._parent = parent_element;
 	new_rel._self = &new_stored_elem;
 	new_rel._init();
 
-	parent_element->_children.push_back(&new_stored_elem);
+	parent_element->_children.push_back(&new_rel);
 
 	return &new_rel;
 }
@@ -59,7 +59,7 @@ Grid* Window::createGrid(Element* parent_element)
 
 	auto& new_grid = new_stored_elem.emplace<Grid>();
 	new_grid._window = this;
-	new_grid._parent = parent_element->_self;
+	new_grid._parent = parent_element;
 	new_grid._self = &new_stored_elem;
 	new_grid._init();
 
@@ -67,15 +67,34 @@ Grid* Window::createGrid(Element* parent_element)
 	new_grid.items_spacing = GridSpacing::START;
 	new_grid.lines_spacing = GridSpacing::START;
 
-	parent_element->_children.push_back(&new_stored_elem);
+	parent_element->_children.push_back(&new_grid);
 
 	return &new_grid;
+}
+
+Menu* Window::createMenu(Element* parent_element)
+{
+	if (parent_element == nullptr) {
+		parent_element = std::get_if<Root>(&elements.front());
+	}
+
+	StoredElement& new_stored_elem = elements.emplace_back();
+
+	auto& new_menu = new_stored_elem.emplace<Menu>();
+	new_menu._window = this;
+	new_menu._parent = parent_element;
+	new_menu._self = &new_stored_elem;
+	new_menu._init();
+
+	parent_element->_children.push_back(&new_menu);
+
+	return &new_menu;
 }
 
 void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
 {
 	Root* root = std::get_if<Root>(&elements.front());
-	root->setKeyDownEvent(callback, key, user_data);
+	root->_events.setKeyDownEvent(callback, key, user_data);
 }
 
 void Window::endMouseDelta()

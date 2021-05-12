@@ -105,13 +105,6 @@ namespace dx11 {
 				init_desc.ByteWidth = new_size_bytes;
 			}
 		}
-
-		// resizeDiscard
-
-		/*void mapForWrite()
-		{
-			throwDX11(ctx3->Map(buff, 0, D3D11_MAP_WRITE, 0, &mapped_mem));
-		}*/
 		
 		void update(uint32_t index, GPU_T& vertex)
 		{
@@ -129,21 +122,6 @@ namespace dx11 {
 
 			ctx3->UpdateSubresource(buff, 0, &src_box, &vertex, 0, 0);
 		}
-
-		/*void set(uint32_t index, size_t field_offset, void* data, size_t field_size)
-		{
-			assert_cond((index * sizeof(GPU_T)) + field_offset < init_desc.ByteWidth, "out of range");
-
-			std::memcpy((GPU_T*)(mapped_mem.pData).pData + index + field_offset, data, field_size);
-		}*/
-
-		// void get
-
-		/*void unmap()
-		{
-			ctx3->Unmap(buff, 0);
-			mapped_mem.pData = nullptr;
-		}*/
 
 		ID3D11Buffer* get()
 		{
@@ -283,18 +261,5 @@ namespace dx11 {
 		void setDepthBias(int32_t depth_bias);
 
 		ID3D11RasterizerState* get();
-	};
-
-
-	struct IndexedDrawcallParams {
-		uint32_t vertex_start_idx;
-		uint32_t vertex_count;  // not required in drawcall but still usefull
-		uint32_t index_start_idx;
-		uint32_t index_count;
-	};
-
-
-	struct IndexedInstancedDrawcallParams {
-
 	};
 }

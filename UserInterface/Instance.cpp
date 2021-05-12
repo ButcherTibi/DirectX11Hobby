@@ -100,20 +100,27 @@ void Instance::create()
 	{
 		std::vector<char> read_buffer;
 
+		// Simple
+		dx11::createVertexShaderFromPath("UserInterface/CompiledShaders/SimpleVS.cso",
+			dev5.Get(), simple_vs.GetAddressOf(), &simple_vs_cso);
+
+		// Character
 		dx11::createVertexShaderFromPath("UserInterface/CompiledShaders/CharVS.cso",
 			dev5.Get(), char_vs.GetAddressOf(), &char_vs_cso);
 
 		dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/CharPS.cso",
 			dev5.Get(), char_ps.GetAddressOf(), &read_buffer);
 
-		dx11::createVertexShaderFromPath("UserInterface/CompiledShaders/RectVS.cso",
-			dev5.Get(), rect_vs.GetAddressOf(), &rect_vs_cso);
-
-		dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/RectFlatFillPS.cso",
+		// Gradient
+		/*dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/RectFlatFillPS.cso",
 			dev5.Get(), rect_flat_fill_ps.GetAddressOf(), &read_buffer);
 
 		dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/RectLinearGradient.cso",
-			dev5.Get(), rect_gradient_linear_ps.GetAddressOf(), &read_buffer);
+			dev5.Get(), rect_gradient_linear_ps.GetAddressOf(), &read_buffer);*/
+
+		// Rect
+		dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/RectPS.cso",
+			dev5.Get(), rect_ps.GetAddressOf(), &read_buffer);
 	}
 
 	// Character Vertex Input Layout
@@ -134,22 +141,17 @@ void Instance::create()
 			char_vs_cso.data(), char_vs_cso.size(), char_input_layout.GetAddressOf()));
 	}
 
-	// Rectangle Vertex Input Layout
+	// Simple Vertex Input Layout
 	{
 		std::vector<D3D11_INPUT_ELEMENT_DESC> input_elems;
 
-		auto vertex_elems = GPU_RectVertex::getInputLayout();
+		auto vertex_elems = GPU_SimpleVertex::getInputLayout();
 		for (auto& elem : vertex_elems) {
 			input_elems.push_back(elem);
 		}
 
-		/*auto instance_elems = GPU_RectInstance::getInputLayout(1);
-		for (auto& elem : instance_elems) {
-			input_elems.push_back(elem);
-		}*/
-
 		throwDX11(dev5->CreateInputLayout(input_elems.data(), input_elems.size(),
-			rect_vs_cso.data(), rect_vs_cso.size(), rect_input_layout.GetAddressOf()));
+			simple_vs_cso.data(), simple_vs_cso.size(), simple_input_layout.GetAddressOf()));
 	}
 
 	// Character Atlas
@@ -572,6 +574,8 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		root._parent = nullptr;
 		root._self = &root_elem;
 		root.Element::_init();
+
+		root._events._init(&w);
 	}
 
 	// Delta Trap
@@ -597,65 +601,6 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		im_ctx3->ClearRenderTargetView(w.present_rtv.Get(), clear_color);
 
 		throwDX11(w.swapchain1->Present(0, 0));
-	}
-
-	// Character Vertex Buffer
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		w.char_vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
-	}
-
-	// Character Index Buffer
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		w.char_idxbuff.create(dev5.Get(), im_ctx3.Get(), desc);
-	}
-
-	// Text Instance Buffer
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		w.text_instabuff.create(dev5.Get(), im_ctx3.Get(), desc);
-	}
-
-	// Rect Vertex Buffer
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		w.rect_vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
-	}
-
-	// Rect Index Buffer
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-		w.rect_idxbuff.create(dev5.Get(), im_ctx3.Get(), desc);
-	}
-
-	// Rect Drawcall Buffer
-	{
-		w.rect_dbuff.create(dev5.Get(), im_ctx3.Get(), D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE);
-		w.rect_dbuff.addFloat4();
-		w.rect_dbuff.addFloat4Array(8);
-		w.rect_dbuff.addFloat4Array(8);	
-		w.rect_dbuff.addFloat();
 	}
 
 	// Constant Buffer

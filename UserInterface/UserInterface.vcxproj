@@ -145,6 +145,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="BasicMath.h" />
+    <ClInclude Include="CommonProperties.hpp" />
     <ClInclude Include="DX11Wrapper.hpp" />
     <ClInclude Include="ErrorStack.hpp" />
     <ClInclude Include="FilePath.hpp" />
@@ -153,14 +154,15 @@
     <ClInclude Include="Input.hpp" />
     <ClInclude Include="NuiLibrary.hpp" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RenderingObjects.hpp" />
     <ClInclude Include="TextureAtlas.hpp">
       <FileType>Document</FileType>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClInclude>
-    <ClInclude Include="UniqueVector.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CommonProperties.cpp" />
     <ClCompile Include="DX11Wrapper.cpp" />
     <ClCompile Include="ErrorStack.cpp" />
     <ClCompile Include="FilePath.cpp" />
@@ -178,12 +180,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="BasicMath.cpp" />
+    <ClCompile Include="RenderingObjects.cpp" />
     <ClCompile Include="TextureAtlas.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="UniqueVector.cpp" />
-    <ClCompile Include="UserInterfaceElements.cpp" />
+    <ClCompile Include="Elements.cpp" />
     <ClCompile Include="WindowImplementation.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -223,7 +225,11 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="RectVS.hlsl">
+    <FxCompile Include="RectPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="SimpleVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
