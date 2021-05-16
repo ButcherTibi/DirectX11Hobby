@@ -50,6 +50,9 @@
     <Filter Include="Source Files\CustomContainers">
       <UniqueIdentifier>{5bfba903-7901-497e-8180-9cf024e3fe73}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\Debug">
+      <UniqueIdentifier>{57fdcfe4-ec96-45fe-b184-45510e932fa8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -136,6 +139,21 @@
     </FxCompile>
     <FxCompile Include="MeshPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="WirePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="MeshGS.hlsl">
+      <Filter>Source Files\Shaders\Mesh</Filter>
+    </FxCompile>
+    <FxCompile Include="SeeThruWirePS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="MeshDepthOnlyPS.hlsl">
+      <Filter>Source Files\Shaders\Wireframe</Filter>
+    </FxCompile>
+    <FxCompile Include="DebugPS.hlsl">
+      <Filter>Source Files\Shaders\Debug</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

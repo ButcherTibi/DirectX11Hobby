@@ -1,22 +1,31 @@
 
-struct PixelIn
-{
-	float4 dx_pos : SV_POSITION;
-	float3 normal : NORMAL;
+struct Instance {
+	float3 inst_pos : INSTANCE_POSITION;
+	float4 inst_rot : INSTANCE_ROTATION;
 	
-	nointerpolation float3 albedo_color : ALBEDO_COLOR;
-	nointerpolation float roughness : ROUGHNESS;
-	nointerpolation float metallic : METALLIC;
-	nointerpolation float specular : SPECULAR;
+	float3 albedo_color : ALBEDO_COLOR;
+	float roughness : ROUGHNESS;
+	float metallic : METALLIC;
+	float specular : SPECULAR;
 	
-	nointerpolation float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
-	nointerpolation float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
-	nointerpolation float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
-	nointerpolation float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
-	nointerpolation float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
-	nointerpolation float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+	float3 wireframe_front_color : WIREFRAME_FRONT_COLOR;
+	float4 wireframe_back_color : WIREFRAME_BACK_COLOR;
+	float3 wireframe_tess_front_color : WIREFRAME_TESS_FRONT_COLOR;
+	float4 wireframe_tess_back_color : WIREFRAME_TESS_BACK_COLOR;
+	float wireframe_tess_split_count : WIREFRAME_TESS_SPLIT_COUNT;
+	float wireframe_tess_gap : WIREFRAME_TESS_GAP;
+};
+
+struct PixelIn {
+	float4 pos : SV_POSITION;
+	float3 vertex_normal : VERTEX_NORMAL;
 	
+	nointerpolation uint vertex_id : VERTEX_ID;
+	nointerpolation uint primitive_id : PRIMITIVE_ID;
 	nointerpolation uint instance_id : INSTANCE_ID;
+	
+	float tess_edge : TESS_EDGE;
+	float tess_edge_dir : TESS_EDGE_DIRECTION;
 };
 
 
@@ -24,6 +33,13 @@ static const float PI = 3.14159265f;
 
 
 // Physical Based Rendering /////////////////////////////////////////////////////////////
+
+struct MeshTriangle {
+	float3 poly_normal;
+	float3 tess_normal;
+	uint tess_vertex_0;
+	uint tess_vertex_1;
+};
 
 struct CameraLight {
 	float3 normal;

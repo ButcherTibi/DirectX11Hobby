@@ -644,6 +644,25 @@ void BackgroundElement::_draw()
 		Instance* instance = _window->instance;
 		ID3D11DeviceContext3* im_ctx3 = instance->im_ctx3.Get();
 
+		//auto clear_bindings = [&]() {
+
+		//	// Input Assembly
+		//	{
+		//		std::array<ID3D11Buffer*, 2> buffs = {
+		//			nullptr, nullptr
+		//		};
+		//		std::array<uint32_t, 2> strides = {
+		//			0, 0
+		//		};
+		//		std::array<uint32_t, 2> offsets = {
+		//			0, 0
+		//		};
+		//		im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
+		//	}
+		//};
+
+		im_ctx3->ClearState();
+
 		SurfaceEvent surface_event;
 		surface_event.dev5 = instance->dev5.Get();
 		surface_event.im_ctx3 = im_ctx3;
@@ -657,19 +676,7 @@ void BackgroundElement::_draw()
 
 		this->_onRenderingSurface(_window, _self, surface_event, _surface_event_user_data);
 
-		// Input Assembly
-		{
-			std::array<ID3D11Buffer*, 2> buffs = {
-			nullptr, nullptr
-			};
-			std::array<uint32_t, 2> strides = {
-				0, 0
-			};
-			std::array<uint32_t, 2> offsets = {
-				0, 0
-			};
-			im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
-		}
+		im_ctx3->ClearState();
 		break;
 	}
 	}

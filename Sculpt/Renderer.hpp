@@ -35,22 +35,20 @@ public:
 	ComPtr<ID3D11VertexShader> mesh_vs;
 	ComPtr<ID3D11VertexShader> octree_vs;
 
+	// Geometry Shader
+	ComPtr<ID3D11GeometryShader> mesh_gs;
+
 	// Rasterizer State
 	dx11::RasterizerState mesh_rs;
 	dx11::RasterizerState mesh_none_rs;
 	dx11::RasterizerState wire_bias_rs;
 	dx11::RasterizerState wire_none_bias_rs;
-	dx11::RasterizerState wire_none_rs;
 
 	ComPtr<ID3D11PixelShader> mesh_ps;
-	ComPtr<ID3D11PixelShader> mesh_output_depth_ps;
-	ComPtr<ID3D11PixelShader> mesh_depth_only_ps;
-	ComPtr<ID3D11PixelShader> front_wire_ps;
-	ComPtr<ID3D11PixelShader> front_wire_tess_ps;
-	ComPtr<ID3D11PixelShader> see_thru_wire_ps;
-	ComPtr<ID3D11PixelShader> see_thru_wire_tess_ps;
 	ComPtr<ID3D11PixelShader> wire_ps;
-	ComPtr<ID3D11PixelShader> wire_tess_ps;
+	ComPtr<ID3D11PixelShader> mesh_depth_only_ps;
+	ComPtr<ID3D11PixelShader> see_thru_wire_ps;
+	ComPtr<ID3D11PixelShader> debug_ps;
 
 	ComPtr<ID3D11DepthStencilState> depth_stencil;
 

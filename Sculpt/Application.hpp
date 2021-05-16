@@ -44,17 +44,15 @@ struct MeshInstanceSet;
 struct MeshInstance;
 struct Mesh;
 
-
+// SOLID_WITH_WIREFRAME_NONE not that usefull, hard to read wireframe among the shading
 enum class DisplayMode {
 	SOLID,
 	SOLID_WITH_WIREFRAME_FRONT,
-	SOLID_WITH_WIREFRAME_NONE,
-	WIREFRANE,
-	WIREFRAME_PURE
+	WIREFRANE
 };
 
 /* which subprimitive holds the surface data to respond to the light */
-namespace ShadingNormal {
+namespace GPU_ShadingNormal {
 	enum {
 		VERTEX,
 		POLY,
@@ -154,6 +152,7 @@ struct MeshInstanceSet {
 	DeferredVector<MeshInstance> instances;  // the instances of the mesh to be rendered in one drawcall
 	std::vector<ModifiedMeshInstance> modified_instances;
 	dx11::ArrayBuffer<GPU_MeshInstance> gpu_instances;
+	ComPtr<ID3D11ShaderResourceView> gpu_instances_srv;
 };
 
 

@@ -25,22 +25,34 @@ MeshInstance* Application::copyInstance(MeshInstance* source, MeshDrawcall* dest
 		instance_set = source->instance_set;
 	}
 	else {
+		bool found = false;
+
+		// Does mesh have a set with that type of drawcall ?
 		Mesh* mesh = source->instance_set->parent_mesh;
 		for (MeshInstanceSet& set : mesh->sets) {
 
 			if (set.drawcall == dest_drawcall) {
 				instance_set = &set;
+				found = true;
 				break;
 			}
+		}
+
+		if (found == false) {
+			instance_set = &mesh->sets.emplace_back();
+			instance_set->parent_mesh = mesh;
+			instance_set->drawcall = dest_drawcall;
 		}
 	}
 
 	uint32_t index_in_buffer;
 	MeshInstance& new_instance = instance_set->instances.emplace(index_in_buffer);
-	new_instance = *source;
 	new_instance.instance_set = instance_set;
 	new_instance.index_in_buffer = index_in_buffer;
 	new_instance.parent_layer = nullptr;
+	new_instance.visible = true;
+
+	new_instance.markFullUpdate();
 
 	transferInstanceToLayer(&new_instance, source->parent_layer);
 
@@ -666,7 +678,7 @@ void Application::resetToHardcodedStartup()
 	last_used_layer->parent = nullptr;
 
 	// Shading
-	shading_normal = ShadingNormal::TESSELATION;
+	shading_normal = GPU_ShadingNormal::POLY;
 
 	// Lighting
 	lights[0].normal = toNormal(45, 45);

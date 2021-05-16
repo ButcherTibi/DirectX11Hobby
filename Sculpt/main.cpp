@@ -71,15 +71,15 @@ void changeShadingNormal(nui::Window* window, nui::StoredElement* source, void* 
 	application.shading_normal = (application.shading_normal + 1) % 3;
 
 	switch (application.shading_normal)	{
-	case ShadingNormal::VERTEX: {
+	case GPU_ShadingNormal::VERTEX: {
 		printf("Shading Normal = VERTEX \n");
 		break;
 	}
-	case ShadingNormal::POLY: {
+	case GPU_ShadingNormal::POLY: {
 		printf("Shading Normal = POLY \n");
 		break;
 	}
-	case ShadingNormal::TESSELATION: {
+	case GPU_ShadingNormal::TESSELATION: {
 		printf("Shading Normal = TESSELATION \n");
 		break;
 	}
@@ -259,15 +259,33 @@ void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, v
 
 	application.resetToHardcodedStartup();
 
-	application.shading_normal = ShadingNormal::POLY;
+	std::array<MeshDrawcall*, 3> drawcalls;
+	for (auto& drawcall : drawcalls) {
+		drawcall = application.createDrawcall();
+	}
 
-	MeshDrawcall* drawcall = application.createDrawcall();
-	drawcall->display_mode = DisplayMode::SOLID;
+	drawcalls[0]->display_mode = DisplayMode::SOLID;
+	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
-	// Triangle
-	{
+	float pos_x = 0;
+	float pos_y = -2;
+	float step_x = 1.5;
+
+	// Meshes
+	uint32_t i = 0;
+	for (auto& drawcall : drawcalls) {
+
 		CreateTriangleInfo info;
-		application.createTriangle(info, nullptr, drawcall);
+		info.transform.pos.x = pos_x;
+		MeshInstance* tris = application.createTriangle(info, nullptr, drawcall);
+
+		//MeshInstance* instance = application.copyInstance(tris, drawcall);
+		//instance->transform.pos.x = pos_x;
+		//instance->transform.pos.y = pos_y;
+
+		pos_x += step_x;
+		i++;
 	}
 
 	// Camera positions
@@ -283,15 +301,45 @@ void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void*
 
 	application.resetToHardcodedStartup();
 
-	application.shading_normal = ShadingNormal::POLY;
+	std::array<MeshDrawcall*, 3> drawcalls;
+	for (auto& drawcall : drawcalls) {
+		drawcall = application.createDrawcall();
+	}
 
-	MeshDrawcall* drawcall = application.createDrawcall();
-	drawcall->display_mode = DisplayMode::SOLID;
+	drawcalls[0]->display_mode = DisplayMode::SOLID;
+	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
-	// Triangle
+	float pos_x = 0;
+	float pos_y = -2;
+	float step_x = 1.5;
+
+	// Meshes
+	for (auto& drawcall : drawcalls) {
+
+		CreateQuadInfo info;
+		info.transform.pos.x = pos_x;
+		application.createQuad(info, nullptr, drawcall);
+
+		pos_x += 1.5;
+	}
+
+	// Instances
 	{
 		CreateQuadInfo info;
-		application.createQuad(info, nullptr, drawcall);
+		info.transform.pos.x = 0;
+		info.transform.pos.y = pos_y;
+		MeshInstance* tris = application.createQuad(info, nullptr, drawcalls[0]);;
+
+		pos_x = step_x;
+		for (uint32_t i = 1; i < drawcalls.size(); i++) {
+
+			MeshInstance* instance = application.copyInstance(tris, drawcalls[i]);
+			instance->transform.pos.x = pos_x;
+			instance->transform.pos.y = pos_y;
+
+			pos_x += step_x;
+		}
 	}
 
 	// Camera positions
@@ -307,16 +355,24 @@ void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void*
 
 	application.resetToHardcodedStartup();
 
-	application.shading_normal = ShadingNormal::POLY;
+	std::array<MeshDrawcall*, 3> drawcalls;
+	for (auto& drawcall : drawcalls) {
+		drawcall = application.createDrawcall();
+	}
 
-	MeshDrawcall* drawcall = application.createDrawcall();
-	drawcall->display_mode = DisplayMode::SOLID;
-	drawcall->is_back_culled = true;
+	drawcalls[0]->display_mode = DisplayMode::SOLID;
+	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
-	// Triangle
-	{
+	float pos_x = 0;
+
+	for (auto& drawcall : drawcalls) {
+
 		CreateCubeInfo info;
+		info.transform.pos.x = pos_x;
 		application.createCube(info, nullptr, drawcall);
+
+		pos_x += 2;
 	}
 
 	// Camera positions
@@ -332,7 +388,7 @@ void createTestScene_DeletePoly(nui::Window* window, nui::StoredElement* source,
 
 	application.resetToHardcodedStartup();
 
-	application.shading_normal = ShadingNormal::POLY;
+	application.shading_normal = GPU_ShadingNormal::POLY;
 
 	MeshDrawcall* drawcall = application.createDrawcall();
 	drawcall->display_mode = DisplayMode::SOLID;

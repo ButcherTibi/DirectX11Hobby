@@ -20,29 +20,40 @@ cbuffer FrameUniforms : register(b0)
 	uint shading_normal;
 };
 
-struct MeshTriangle {
-	float3 normal;
-};
-
 StructuredBuffer<MeshTriangle> mesh_triangles;
 
+StructuredBuffer<Instance> instances;
+
+
+[earlydepthstencil]
 PixelOutput main(PixelIn input, uint primitive_id : SV_PrimitiveID)
 {
 	float3 normal;
 	
+	switch (shading_normal) {
 	// VERTEX
-	if (shading_normal == 0) {
-		normal = input.normal;
+	case 0: {
+		normal = input.vertex_normal;
+		break;
 	}
-	// POLY | TESSELATION
-	else {
-		normal = mesh_triangles[primitive_id].normal;
+	// POLY
+	case 1: {
+		normal = mesh_triangles[primitive_id].poly_normal;
+		break;
 	}
+	//	TESSELATION
+	default: {
+		normal = mesh_triangles[primitive_id].tess_normal;
+		break;
+	}
+	}
+	
+	Instance instance = instances.Load(input.instance_id);
 	
 	float3 pbr_color = calcPhysicalBasedRendering(
 		normal, -camera_forward, lights,
-		input.roughness, input.metallic, input.specular,
-		input.albedo_color, ambient_intensity);
+		instance.roughness, instance.metallic, instance.specular,
+		instance.albedo_color, ambient_intensity);
 	
 	PixelOutput output;
 	output.color = float4(pbr_color, 1.);
