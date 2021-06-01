@@ -14,8 +14,8 @@ namespace nui {
 			int32_t left = pos[0];
 			int32_t right = left + size[0];
 
-			if (top < y && y <= bot &&
-				left < x && x <= right)
+			if (top <= y && y < bot &&
+				left <= x && x < right)
 			{
 				return true;
 			}

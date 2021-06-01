@@ -3,15 +3,13 @@
 #include "NuiLibrary.hpp"
 #include "Application.hpp"
 
-#include "DeferredVector.hpp"
 
-
-void renderDocTriggerCapture(nui::Window* window, nui::StoredElement* source, void* user_data)
+void renderDocTriggerCapture(nui::Window*, nui::StoredElement*, void*)
 {
 	render_doc.triggerCapture();
 }
 
-void onMouseMove(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onMouseMove(nui::Window*, nui::StoredElement*, void*)
 {
 	/*uint32_t isect_poly;
 	glm::vec3 isect_point;
@@ -20,13 +18,23 @@ void onMouseMove(nui::Window* window, nui::StoredElement* source, void* user_dat
 	}*/
 }
 
-void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void*)
 {
+	nui::Input& input = window->input;
+	glm::vec3 pixel_world_pos;
+	application.renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
+
+	//printf("%.2f %.2f %.2f \n", pixel_world_pos.x, pixel_world_pos.y, pixel_world_pos.z);
+
+	if (pixel_world_pos.x != FLT_MAX) {
+		application.setCameraFocus(pixel_world_pos);
+	}
+
 	nui::Grid* grid = std::get_if<nui::Grid>(source);
-	grid->beginMouseDelta();
+	grid->beginMouseFixedDeltaEffect();
 }
 
-void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement*, void*)
 {
 	int32_t delta_x = window->input.mouse_delta_x;
 	int32_t delta_y = window->input.mouse_delta_y;
@@ -35,19 +43,19 @@ void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement* source, void*
 	application.arcballOrbitCamera((float)delta_x * scaling, (float)delta_y * scaling);
 }
 
-void onCameraOrbitKeyUp(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraOrbitKeyUp(nui::Window* window, nui::StoredElement*, void*)
 {
 	// nui::Grid* grid = std::get_if<nui::Grid>(source);
-	window->endMouseDelta();
+	window->endMouseDeltaEffect();
 }
 
-void onCameraPanKeyDown(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraPanKeyDown(nui::Window*, nui::StoredElement* source, void*)
 {
 	auto grid = std::get_if<nui::Grid>(source);
-	grid->beginMouseDelta();
+	grid->beginMouseLoopDeltaEffect();
 }
 
-void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement*, void*)
 {
 	int32_t delta_x = window->input.mouse_delta_x;
 	int32_t delta_y = window->input.mouse_delta_y;
@@ -56,34 +64,75 @@ void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement* source, void* u
 	application.panCamera((float)-delta_x * scaling, (float)-delta_y * scaling);
 }
 
-void onCameraPanKeyUp(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraPanKeyUp(nui::Window* window, nui::StoredElement*, void*)
 {
-	window->endMouseDelta();
+	window->endMouseDeltaEffect();
 }
 
-void onCameraDollyScroll(nui::Window* window, nui::StoredElement* source, void* user_data)
+void onCameraDollyScroll(nui::Window* window, nui::StoredElement*, void*)
 {
 	application.dollyCamera(window->input.mouse_wheel_delta * application.camera_dolly_sensitivity);
 }
 
-void changeShadingNormal(nui::Window* window, nui::StoredElement* source, void* user_data)
+void setBackCullingTrue(nui::Window*, nui::StoredElement*, void*)
+{
+	application.getRootDrawcall().is_back_culled = true;
+}
+
+void setBackCullingFalse(nui::Window*, nui::StoredElement*, void*)
+{
+	application.getRootDrawcall().is_back_culled = false;
+}
+
+void setShadingNormalVertex(nui::Window*, nui::StoredElement*, void*)
+{
+	application.setShadingNormal(GPU_ShadingNormal::VERTEX);
+}
+
+void setShadingNormalPoly(nui::Window*, nui::StoredElement*, void*)
+{
+	application.setShadingNormal(GPU_ShadingNormal::POLY);
+}
+
+void setShadingNormalTesselation(nui::Window*, nui::StoredElement*, void*)
+{
+	application.setShadingNormal(GPU_ShadingNormal::TESSELATION);
+}
+
+void setDisplayModeSolid(nui::Window*, nui::StoredElement*, void*)
+{
+	application.getRootDrawcall().display_mode = DisplayMode::SOLID;
+}
+
+void setDisplayModeWireframeOverlay(nui::Window*, nui::StoredElement*, void*)
+{
+	application.getRootDrawcall().display_mode = DisplayMode::WIREFRAME_OVERLAY;
+}
+
+void setDisplayModeWireframe(nui::Window*, nui::StoredElement*, void*)
+{
+	application.getRootDrawcall().display_mode = DisplayMode::WIREFRANE;
+}
+
+void changeShadingNormal(nui::Window*, nui::StoredElement*, void*)
 {
 	application.shading_normal = (application.shading_normal + 1) % 3;
+}
 
-	switch (application.shading_normal)	{
-	case GPU_ShadingNormal::VERTEX: {
-		printf("Shading Normal = VERTEX \n");
-		break;
-	}
-	case GPU_ShadingNormal::POLY: {
-		printf("Shading Normal = POLY \n");
-		break;
-	}
-	case GPU_ShadingNormal::TESSELATION: {
-		printf("Shading Normal = TESSELATION \n");
-		break;
-	}
-	}
+void showAABBs(nui::Window*, nui::StoredElement*, void*)
+{
+	application.shouldRenderAABBsForDrawcall(
+		&application.getRootDrawcall(),
+		true
+	);
+}
+
+void hideAABBs(nui::Window*, nui::StoredElement*, void*)
+{
+	application.shouldRenderAABBsForDrawcall(
+		&application.getRootDrawcall(),
+		false
+	);
 }
 
 //void onCameraResetKeyDown(nui::KeyDownEvent& event)
@@ -253,10 +302,114 @@ void changeShadingNormal(nui::Window* window, nui::StoredElement* source, void* 
 //	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
 //}
 
-void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, void* user_data)
+void createTestScene_EmptyScene(nui::Window*, nui::StoredElement*, void*)
 {
-	printf("Test Scene: Create Triangle \n");
+	application.resetToHardcodedStartup();
+}
 
+void createTestScene_SimpleTriangle(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateTriangleInfo info;
+	application.createTriangle(info);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_CopyInstance(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateTriangleInfo info;
+	MeshInstanceRef tris_ref = application.createTriangle(info);
+
+	MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
+	MeshInstance* copy_inst = copy_ref.get();
+	copy_inst->transform.pos.x = 2;
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_DeleteInstance(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateTriangleInfo info;
+	MeshInstanceRef tris_ref = application.createTriangle(info);
+
+	MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
+	MeshInstance* copy_inst = copy_ref.get();
+	copy_inst->transform.pos.x = 2;
+
+	application.deleteInstance(copy_ref);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_joinMeshes(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateTriangleInfo info;
+	MeshInstanceRef tris_ref = application.createTriangle(info);
+
+	MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
+	MeshInstance* copy_inst = copy_ref.get();
+	copy_inst->transform.pos.x = 2;
+
+	std::vector<MeshInstanceRef> children = {
+		copy_ref
+	};
+	application.joinMeshes(children, tris_ref);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+
+//void createTestScene_DeleteAllInstancesInDrawcall(nui::Window*, nui::StoredElement*, void*)
+//{
+//	application.resetToHardcodedStartup();
+//
+//	CreateTriangleInfo info;
+//	MeshInstanceRef tris_ref = application.createTriangle(info);
+//
+//	MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
+//	MeshInstance* copy_inst = copy_ref.get();
+//	copy_inst->transform.pos.x = 2;
+//
+//	application.deleteInstance(copy_ref);
+//
+//	// Camera positions
+//	glm::vec2 center = { 0, 0 };
+//	application.setCameraPosition(center.x, center.y, 10);
+//
+//	glm::vec3 focus = { center.x, center.y, 0 };
+//	application.setCameraFocus(focus);
+//}
+
+void createTestScene_Triangle(nui::Window*, nui::StoredElement*, void*)
+{
 	application.resetToHardcodedStartup();
 
 	std::array<MeshDrawcall*, 3> drawcalls;
@@ -265,7 +418,7 @@ void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, v
 	}
 
 	drawcalls[0]->display_mode = DisplayMode::SOLID;
-	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[1]->display_mode = DisplayMode::WIREFRAME_OVERLAY;
 	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
 	float pos_x = 0;
@@ -278,11 +431,11 @@ void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, v
 
 		CreateTriangleInfo info;
 		info.transform.pos.x = pos_x;
-		MeshInstance* tris = application.createTriangle(info, nullptr, drawcall);
+		MeshInstanceRef tris_ref = application.createTriangle(info, nullptr, drawcall);
 
-		//MeshInstance* instance = application.copyInstance(tris, drawcall);
-		//instance->transform.pos.x = pos_x;
-		//instance->transform.pos.y = pos_y;
+		MeshInstance* instance = application.copyInstance(tris_ref).get();
+		instance->transform.pos.x = pos_x;
+		instance->transform.pos.y = pos_y;
 
 		pos_x += step_x;
 		i++;
@@ -290,15 +443,14 @@ void createTestScene_Triangle(nui::Window* window, nui::StoredElement* source, v
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
-
 	application.setCameraPosition(center.x, center.y, 10);
-	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
 }
 
-void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void* user_data)
+void createTestScene_Quad(nui::Window*, nui::StoredElement*, void*)
 {
-	printf("Test Scene: Create Quad \n");
-
 	application.resetToHardcodedStartup();
 
 	std::array<MeshDrawcall*, 3> drawcalls;
@@ -307,7 +459,7 @@ void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void*
 	}
 
 	drawcalls[0]->display_mode = DisplayMode::SOLID;
-	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[1]->display_mode = DisplayMode::WIREFRAME_OVERLAY;
 	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
 	float pos_x = 0;
@@ -329,12 +481,12 @@ void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void*
 		CreateQuadInfo info;
 		info.transform.pos.x = 0;
 		info.transform.pos.y = pos_y;
-		MeshInstance* tris = application.createQuad(info, nullptr, drawcalls[0]);;
+		MeshInstanceRef ref = application.createQuad(info, nullptr, drawcalls[0]);
 
 		pos_x = step_x;
 		for (uint32_t i = 1; i < drawcalls.size(); i++) {
 
-			MeshInstance* instance = application.copyInstance(tris, drawcalls[i]);
+			MeshInstance* instance = application.copyInstance(ref).get();
 			instance->transform.pos.x = pos_x;
 			instance->transform.pos.y = pos_y;
 
@@ -344,15 +496,14 @@ void createTestScene_Quad(nui::Window* window, nui::StoredElement* source, void*
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
-
 	application.setCameraPosition(center.x, center.y, 10);
-	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
 }
 
-void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void* user_data)
+void createTestScene_Cube(nui::Window*, nui::StoredElement*, void*)
 {
-	printf("Test Scene: Create Cube \n");
-
 	application.resetToHardcodedStartup();
 
 	std::array<MeshDrawcall*, 3> drawcalls;
@@ -361,7 +512,7 @@ void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void*
 	}
 
 	drawcalls[0]->display_mode = DisplayMode::SOLID;
-	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
+	drawcalls[1]->display_mode = DisplayMode::WIREFRAME_OVERLAY;
 	drawcalls[2]->display_mode = DisplayMode::WIREFRANE;
 
 	float pos_x = 0;
@@ -377,36 +528,98 @@ void createTestScene_Cube(nui::Window* window, nui::StoredElement* source, void*
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
-
 	application.setCameraPosition(center.x, center.y, 10);
-	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
 }
 
-void createTestScene_DeletePoly(nui::Window* window, nui::StoredElement* source, void* user_data)
+void createTestScene_Cylinder(nui::Window*, nui::StoredElement*, void*)
 {
-	printf("Test Scene: Delete Poly \n");
+	application.resetToHardcodedStartup();
 
+	CreateCylinderInfo info;
+	info.rows = 32;
+	info.columns = 64;
+	application.createCylinder(info);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_UV_Sphere(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateUV_SphereInfo info;
+	info.rows = 32;
+	info.columns = 64;
+	application.createUV_Sphere(info);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_DeletePoly(nui::Window*, nui::StoredElement*, void*)
+{
 	application.resetToHardcodedStartup();
 
 	application.shading_normal = GPU_ShadingNormal::POLY;
 
-	MeshDrawcall* drawcall = application.createDrawcall();
-	drawcall->display_mode = DisplayMode::SOLID;
-
 	// Triangle
 	{
 		CreateCubeInfo info;
-		MeshInstance* inst = application.createCube(info, nullptr, drawcall);
+		MeshInstanceRef cube_ref = application.createCube(info, nullptr, nullptr);
 		
-		scme::SculptMesh& mesh = inst->instance_set->parent_mesh->mesh;
+		scme::SculptMesh& mesh = cube_ref.get()->instance_set->parent_mesh->mesh;
 		mesh.deletePoly(0);
 	}
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
-
 	application.setCameraPosition(center.x, center.y, 10);
-	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_ImportGLTF(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	io::FilePath file_path;
+	ErrStack err_stack = file_path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	GLTF_ImporterSettings settings;
+	err_stack = application.importMeshesFromGLTF_File(file_path, settings);
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	// Camera
+	glm::vec2 center = { 0, 100 };
+	application.setCameraPosition(center.x, center.y, 1000);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void exit_application(nui::Window*, nui::StoredElement*, void*)
+{
+	application.main_window->win_messages.should_close = true;
 }
 
 //void createDebugLine()
@@ -426,17 +639,32 @@ void createTestScene_DeletePoly(nui::Window* window, nui::StoredElement* source,
 //}
 
 
-int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow)
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
-	ErrStack err_stack;
+	// Debug Runtime Configuration
+#if 0
+	// Memory Debug
+	{
+		int tmpFlag = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+		tmpFlag |= _CRTDBG_CHECK_ALWAYS_DF;
+		tmpFlag |= _CRTDBG_LEAK_CHECK_DF;
 
-	render_doc.init();
+		// Set flag to the new value.
+		_CrtSetDbgFlag(tmpFlag);
+	}
+
+	// GPU Debug
+	{
+		render_doc.init();
+	}
+#endif
 
 	// Application
 	application.resetToHardcodedStartup();
 
-	//createTestScene_Triangle();
-	createTestScene_Triangle(nullptr, nullptr, nullptr);
+#ifdef _DEBUG
+	createTestScene_SimpleTriangle(nullptr, nullptr, nullptr);
+#endif
 
 	// User Interface
 	{
@@ -461,95 +689,171 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 		window_grid->orientation = nui::GridOrientation::COLUMN;
 
 		nui::Menu* top_menu = window->createMenu(window_grid);
-		top_menu->z_index = 1;
+		top_menu->z_index = 2;
 		top_menu->titles_background_color.setRGBA_UNORM(0.f, 0.05f, 0.05f, 1.f);
 		top_menu->select_background_color.setRGBA_UNORM(1.f, 1.f, 1.f, 0.05f);
 		{
-			uint32_t side_padding = 5;
+			nui::MenuStyle title_style;
+			title_style.font_size = 15;
+			title_style.top_padding = 4;
+			title_style.bot_padding = title_style.top_padding;
+			title_style.left_padding = 5;
+			title_style.right_padding = title_style.left_padding;
+			title_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
 
-			nui::MenuItem* scene = top_menu->addItem(nullptr);
+			nui::MenuStyle menus_style;
+			menus_style.font_size = 15;
+			menus_style.top_padding = 4;
+			menus_style.bot_padding = menus_style.top_padding;
+			menus_style.left_padding = 7;
+			menus_style.right_padding = menus_style.left_padding;
+			menus_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+
+			nui::MenuItem* scene = top_menu->addItem(nullptr, title_style);
 			scene->text = "Scene";
-
-			// Scene
-			nui::MenuItem* create = top_menu->addItem(scene);
-			create->text = "New";
-
-			// New Test Scene
-			nui::MenuItem* new_test = top_menu->addItem(scene);
-			new_test->text = "New Test Scene";
-
-			nui::MenuItem* triangle_test = top_menu->addItem(new_test);
-			nui::MenuItem* quad_test = top_menu->addItem(new_test);
-			nui::MenuItem* cube_test = top_menu->addItem(new_test);
-			nui::MenuItem* cube_delete_poly_test = top_menu->addItem(new_test);
 			{
-				triangle_test->text = "Triangle";
-				quad_test->text = "Quad";
-				cube_test->text = "Cube";
-				cube_delete_poly_test->text = "Cube delete poly";
+				nui::MenuItem* create = top_menu->addItem(scene, menus_style);
+				create->text = "New";
+
+				nui::MenuItem* new_test = top_menu->addItem(scene, menus_style);
+				new_test->text = "New Test Scene";
+				{
+					nui::MenuItem* empty_test = top_menu->addItem(new_test, menus_style);
+					empty_test->text = "Empty Scene";
+					empty_test->label_callback = createTestScene_EmptyScene;
+
+					nui::MenuItem* triangle_test = top_menu->addItem(new_test, menus_style);
+					triangle_test->text = "Simple Triangle";
+					triangle_test->label_callback = createTestScene_SimpleTriangle;
+
+					nui::MenuItem* tris_drawcalls = top_menu->addItem(new_test, menus_style);
+					tris_drawcalls->text = "Triangle";
+					tris_drawcalls->label_callback = createTestScene_Triangle;
+
+					nui::MenuItem* quad_test = top_menu->addItem(new_test, menus_style);
+					quad_test->text = "Quad";
+					quad_test->label_callback = createTestScene_Quad;
+
+					nui::MenuItem* cube_test = top_menu->addItem(new_test, menus_style);
+					cube_test->text = "Cube";
+					cube_test->label_callback = createTestScene_Cube;
+
+					nui::MenuItem* cylinder_test = top_menu->addItem(new_test, menus_style);
+					cylinder_test->text = "Cylinder";
+					cylinder_test->label_callback = createTestScene_Cylinder;
+
+					nui::MenuItem* uv_sphere_test = top_menu->addItem(new_test, menus_style);
+					uv_sphere_test->text = "UV Sphere";
+					uv_sphere_test->label_callback = createTestScene_UV_Sphere;
+
+					nui::MenuItem* import_gltf = top_menu->addItem(new_test, menus_style);
+					import_gltf->text = "Import GLTF file";
+					import_gltf->label_callback = createTestScene_ImportGLTF;
+
+					// Mesh
+					nui::MenuItem* delete_poly_test = top_menu->addItem(new_test, menus_style);
+					delete_poly_test->text = "Delete poly";
+					delete_poly_test->label_callback = createTestScene_DeletePoly;
+
+					// Instance
+					nui::MenuItem* copy_instance_test = top_menu->addItem(new_test, menus_style);
+					copy_instance_test->text = "Copy Instance";
+					copy_instance_test->label_callback = createTestScene_CopyInstance;
+
+					nui::MenuItem* delete_instance_test = top_menu->addItem(new_test, menus_style);
+					delete_instance_test->text = "Delete Instance";
+					delete_instance_test->label_callback = createTestScene_DeleteInstance;
+
+					nui::MenuItem* join_meshes_test = top_menu->addItem(new_test, menus_style);
+					join_meshes_test->text = "Join Meshes";
+					join_meshes_test->label_callback = createTestScene_joinMeshes;
+				}
+
+				nui::MenuItem* load = top_menu->addItem(scene, menus_style);
+				load->text = "Load";
+
+				nui::MenuItem* save = top_menu->addItem(scene, menus_style);
+				save->text = "Save";
+
+				nui::MenuItem* save_as = top_menu->addItem(scene, menus_style);
+				save_as->text = "Save As";
+
+				nui::MenuItem* exit_app = top_menu->addItem(scene, menus_style);
+				exit_app->text = "Exit";
+				exit_app->label_callback = exit_application;
 			}
 
-			nui::MenuItem* load = top_menu->addItem(scene);
-			load->text = "Load";
-
-			nui::MenuItem* save = top_menu->addItem(scene);
-			save->text = "Save";
-
-			nui::MenuItem* save_as = top_menu->addItem(scene);
-			save_as->text = "Save as";
-
-			nui::MenuItem* instance_menu = top_menu->addItem(nullptr);
-			instance_menu->text = "Instance";
-
-			// Instance
-			nui::MenuItem* create_inst = top_menu->addItem(instance_menu);
-			create_inst->text = "Create";
-
-			nui::MenuItem* mesh_menu = top_menu->addItem(nullptr);
+			// Mesh
+			nui::MenuItem* mesh_menu = top_menu->addItem(nullptr, title_style);
 			mesh_menu->text = "Mesh";
 
-			nui::MenuItem* layer_menu = top_menu->addItem(nullptr);
+			// Layer
+			nui::MenuItem* layer_menu = top_menu->addItem(nullptr, title_style);
 			layer_menu->text = "Layer";
 
-			// Common Styles
-			std::array<nui::MenuItem*, 4> titles = {
-				scene,
-				instance_menu,
-				mesh_menu,
-				layer_menu
-			};
+			// Display
+			nui::MenuItem* display_menu = top_menu->addItem(nullptr, title_style);
+			display_menu->text = "Display";
+			{
+				nui::MenuItem* back_culling = top_menu->addItem(display_menu, menus_style);
+				back_culling->text = "Back Culling";
+				{
+					nui::MenuItem* back = top_menu->addItem(back_culling, menus_style);
+					back->text = "Back";
+					back->label_callback = setBackCullingTrue;
 
-			for (auto& title : titles) {
-				title->font_size = 17;
-				title->top_padding = 3;
-				title->bot_padding = 3;
+					nui::MenuItem* none = top_menu->addItem(back_culling, menus_style);
+					none->text = "None";
+					none->label_callback = setBackCullingFalse;
+				}
 
-				title->left_padding = side_padding;
-				title->right_padding = side_padding;
+				nui::MenuItem* shading_normal = top_menu->addItem(display_menu, menus_style);
+				shading_normal->text = "Shading Normal";
+				{
+					nui::MenuItem* vertex = top_menu->addItem(shading_normal, menus_style);
+					vertex->text = "Vertex";
+					vertex->label_callback = setShadingNormalVertex;
 
-				title->menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
-			}
+					nui::MenuItem* poly = top_menu->addItem(shading_normal, menus_style);
+					poly->text = "Poly";
+					poly->label_callback = setShadingNormalPoly;
 
-			std::array<nui::MenuItem*, 10> items = {
-				create,
-				new_test,
-				load,
-				save,
-				save_as,
-				create_inst,
-				triangle_test,
-				quad_test,
-				cube_test,
-				cube_delete_poly_test
-			};
+					nui::MenuItem* tesselation = top_menu->addItem(shading_normal, menus_style);
+					tesselation->text = "Tesselation";
+					tesselation->label_callback = setShadingNormalTesselation;
+				}
 
-			for (auto& item : items) {
-				item->font_size = 17;
-				item->top_padding = 3;
-				item->bot_padding = 3;
-				item->left_padding = side_padding;
-				item->right_padding = side_padding;
-				item->menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+				nui::MenuItem* display_mode = top_menu->addItem(display_menu, menus_style);
+				display_mode->text = "Display Mode";
+				{
+					nui::MenuItem* solid_mode = top_menu->addItem(display_mode, menus_style);
+					solid_mode->text = "Solid";
+					solid_mode->label_callback = setDisplayModeSolid;
+
+					nui::MenuItem* wire_overlay_mode = top_menu->addItem(display_mode, menus_style);
+					wire_overlay_mode->text = "Wireframe Overlay";
+					wire_overlay_mode->label_callback = setDisplayModeWireframeOverlay;
+
+					nui::MenuItem* wire_mode = top_menu->addItem(display_mode, menus_style);
+					wire_mode->text = "Wireframe";
+					wire_mode->label_callback = setDisplayModeWireframe;
+				}
+
+				nui::MenuItem* aabbs = top_menu->addItem(display_menu, menus_style);
+				aabbs->text = "Octree";
+				{
+					nui::MenuItem* show = top_menu->addItem(aabbs, menus_style);
+					show->text = "Show";
+					show->label_callback = showAABBs;
+
+					nui::MenuItem* hide = top_menu->addItem(aabbs, menus_style);
+					hide->text = "Hide";
+					hide->label_callback = hideAABBs;
+
+					/*nui::MenuItem* wire_mode = top_menu->addItem(display_mode, menus_style);
+					wire_mode->text = "Wireframe";
+					wire_mode->label_callback = setDisplayModeWireframe;*/
+				}
 			}
 		}
 
@@ -575,16 +879,7 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
 		// Shading Normal
 		viewport->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
-
-
-		// Test Scenes
-		viewport->setKeyDownEvent(createTestScene_Triangle, nui::VirtualKeys::F1);
-		viewport->setKeyDownEvent(createTestScene_Quad, nui::VirtualKeys::F2);
-		viewport->setKeyDownEvent(createTestScene_Cube, nui::VirtualKeys::F3);
-		viewport->setKeyDownEvent(createTestScene_DeletePoly, nui::VirtualKeys::F4);
 	}
-
-	application.ui_instance.min_frame_duration_ms = 16;
 
 	nui::WindowMessages& win_messages = application.main_window->win_messages;
 	while (!win_messages.should_close) {
@@ -594,7 +889,14 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 	return 0;
 }
 
-int main(int argc, char** argv)
+int main(int, char**)
 {
-	return WinMain(nullptr, nullptr, "", 0);
+	// Disabled compiler warnings:
+	// - 4201 nameless struct/union = needed by GLM
+	// - 4239 default reference parameter
+	// - 4267 uint32_t size = vector.size()
+	// - 4701 potentially uninitialized local variable used
+	// - 4703 potentially uninitialized local pointer variable used
+
+	return WinMain(nullptr, nullptr, nullptr, 0);
 }

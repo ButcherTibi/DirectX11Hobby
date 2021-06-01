@@ -26,14 +26,14 @@ struct GPU_MeshVertex {
 
 	static auto getInputLayout()
 	{
-		std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
-		elems[0].SemanticName = "POSITION";
-		elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		std::array<D3D11_INPUT_ELEMENT_DESC, 2> nodes;
+		nodes[0].SemanticName = "POSITION";
+		nodes[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		elems[1].SemanticName = "NORMAL";
-		elems[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+		nodes[1].SemanticName = "NORMAL";
+		nodes[1].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 
-		for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+		for (D3D11_INPUT_ELEMENT_DESC& elem : nodes) {
 			elem.SemanticIndex = 0;
 			elem.InputSlot = 0;
 			elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
@@ -41,7 +41,7 @@ struct GPU_MeshVertex {
 			elem.InstanceDataStepRate = 0;
 		}
 
-		return elems;
+		return nodes;
 	}
 };
 

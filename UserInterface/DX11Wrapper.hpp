@@ -22,7 +22,7 @@ namespace dx11 {
 		ID3D11DeviceContext3* ctx3;
 		D3D11_BUFFER_DESC init_desc;
 
-		ComPtr<ID3D11Buffer> buff;
+		ComPtr<ID3D11Buffer> buff = nullptr;
 
 	public:
 		void _ensureSize(size_t size);
@@ -215,7 +215,8 @@ namespace dx11 {
 		void load(void* data);
 		void load(void* data, uint32_t width, uint32_t height);
 
-		void readbackAtPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g);
+		void readPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g);
+		void readPixel(uint32_t x, uint32_t y, std::array<uint32_t, 4>& rgba);
 
 		void ensureUnmapped();
 

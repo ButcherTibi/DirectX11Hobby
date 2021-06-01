@@ -25,11 +25,17 @@
 #include "BasicMath.h"
 
 
-/* TODO:
-- 60fps limit
-- fullscreen support
-- handle Alt, F10
-*/
+// TODO:
+// - tooltips
+// - menu arrow
+// - menu shortcuts
+// - context menu
+// - button
+// - drop down
+// - tabs
+// - tree list
+// - edit text
+// - slider
 
 
 // NOTES TO SELF:
@@ -54,6 +60,8 @@
 // Version 2: Full support for flex type positioning, improved event handling and shortcuts
 // Version 3: Simplified the design and generalized the elements, separated elements from the drawing code,
 //  removed Z Index feature
+// Version 3.5: Readded Z index feature, changed how events are propagated, no longer try to pack gpu_data
+//  into large buffers
 namespace nui {
 
 	// Forward declarations
@@ -155,8 +163,9 @@ namespace nui {
 
 		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 
-		// Other
-		void beginMouseDelta(Element* elem);
+		// Loops the mouse around the element
+		void beginMouseLoopDeltaEffect(Element* elem);
+		void beginMouseFixedDeltaEffect(Element* elem);
 
 		float getInsideDuration();
 	};
@@ -201,6 +210,7 @@ namespace nui {
 		std::array<int32_t, 2> _position;  // calculated position
 
 		uint32_t z_index;  // z_index is not inherited
+		uint32_t _z_index;
 
 		std::array<ElementSize, 2> size;
 		std::array<uint32_t, 2> _size;  // calculated size
@@ -212,7 +222,7 @@ namespace nui {
 		void _calcSizeRelativeToParent();
 
 		// takes a list of next chilldren and appends it's own children if any
-		virtual void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children);
+		virtual void _emitEvents(bool& allow_inside_events);
 
 		// calculate size if size requires computation
 		// Example:
@@ -232,7 +242,7 @@ namespace nui {
 	struct Root : Element {
 		EventsComponent _events;
 
-		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+		void _emitEvents(bool& allow_inside_events) override;
 
 		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
 	};
@@ -327,7 +337,7 @@ namespace nui {
 		GridSpacing lines_spacing;
 
 	public:
-		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+		void _emitEvents(bool& allow_inside_events) override;
 		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
 
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
@@ -335,20 +345,27 @@ namespace nui {
 		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
 
-		void beginMouseDelta();
+		void beginMouseLoopDeltaEffect();
+		void beginMouseFixedDeltaEffect();
 	};
 
 
 	// Menu //////////////////////////////////////////////////////////////
 
-	// Features:
-	// separators
-	// spacing between separetors
-	// spacing between text and shortcut
-	// background color
-	// arrow style
-	// arrow color
+	struct MenuStyle {
+		std::string font_family = "Roboto";
+		std::string font_style = "Regular";
+		uint32_t font_size = 14;
+		uint32_t line_height = 0;
+		Color text_color = Color(1.0f, 1.0f, 1.0f);
 
+		uint32_t top_padding = 0;
+		uint32_t bot_padding = 0;
+		uint32_t left_padding = 0;
+		uint32_t right_padding = 0;
+
+		Color menu_background_color;
+	};
 
 	// Each Menu Item is both a child and parent
 	// it is a child entry of a menu
@@ -370,7 +387,8 @@ namespace nui {
 		uint32_t left_padding;
 		uint32_t right_padding;
 		Box2D _label_box;
-		// EventsComponent _label_events;
+		EventCallback label_callback;
+		void* label_user_data;
 
 		// Menu
 		Color menu_background_color;
@@ -397,7 +415,7 @@ namespace nui {
 	public:
 		void _init();
 
-		void _emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children) override;
+		void _emitEvents(bool& allow_inside_events) override;
 
 		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
 
@@ -405,17 +423,8 @@ namespace nui {
 
 		void _draw() override;
 
-		MenuItem* addItem(MenuItem* parent);
+		MenuItem* addItem(MenuItem* parent, MenuStyle& style);
 	};
-
-	// menu
-	// button
-	// drop down
-	// tabs
-	// tree list
-	// edit text
-	// slider
-	// context menu
 
 
 	struct WindowMessages {
@@ -428,7 +437,7 @@ namespace nui {
 	public:
 		Instance* instance;
 
-		WNDCLASS window_class;
+		WNDCLASSA window_class;
 		HWND hwnd;
 
 		// Input data updated by WinProc
@@ -447,11 +456,16 @@ namespace nui {
 
 		std::map<uint32_t, std::list<Element*>> draw_stacks;
 
-		int32_t delta_trap_top;  // TODO: implement it
-		int32_t delta_trap_bot;
-		int32_t delta_trap_left;
-		int32_t delta_trap_right;
+		// Mouse Delta Handling
+		enum class DeltaEffectType {
+			LOOP,
+			HIDDEN
+		};
+		DeltaEffectType delta_effect;
+		
 		Element* delta_owner_elem;
+		uint32_t begin_mouse_x;
+		uint32_t begin_mouse_y;
 
 		// DirectX 11
 		ComPtr<IDXGISwapChain1> swapchain1;
@@ -475,18 +489,17 @@ namespace nui {
 		Grid* createGrid(Element* parent = nullptr);
 		Menu* createMenu(Element* parent = nullptr);
 
-		// Event
+		// Events
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
-		void endMouseDelta();
+		void endMouseDeltaEffect();
 
 		// Window
 		RECT getClientRectangle();
 
 		// Mouse
 		bool setLocalMousePosition(uint32_t x, uint32_t y);
-		bool trapLocalMousePosition(BoundingBox2D<uint32_t>& box);
 		bool untrapMousePosition();
-		void hideMousePointer(bool hide = true);
+		void setMouseVisibility(bool is_visible);
 	};
 
 	 

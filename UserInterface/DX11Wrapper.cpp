@@ -355,7 +355,7 @@ void dx11::Texture::load(void* data, uint32_t width, uint32_t height)
 	}
 }
 
-void dx11::Texture::readbackAtPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g)
+void dx11::Texture::readPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g)
 {
 	if (mapped.pData == nullptr) {
 		throwDX11(ctx3->Map(tex.Get(), 0, D3D11_MAP_READ, 0, &mapped));
@@ -370,6 +370,18 @@ void dx11::Texture::readbackAtPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_
 	g = rg[1];
 }
 
+void dx11::Texture::readPixel(uint32_t x, uint32_t y, std::array<uint32_t, 4>& rgba)
+{
+	if (mapped.pData == nullptr) {
+		throwDX11(ctx3->Map(tex.Get(), 0, D3D11_MAP_READ, 0, &mapped));
+	}
+
+	uint32_t stride = sizeof(uint32_t) * 4;
+	uint32_t idx = (y * mapped.RowPitch) + (x * stride);
+
+	std::memcpy(rgba.data(), ((uint8_t*)mapped.pData) + idx, stride);
+}
+
 void dx11::Texture::ensureUnmapped()
 {
 	if (mapped.pData != nullptr) {
@@ -380,6 +392,11 @@ void dx11::Texture::ensureUnmapped()
 
 ID3D11Texture2D* dx11::Texture::get()
 {
+	if (tex == nullptr) {
+		throwDX11(dev5->CreateTexture2D(&tex_desc, nullptr, tex.GetAddressOf()),
+			"failed to create texture 2D");
+	}
+
 	ensureUnmapped();
 	return tex.Get();
 }

@@ -54,8 +54,8 @@ namespace gltf {
 	}
 
 	namespace Atributes {
-		constexpr char* position = "POSITION";
-		constexpr char* normal = "NORMAL";
+		constexpr auto position = "POSITION";
+		constexpr auto normal = "NORMAL";
 	}
 
 	struct Primitive {
@@ -141,13 +141,13 @@ namespace gltf {
 	}
 
 	namespace Types {
-		constexpr char* scalar = "SCALAR";
-		constexpr char* vec2 = "VEC2";
-		constexpr char* vec3 = "VEC3";
-		constexpr char* vec4 = "VEC4";
-		constexpr char* mat2 = "MAT2";
-		constexpr char* mat3 = "MAT3";
-		constexpr char* mat4 = "MAT4";
+		constexpr auto scalar = "SCALAR";
+		constexpr auto vec2 = "VEC2";
+		constexpr auto vec3 = "VEC3";
+		constexpr auto vec4 = "VEC4";
+		constexpr auto mat2 = "MAT2";
+		constexpr auto mat3 = "MAT3";
+		constexpr auto mat4 = "MAT4";
 	};
 
 	struct Accessor {

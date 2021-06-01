@@ -9,27 +9,22 @@
 
 
 /* TODO:
-- camera on point rotation
+- change shading normal from menu
+- change root drawcall from menu
+- show Bounding Boxes
+- delete vertex
+- delete edge
+- select stuff
 
+- createUnorderedPoly, winding based on normal
 - frame camera to mesh
-- selected drawcall set display mode
 - Surface Detail shading mode
-- primitive highlighting
 - compute shader mesh deform
 - save mesh to file and load from file
 - vert groups, edge groups, poly groups
-- partial vertex buffer updates ???
-- dynamic z_near and far
 - mesh LOD using the AABBs
 - MeshInstanceAABB
 - dynamic shader reloading
-- separate UI updates for CPU and GPU for
-  CPU:
-  -> map previuos frame readback textures
-  -> map buffers for change
-  GPU:
-  -> unmap textures that will be invalidated
-  -> unmap buffer to lock them into place
 */
 
 
@@ -47,8 +42,9 @@ struct Mesh;
 // SOLID_WITH_WIREFRAME_NONE not that usefull, hard to read wireframe among the shading
 enum class DisplayMode {
 	SOLID,
-	SOLID_WITH_WIREFRAME_FRONT,
-	WIREFRANE
+	WIREFRAME_OVERLAY,
+	WIREFRANE,
+	AABB
 };
 
 /* which subprimitive holds the surface data to respond to the light */
@@ -59,6 +55,12 @@ namespace GPU_ShadingNormal {
 		TESSELATION
 	};
 }
+
+//
+//enum class SelectionMode {
+//
+//};
+
 
 /* light that is relative to the camera orientation */
 struct CameraLight {
@@ -74,7 +76,7 @@ struct MeshDrawcall {
 
 	DisplayMode display_mode;
 	bool is_back_culled;
-	bool _debug_show_octree;
+	bool render_aabbs;
 };
 
 
@@ -121,10 +123,10 @@ struct MeshWireframeColors {
 struct MeshInstance {
 	MeshInstanceSet* instance_set;
 	uint32_t index_in_buffer;
+
 	MeshLayer* parent_layer;
 
 	std::string name;  // user given name
-	//uint32_t id;  
 	bool visible;  // whether to render or not
 	// bool can_collide;
 
@@ -143,13 +145,24 @@ public:
 };
 
 
+struct MeshInstanceRef {
+	MeshInstanceSet* instance_set;
+	uint32_t index_in_buffer;
+
+public:
+	MeshInstance* get();
+};
+
+
 // Instances of mesh to rendered with a certain drawcall
 struct MeshInstanceSet {
 	Mesh* parent_mesh;
 
 	MeshDrawcall* drawcall;  // with what settings to render this set of instances
 
-	DeferredVector<MeshInstance> instances;  // the instances of the mesh to be rendered in one drawcall
+	// the instances of the mesh to be rendered in one drawcall
+	// adding or removing cause MeshInstance* to be invalid
+	DeferredVector<MeshInstance> instances;
 	std::vector<ModifiedMeshInstance> modified_instances;
 	dx11::ArrayBuffer<GPU_MeshInstance> gpu_instances;
 	ComPtr<ID3D11ShaderResourceView> gpu_instances_srv;
@@ -161,15 +174,19 @@ struct Mesh {
 	scme::SculptMesh mesh;
 
 	std::list<MeshInstanceSet> sets;
+
+	// should vertices for AABBs be generated for rendering
+	// and should they be rendered
+	bool render_aabbs;
 };
 
 
 struct MeshLayer {
-	MeshLayer* parent;
-	std::unordered_set<MeshLayer*> children;
+	MeshLayer* _parent;
+	std::unordered_set<MeshLayer*> _children;
 
 	std::string name;
-	std::unordered_set<MeshInstance*> instances;
+	std::list<MeshInstanceRef> instances;
 };
 
 
@@ -240,6 +257,9 @@ public:
 	std::list<MeshLayer> layers;
 	MeshLayer* last_used_layer;
 
+	// Selection
+	//std::list<MeshInstanceRef> mesh_selection;
+
 	// Shading
 	uint32_t shading_normal;
 
@@ -264,22 +284,28 @@ public:
 	// TODO: what happens if the last used drawcall is deleted
 	// void setLastUsedDrawcall();
 
+	Mesh& _createMesh();
+	MeshInstanceRef _addInstance(Mesh& mesh, MeshLayer* dest_layer, MeshDrawcall* dest_drawcall);
+	void _unparentInstanceFromParentLayer(MeshInstanceRef& instance);
+
 public:
 
 	// Instances
 
-	MeshInstance* copyInstance(MeshInstance* source, MeshDrawcall* dest_drawcall = nullptr);
+	// Invalidates MeshInstance*
+	MeshInstanceRef copyInstance(MeshInstanceRef& source);
 
-	//void deleteInstance(MeshInstance* inst);
+	// Invalidates MeshInstance*
+	void deleteInstance(MeshInstanceRef& inst);
 
-	void transferInstanceToLayer(MeshInstance* mesh_instance, MeshLayer* dest_layer);
+	void transferInstanceToLayer(MeshInstanceRef& instance, MeshLayer* dest_layer);
 
 	// Copies Instance from one set to another set of the same Mesh that has a set with the
 	// destination drawcall. If the set with the destination drawcall does not exist it is created
 	// 
-	// Returns pointer to instance allocated on a different instance set of the same mesh
-	// Warning: passed in pointer is invalidated
-	//MeshInstance* transferInstanceToDrawcall(MeshInstance* mesh_instance, MeshDrawcall* dest_drawcall);
+	// Returns a reference to instance allocated on a different instance set of the same mesh
+	// Invalidates MeshInstance* and MeshInstanceRef
+	//MeshInstanceRef moveInstanceToDrawcall(MeshInstanceRef& instance, MeshDrawcall* dest_drawcall);
 
 	void rotateInstanceAroundY(MeshInstance* mesh_instance, float radians);
 
@@ -292,6 +318,12 @@ public:
 	// Deletes a drawcall and moves instances to the last used drawcall
 	//void deleteDrawcall();
 
+	MeshDrawcall& getRootDrawcall();
+
+	// Iterate over all instances that are rendered with that drawcall and turn on AABB
+	// vertex generation
+	void shouldRenderAABBsForDrawcall(MeshDrawcall* drawcall, bool yes_or_no);
+
 
 	// Layers
 
@@ -300,29 +332,36 @@ public:
 
 	void transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
 
-	// Recursivelly sets all instances of a layer as invisible
+	// Recursivelly sets the visibility state for all instances of a layer
 	void setLayerVisibility(MeshLayer* layer, bool visible_state);
 
 
-	// Create Objects
-	MeshInstance* createEmptyMesh(MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createTriangle(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createQuad(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createCube(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	/*MeshInstance* createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
-	MeshInstance* createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	// Create Meshes
+	// All of them invalidate MeshInstance*
+
+	MeshInstanceRef createEmptyMesh(MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createTriangle(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createQuad(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createCube(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
-		std::vector<MeshInstance*>* r_instances = nullptr);
-	MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+		std::vector<MeshInstanceRef>* r_instances = nullptr);
+	//MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
+	// all children get converted into meshes and added to parent mesh
+	// Invalidates MeshInstance*
+	void joinMeshes(std::vector<MeshInstanceRef>& children, MeshInstanceRef& parent);
+
 
 	// Raycasts
 
 	// performs a raycast in the instance regardless of properties
-	bool raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
-		uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);
+	//bool raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
+	//	uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);*/
 
-	MeshInstance* mouseRaycastInstances(uint32_t& r_isect_poly, glm::vec3& r_isect_point);*/
+	// performs a raycast from camera position to pixel world position of the mouse
+	bool mouseRaycastInstances(MeshInstanceRef& r_isect_inst, uint32_t& r_isect_poly, glm::vec3& r_isect_point);
 
 
 	// Camera
@@ -341,10 +380,18 @@ public:
 
 	void setCameraRotation(float x, float y, float z);
 
+	//void frameCameraToSelection();
+
 
 	// Scene
 
+	// reset everything
 	void resetToHardcodedStartup();
+
+
+	// Other
+
+	void setShadingNormal(uint32_t shading_normal);
 };
 
 extern Application application;

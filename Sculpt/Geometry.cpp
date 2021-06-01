@@ -2,6 +2,11 @@
 // Header
 #include "Geometry.hpp"
 
+#include <corecrt_math_defines.h>
+
+// GLM
+#include "glm\ext\quaternion_common.hpp"
+
 
 bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
 {
@@ -63,14 +68,4 @@ glm::vec3 toNormal(float nord, float east)
 	rot = glm::normalize(rot);
 	
 	return glm::vec3(0, 0, -1) * rot;
-}
-
-float remapAboveTo01(float half_to_one)
-{
-	return (half_to_one - 0.5f) * 2.f;
-}
-
-float remapBelowTo01(float zero_to_half)
-{
-	return 1.f - (zero_to_half * 2.f);
 }

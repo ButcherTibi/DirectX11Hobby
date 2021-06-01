@@ -9,8 +9,7 @@ using namespace nui;
 //#pragma warning(4701 : disable)
 void Window::_updateCPU()
 {
-	draw_stacks.clear();
-
+	// not here not good
 	std::vector<Element*> leafs;
 	{
 		for (StoredElement& stored_elem : elements) {
@@ -19,34 +18,22 @@ void Window::_updateCPU()
 			if (elem->_children.size() == 0) {
 				leafs.push_back(elem);
 			}
-
-			draw_stacks[elem->z_index];
 		}
 	}
 
 	// Events
 	{
-		std::vector<EventsPassedElement> now_elems;
-		now_elems.resize(leafs.size());
+		bool emit_inside_events = true;
 
-		for (uint32_t i = 0; i < leafs.size(); i++) {
+		for (auto i = draw_stacks.rbegin(); i != draw_stacks.rend(); ++i) {
 
-			EventsPassedElement& passed = now_elems[i];
+			std::list<Element*>& elems = i->second;
 
-			passed.allow_inside_event = true;
-			passed.elem = leafs[i];
-		}
-		
-		std::vector<EventsPassedElement> next_elems;
+			for (auto j = elems.rbegin(); j != elems.rend(); ++j) {
 
-		while (now_elems.size()) {
-
-			for (EventsPassedElement passed : now_elems) {
-				passed.elem->_emitEvents(passed.allow_inside_event, next_elems);
+				Element* elem = *j;
+				elem->_emitEvents(emit_inside_events);
 			}
-
-			now_elems.swap(next_elems);
-			next_elems.clear();
 		}
 	}
 
@@ -73,8 +60,6 @@ void Window::_updateCPU()
 				for (Element* child : now_elem->_children) {
 					next_elems.push_back(child);
 				}
-
-				draw_stacks[now_elem->z_index].push_back(now_elem);
 			}
 
 			now_elems.swap(next_elems);
@@ -108,8 +93,12 @@ void Window::_updateCPU()
 	// Convert local to parent positions to screen relative
 	// And generate GPU Data
 	{
+		draw_stacks.clear();
+
 		struct PassedElement {
 			std::array<int32_t, 2> ancestor_pos;
+			int32_t ancestor_z_position;
+			uint32_t ancestor_z_index;
 			Element* elem;
 		};
 
@@ -121,6 +110,8 @@ void Window::_updateCPU()
 
 				PassedElement& passed_child = now_pelems.emplace_back();
 				passed_child.ancestor_pos = { 0, 0 };
+				passed_child.ancestor_z_position = 0;
+				passed_child.ancestor_z_index = 1;
 				passed_child.elem = child;
 			}
 		}
@@ -135,13 +126,26 @@ void Window::_updateCPU()
 				Element* elem = now_elem.elem;
 				elem->_position[0] += now_elem.ancestor_pos[0];
 				elem->_position[1] += now_elem.ancestor_pos[1];
-
 				elem->_generateGPU_Data();
+
+				int32_t z_position;
+				if (elem->z_index == 0) {
+					elem->_z_index = now_elem.ancestor_z_index;
+					z_position = now_elem.ancestor_z_position + 1;
+				}
+				else {
+					elem->_z_index = elem->z_index;
+					z_position = 0;
+				}
+
+				draw_stacks[elem->_z_index].push_back(elem);
 
 				for (Element* child : elem->_children) {
 
 					PassedElement& next_elem = next_pelems.emplace_back();
 					next_elem.ancestor_pos = elem->_position;
+					next_elem.ancestor_z_position = z_position;
+					next_elem.ancestor_z_index = elem->_z_index;
 					next_elem.elem = child;
 				}
 			}
@@ -154,6 +158,7 @@ void Window::_updateCPU()
 	// Mouse Delta Trap
 	if (delta_owner_elem != nullptr) {
 
+		// Trap the Mouse position
 		int32_t local_top = delta_owner_elem->_position[1];
 		int32_t local_bot = local_top + delta_owner_elem->_size[1];
 		int32_t local_left = delta_owner_elem->_position[0];
@@ -166,34 +171,32 @@ void Window::_updateCPU()
 		new_trap.left = client_rect.left + local_left;
 		new_trap.right = client_rect.left + local_right;
 
-		// reapply the mouse trap if the size or position of the traping element changes
-		if (new_trap.top != delta_trap_top ||
-			new_trap.bottom != delta_trap_bot ||
-			new_trap.left != delta_trap_left ||
-			new_trap.right != delta_trap_right)
-		{
-			ClipCursor(&new_trap);
+		ClipCursor(&new_trap);
 
-			delta_trap_top = new_trap.top;
-			delta_trap_bot = new_trap.bottom;
-			delta_trap_left = new_trap.left;
-			delta_trap_right = new_trap.right;
+		switch (delta_effect) {
+		case DeltaEffectType::LOOP: {
+			POINT mouse_screen_pos;
+			GetCursorPos(&mouse_screen_pos);
+
+			if (mouse_screen_pos.y <= new_trap.top) {
+				setLocalMousePosition(input.mouse_x, local_bot - 1);
+			}
+			else if (mouse_screen_pos.y >= new_trap.bottom - 1) {
+				setLocalMousePosition(input.mouse_x, local_top + 1);
+			}
+			else if (mouse_screen_pos.x <= new_trap.left) {
+				setLocalMousePosition(local_right + 1, input.mouse_y);
+			}
+			else if (mouse_screen_pos.x >= new_trap.right - 1) {
+				setLocalMousePosition(local_left + 1, input.mouse_y);
+			}
+			break;
 		}
 
-		POINT mouse_screen_pos;
-		GetCursorPos(&mouse_screen_pos);
-
-		if (mouse_screen_pos.y <= new_trap.top) {
-			setLocalMousePosition(input.mouse_x, local_bot - 1);
+		case DeltaEffectType::HIDDEN: {
+			setMouseVisibility(false);
+			break;
 		}
-		else if (mouse_screen_pos.y >= new_trap.bottom - 1) {
-			setLocalMousePosition(input.mouse_x, local_top + 1);
-		}
-		else if (mouse_screen_pos.x <= new_trap.left) {
-			setLocalMousePosition(local_right + 1, input.mouse_y);
-		}
-		else if (mouse_screen_pos.x >= new_trap.right - 1) {
-			setLocalMousePosition(local_left + 1, input.mouse_y);
 		}
 	}
 

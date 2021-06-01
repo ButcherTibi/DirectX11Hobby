@@ -27,6 +27,10 @@ public:
 	/* the see thru wireframe shader must discard pixels only relative to itself */
 	dx11::Texture wireframe_dtex;
 
+	// World Position of Pixels (RGBA format)
+	dx11::Texture world_pos_tex;
+	dx11::Texture world_pos_cputex;
+
 	//dx11::ConstantBuffer frame_ubuff;
 	dx11::Buffer frame_ubuff;
 
@@ -48,6 +52,7 @@ public:
 	ComPtr<ID3D11PixelShader> wire_ps;
 	ComPtr<ID3D11PixelShader> mesh_depth_only_ps;
 	ComPtr<ID3D11PixelShader> see_thru_wire_ps;
+	ComPtr<ID3D11PixelShader> aabb_ps;
 	ComPtr<ID3D11PixelShader> debug_ps;
 
 	ComPtr<ID3D11DepthStencilState> depth_stencil;
@@ -64,7 +69,8 @@ public:
 	void loadUniform();
 
 public:
-	void setWireframeDepthBias(int depth_bias);
+	void setWireframeDepthBias(int32_t depth_bias);
+	void getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_world_pos);
 
 	void draw(nui::SurfaceEvent& event);
 };

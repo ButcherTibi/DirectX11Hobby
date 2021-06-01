@@ -97,9 +97,16 @@ void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_da
 	root->_events.setKeyDownEvent(callback, key, user_data);
 }
 
-void Window::endMouseDelta()
+void Window::endMouseDeltaEffect()
 {
-	this->delta_owner_elem = nullptr;
+	switch (delta_effect) {
+	case DeltaEffectType::HIDDEN: {
+		setLocalMousePosition(begin_mouse_x, begin_mouse_y);
+		setMouseVisibility(true);
+	}
+	}
+
+	delta_owner_elem = nullptr;
 	ClipCursor(nullptr);
 }
 
@@ -136,35 +143,23 @@ bool Window::setLocalMousePosition(uint32_t x, uint32_t y)
 	return SetCursorPos(client_rect.left + x, client_rect.top + y);
 }
 
-bool Window::trapLocalMousePosition(BoundingBox2D<uint32_t>& box)
-{
-	RECT client_rect = getClientRectangle();
-
-	RECT rect;
-	rect.left = client_rect.left + box.x0;
-	rect.right = client_rect.left + box.x1;
-	rect.top = client_rect.top + box.y0;
-	rect.bottom = client_rect.top + box.y1;
-	return ClipCursor(&rect);
-}
-
 bool Window::untrapMousePosition()
 {
 	return ClipCursor(nullptr);
 }
 
-void Window::hideMousePointer(bool hide)
+void Window::setMouseVisibility(bool is_visible)
 {
-	if (hide) {
-		int32_t internal_display_counter = ShowCursor(false);
-		while (internal_display_counter  >= 0) {
-			internal_display_counter = ShowCursor(false);
-		}
-	}
-	else {
+	if (is_visible) {
 		int32_t internal_display_counter = ShowCursor(true);
 		while (internal_display_counter < 0) {
 			internal_display_counter = ShowCursor(true);
+		}
+	}
+	else {
+		int32_t internal_display_counter = ShowCursor(false);
+		while (internal_display_counter >= 0) {
+			internal_display_counter = ShowCursor(false);
 		}
 	}
 }

@@ -18,6 +18,7 @@ struct Instance {
 
 struct PixelIn {
 	float4 pos : SV_POSITION;
+	float3 world_pos : WORLD_POS;
 	float3 vertex_normal : VERTEX_NORMAL;
 	
 	nointerpolation uint vertex_id : VERTEX_ID;

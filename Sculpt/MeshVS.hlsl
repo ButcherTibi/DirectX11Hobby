@@ -59,26 +59,25 @@ float getLerp(float min, float center, float max)
 	return (center - min) / (max - min);
 }
 
-
+#pragma warning( disable : 3578 )
 PixelIn main(VertexIn vertex,
 	uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID)
 {
 	PixelIn output;
+	Instance instance = instances.Load(instance_id);
 	
-	// discard vertex
-	#pragma warning( disable : 3578 )
-	if (vertex.normal.x == 999999.f) {
-		output.pos.w = -1.f;
+	// Discard instance or vertex
+	if (instance.inst_rot.w == 2.f || vertex_id == 0) {
+		output.pos = float4(0.f, 0.f, 0.f, 0.f);
 		return output;
 	}
-	#pragma warning( default : 3578 )
-	
-	Instance instance = instances.Load(instance_id);
 	
 	// World Position
 	float3 pos = vertex.pos;
 	pos = quatRotate(pos, instance.inst_rot);
 	pos += instance.inst_pos;
+	
+	output.world_pos = pos;
 	
 	// Camera Position
 	pos -= camera_pos;

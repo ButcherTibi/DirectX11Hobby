@@ -5,135 +5,137 @@
 template<typename T>
 class DeferredVector;
 
-template<typename T>
-class LiteVector;
-
-
-template<typename T>
-struct LiteVectorIterator {
-	LiteVector<T>* parent;
-	uint32_t current_idx;
-
-	LiteVectorIterator() {};
-
-	bool operator!=(LiteVectorIterator& iter_right)
-	{
-		return parent != iter_right.parent || current_idx != iter_right.current_idx;
-	}
-
-	T& get()
-	{
-		return *(parent->data + current_idx);
-	}
-
-	inline uint32_t index()
-	{
-		return current_idx;
-	}
-
-	void next()
-	{
-		current_idx++;
-	}
-};
-
-
-template<typename T>
-class LiteVector {
-public:
-	uint32_t size;
-	uint32_t capacity;
-	T* data;
-
-	LiteVector()
-	{
-		size = 0;
-		capacity = 0;
-	}
-
-	void resize(uint32_t new_size)
-	{
-		if (capacity == 0) {
-			data = new T[new_size];
-			capacity = new_size;
-		}
-		else if (capacity < new_size) {
-
-			T* new_data = new T[new_size];
-
-			std::memcpy(new_data, data, capacity * sizeof(T));
-
-			delete[] data;
-
-			data = new_data;
-			capacity = new_size;
-		}
-
-		size = new_size;
-	}
-
-	void reserve(uint32_t new_capacity)
-	{
-		if (capacity == 0) {
-			data = new T[new_capacity];
-			capacity = new_capacity;
-		}
-		else if (new_capacity > capacity) {
-
-			T* new_data = new T[new_capacity];
-
-			std::memcpy(new_data, data, new_capacity * sizeof(T));
-
-			delete[] data;
-
-			data = new_data;
-			capacity = new_capacity;
-
-			// size unchanged
-		}
-	}
-
-	void clear()
-	{
-		size = 0;
-	}
-
-	T& operator[](uint32_t idx)
-	{
-		return data[idx];
-	}
-
-	T& emplace_back()
-	{
-		this->resize(size + 1);
-		return data[size - 1];
-	}
-
-	LiteVectorIterator<T> begin()
-	{
-		LiteVectorIterator<T> iter;
-		iter.parent= this;
-		iter.current_idx = 0;
-
-		return iter;
-	}
-
-	LiteVectorIterator<T> end()
-	{
-		LiteVectorIterator<T> iter;
-		iter.parent = this;
-		iter.current_idx = size;
-
-		return iter;
-	}
-
-	~LiteVector()
-	{
-		if (capacity) {
-			delete[] data;
-		}
-	}
-};
+// I did something wrong but what ?
+//template<typename T>
+//class LiteVector;
+//
+//
+//template<typename T>
+//struct LiteVectorIterator {
+//	LiteVector<T>* parent;
+//	uint32_t current_idx;
+//
+//	LiteVectorIterator() {};
+//
+//	bool operator!=(LiteVectorIterator& iter_right)
+//	{
+//		return parent != iter_right.parent || current_idx != iter_right.current_idx;
+//	}
+//
+//	T& get()
+//	{
+//		return *(parent->data + current_idx);
+//	}
+//
+//	inline uint32_t index()
+//	{
+//		return current_idx;
+//	}
+//
+//	void next()
+//	{
+//		current_idx++;
+//	}
+//};
+//
+//
+//template<typename T>
+//class LiteVector {
+//public:
+//	uint32_t size;
+//	uint32_t capacity;
+//	T* data;
+//
+//	LiteVector()
+//	{
+//		size = 0;
+//		capacity = 0;
+//	}
+//
+//	void resize(uint32_t new_size)
+//	{
+//		if (capacity == 0) {
+//			data = new T[new_size];
+//			capacity = new_size;
+//		}
+//		else if (capacity < new_size) {
+//
+//			T* new_data = new T[new_size];
+//
+//			std::memcpy(new_data, data, capacity * sizeof(T));
+//
+//			delete[] data;
+//
+//			data = new_data;
+//			capacity = new_size;
+//		}
+//
+//		size = new_size;
+//	}
+//
+//	void reserve(uint32_t new_capacity)
+//	{
+//		if (capacity == 0) {
+//			data = new T[new_capacity];
+//			capacity = new_capacity;
+//		}
+//		else if (new_capacity > capacity) {
+//
+//			T* new_data = new T[new_capacity];
+//
+//			std::memcpy(new_data, data, new_capacity * sizeof(T));
+//
+//			delete[] data;
+//
+//			data = new_data;
+//			capacity = new_capacity;
+//
+//			// size unchanged
+//		}
+//	}
+//
+//	void clear()
+//	{
+//		size = 0;
+//	}
+//
+//	T& operator[](uint32_t idx)
+//	{
+//		assert_cond(idx <= capacity);
+//		return data[idx];
+//	}
+//
+//	T& emplace_back()
+//	{
+//		this->resize(size + 1);
+//		return data[size - 1];
+//	}
+//
+//	LiteVectorIterator<T> begin()
+//	{
+//		LiteVectorIterator<T> iter;
+//		iter.parent= this;
+//		iter.current_idx = 0;
+//
+//		return iter;
+//	}
+//
+//	LiteVectorIterator<T> end()
+//	{
+//		LiteVectorIterator<T> iter;
+//		iter.parent = this;
+//		iter.current_idx = size;
+//
+//		return iter;
+//	}
+//
+//	~LiteVector()
+//	{
+//		if (capacity) {
+//			delete[] data;
+//		}
+//	}
+//};
 
 
 template<typename T>
@@ -144,22 +146,22 @@ struct DeferredVectorNode {
 
 
 template<typename T>
-class SparseVectorIterator {
+class DeferredVectorIterator {
 public:
 	DeferredVector<T>* _parent_vector;
 	uint32_t _current_idx;
 
 public:
-	SparseVectorIterator() {};
+	DeferredVectorIterator() {};
 
-	bool operator!=(SparseVectorIterator& iter_right)
+	bool operator!=(DeferredVectorIterator& iter_right)
 	{
 		return _parent_vector != iter_right._parent_vector || _current_idx != iter_right._current_idx;
 	}
 
 	T& get()
 	{
-		return _parent_vector->elems[_current_idx].elem;
+		return _parent_vector->nodes[_current_idx].elem;
 	}
 
 	inline uint32_t index()
@@ -169,7 +171,7 @@ public:
 
 	void next()
 	{
-		LiteVector<DeferredVectorNode<T>>& elems = _parent_vector->elems;
+		auto& nodes = _parent_vector->nodes;
 
 		_current_idx++;
 
@@ -178,7 +180,7 @@ public:
 				return;  // reached the end
 			}
 
-			if (elems[_current_idx].is_deleted == false) {
+			if (nodes[_current_idx].is_deleted == false) {
 				return;  // element found
 			}
 
@@ -200,8 +202,8 @@ public:
 	uint32_t _first_index;
 	uint32_t _last_index;
 
-	LiteVector<DeferredVectorNode<T>> elems;
-	LiteVector<uint32_t> deleted;
+	std::vector<DeferredVectorNode<T>> nodes;
+	std::vector<uint32_t> deleted;
 
 public:
 	DeferredVector()
@@ -209,68 +211,33 @@ public:
 		_size = 0;
 		_first_index = 0;
 		_last_index = 0;
+
+		//elems();
+		//deleted();
 	}
 
 	void resize(uint32_t new_size)
 	{
-		elems.resize(new_size);
-		deleted.clear();
+		nodes.resize(new_size);
 
 		_size = new_size;
-		_first_index = 0;
 		_last_index = new_size - 1;
-
-		// clear deleted flags
-		for (auto iter = elems.begin(); iter != elems.end(); iter.next()) {
-			DeferredVectorNode<T>& node = iter.get();
-			node.is_deleted = false;
-		}
 	}
 
 	void reserve(uint32_t new_capacity)
 	{
-		elems.reserve(new_capacity);
+		nodes.reserve(new_capacity);
 	}
-
-	//T* _tryReuseDeleted()
-	//{
-	//	for (auto iter = deleted.begin(); iter != deleted.end(); iter.next()) {
-
-	//		uint32_t& deleted_idx = iter.get();
-	//		if (deleted_idx != 0xFFFF'FFFF) {
-
-	//			// mark node as available
-	//			DeferredVectorNode<T>& recycled_node = elems[deleted_idx];
-	//			recycled_node.is_deleted = false;
-
-	//			// bounds update
-	//			if (deleted_idx < _first_index) {
-	//				_first_index = deleted_idx;
-	//			}
-	//			else if (deleted_idx > _last_index) {
-	//				_last_index = deleted_idx;
-	//			}
-
-	//			// remove from deleted list
-	//			deleted_idx = 0xFFFF'FFFF;
-
-	//			return &recycled_node.elem;
-	//		}
-	//	}
-
-	//	return nullptr;
-	//}
 
 	T& emplace(uint32_t& r_index)
 	{
 		// try reuse deleted
-		for (auto iter = deleted.begin(); iter != deleted.end(); iter.next()) {
+		for (uint32_t& deleted_idx : deleted) {
 
-			uint32_t& deleted_idx = iter.get();
 			if (deleted_idx != 0xFFFF'FFFF) {
 
 				// mark node as available
-				DeferredVectorNode<T>& recycled_node = elems[deleted_idx];
+				DeferredVectorNode<T>& recycled_node = nodes[deleted_idx];
 				recycled_node.is_deleted = false;
 
 				// bounds update
@@ -290,17 +257,18 @@ public:
 			}
 		}
 
+		_last_index = _size;
 		_size++;
 
-		r_index = elems.size;
+		r_index = nodes.size();
 
-		DeferredVectorNode<T>& new_node = elems.emplace_back();
+		DeferredVectorNode<T>& new_node = nodes.emplace_back();
 		return new_node.elem;
 	}
 
 	void erase(uint32_t index)
 	{
-		DeferredVectorNode<T>& node = elems[index];
+		DeferredVectorNode<T>& node = nodes[index];
 		if (node.is_deleted == false) {
 
 			node.is_deleted = true;
@@ -311,7 +279,7 @@ public:
 				uint32_t i = index + 1;
 
 				while (true) {
-					if (i == _last_index || elems[i].is_deleted == false) {
+					if (i == _last_index || nodes[i].is_deleted == false) {
 						_first_index = i;
 						break;
 					}
@@ -324,7 +292,7 @@ public:
 				uint32_t i = index - 1;
 
 				while (true) {
-					if (i == _first_index || elems[i].is_deleted == false) {
+					if (i == _first_index || nodes[i].is_deleted == false) {
 						_last_index = i;
 						break;
 					}
@@ -335,8 +303,7 @@ public:
 			_size--;
 
 			// add to delete list
-			for (auto iter = deleted.begin(); iter != deleted.end(); iter.next()) {
-				uint32_t& deleted_idx = iter.get();
+			for (uint32_t& deleted_idx : deleted) {
 				if (deleted_idx == 0xFFFF'FFFF) {
 					deleted_idx = index;
 					return;
@@ -356,12 +323,12 @@ public:
 	void clear()
 	{
 		// mark as deleted
-		for (auto iter = elems.begin(); iter != elems.end(); iter.next()) {
+		for (auto iter = nodes.begin(); iter != nodes.end(); iter.next()) {
 			DeferredVectorNode<T>& node = iter.get();
 			node.is_deleted = true;
 		}
 
-		elems.clear();
+		nodes.clear();
 		deleted.clear();
 
 		_size = 0;
@@ -371,26 +338,31 @@ public:
 
 	T& operator[](uint32_t idx)
 	{
-		return elems[idx].elem;
+		return nodes[idx].elem;
+	}
+
+	T& front()
+	{
+		return nodes[_first_index].elem;
 	}
 
 	T& back()
 	{
-		return elems[_last_index].elem;
+		return nodes[_last_index].elem;
 	}
 
-	SparseVectorIterator<T> begin()
+	DeferredVectorIterator<T> begin()
 	{
-		SparseVectorIterator<T> iter;
+		DeferredVectorIterator<T> iter;
 		iter._parent_vector = this;
 		iter._current_idx = _first_index;
 
 		return iter;
 	}
 
-	SparseVectorIterator<T> end()
+	DeferredVectorIterator<T> end()
 	{
-		SparseVectorIterator<T> iter;
+		DeferredVectorIterator<T> iter;
 		iter._parent_vector = this;
 		iter._current_idx = _last_index + 1;
 
@@ -403,8 +375,18 @@ public:
 		return _size;
 	}
 
+	inline uint32_t firstIndex()
+	{
+		return _first_index;
+	}
+
+	inline uint32_t lastIndex()
+	{
+		return _last_index;
+	}
+
 	inline uint32_t capacity()
 	{
-		return elems.capacity;
+		return nodes.capacity();
 	}
 };

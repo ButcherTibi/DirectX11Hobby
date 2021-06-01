@@ -25,17 +25,17 @@ namespace nui {
 
 		static auto getInputLayout(uint32_t input_slot = 0)
 		{
-			std::array<D3D11_INPUT_ELEMENT_DESC, 3> elems;
-			elems[0].SemanticName = "POSITION";
-			elems[0].Format = DXGI_FORMAT_R32G32_SINT;
+			std::array<D3D11_INPUT_ELEMENT_DESC, 3> nodes;
+			nodes[0].SemanticName = "POSITION";
+			nodes[0].Format = DXGI_FORMAT_R32G32_SINT;
 
-			elems[1].SemanticName = "TEXCOORD";
-			elems[1].Format = DXGI_FORMAT_R32G32_FLOAT;
+			nodes[1].SemanticName = "TEXCOORD";
+			nodes[1].Format = DXGI_FORMAT_R32G32_FLOAT;
 
-			elems[2].SemanticName = "INSTANCE_ID";
-			elems[2].Format = DXGI_FORMAT_R32_UINT;
+			nodes[2].SemanticName = "INSTANCE_ID";
+			nodes[2].Format = DXGI_FORMAT_R32_UINT;
 
-			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			for (D3D11_INPUT_ELEMENT_DESC& elem : nodes) {
 				elem.SemanticIndex = 0;
 				elem.InputSlot = input_slot;
 				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
@@ -43,7 +43,7 @@ namespace nui {
 				elem.InstanceDataStepRate = 0;
 			}
 
-			return elems;
+			return nodes;
 		}
 	};
 
@@ -53,11 +53,11 @@ namespace nui {
 
 		static auto getInputLayout(uint32_t input_slot = 0)
 		{
-			std::array<D3D11_INPUT_ELEMENT_DESC, 1> elems;
-			elems[0].SemanticName = "COLOR";
-			elems[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+			std::array<D3D11_INPUT_ELEMENT_DESC, 1> nodes;
+			nodes[0].SemanticName = "COLOR";
+			nodes[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
-			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			for (D3D11_INPUT_ELEMENT_DESC& elem : nodes) {
 				elem.SemanticIndex = 0;
 				elem.InputSlot = input_slot;
 				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
@@ -65,7 +65,7 @@ namespace nui {
 				elem.InstanceDataStepRate = 1;
 			}
 
-			return elems;
+			return nodes;
 		}
 	};
 
@@ -76,14 +76,14 @@ namespace nui {
 
 		static auto getInputLayout(uint32_t input_slot = 0)
 		{
-			std::array<D3D11_INPUT_ELEMENT_DESC, 2> elems;
-			elems[0].SemanticName = "POSITION";
-			elems[0].Format = DXGI_FORMAT_R32G32_SINT;
+			std::array<D3D11_INPUT_ELEMENT_DESC, 2> nodes;
+			nodes[0].SemanticName = "POSITION";
+			nodes[0].Format = DXGI_FORMAT_R32G32_SINT;
 
-			elems[1].SemanticName = "INSTANCE_ID";
-			elems[1].Format = DXGI_FORMAT_R32_UINT;
+			nodes[1].SemanticName = "INSTANCE_ID";
+			nodes[1].Format = DXGI_FORMAT_R32_UINT;
 
-			for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
+			for (D3D11_INPUT_ELEMENT_DESC& elem : nodes) {
 				elem.SemanticIndex = 0;
 				elem.InputSlot = input_slot;
 				elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
@@ -91,7 +91,7 @@ namespace nui {
 				elem.InstanceDataStepRate = 0;
 			}
 
-			return elems;
+			return nodes;
 		}
 	};
 

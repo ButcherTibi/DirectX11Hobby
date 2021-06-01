@@ -3,7 +3,7 @@
 
 struct PixelOutput {
 	float4 color : SV_Target0;
-	//uint2 instance_poly_id : SV_Target1;
+	float4 world_pos : SV_Target1;
 };
 
 cbuffer FrameUniforms : register(b0)
@@ -57,8 +57,7 @@ PixelOutput main(PixelIn input, uint primitive_id : SV_PrimitiveID)
 	
 	PixelOutput output;
 	output.color = float4(pbr_color, 1.);
-	//output.instance_poly_id[0] = input.instance_id;
-	//output.instance_poly_id[1] = input.poly_id;
+	output.world_pos = float4(input.world_pos, 0.12345);
 	
 	return output;
 }

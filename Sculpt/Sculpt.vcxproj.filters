@@ -53,6 +53,9 @@
     <Filter Include="Source Files\Shaders\Debug">
       <UniqueIdentifier>{57fdcfe4-ec96-45fe-b184-45510e932fa8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\AABBs">
+      <UniqueIdentifier>{dadc4d94-3243-47f2-bfaa-fb8643ebf1c4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -76,7 +79,7 @@
     <ClCompile Include="Geometry.cpp">
       <Filter>Source Files\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="SubPrimitives.cpp">
+    <ClCompile Include="Primitives.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
     <ClCompile Include="GPU_ShaderTypesMesh.cpp">
@@ -155,10 +158,18 @@
     <FxCompile Include="DebugPS.hlsl">
       <Filter>Source Files\Shaders\Debug</Filter>
     </FxCompile>
+    <FxCompile Include="AABB_PS.hlsl">
+      <Filter>Source Files\Shaders\AABBs</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="MeshPixelIn.hlsli">
       <Filter>Source Files\Shaders\Headers</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CommentGraphics.txt">
+      <Filter>Source Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

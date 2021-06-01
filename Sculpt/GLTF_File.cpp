@@ -122,7 +122,9 @@ std::vector<json::Value*>* expectJSON_Array(json::Field* field)
 			"expected JSON field \"" + std::string(#obj) + "\" to be of OBJECT type"); \
 	}
 
-constexpr char data_URI_prefix[38] = "data:application/octet-stream;base64,";
+
+constexpr auto data_URI_prefix = "data:application/octet-stream;base64,";
+std::string bin_suffix = ".bin";
 
 
 bool hasEnding(std::string& str, std::string& ending) {
@@ -614,7 +616,7 @@ ErrStack Structure::importGLTF(io::FilePath& path_to_gltf_file)
 					}
 				}
 				// Relative URI
-				else if (hasEnding(uri, std::string(".bin"))) {
+				else if (hasEnding(uri, bin_suffix)) {
 
 					io::FilePath file_path = relative_uri_root;
 					file_path.push_back(uri);

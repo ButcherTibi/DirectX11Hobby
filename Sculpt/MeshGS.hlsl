@@ -13,6 +13,7 @@ void main(triangle PixelIn input[3], uint primitive_id : SV_PrimitiveID,
 		
 		// Vertex
 		vertex.pos = input[i].pos;
+		vertex.world_pos = input[i].world_pos;
 		vertex.vertex_normal = input[i].vertex_normal;
 		
 		vertex.vertex_id = input[i].vertex_id;
@@ -30,6 +31,7 @@ void main(triangle PixelIn input[3], uint primitive_id : SV_PrimitiveID,
 		}
 		else {
 			vertex.tess_edge = 0;
+			vertex.tess_edge_dir = 0.12345;
 		}
 		
 		output.Append(vertex);

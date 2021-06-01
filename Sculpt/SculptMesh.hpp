@@ -93,23 +93,6 @@ namespace scme {
 	/* Winged-edge data structure */
 	struct Edge {
 	public:
-		//uint32_t target_v;
-		//// source_v is obtained from the previous loop around the polygon
-
-		//// next loop around vertex, if there is no other loop then point to itself
-		//// the loops that orbit the vertex always point outward (vertex != target_v)
-		//uint32_t v_next_loop;
-		//uint32_t v_prev_loop;
-
-		//uint32_t poly;  // each loop can only belong to ONE polygon
-		//uint32_t poly_next_loop;  // next loop around polygon
-		//uint32_t poly_prev_loop;
-
-		//// next loop that is parallel i.e the loop of the adjacent polygon,
-		//// if there is no other mirror loop the point to self
-		//uint32_t next_mirror_loop;
-		//uint32_t prev_mirror_loop;
-
 		// Double Linked list of edges around vertices
 		uint32_t v0;
 		uint32_t v0_next_edge;
@@ -149,23 +132,20 @@ namespace scme {
 		// the normal of the triangle or 
 		// the average normal of the 2 triangles composing the quad
 		glm::vec3 normal;
+		glm::vec3 tess_normals[2];
 
 		uint32_t edges[4];
 
 		uint8_t tesselation_type : 1,  // split from 0 to 2 or from 1 to 3
-			is_tris : 1,  // is it a triangle or quad
-
-			// orientation of the edges for faster iteration of vertices around poly
-			flip_edge_0 : 1,
-			flip_edge_1 : 1,
+			is_tris : 1,  // is it a triangle or quad	
+			flip_edge_0 : 1,  // orientation of the edges for faster iteration of vertices around poly
+			flip_edge_1 : 1,  // do not replace with edges[i].v0 == edges[i + 1].v0 stuff, it's slower
 			flip_edge_2 : 1,
-			flip_edge_3 : 1,
-			_pad : 2;
-
-		glm::vec3 tess_normals[2];
+			flip_edge_3 : 1, : 2;
 
 		Poly() {};
 	};
+	// NOTE TO SELF: wrong bit field syntax breaks MSVC hard
 
 
 	// Version 1 & 2: Naive implementation with vectors allocated per element
@@ -177,11 +157,6 @@ namespace scme {
 	public:
 		uint32_t root_aabb;
 		std::vector<VertexBoundingBox> aabbs;
-
-		// TODO:
-		// ScultMesh cache locality stupid solution :
-		// just store the vertices in verts vector grouped by AABB
-		// simple to maintain and fast
 
 		// the first vertex is not part of the mesh, it is only used to denote a deleted polygon in the
 		// index buffer
@@ -197,6 +172,10 @@ namespace scme {
 		dx11::ArrayBuffer<GPU_MeshTriangle> gpu_triangles;
 		ComPtr<ID3D11ShaderResourceView> gpu_triangles_srv;
 
+		// AABBs
+		std::vector<GPU_MeshVertex> gpu_aabb_verts;
+		dx11::Buffer aabb_vbuff;
+
 		// Settings
 		uint32_t max_vertices_in_AABB;
 
@@ -210,12 +189,16 @@ namespace scme {
 		void _deleteEdgeMemory(uint32_t edge);
 		void _deletePolyMemory(uint32_t poly);
 
+		void _printEdgeListOfVertex(uint32_t vertex_idx);
+
 	public:
 		// Axis Aligned Bounding Box ////////////////////////////////
 
 		void transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
 
 		void registerVertexToAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
+
+		void recreateAABBs();
 
 
 		// Internal Data Structures for primitives //////////////////
@@ -228,7 +211,7 @@ namespace scme {
 
 		// removes from edge list around the vertex
 		// trying to unregister the last edge has no effect
-		void unregisterEdgeFromVertexList(Edge* delete_edge, uint32_t vertex_idx, Vertex* vertex);
+		void unregisterEdgeFromVertex(Edge* delete_edge, uint32_t vertex_idx, Vertex* vertex);
 
 		void registerPolyToEdge(uint32_t new_poly, uint32_t edge);
 
@@ -237,6 +220,7 @@ namespace scme {
 		// Vertex ///////////////////////////////////////////////////
 
 		// calculates vertex normal based on the average normals of the connected polygons
+		// only called when updating vertex gpu data
 		void calcVertexNormal(uint32_t vertex);
 
 		// schedule a vertex to have it's data updated on the GPU side
@@ -252,7 +236,7 @@ namespace scme {
 		// create a edge between vertices
 		uint32_t createEdge(uint32_t v0, uint32_t v1);
 
-		void setEdge(uint32_t existing_loop, uint32_t src_vertex, uint32_t target_vertex);
+		void setEdge(uint32_t blank_edge, uint32_t v0, uint32_t v1);
 
 		// creates or returns existing edge between vertex 0 and vertex 1
 		uint32_t addEdge(uint32_t v0, uint32_t v1);
@@ -260,40 +244,46 @@ namespace scme {
 
 		// Poly ////////////////////////////////////////////////////
 
+		// calculate a normal based on the winding order of the vertices
+		// only called when updating poly gpu data
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
-
-		// recalculates a polygons normal
-		void recalcPolyNormal(Poly* poly);
 
 		// schedule a poly to have it's data updated on the GPU side
 		void markPolyFullUpdate(uint32_t poly);
 
-		// creates a new triangle from existing vertices, creates new edge between the vertices 
+		// creates a new triangle from existing vertices, creates new edges between the vertices 
 		// if they are not already present
 		uint32_t addTris(uint32_t v0, uint32_t v1, uint32_t v2);
 
-		// assemble the tris using blank edges and existing vertices
-		/*void setTris(uint32_t tris, uint32_t edge_0, uint32_t edge_1, uint32_t edge_2,
-			uint32_t v0, uint32_t v1, uint32_t v2);*/
+		// like addTris but doesn't create a new polygon
+		void setTris(uint32_t blank_tris, uint32_t v0, uint32_t v1, uint32_t v2);
 
-		// creates a new quad from existing vertices, creates new loops between the vertices
+		// creates a new quad from existing vertices, creates new edges between the vertices
 		// if they are not already present
 		uint32_t addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
+		// like addQuad but doesn't create a new polygon
 		void setQuad(uint32_t blank_quad, uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
 
+		// think capping a cylinder
 		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
 
 		void deletePoly(uint32_t poly);
 
+		void getTrisPrimitives(Poly* poly, uint32_t(&r_vertex_indexes)[3], Vertex* (&r_vertices)[3]);
+		void getTrisPrimitives(Poly* poly, Vertex* (&r_vertices)[3]);
+
+		void getQuadPrimitives(Poly* poly, uint32_t(&r_vertex_indexes)[4], Vertex* (&r_vertices)[4]);
+		void getQuadPrimitives(Poly* poly, Vertex* (&r_vertices)[4]);
+
 
 		// Queries ////////////////////////////////////////////
 
-		//bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
+		bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
 
 		// TODO: mark vertices that are processed to avoid duplicate runs and increse performance
-		//bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-			//uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_position);
+		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
+			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
 
 
 		////////////////////////////////////////////////////////////
@@ -301,14 +291,14 @@ namespace scme {
 		void createAsTriangle(float size);
 		void createAsQuad(float size);
 		void createAsCube(float size);
-		//void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped = true);
-		//void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns);
+		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped = true);
+		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns);
 
 		// Line (not sure to even bother to set up AABB)
 		void createAsLine(glm::vec3& origin, glm::vec3& direction, float length);
 		void changeLineOrigin(glm::vec3& new_origin);
 		void changeLineDirection(glm::vec3& new_direction);
 
-		//void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
+		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
 	};
 }

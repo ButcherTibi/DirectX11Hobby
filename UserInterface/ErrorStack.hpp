@@ -97,10 +97,10 @@ inline void assert_cond(bool condition) {
 #endif
 }
 
-inline void assert_cond(bool condition, const char* msg) {
+inline void assert_cond(bool condition, const char* fail_msg) {
 #ifndef NDEBUG  // or _DEBUG
 	if (condition != true) {
-		throw std::exception(msg);
+		throw std::exception(fail_msg);
 	}
 #endif
 }

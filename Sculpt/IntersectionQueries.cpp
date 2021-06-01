@@ -103,146 +103,176 @@ bool raycastTrisMollerTrumbore(glm::vec3& orig, glm::vec3& dir,
 	return true;
 }
 
-//
-//bool SculptMesh::raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly_idx, glm::vec3& r_point)
-//{
-//	Poly* poly = &polys[poly_idx];
-//
-//	if (poly->is_tris) {
-//
-//		Loop* l0 = &loops[poly->inner_loop];
-//		Loop* l1 = &loops[l0->poly_next_loop];
-//		Loop* l2 = &loops[l1->poly_next_loop];
-//
-//		Vertex* v0 = &verts[l0->target_v];
-//		Vertex* v1 = &verts[l1->target_v];
-//		Vertex* v2 = &verts[l2->target_v];
-//
-//		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
-//			v0->pos, v1->pos, v2->pos, r_point);
-//	}
-//
-//	Loop* l0 = &loops[poly->inner_loop];
-//	Loop* l1 = &loops[l0->poly_next_loop];
-//	Loop* l2 = &loops[l1->poly_next_loop];
-//	Loop* l3 = &loops[l2->poly_next_loop];
-//
-//	Vertex* v0 = &verts[l0->target_v];
-//	Vertex* v1 = &verts[l1->target_v];
-//	Vertex* v2 = &verts[l2->target_v];
-//	Vertex* v3 = &verts[l3->target_v];
-//
-//	if (poly->tesselation_type == 0) {
-//
-//		if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
-//			v0->pos, v1->pos, v2->pos, r_point))
-//		{
-//			return true;
-//		}
-//
-//		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
-//			v0->pos, v2->pos, v2->pos, r_point);
-//	}
-//
-//	if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
-//		v0->pos, v1->pos, v3->pos, r_point))
-//	{
-//		return true;
-//	}
-//
-//	return raycastTrisMollerTrumbore(ray_origin, ray_direction,
-//		v1->pos, v2->pos, v3->pos, r_point);
-//}
-//
-//bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-//	uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_position)
-//{
-//	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
-//	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
-//	std::vector<VertexBoundingBox*>& traced_aabbs = _traced_aabbs;
-//
-//	now_aabbs.resize(1);
-//	now_aabbs[0] = &aabbs[root_aabb];
-//
-//	traced_aabbs.clear();
-//
-//	// gather AABBs that intersect with ray
-//	while (now_aabbs.size()) {
-//		next_aabbs.clear();
-//
-//		for (VertexBoundingBox* now_aabb : now_aabbs) {
-//
-//			if (now_aabb->aabb.isRayIsect(ray_origin, ray_direction)) {
-//
-//				if (now_aabb->isLeaf()) {
-//					traced_aabbs.push_back(now_aabb);
-//				}
-//				else {
-//					// Schedule next
-//					for (uint32_t child_idx : now_aabb->children) {
-//						next_aabbs.push_back(&aabbs[child_idx]);
-//					}
-//				}
-//			}
-//		}
-//
-//		now_aabbs.swap(next_aabbs);
-//	}
-//
-//	// Depth sort traced AABBs ( LEAF AABBs DO NOT OVERLAP so they can depth discarded )
-//	std::sort(traced_aabbs.begin(), traced_aabbs.end(), [&](VertexBoundingBox* a, VertexBoundingBox* b) {
-//		float dist_a = glm::distance(ray_origin, a->aabb.max);
-//		float dist_b = glm::distance(ray_origin, b->aabb.max);
-//		return dist_a < dist_b;
-//	});
-//
-//	// Find closest triangle
-//	for (VertexBoundingBox* aabb : traced_aabbs) {
-//
-//		uint32_t closest_poly;
-//		float closest_distance = FLT_MAX;
-//		glm::vec3 closest_isect_position;
-//
-//		for (uint32_t v_idx : aabb->verts) {
-//
-//			if (v_idx != 0xFFFF'FFFF) {
-//
-//				Vertex* vertex = &verts[v_idx];
-//				
-//				// Loop around the vertex and check each polygon, store if closer
-//				if (!vertex->isPoint()) {
-//
-//					uint32_t loop_idx = vertex->away_loop;
-//					Loop* loop = &loops[loop_idx];
-//
-//					do {
-//						glm::vec3 isect_position;
-//						if (raycastPoly(ray_origin, ray_direction, loop->poly, isect_position)) {
-//
-//							float dist = glm::distance(ray_origin, isect_position);
-//							if (dist < closest_distance) {
-//								closest_distance = dist;
-//								closest_poly = loop->poly;
-//								closest_isect_position = isect_position;
-//							}
-//						}
-//
-//						loop_idx = loop->v_next_loop;
-//						loop = &loops[loop_idx];
-//					}
-//					while (loop_idx != vertex->away_loop);
-//				}
-//			}
-//		}
-//
-//		if (closest_distance != FLT_MAX) {
-//			
-//			r_isect_poly = closest_poly;
-//			r_isect_distance = closest_distance;
-//			r_isect_position = closest_isect_position;
-//			return true;
-//		}
-//	}
-//
-//	return false;
-//}
+
+#pragma warning(disable : 4702)
+bool SculptMesh::raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly_idx, glm::vec3& r_point)
+{
+	Poly* poly = &polys[poly_idx];
+
+	if (poly->is_tris) {
+
+		Vertex* vs[3];
+		getTrisPrimitives(poly, vs);
+
+		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
+			vs[0]->pos, vs[1]->pos, vs[2]->pos, r_point);
+	}
+	else {
+		Vertex* vs[4];
+		getQuadPrimitives(poly, vs);
+
+		if (poly->tesselation_type == 0) {
+
+			//  Tesselated Polygon 0 - 2
+			//  0-----------1
+			//  | \         |
+			//  |   \       |
+			//  |     \     |
+			//  |       \   |
+			//  |         \ |
+			//  3-----------2
+			if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
+				vs[0]->pos, vs[1]->pos, vs[2]->pos, r_point))
+			{
+				return true;
+			}
+
+			return raycastTrisMollerTrumbore(ray_origin, ray_direction,
+				vs[0]->pos, vs[2]->pos, vs[3]->pos, r_point);
+		}
+		else {
+
+			//  Tesselated Polygon 1 - 3
+			//  0-----------1
+			//  |         / |
+			//  |       /   |
+			//  |     /     |
+			//  |   /       |
+			//  | /         |
+			//  3-----------2
+			if (raycastTrisMollerTrumbore(ray_origin, ray_direction,
+				vs[0]->pos, vs[1]->pos, vs[3]->pos, r_point))
+			{
+				return true;
+			}
+
+			return raycastTrisMollerTrumbore(ray_origin, ray_direction,
+				vs[1]->pos, vs[2]->pos, vs[3]->pos, r_point);
+		}
+	}
+
+
+	return false;
+}
+#pragma warning(default : 4702)
+
+bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
+	uint32_t& r_isect_poly, glm::vec3& r_isect_position)
+{
+	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
+	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
+	std::vector<VertexBoundingBox*>& traced_aabbs = _traced_aabbs;
+
+	now_aabbs.resize(1);
+	now_aabbs[0] = &aabbs[root_aabb];
+
+	traced_aabbs.clear();
+
+	// gather AABBs that intersect with ray
+	while (now_aabbs.size()) {
+		next_aabbs.clear();
+
+		for (VertexBoundingBox* now_aabb : now_aabbs) {
+
+			if (now_aabb->aabb.isRayIsect(ray_origin, ray_direction)) {
+
+				if (now_aabb->isLeaf()) {
+					traced_aabbs.push_back(now_aabb);
+				}
+				else {
+					// Schedule next
+					for (uint32_t child_idx : now_aabb->children) {
+						next_aabbs.push_back(&aabbs[child_idx]);
+					}
+				}
+			}
+		}
+
+		now_aabbs.swap(next_aabbs);
+	}
+
+	// Depth sort traced AABBs
+	std::sort(traced_aabbs.begin(), traced_aabbs.end(), [&](VertexBoundingBox* a, VertexBoundingBox* b) {
+		float dist_a = glm::distance(ray_origin, a->aabb.max);
+		float dist_b = glm::distance(ray_origin, b->aabb.max);
+		return dist_a < dist_b;
+	});
+
+	// Find the closest triangle in the closest AABB
+	for (VertexBoundingBox* aabb : traced_aabbs) {
+
+		uint32_t closest_poly;
+		float closest_distance = FLT_MAX;
+		glm::vec3 closest_isect_position;
+
+		for (uint32_t v_idx : aabb->verts) {
+
+			if (v_idx != 0xFFFF'FFFF) {
+
+				Vertex* vertex = &verts[v_idx];
+				
+				// vertex -> edges -> polys[2]
+				if (vertex->isPoint() == false) {
+
+					uint32_t edge_idx = vertex->edge;
+					Edge* edge = &edges[edge_idx];
+
+					do {
+						if (edge->p0 !=  0xFFFF'FFFF) {
+
+							glm::vec3 isect_position;
+							if (raycastPoly(ray_origin, ray_direction, edge->p0, isect_position)) {
+
+								float dist = glm::distance(ray_origin, isect_position);
+								if (dist < closest_distance) {
+									closest_distance = dist;
+									closest_poly = edge->p0;
+									closest_isect_position = isect_position;
+								}
+							}
+						}
+
+						if (edge->p1 != 0xFFFF'FFFF) {
+
+							glm::vec3 isect_position;
+							if (raycastPoly(ray_origin, ray_direction, edge->p1, isect_position)) {
+
+								float dist = glm::distance(ray_origin, isect_position);
+								if (dist < closest_distance) {
+									closest_distance = dist;
+									closest_poly = edge->p1;
+									closest_isect_position = isect_position;
+								}
+							}
+						}
+
+						// Iter
+						edge_idx = edge->nextEdgeOf(v_idx);
+						edge = &edges[edge_idx];
+					}
+					while (edge_idx != vertex->edge);
+				}
+			}
+		}
+
+		// stop at the first (closest) AABB for hit
+		if (closest_distance != FLT_MAX) {
+			
+			r_isect_poly = closest_poly;
+			r_isect_position = closest_isect_position;
+			return true;
+		}
+	}
+
+	return false;
+}

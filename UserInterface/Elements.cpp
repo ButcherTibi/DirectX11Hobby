@@ -244,9 +244,24 @@ void EventsComponent::setKeyUpEvent(EventCallback callback, uint32_t key, void* 
 	}
 }
 
-void EventsComponent::beginMouseDelta(Element* elem)
+void EventsComponent::beginMouseLoopDeltaEffect(Element* elem)
 {
+	assert_cond(_window->delta_owner_elem == nullptr, "previous delta effect did not end");
+
+	_window->delta_effect = Window::DeltaEffectType::LOOP;
 	_window->delta_owner_elem = elem;
+}
+
+void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
+{
+	assert_cond(_window->delta_owner_elem == nullptr, "previous delta effect did not end");
+
+	_window->delta_effect = Window::DeltaEffectType::HIDDEN;
+	_window->delta_owner_elem = elem;
+
+	nui::Input& input = _window->input;
+	_window->begin_mouse_x = input.mouse_x;
+	_window->begin_mouse_y = input.mouse_y;
 }
 
 float EventsComponent::getInsideDuration()
@@ -445,13 +460,9 @@ void Element::_calcSizeRelativeToParent()
 }
 
 #pragma warning(disable : 4100)
-void Element::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children)
+void Element::_emitEvents(bool& allow_inside_events)
 {
-	for (Element* child : _children) {
-		EventsPassedElement& passed_child = r_next_children.emplace_back();
-		passed_child.allow_inside_event = allow_inside_events;
-		passed_child.elem = child;
-	}
+	// no events
 };
 
 void Element::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
@@ -491,16 +502,12 @@ Element* nui::getElementBase(StoredElement* elem)
 	return nullptr;
 }
 
-void Root::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children)
+#pragma warning(disable : 4100)
+void Root::_emitEvents(bool& allow_inside_events)
 {
 	_events._emitInsideEvents(_self);
-
-	for (Element* child : _children) {
-		EventsPassedElement& passed_child = r_next_children.emplace_back();
-		passed_child.allow_inside_event = allow_inside_events;
-		passed_child.elem = child;
-	}
 }
+#pragma warning(default : 4100)
 
 #pragma warning(disable : 4100)
 void Root::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
@@ -688,7 +695,7 @@ void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callba
 	this->_surface_event_user_data = user_data;
 }
 
-void Grid::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children)
+void Grid::_emitEvents(bool& allow_inside_events)
 {
 	if (allow_inside_events) {
 
@@ -713,13 +720,6 @@ void Grid::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement
 	else {
 		_events._emitOutsideEvents(_self);
 		allow_inside_events = true;
-	}
-
-	for (Element* child : _children) {
-
-		EventsPassedElement& passed_child = r_next_children.emplace_back();
-		passed_child.allow_inside_event = allow_inside_events;
-		passed_child.elem = child;
 	}
 }
 
@@ -991,9 +991,14 @@ void Grid::setMouseScrollEvent(EventCallback callback, void* user_data)
 	_events.setMouseScrollEvent(callback, user_data);
 }
 
-void Grid::beginMouseDelta()
+void Grid::beginMouseLoopDeltaEffect()
 {
-	_events.beginMouseDelta(this);
+	_events.beginMouseLoopDeltaEffect(this);
+}
+
+void Grid::beginMouseFixedDeltaEffect()
+{
+	_events.beginMouseFixedDeltaEffect(this);
 }
 
 void Menu::_init()
@@ -1010,12 +1015,12 @@ void Menu::_init()
 	_visible_menus.push_back(&root);
 }
 
-// #pragma warning(default : 4100)
-void Menu::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement>& r_next_children)
+void Menu::_emitEvents(bool& allow_inside_events)
 {
 	Input& input = _window->input;
 
-	bool found = false;
+	bool is_hovered = false;
+	bool is_clicked = false;
 	
 	for (int32_t i = _visible_menus.size() - 1; i >= 0; i--) {
 
@@ -1025,26 +1030,39 @@ void Menu::_emitEvents(bool allow_inside_events, std::vector<EventsPassedElement
 
 			if (item->_label_box.isInside(input.mouse_x, input.mouse_y)) {
 
-				// emit inside event
-				printf("item = %s \n", item->text.c_str());
+				if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition &&
+					item->_children.size() == 0 &&  // item is not a submenu
+					item->label_callback != nullptr)
+				{
+					item->label_callback(_window, _self, item->label_user_data);
+					is_clicked = true;
+				}
 
-				found = true;
+				is_hovered = true;
 				_visible_menus.resize(i + 2);
 				_visible_menus[i + 1] = item;
-				
-				//printf("count = %lld \n", _visible_menus.size());
 
 				break;
 			}
 		}
 	}
 
-	if (found) {
-		// emit outside events for everyone except visible_menu
+	// is the mouse over the menu
+	if (is_hovered) {
+
+		if (is_clicked) {
+			_visible_menus.resize(1);
+		}
+		allow_inside_events = false;
 	}
 	else {
-		_visible_menus.resize(1);
-		// emit outside events for everyone
+		uint8_t mouse_btns = input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down +
+			input.key_list[VirtualKeys::RIGHT_MOUSE_BUTTON].is_down;
+
+		if (_visible_menus.size() < 3 || mouse_btns) {
+
+			_visible_menus.resize(1);
+		}
 	}
 }
 
@@ -1186,13 +1204,6 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 
 				menu->_menu_box.pos = { menu_x, menu_y };
 				menu->_menu_box.size = { menu_width, (uint32_t)(pen_y - menu_y) };
-
-				RectInstance props;
-				props.screen_pos = menu->_menu_box.pos;
-				props.size = menu->_menu_box.size;
-				props.color = menu->menu_background_color;
-
-				_menu_background_render.addInstance(props);
 			}
 		}
 	}
@@ -1218,30 +1229,30 @@ void Menu::_draw()
 	_label_render.draw();
 }
 
-MenuItem* Menu::addItem(MenuItem* parent)
+MenuItem* Menu::addItem(MenuItem* parent, MenuStyle& style)
 {
 	if (parent == nullptr) {	
 		parent = &_items.front();
 	}
 
 	MenuItem& new_item = _items.emplace_back();
-	new_item._parent = parent;
+	new_item._parent = parent;;
+	new_item.label_callback = nullptr;
 
 	// Label
-	new_item.text = "";
-	new_item.font_family = "Roboto";
-	new_item.font_style = "Regular";
-	new_item.font_size = 14;
-	new_item.line_height = 0;
-	new_item.text_color.rgba = { 1, 1, 1, 1 };
+	new_item.font_family = style.font_family;
+	new_item.font_style = style.font_style;
+	new_item.font_size = style.font_size;
+	new_item.line_height = style.line_height;
+	new_item.text_color.rgba = style.text_color.rgba;
 
-	new_item.top_padding = 0;
-	new_item.bot_padding = 0;
-	new_item.left_padding = 0;
-	new_item.right_padding = 0;
+	new_item.top_padding = style.top_padding;
+	new_item.bot_padding = style.bot_padding;
+	new_item.left_padding = style.left_padding;
+	new_item.right_padding = style.right_padding;
 
 	// Menu
-	new_item.menu_background_color.setRGBA_UNORM(0, 0, 0, 0);
+	new_item.menu_background_color.rgba = style.menu_background_color.rgba;
 
 	parent->_children.push_back(&new_item);
 
