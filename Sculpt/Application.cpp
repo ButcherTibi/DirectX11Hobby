@@ -53,16 +53,18 @@ void Application::deleteInstance(MeshInstanceRef& ref)
 
 	MeshInstance* inst = ref.get();
 	MeshInstanceSet* instance_set = inst->instance_set;
+
+	// Delete Instance
 	instance_set->instances.erase(ref.index_in_buffer);
 
 	ModifiedMeshInstance& deleted_inst = instance_set->modified_instances.emplace_back();
 	deleted_inst.idx = ref.index_in_buffer;
 	deleted_inst.type = ModifiedInstanceType::DELETED;
 
-	// Delete Set
-	if (instance_set->instances.size() == 0) {
+	Mesh* mesh = instance_set->parent_mesh;
 
-		Mesh* mesh = instance_set->parent_mesh;
+	// Delete Set
+	if (instance_set->instances.size() == 0) {	
 
 		for (auto iter = mesh->sets.begin(); iter != mesh->sets.end(); iter++) {
 
@@ -74,6 +76,15 @@ void Application::deleteInstance(MeshInstanceRef& ref)
 	}
 
 	// Delete Mesh
+	if (mesh->sets.size() == 0) {
+		for (auto iter = meshes.begin(); iter != meshes.end(); iter++) {
+
+			if (&(*iter) == mesh) {
+				meshes.erase(iter);
+				break;
+			}
+		}
+	}
 }
 
 void Application::transferInstanceToLayer(MeshInstanceRef& ref, MeshLayer* dest_layer)
@@ -147,7 +158,7 @@ MeshDrawcall* Application::createDrawcall()
 	MeshDrawcall* new_drawcall = &drawcalls.emplace_back();
 	new_drawcall->display_mode = DisplayMode::SOLID;
 	new_drawcall->is_back_culled = false;
-	new_drawcall->render_aabbs = false;
+	new_drawcall->aabb_render_mode = AABB_RenderMode::NO_RENDER;
 
 	return new_drawcall;
 }
@@ -157,18 +168,18 @@ MeshDrawcall& Application::getRootDrawcall()
 	return drawcalls.front();
 }
 
-void Application::shouldRenderAABBsForDrawcall(MeshDrawcall* drawcall, bool yes_or_no)
+void Application::setAABB_RenderModeForDrawcall(MeshDrawcall* drawcall, AABB_RenderMode render_mode)
 {
-	drawcall->render_aabbs = yes_or_no;
+	drawcall->aabb_render_mode = render_mode;
 
 	for (Mesh& mesh : meshes) {
 		for (MeshInstanceSet& set : mesh.sets) {
 
 			if (set.drawcall == drawcall) {
-				mesh.render_aabbs = yes_or_no;
+				mesh.aabb_render_mode = render_mode;
 
 				// Free CPU Memory
-				if (yes_or_no == false) {
+				if (render_mode == AABB_RenderMode::NO_RENDER) {
 					mesh.mesh.gpu_aabb_verts.clear();
 					mesh.mesh.gpu_aabb_verts.shrink_to_fit();
 				}
@@ -212,7 +223,6 @@ Mesh& Application::_createMesh()
 
 	scme::SculptMesh& sculpt_mesh = new_mesh.mesh;
 	sculpt_mesh.gpu_triangles_srv = nullptr;
-	sculpt_mesh.max_vertices_in_AABB = 1024;
 
 	return new_mesh;
 }
@@ -277,7 +287,7 @@ MeshInstanceRef Application::createTriangle(CreateTriangleInfo& info,
 	new_instance->transform = info.transform;
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
-	mesh->mesh.createAsTriangle(info.size);
+	mesh->mesh.createAsTriangle(info.size, 1024);
 
 	return new_ref;
 }
@@ -290,7 +300,7 @@ MeshInstanceRef Application::createQuad(CreateQuadInfo& info,
 	new_instance->transform = info.transform;
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
-	mesh->mesh.createAsQuad(info.size);
+	mesh->mesh.createAsQuad(info.size, 1024);
 
 	return new_ref;
 }
@@ -303,7 +313,7 @@ MeshInstanceRef Application::createCube(CreateCubeInfo& info,
 	new_instance->transform = info.transform;
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
-	mesh->mesh.createAsCube(info.size);
+	mesh->mesh.createAsCube(info.size, 1024);
 
 	return new_ref;
 }
@@ -317,7 +327,7 @@ MeshInstanceRef Application::createCylinder(CreateCylinderInfo& info,
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
 	mesh->mesh.createAsCylinder(info.height, info.diameter,
-		info.rows, info.columns, info.with_caps);
+		info.rows, info.columns, info.with_caps, 1024);
 
 	return new_ref;
 }
@@ -330,7 +340,7 @@ MeshInstanceRef Application::createUV_Sphere(CreateUV_SphereInfo& info,
 	new_instance->transform = info.transform;
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
-	mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns);
+	mesh->mesh.createAsUV_Sphere(info.diameter, info.rows, info.columns, 1024);
 
 	return new_ref;
 }
@@ -371,7 +381,8 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 
 			if (gltf_prim.indexes.size()) {
 				if (gltf_prim.normals.size()) {
-					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals);
+					sculpt_mesh.createFromLists(gltf_prim.indexes, gltf_prim.positions, gltf_prim.normals,
+						1024);
 				}
 				else {
 					//new_mesh->addFromLists(prim.indexes, prim.positions, true);
@@ -488,134 +499,163 @@ bool Application::raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, gl
 	return mesh.raycastPolys(local_ray_origin, local_ray_dir, r_isect_poly, r_isect_distance, r_isect_point);
 }*/
 
-void Application::joinMeshes(std::vector<MeshInstanceRef>& children, MeshInstanceRef& parent)
-{
-	MeshInstance* parent_inst = parent.get();
-	scme::SculptMesh& parent_mesh = parent_inst->instance_set->parent_mesh->mesh;
 
-	uint32_t vertex_idx;
-	uint32_t edge_idx;
-	uint32_t poly_idx;
+void Application::joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t destination_idx)
+{
+	// History:
+	// Version 1
+	// This this was horrendously buggy, the deleted first vertex is so error prone
+	// I could make the first delete vertex be only a GPU thing but it seems even worse to have these
+	// problems on the GPU where already indexing is complicated
+	//
+	// Version 2
+	// Changed the rendering system so it's add an additional deleted vertex
+	
+	// Notes:
+	// - can't use memcpy as children reference local indexes, and meshes may be sparse so it would
+	//   copy deleted vertices
+	// - to make the converson form local mesh indexes to dest mesh indexes, copy from 0 to lastIndex
+	//   starting from firstIndex makes the offset too small and ending to capacity makes it too big
+	//   using the size is just bad as deleted element are not counted
+	
+	// Diagram:
+	// 0 1 2 3 5 6 7 8 9
+	//   X   X|  X   X
+
+	MeshInstance* dest_inst = sources[destination_idx].get();
+
+	scme::SculptMesh dest_mesh;
 	{
-		uint32_t vertex_count = parent_mesh.verts.size();
-		uint32_t edge_count = parent_mesh.edges.size();
-		uint32_t poly_count = parent_mesh.polys.size();
-		for (MeshInstanceRef& ref : children) {
+		uint32_t vertex_count = 0;
+		uint32_t edge_count = 0;
+		uint32_t poly_count = 0;
+		for (MeshInstanceRef& ref : sources) {
 
 			MeshInstance* child_inst = ref.get();
 			scme::SculptMesh& child_mesh = child_inst->instance_set->parent_mesh->mesh;
 
-			vertex_count += child_mesh.verts.size() - 1;  // account for deleted vertex
-			edge_count += child_mesh.edges.size();
-			poly_count += child_mesh.polys.size();
+			vertex_count += child_mesh.verts.lastIndex() + 1;
+			edge_count += child_mesh.edges.lastIndex() + 1;
+			poly_count += child_mesh.polys.lastIndex() + 1;
 		}
 
-		// Save where to start adding before starting resizing
-		vertex_idx = parent_mesh.verts.lastIndex() + 1;
-		edge_idx = parent_mesh.edges.lastIndex() + 1;
-		poly_idx = parent_mesh.polys.lastIndex() + 1;
-
-		parent_mesh.verts.resize(vertex_count);
-		parent_mesh.edges.resize(edge_count);
-		parent_mesh.polys.resize(poly_count);
+		dest_mesh.verts.resize(vertex_count);
+		dest_mesh.edges.resize(edge_count);
+		dest_mesh.polys.resize(poly_count);
 	}
-	
-	for (MeshInstanceRef& ref : children) {
 
+	uint32_t vertex_idx_offset = 0;
+	uint32_t edge_idx_offset = 0;
+	uint32_t poly_idx_offset = 0;
+	
+	for (uint32_t source_idx = 0; source_idx < sources.size(); source_idx++) {
+
+		MeshInstanceRef& ref = sources[source_idx];
 		MeshInstance* child_inst = ref.get();
 		scme::SculptMesh& child_mesh = child_inst->instance_set->parent_mesh->mesh;
 
-		glm::vec3 offset = child_inst->transform.pos - parent_inst->transform.pos;
-
+		glm::vec3 position_offset = child_inst->transform.pos - dest_inst->transform.pos;
 		// TODO: account for rotation on position and normal
 
-		uint32_t i = 0;
-		{
-			auto v_iter = child_mesh.verts.begin();
-			v_iter.next();
+		for (uint32_t i = 0; i <= child_mesh.verts.lastIndex(); i++) {
 
-			for (; v_iter != child_mesh.verts.begin(); v_iter.next()) {
+			if (child_mesh.verts.isDeleted(i) == false) {
 
-				scme::Vertex& src_vertex = v_iter.get();
+				scme::Vertex& src_vertex = child_mesh.verts[i];
 
-				scme::Vertex& dest_vertex = parent_mesh.verts[vertex_idx + i];
-				dest_vertex.pos = src_vertex.pos + offset;
+				uint32_t dest_vertex_idx = vertex_idx_offset + i;
+				scme::Vertex& dest_vertex = dest_mesh.verts[dest_vertex_idx];
+				dest_vertex.pos = src_vertex.pos + position_offset;
 				dest_vertex.normal = src_vertex.normal;
-				dest_vertex.edge = src_vertex.edge + edge_idx;
-				// aabb invalid
-				// idx_in_aabb invalid
+				dest_vertex.edge = edge_idx_offset + src_vertex.edge;
 
-				parent_mesh.markVertexFullUpdate(v_iter.index());
-
-				i++;
-			}
-		}
-
-		i = 0;
-		for (auto iter = child_mesh.edges.begin(); iter != child_mesh.edges.begin(); iter.next()) {
-
-			scme::Edge& src_edge = iter.get();
-
-			scme::Edge& dest_edge = parent_mesh.edges[edge_idx + i];
-			dest_edge.v0 = src_edge.v0 + vertex_idx;
-			dest_edge.v0_next_edge = src_edge.v0_next_edge + edge_idx;
-			dest_edge.v0_prev_edge = src_edge.v0_prev_edge + edge_idx;
-
-			dest_edge.v1 = src_edge.v1 + vertex_idx;
-			dest_edge.v1_next_edge = src_edge.v1_next_edge + edge_idx;
-			dest_edge.v1_prev_edge = src_edge.v1_prev_edge + edge_idx;
-
-			if (src_edge.p0 != 0xFFFF'FFFF) {
-				dest_edge.p0 = src_edge.p0 + poly_idx;
+				dest_mesh.markVertexFullUpdate(dest_vertex_idx);
 			}
 			else {
-				dest_edge.p0 = src_edge.p0;
+				dest_mesh.verts.erase(i);
 			}
-			
-			if (src_edge.p1 != 0xFFFF'FFFF) {
-				dest_edge.p1 = src_edge.p1 + poly_idx;
+		}
+
+		for (uint32_t i = 0; i <= child_mesh.edges.lastIndex(); i++) {
+
+			if (child_mesh.edges.isDeleted(i) == false) {
+
+				scme::Edge& src_edge = child_mesh.edges[i];
+
+				scme::Edge& dest_edge = dest_mesh.edges[edge_idx_offset + i];
+				dest_edge.v0 = vertex_idx_offset + src_edge.v0;
+				dest_edge.v0_next_edge = edge_idx_offset + src_edge.v0_next_edge;
+				dest_edge.v0_prev_edge = edge_idx_offset + src_edge.v0_prev_edge;
+
+				dest_edge.v1 = vertex_idx_offset + src_edge.v1;
+				dest_edge.v1_next_edge = edge_idx_offset + src_edge.v1_next_edge;
+				dest_edge.v1_prev_edge = edge_idx_offset + src_edge.v1_prev_edge;
+
+				if (src_edge.p0 != 0xFFFF'FFFF) {
+					dest_edge.p0 = src_edge.p0 + poly_idx_offset;
+				}
+				else {
+					dest_edge.p0 = src_edge.p0;
+				}
+
+				if (src_edge.p1 != 0xFFFF'FFFF) {
+					dest_edge.p1 = src_edge.p1 + poly_idx_offset;
+				}
+				else {
+					dest_edge.p1 = src_edge.p1;
+				}
 			}
 			else {
-				dest_edge.p1 = src_edge.p1;
+				dest_mesh.edges.erase(i);
 			}
-
-			i++;
 		}
 
-		i = 0;
-		for (auto iter = child_mesh.polys.begin(); iter != child_mesh.polys.begin(); iter.next()) {
+		for (uint32_t i = 0; i <= child_mesh.polys.lastIndex(); i++) {
 
-			scme::Poly& src_poly = iter.get();
-			scme::Poly& dest_poly = parent_mesh.polys[poly_idx + i];
-			dest_poly.normal = src_poly.normal;
-			dest_poly.tess_normals[0] = src_poly.tess_normals[0];
-			dest_poly.tess_normals[2] = src_poly.tess_normals[1];
-			dest_poly.edges[0] = edge_idx + src_poly.edges[0];
-			dest_poly.edges[1] = edge_idx + src_poly.edges[1];
-			dest_poly.edges[2] = edge_idx + src_poly.edges[2];
+			if (child_mesh.polys.isDeleted(i) == false) {
 
-			if (src_poly.is_tris == false) {
-				dest_poly.edges[3] = edge_idx + src_poly.edges[3];
+				scme::Poly& src_poly = child_mesh.polys[i];
+
+				uint32_t dest_poly_idx = poly_idx_offset + i;
+				scme::Poly& dest_poly = dest_mesh.polys[dest_poly_idx];
+				dest_poly.normal = src_poly.normal;
+				dest_poly.tess_normals[0] = src_poly.tess_normals[0];
+				dest_poly.tess_normals[2] = src_poly.tess_normals[1];
+				dest_poly.edges[0] = edge_idx_offset + src_poly.edges[0];
+				dest_poly.edges[1] = edge_idx_offset + src_poly.edges[1];
+				dest_poly.edges[2] = edge_idx_offset + src_poly.edges[2];
+
+				if (src_poly.is_tris == false) {
+					dest_poly.edges[3] = edge_idx_offset + src_poly.edges[3];
+				}
+
+				dest_poly.tesselation_type = src_poly.tesselation_type;
+				dest_poly.is_tris = src_poly.is_tris;
+				dest_poly.flip_edge_0 = src_poly.flip_edge_0;
+				dest_poly.flip_edge_1 = src_poly.flip_edge_1;
+				dest_poly.flip_edge_2 = src_poly.flip_edge_2;
+				dest_poly.flip_edge_3 = src_poly.flip_edge_3;
+
+				dest_mesh.markPolyFullUpdate(dest_poly_idx);
 			}
-
-			dest_poly.tesselation_type = src_poly.tesselation_type;
-			dest_poly.is_tris = src_poly.is_tris;
-			dest_poly.flip_edge_0 = src_poly.flip_edge_0;
-			dest_poly.flip_edge_1 = src_poly.flip_edge_1;
-			dest_poly.flip_edge_2 = src_poly.flip_edge_2;
-			dest_poly.flip_edge_3 = src_poly.flip_edge_3;
-
-			i++;
+			else {
+				dest_mesh.polys.erase(i);
+			}
 		}
 
-		vertex_idx += child_mesh.verts.size() - 1;
-		edge_idx += child_mesh.edges.size();
-		poly_idx += child_mesh.polys.size();
+		vertex_idx_offset += child_mesh.verts.lastIndex() + 1;
+		edge_idx_offset += child_mesh.edges.lastIndex() + 1;
+		poly_idx_offset += child_mesh.polys.lastIndex() + 1;
 
-		deleteInstance(ref);
+		if (source_idx != destination_idx) {
+			application.deleteInstance(ref);
+		}
 	}
 
-	parent_mesh.recreateAABBs();
+	scme::SculptMesh& source_mesh = dest_inst->instance_set->parent_mesh->mesh;
+	dest_mesh.recreateAABBs(source_mesh.max_vertices_in_AABB);
+
+	source_mesh = dest_mesh;
 }
 
 bool Application::mouseRaycastInstances(MeshInstanceRef& r_isect_inst, uint32_t& r_isect_poly,
@@ -850,4 +890,77 @@ void Application::resetToHardcodedStartup()
 void Application::setShadingNormal(uint32_t new_shading_normal)
 {
 	this->shading_normal = new_shading_normal;
+}
+
+void endFrameEvents(nui::Window*, void*)
+{
+	for (Mesh& mesh : application.meshes) {
+
+		scme::SculptMesh& sculpt_mesh = mesh.mesh;
+
+		if (sculpt_mesh.modified_polys.size() > 0) {
+
+			for (scme::ModifiedPoly& modified_poly : sculpt_mesh.modified_polys) {
+
+				switch (modified_poly.state) {
+				case scme::ModifiedPolyState::UPDATE: {
+
+					if (sculpt_mesh.polys.isDeleted(modified_poly.idx)) {
+						continue;
+					}
+
+					scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
+
+					if (poly.is_tris) {
+
+						std::array<scme::Vertex*, 3> vs;
+						sculpt_mesh.getTrisPrimitives(&poly, vs);
+
+						// Triangle Normal
+						poly.normal = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
+					}
+					else {
+						std::array<scme::Vertex*, 4> vs;
+						sculpt_mesh.getQuadPrimitives(&poly, vs);
+
+						// Tesselation and Normals
+						if (glm::distance(vs[0]->pos, vs[2]->pos) < glm::distance(vs[1]->pos, vs[3]->pos)) {
+
+							poly.tesselation_type = 0;
+							poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
+							poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[0], vs[2], vs[3]);
+						}
+						else {
+							poly.tesselation_type = 1;
+							poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[3]);
+							poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[1], vs[2], vs[3]);
+						}
+						poly.normal = glm::normalize((poly.tess_normals[0] + poly.tess_normals[1]) / 2.f);
+					}
+					break;
+				}
+				}
+			}
+		}
+
+		if (sculpt_mesh.modified_verts.size() > 0) {
+
+			for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
+
+				switch (modified_v.state) {
+				case scme::ModifiedVertexState::UPDATE: {
+
+					// it is posible to have the vertex as both deleted and updated multiple times
+					// when running multiple sculpt mesh operations
+					if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
+
+						sculpt_mesh.moveVertexInAABBs(modified_v.idx);
+						sculpt_mesh.calcVertexNormal(modified_v.idx);
+					}
+					break;
+				}
+				}
+			}
+		}
+	}
 }

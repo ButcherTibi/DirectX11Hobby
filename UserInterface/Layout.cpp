@@ -21,7 +21,7 @@ void Window::_updateCPU()
 		}
 	}
 
-	// Events
+	// Element Events
 	{
 		bool emit_inside_events = true;
 
@@ -34,6 +34,13 @@ void Window::_updateCPU()
 				Element* elem = *j;
 				elem->_emitEvents(emit_inside_events);
 			}
+		}
+	}
+
+	// Window Events
+	{
+		if (finalEvent != nullptr) {
+			finalEvent(this, final_event_user_data);
 		}
 	}
 

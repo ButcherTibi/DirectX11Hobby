@@ -13,7 +13,7 @@
 
 #include "ErrorStack.hpp"
 #include "Geometry.hpp"
-#include "DeferredVector.hpp"
+#include "SparseVector.hpp"
 #include "GPU_ShaderTypesMesh.hpp"
 
 
@@ -71,8 +71,12 @@ namespace scme {
 	};
 
 
-	// NOTE_TO_SELF: Making the AABB actully contain the vertices is a terrible idea if you ever
-	// need to update the mesh because you need to update all primitives that reference that vertex
+	// NOTES:
+	// - Making the AABB actully contain the vertices is a terrible idea if you ever
+	//   need to update the mesh because you need to update all primitives that reference that vertex
+	// - All AABBs get divided into 8, even if child AABBs are unused,
+	//   this is to not require storing which vertices belong to each child in a buffer before assigning them to
+	//   to the child AABB, as well as to enable resizing the AABB vector only once for all 8 children
 	struct VertexBoundingBox {
 		uint32_t parent;
 		uint32_t children[8];
@@ -85,8 +89,8 @@ namespace scme {
 		//bool _debug_show_tesselation;  // TODO:
 
 	public:
-		bool isUnused();
 		bool isLeaf();
+		bool hasVertices();
 	};
 
 
@@ -148,6 +152,7 @@ namespace scme {
 	// NOTE TO SELF: wrong bit field syntax breaks MSVC hard
 
 
+	// History:
 	// Version 1 & 2: Naive implementation with vectors allocated per element
 	// Version 3: Edge list inspired allocation-less primitives with AABBs (top down only search)
 	// Version 4: Partial GPU updatable buffer with change log, merged rendering data
@@ -158,15 +163,13 @@ namespace scme {
 		uint32_t root_aabb;
 		std::vector<VertexBoundingBox> aabbs;
 
-		// the first vertex is not part of the mesh, it is only used to denote a deleted polygon in the
-		// index buffer
-		DeferredVector<Vertex> verts;
+		SparseVector<Vertex> verts;
 		std::vector<ModifiedVertex> modified_verts;
 		dx11::ArrayBuffer<GPU_MeshVertex> gpu_verts;
 
-		DeferredVector<Edge> edges;
+		SparseVector<Edge> edges;
 
-		DeferredVector<Poly> polys;
+		SparseVector<Poly> polys;
 		std::vector<ModifiedPoly> modified_polys;
 		dx11::ArrayBuffer<uint32_t> gpu_indexes;
 		dx11::ArrayBuffer<GPU_MeshTriangle> gpu_triangles;
@@ -189,16 +192,16 @@ namespace scme {
 		void _deleteEdgeMemory(uint32_t edge);
 		void _deletePolyMemory(uint32_t poly);
 
-		void _printEdgeListOfVertex(uint32_t vertex_idx);
+		void printEdgeListOfVertex(uint32_t vertex_idx);
 
 	public:
 		// Axis Aligned Bounding Box ////////////////////////////////
 
-		void transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
+		void _transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
 
-		void registerVertexToAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
+		void moveVertexInAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
 
-		void recreateAABBs();
+		void recreateAABBs(uint32_t max_vertices_in_AABB = 0);
 
 
 		// Internal Data Structures for primitives //////////////////
@@ -270,11 +273,13 @@ namespace scme {
 
 		void deletePoly(uint32_t poly);
 
-		void getTrisPrimitives(Poly* poly, uint32_t(&r_vertex_indexes)[3], Vertex* (&r_vertices)[3]);
-		void getTrisPrimitives(Poly* poly, Vertex* (&r_vertices)[3]);
+		void getTrisPrimitives(Poly* poly, std::array<uint32_t, 3>& r_vertex_indexes, std::array<Vertex*, 3>& r_vertices);
+		void getTrisPrimitives(Poly* poly, std::array<uint32_t, 3>& r_vertex_indexes);
+		void getTrisPrimitives(Poly* poly, std::array<Vertex*, 3>& r_vertices);
 
-		void getQuadPrimitives(Poly* poly, uint32_t(&r_vertex_indexes)[4], Vertex* (&r_vertices)[4]);
-		void getQuadPrimitives(Poly* poly, Vertex* (&r_vertices)[4]);
+		void getQuadPrimitives(Poly* poly, std::array<uint32_t, 4>& r_vertex_indexes, std::array<Vertex*, 4>& r_vertices);
+		void getQuadPrimitives(Poly* poly, std::array<uint32_t, 4>& r_vertex_indexes);
+		void getQuadPrimitives(Poly* poly, std::array<Vertex*, 4>& r_vertices);
 
 
 		// Queries ////////////////////////////////////////////
@@ -286,19 +291,27 @@ namespace scme {
 			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
 
 
-		////////////////////////////////////////////////////////////
-
-		void createAsTriangle(float size);
-		void createAsQuad(float size);
-		void createAsCube(float size);
-		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped = true);
-		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns);
+		// Creation //////////////////////////////////////////////////////////
+		void createAsTriangle(float size, uint32_t max_vertices_in_AABB);
+		void createAsQuad(float size, uint32_t max_vertices_in_AABB);
+		void createAsCube(float size, uint32_t max_vertices_AABB);
+		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped, uint32_t max_vertices_AABB);
+		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns, uint32_t max_vertices_AABB);
 
 		// Line (not sure to even bother to set up AABB)
 		void createAsLine(glm::vec3& origin, glm::vec3& direction, float length);
 		void changeLineOrigin(glm::vec3& new_origin);
 		void changeLineDirection(glm::vec3& new_direction);
 
-		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals);
+		void createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
+			std::vector<glm::vec3>& normals, uint32_t max_vertices_AABB);
+	
+		
+		// Prints /////////////////////////////////////////////////////////////
+
+		void printVerices();
+
+
+		// Other
 	};
 }

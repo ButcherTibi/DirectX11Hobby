@@ -5,146 +5,98 @@
 
 using namespace scme;
 
+void SculptMesh::createAsTriangle(float size, uint32_t max_vertices_AABB)
+{
+	verts.resize(3);
 
-void SculptMesh::createAsTriangle(float size)
+	float half = size / 2;
+	verts[0].pos = { 0, half, 0 };
+	verts[1].pos = { half, -half, 0 };
+	verts[2].pos = { -half, -half, 0 };
+
+	for (uint8_t i = 0; i < 3; i++) {
+		verts[i].init();
+
+		markVertexFullUpdate(i);
+	}
+
+	addTris(0, 1, 2);
+
+	recreateAABBs(max_vertices_AABB);
+}
+
+void SculptMesh::createAsQuad(float size, uint32_t max_vertices_AABB)
 {
 	verts.resize(4);
 
 	float half = size / 2;
-	verts[0].normal.x = 999'999.f;
-	verts[1].pos = { 0, half, 0 };
+	verts[0].pos = { -half, half, 0 };
+	verts[1].pos = { half, half, 0 };
 	verts[2].pos = { half, -half, 0 };
 	verts[3].pos = { -half, -half, 0 };
 
-	for (uint8_t i = 1; i < 4; i++) {
+	for (uint8_t i = 0; i < 4; i++) {
 		verts[i].init();
-		verts[i].normal = { 0, 0, 1 };
 
 		markVertexFullUpdate(i);
 	}
 
-	addTris(1, 2, 3);
+	addQuad(0, 1, 2, 3);
 
-	VertexBoundingBox& root = aabbs.emplace_back();
-	root.parent = 0xFFFF'FFFF;
-	root.children[0] = 0xFFFF'FFFF;
-	root.aabb.max = { half, half, half };
-	root.aabb.min = { -half, -half, -half };
-	root.verts_deleted_count = 0;
-
-	root_aabb = 0;
-
-	for (uint32_t i = 1; i < verts.size(); i++) {
-		registerVertexToAABBs(i, 0);
-	}
-}
-
-void SculptMesh::createAsQuad(float size)
-{
-	verts.resize(5);
-
-	float half = size / 2;
-	verts[0].normal.x = 999'999.f;
-	verts[1].pos = { -half, half, 0 };
-	verts[2].pos = { half, half, 0 };
-	verts[3].pos = { half, -half, 0 };
-	verts[4].pos = { -half, -half, 0 };
-
-	for (uint8_t i = 1; i < 5; i++) {
-		verts[i].init();
-		verts[i].normal = { 0, 0, 1 };
-
-		markVertexFullUpdate(i);
-	}
-
-	addQuad(1, 2, 3, 4);
-
-	VertexBoundingBox& octree = aabbs.emplace_back();
-	octree.parent = 0xFFFF'FFFF;
-	octree.children[0] = 0xFFFF'FFFF;
-	octree.aabb.max = { half, half, half };
-	octree.aabb.min = { -half, -half, -half };
-	octree.verts_deleted_count = 0;
-
-	root_aabb = 0;
-
-	for (uint32_t i = 1; i < verts.size(); i++) {
-		registerVertexToAABBs(i, 0);
-	}
+	recreateAABBs(max_vertices_AABB);
 }
 
 /*
-		5--------6
+		4--------5
 	   /|       /|
 	  / |      / |
-	 1--------2  |
-	 |  8-----|--7
+	 0--------1  |
+	 |  7-----|--6
 	 | /      | /
 	 |/       |/
-	 4--------3
+	 3--------2
 */
 
-void SculptMesh::createAsCube(float size)
+void SculptMesh::createAsCube(float size, uint32_t max_vertices_AABB)
 {
-	verts.resize(9);
+	verts.resize(8);
 
 	float half = size / 2;
 
 	// Front
-	verts[0].normal.x = 999'999.f;
-	verts[1].pos = { -half,  half, half };
-	verts[2].pos = {  half,  half, half };
-	verts[3].pos = {  half, -half, half };
-	verts[4].pos = { -half, -half, half };
+	verts[0].pos = { -half,  half, half };
+	verts[1].pos = { half,  half, half };
+	verts[2].pos = { half, -half, half };
+	verts[3].pos = { -half, -half, half };
 	
 	// Back
-	verts[5].pos = { -half,  half, -half };
-	verts[6].pos = {  half,  half, -half };
-	verts[7].pos = {  half, -half, -half };
-	verts[8].pos = { -half, -half, -half };
+	verts[4].pos = { -half,  half, -half };
+	verts[5].pos = { half,  half, -half };
+	verts[6].pos = { half, -half, -half };
+	verts[7].pos = { -half, -half, -half };
 
-	for (uint8_t i = 1; i < verts.size(); i++) {
+	for (uint8_t i = 0; i < verts.size(); i++) {
 		verts[i].init();
 
 		markVertexFullUpdate(i);
 	}
 
-	addQuad(1, 2, 3, 4);  // front
-	addQuad(2, 6, 7, 3);  // right
-	addQuad(6, 5, 8, 7);  // back
-	addQuad(5, 1, 4, 8);  // left
-	addQuad(1, 5, 6, 2);  // top
-	addQuad(4, 3, 7, 8);  // bot
+	addQuad(0, 1, 2, 3);  // front
+	addQuad(1, 5, 6, 2);  // right
+	addQuad(5, 4, 7, 6);  // back
+	addQuad(4, 0, 3, 7);  // left
+	addQuad(0, 4, 5, 1);  // top
+	addQuad(3, 2, 6, 7);  // bot
 
-	VertexBoundingBox& octree = aabbs.emplace_back();
-	octree.parent = 0xFFFF'FFFF;
-	octree.children[0] = 0xFFFF'FFFF;
-	octree.aabb.max = { half, half, half };
-	octree.aabb.min = { -half, -half, -half };
-	octree.verts_deleted_count = 0;
-
-	root_aabb = 0;
-
-	for (uint32_t i = 1; i < verts.size(); i++) {
-		registerVertexToAABBs(i, 0);
-	}
+	recreateAABBs(max_vertices_AABB);
 }
 
-void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols, bool capped)
+void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, uint32_t cols, bool capped,
+	uint32_t max_vertices_AABB)
 {
 	float radius = diameter / 2.f;
 
-	// AABB
-	{
-		VertexBoundingBox& octree = aabbs.emplace_back();
-		octree.parent = 0xFFFF'FFFF;
-		octree.children[0] = 0xFFFF'FFFF;
-		octree.aabb.max = { radius, radius, radius };
-		octree.aabb.min = { -radius, -radius, -radius };
-		octree.verts_deleted_count = 0;
-	}
-
-	uint32_t vertex_count = rows * cols + 1;
+	uint32_t vertex_count = rows * cols;
 	uint32_t quad_count = (rows - 1) * cols;
 	uint32_t tris_count = 0;
 
@@ -166,7 +118,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 
 		for (uint32_t col = 0; col < cols; col++) {
 
-			uint32_t idx = 1 + row_offset + col;
+			uint32_t idx = row_offset + col;
 			Vertex& v = verts[idx];
 
 			float col_ratio = ((float)col / cols) * (2.f * glm::pi<float>());
@@ -178,7 +130,6 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 			v.pos.z = -(sine * radius);
 			v.pos.y = y;
 
-			registerVertexToAABBs(idx);
 			markVertexFullUpdate(idx);
 		}
 
@@ -187,44 +138,50 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 
 	if (capped) {
 
-		uint32_t top_idx = verts.size() - 2;
-		
-		Vertex& top_vertex = verts[top_idx];
-		top_vertex.init();
-		top_vertex.pos = { 0, 0, 0 };
+		std::vector<uint32_t> rim(cols);
 
-		registerVertexToAABBs(top_idx);
-		markVertexFullUpdate(top_idx);
+		auto iter = verts.end();
+		iter.prev();
+
+		// bot cap
+		{
+			uint32_t bot_idx = iter.index();
+
+			Vertex& bot_vertex = verts[bot_idx];
+			bot_vertex.init();
+			bot_vertex.pos = { 0, -height, 0 };
+
+			markVertexFullUpdate(bot_idx);
+			{
+				uint32_t row_offset = (rows - 1) * cols;
+
+				uint32_t col = cols - 1;
+				for (auto& v : rim) {
+					v = row_offset + col;
+					col--;
+				}
+
+				stichVerticesToVertexLooped(rim, bot_idx);
+			}
+		}	
+
+		iter.prev();
 
 		// top cap
-		std::vector<uint32_t> rim(cols);
 		{
+			uint32_t top_idx = iter.index();
+
+			Vertex& top_vertex = verts[top_idx];
+			top_vertex.init();
+			top_vertex.pos = { 0, 0, 0 };
+
+			markVertexFullUpdate(top_idx);
+
 			for (uint32_t col = 0; col < cols; col++) {
-				rim[col] = 1 + col;
+				rim[col] = col;
 			}
 
 			stichVerticesToVertexLooped(rim, top_idx);
-		}
-
-		// bot cap
-		uint32_t bot_idx = verts.size() - 1;
-
-		Vertex& bot_vertex = verts[bot_idx];
-		bot_vertex.init();
-		bot_vertex.pos = { 0, -height, 0 };
-
-		registerVertexToAABBs(bot_idx);
-		markVertexFullUpdate(bot_idx);
-		{
-			uint32_t row_offset = 1 + (rows - 1) * cols;
-
-			uint32_t col = cols - 1;
-			for (auto& v : rim) {
-				v = row_offset + col;
-				col--;
-			}
-
-			stichVerticesToVertexLooped(rim, bot_idx);
 		}
 	}
 
@@ -242,48 +199,40 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 	for (uint32_t row = 0; row < rows - 1; row++) {
 		for (uint32_t col = 0; col < cols - 1; col++) {
 
-			uint32_t v0_idx = 1 + (row * cols) + col;
-			uint32_t v1_idx = 1 + (row * cols) + col + 1;
-			uint32_t v2_idx = 1 + (row + 1) * cols + col + 1;
-			uint32_t v3_idx = 1 + (row + 1) * cols + col;
+			uint32_t v0_idx = (row * cols) + col;
+			uint32_t v1_idx = (row * cols) + col + 1;
+			uint32_t v2_idx = (row + 1) * cols + col + 1;
+			uint32_t v3_idx = (row + 1) * cols + col;
 
 			setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 			
 			quad_idx++;
 		}
 
-		uint32_t v0_idx = 1 + (row * cols) + cols - 1;
-		uint32_t v1_idx = 1 + (row * cols);
-		uint32_t v2_idx = 1 + (row + 1) * cols;
-		uint32_t v3_idx = 1 + (row + 1) * cols + cols - 1;
+		uint32_t v0_idx = (row * cols) + cols - 1;
+		uint32_t v1_idx = (row * cols);
+		uint32_t v2_idx = (row + 1) * cols;
+		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
 		setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 		quad_idx++;
 	}
 
+	recreateAABBs(max_vertices_AABB);
+
 	// make sure I got the counts right
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
+void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols, uint32_t max_vertices_AABB)
 {
 	assert_cond(rows > 1, "");
 	assert_cond(cols > 1, "");
 
 	float radius = diameter / 2.f;
 
-	// AABB
-	{
-		VertexBoundingBox& octree = aabbs.emplace_back();
-		octree.parent = 0xFFFF'FFFF;
-		octree.children[0] = 0xFFFF'FFFF;
-		octree.aabb.max = { radius, radius, radius };
-		octree.aabb.min = { -radius, -radius, -radius };
-		octree.verts_deleted_count = 0;
-	}
-
-	uint32_t vertex_count = 1 + rows * cols + 2;
+	uint32_t vertex_count = rows * cols + 2;
 	uint32_t quad_count = (rows - 1) * cols;
 	uint32_t tris_count = cols * 2;
 
@@ -311,7 +260,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			x = sin(Pi * m / M) * cos(2Pi * n / N);
 			y = sin(Pi * m / M) * sin(2Pi * n / N);
 			z = cos(Pi * m / M);*/
-			uint32_t v_idx = 1 + row_offset + col;
+			uint32_t v_idx = row_offset + col;
 			Vertex& v = verts[v_idx];
 
 			float col_ratio = ((float)col / cols) * (2.f * glm::pi<float>());
@@ -323,48 +272,57 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 			v.pos.z = -(sine * row_radius);
 			v.pos.y = y;
 
-			registerVertexToAABBs(v_idx, 0);
 			markVertexFullUpdate(v_idx);
 		}
 	}
 
-	// top cap
-	std::vector<uint32_t> rim(cols);
+	// Capped
 	{
-		for (uint32_t col = 0; col < cols; col++) {
-			rim[col] = 1 + col;
+		std::vector<uint32_t> rim(cols);
+
+		auto iter = verts.end();
+		iter.prev();
+
+		// bot cap
+		{
+			uint32_t bot_idx = iter.index();
+
+			Vertex& bot_vertex = verts[bot_idx];
+			bot_vertex.init();
+			bot_vertex.pos = { 0, -radius, 0 };
+
+			markVertexFullUpdate(bot_idx);
+			{
+				uint32_t row_offset = (rows - 1) * cols;
+
+				uint32_t col = cols - 1;
+				for (auto& v : rim) {
+					v = row_offset + col;
+					col--;
+				}
+
+				stichVerticesToVertexLooped(rim, bot_idx);
+			}
 		}
 
-		uint32_t v_idx = verts.size() - 2;
-		Vertex& top_vertex = verts[v_idx];
-		top_vertex.init();
-		top_vertex.pos = { 0, radius, 0};
+		iter.prev();
 
-		stichVerticesToVertexLooped(rim, v_idx);
+		// top cap
+		{
+			uint32_t top_idx = iter.index();
 
-		registerVertexToAABBs(v_idx, 0);
-		markVertexFullUpdate(v_idx);
-	}
+			Vertex& top_vertex = verts[top_idx];
+			top_vertex.init();
+			top_vertex.pos = { 0, radius, 0 };
 
-	// bot cap
-	{
-		uint32_t row_offset = 1 + (rows - 1) * cols;
+			markVertexFullUpdate(top_idx);
 
-		uint32_t col = cols - 1;
-		for (auto& v : rim) {
-			v = row_offset + col;
-			col--;
+			for (uint32_t col = 0; col < cols; col++) {
+				rim[col] = col;
+			}
+
+			stichVerticesToVertexLooped(rim, top_idx);
 		}
-
-		uint32_t v_idx = verts.size() - 1;
-		Vertex& bot_vertex = verts[v_idx];
-		bot_vertex.init();
-		bot_vertex.pos = { 0, -radius, 0 };
-
-		stichVerticesToVertexLooped(rim, v_idx);
-
-		registerVertexToAABBs(v_idx, 0);
-		markVertexFullUpdate(v_idx);
 	}
 
 	// Create Quads
@@ -373,31 +331,34 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols)
 	for (uint32_t row = 0; row < rows - 1; row++) {
 		for (uint32_t col = 0; col < cols - 1; col++) {
 
-			uint32_t v0_idx = 1 + (row * cols) + col;
-			uint32_t v1_idx = 1 + (row * cols) + col + 1;
-			uint32_t v2_idx = 1 + (row + 1) * cols + col + 1;
-			uint32_t v3_idx = 1 + (row + 1) * cols + col;
+			uint32_t v0_idx = (row * cols) + col;
+			uint32_t v1_idx = (row * cols) + col + 1;
+			uint32_t v2_idx = (row + 1) * cols + col + 1;
+			uint32_t v3_idx = (row + 1) * cols + col;
 
 			setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 			quad_idx++;
 		}
 
-		uint32_t v0_idx = 1 + (row * cols) + cols - 1;
-		uint32_t v1_idx = 1 + (row * cols);
-		uint32_t v2_idx = 1 + (row + 1) * cols;
-		uint32_t v3_idx = 1 + (row + 1) * cols + cols - 1;
+		uint32_t v0_idx = (row * cols) + cols - 1;
+		uint32_t v1_idx = (row * cols);
+		uint32_t v2_idx = (row + 1) * cols;
+		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
 		setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 		quad_idx++;
 	}
 
+	recreateAABBs(max_vertices_AABB);
+
 	// make sure I got the counts right
 	assert_cond(polys.capacity() == quad_count + tris_count, "");
 }
 
-void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions, std::vector<glm::vec3>& normals)
+void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm::vec3>& positions,
+	std::vector<glm::vec3>& normals, uint32_t max_vertices_AABB)
 {
 	verts.resize(positions.size());
 	polys.resize(indexes.size() / 3);
@@ -426,22 +387,6 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 		}
 	}
 
-	// AABBs
-	{
-		VertexBoundingBox& root = aabbs.emplace_back();
-		root.parent = 0xFFFF'FFFF;
-		root.children[0] = 0xFFFF'FFFF;
-		root.aabb.min = { -root_aabb_size, -root_aabb_size, -root_aabb_size };
-		root.aabb.max = { root_aabb_size, root_aabb_size, root_aabb_size };
-		root.verts_deleted_count = 0;
-
-		root_aabb = 0;
-
-		for (uint32_t i = 0; i < verts.size(); i++) {
-			registerVertexToAABBs(i, 0);
-		}
-	}
-
 	uint32_t tris_idx = 0;
 	for (uint32_t i = 0; i < indexes.size(); i += 3) {
 		
@@ -466,7 +411,7 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 		tris_idx++;
 	}
 
-	[]() {};
+	recreateAABBs(max_vertices_AABB);
 }
 
 void SculptMesh::createAsLine(glm::vec3& origin, glm::vec3& direction, float length)

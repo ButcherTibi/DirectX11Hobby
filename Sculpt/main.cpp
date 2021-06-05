@@ -119,188 +119,29 @@ void changeShadingNormal(nui::Window*, nui::StoredElement*, void*)
 	application.shading_normal = (application.shading_normal + 1) % 3;
 }
 
-void showAABBs(nui::Window*, nui::StoredElement*, void*)
+void renderAABBs_Normal(nui::Window*, nui::StoredElement*, void*)
 {
-	application.shouldRenderAABBsForDrawcall(
+	application.setAABB_RenderModeForDrawcall(
 		&application.getRootDrawcall(),
-		true
+		AABB_RenderMode::NORMAL
+	);
+}
+
+void renderAABBs_LeafOnly(nui::Window*, nui::StoredElement*, void*)
+{
+	application.setAABB_RenderModeForDrawcall(
+		&application.getRootDrawcall(),
+		AABB_RenderMode::LEAF_ONLY
 	);
 }
 
 void hideAABBs(nui::Window*, nui::StoredElement*, void*)
 {
-	application.shouldRenderAABBsForDrawcall(
+	application.setAABB_RenderModeForDrawcall(
 		&application.getRootDrawcall(),
-		false
+		AABB_RenderMode::NO_RENDER
 	);
 }
-
-//void onCameraResetKeyDown(nui::KeyDownEvent& event)
-//{
-//	application.setCameraPosition(0, 0, 10);
-//	application.setCameraRotation(0, 0, 0);
-//}
-//
-//void createTestScene_01()
-//{
-//	application.shading_normal = ShadingNormal::TESSELATION;
-//
-//	std::array<MeshDrawcall*, 10> drawcalls;
-//	for (MeshDrawcall*& drawcall : drawcalls) {
-//		drawcall = application.createDrawcall();
-//	}
-//
-//	drawcalls[0]->display_mode = DisplayMode::SOLID;
-//	drawcalls[1]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
-//	drawcalls[2]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
-//	drawcalls[3]->display_mode = DisplayMode::WIREFRANE;
-//	drawcalls[4]->display_mode = DisplayMode::WIREFRANE;
-//
-//	drawcalls[5]->display_mode = DisplayMode::SOLID;
-//	drawcalls[5]->is_back_culled = true;
-//
-//	drawcalls[6]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_FRONT;
-//	drawcalls[6]->is_back_culled = true;
-//
-//	drawcalls[7]->display_mode = DisplayMode::SOLID_WITH_WIREFRAME_NONE;
-//	drawcalls[7]->is_back_culled = true;
-//
-//	drawcalls[8]->display_mode = DisplayMode::WIREFRANE;
-//	drawcalls[8]->is_back_culled = true;
-//
-//	drawcalls[9]->display_mode = DisplayMode::WIREFRANE;
-//	drawcalls[9]->is_back_culled = true;
-//
-//	std::array<MeshInstance*, 5> primitives;
-//
-//	float gap_space = 120;
-//	float primitive_size = 50;
-//
-//	// Triangle
-//	{
-//		CreateTriangleInfo info;
-//		info.size = primitive_size;
-//		info.transform.pos.x = 0;
-//
-//		primitives[0] = application.createTriangle(info, nullptr, drawcalls[0]);
-//	}
-//	
-//	// Quad
-//	{
-//		CreateQuadInfo info;
-//		info.size = primitive_size;
-//		info.transform.pos.x = gap_space;
-//
-//		primitives[1] = application.createQuad(info, nullptr, drawcalls[1]);
-//	}
-//
-//	// Cube
-//	{
-//		CreateCubeInfo info;
-//		info.size = primitive_size;
-//		info.transform.pos.x = gap_space * 2;
-//
-//		primitives[2] = application.createCube(info, nullptr, drawcalls[2]);
-//	}
-//
-//	// Cylinder
-//	{
-//		CreateCylinderInfo info;
-//		info.transform.pos.x = gap_space * 3;
-//		info.diameter = primitive_size;
-//		info.height = primitive_size;
-//		info.rows = 16;
-//		info.columns = 16;
-//
-//		primitives[3] = application.createCylinder(info, nullptr, drawcalls[3]);
-//	}
-//
-//	// Sphere
-//	{
-//		CreateUV_SphereInfo info;
-//		info.transform.pos.x = gap_space * 4;
-//		info.diameter = primitive_size;
-//		info.rows = 16;
-//		info.columns = 16;
-//		
-//		primitives[4] = application.createUV_Sphere(info, nullptr, drawcalls[4]);
-//	}
-//
-//	auto move_meshes = [](std::vector<MeshInstance*>& instances, glm::vec3 pos) {
-//		for (MeshInstance* inst : instances) {
-//			inst->pos = pos;
-//		}
-//	};
-//
-//	float meshes_y = -250;
-//
-//	// Loaded Mesh
-//	std::vector<MeshInstance*> meshes;
-//	{
-//		io::FilePath path;
-//		path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
-//
-//		GLTF_ImporterSettings settings;
-//		settings.dest_drawcall = drawcalls[0];
-//
-//		ErrStack err_stack = application.importMeshesFromGLTF_File(path, settings, &meshes);
-//		if (err_stack.isBad()) {
-//			err_stack.debugPrint();
-//			throw std::exception();
-//		}
-//
-//		move_meshes(meshes, { 0, meshes_y, 0 });
-//	}
-//
-//	for (uint32_t i = 1; i < 5; i++) {
-//
-//		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-//
-//		for (MeshInstance* inst : meshes) {
-//
-//			MeshInstance* derive = application.copyInstance(inst);
-//			derive->pos = new_pos;
-//
-//			application.transferInstanceToDrawcall(derive, drawcalls[i]);
-//		}
-//	}
-//
-//	meshes_y -= 100;
-//
-//	// Duplicates
-//	{
-//		for (uint32_t i = 0; i < 5; i++) {
-//
-//			glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-//
-//			MeshInstance* derive = application.copyInstance(primitives[1]);
-//			derive->pos = new_pos;
-//
-//			application.transferInstanceToDrawcall(derive, drawcalls[5 + i]);
-//		}
-//	}
-//
-//	meshes_y -= 250;
-//
-//	for (uint32_t i = 0; i < 5; i++) {
-//
-//		glm::vec3 new_pos = { gap_space * i, meshes_y, 0 };
-//
-//		for (MeshInstance* inst : meshes) {
-//
-//			MeshInstance* derive = application.copyInstance(inst);
-//			derive->pos = new_pos;
-//
-//			application.transferInstanceToDrawcall(derive, drawcalls[5 + i]);
-//		}
-//	}
-//
-//	// Camera positions
-//	glm::vec2 center = { gap_space * (primitives.size() / 2), 0 };
-//
-//	application.setCameraPosition(center.x, center.y, 2000);
-//	application.setCameraFocus(glm::vec3(center.x, center.y, 0));
-//}
 
 void createTestScene_EmptyScene(nui::Window*, nui::StoredElement*, void*)
 {
@@ -354,6 +195,8 @@ void createTestScene_DeleteInstance(nui::Window*, nui::StoredElement*, void*)
 
 	application.deleteInstance(copy_ref);
 
+	application.deleteInstance(tris_ref);
+
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
 	application.setCameraPosition(center.x, center.y, 10);
@@ -366,17 +209,39 @@ void createTestScene_joinMeshes(nui::Window*, nui::StoredElement*, void*)
 {
 	application.resetToHardcodedStartup();
 
-	CreateTriangleInfo info;
-	MeshInstanceRef tris_ref = application.createTriangle(info);
+	// Same Parent
+	{
+		CreateTriangleInfo info;
+		MeshInstanceRef tris_ref = application.createTriangle(info);
 
-	MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
-	MeshInstance* copy_inst = copy_ref.get();
-	copy_inst->transform.pos.x = 2;
+		MeshInstanceRef copy_ref = application.copyInstance(tris_ref);
+		MeshInstance* copy_inst = copy_ref.get();
+		copy_inst->transform.pos.x = 2;
 
-	std::vector<MeshInstanceRef> children = {
-		copy_ref
-	};
-	application.joinMeshes(children, tris_ref);
+		std::vector<MeshInstanceRef> sources = {
+			tris_ref, copy_ref
+		};
+		application.joinMeshes(sources, 0);
+	}
+
+	// Different Parent
+	{
+		float y = -6;
+
+		CreateTriangleInfo tris_info;
+		tris_info.transform.pos.y = y;
+		MeshInstanceRef tris_ref = application.createTriangle(tris_info);
+
+		CreateQuadInfo quad_info;
+		quad_info.transform.pos.x = 2;
+		quad_info.transform.pos.y = y;
+		MeshInstanceRef quad_ref = application.createQuad(quad_info);
+
+		std::vector<MeshInstanceRef> sources = {
+			tris_ref, quad_ref
+		};
+		application.joinMeshes(sources, 0);
+	}
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
@@ -386,6 +251,40 @@ void createTestScene_joinMeshes(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
+void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	io::FilePath file_path;
+	ErrStack err_stack = file_path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	std::vector<MeshInstanceRef> new_refs;
+
+	GLTF_ImporterSettings settings;
+	err_stack = application.importMeshesFromGLTF_File(file_path, settings, &new_refs);
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	application.joinMeshes(new_refs, 0);
+
+	application.setAABB_RenderModeForDrawcall(
+		&application.getRootDrawcall(),
+		AABB_RenderMode::LEAF_ONLY
+	);
+
+	// Camera
+	glm::vec2 center = { 0, 100 };
+	application.setCameraPosition(center.x, center.y, 1000);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
 
 //void createTestScene_DeleteAllInstancesInDrawcall(nui::Window*, nui::StoredElement*, void*)
 //{
@@ -680,8 +579,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			application.main_window = instance.createWindow(info);
 			window = application.main_window;
+
+			window->setFinalEvent(endFrameEvents);
+			window->setKeyDownEvent(renderDocTriggerCapture, nui::VirtualKeys::F11);
 		}
-		window->setKeyDownEvent(renderDocTriggerCapture, nui::VirtualKeys::F11);
 
 		nui::Grid* window_grid = window->createGrid();
 		window_grid->size[0] = 100.f;
@@ -755,6 +656,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 					delete_poly_test->text = "Delete poly";
 					delete_poly_test->label_callback = createTestScene_DeletePoly;
 
+					nui::MenuItem* join_meshes_test = top_menu->addItem(new_test, menus_style);
+					join_meshes_test->text = "Join Meshes Simple";
+					join_meshes_test->label_callback = createTestScene_joinMeshes;
+
+					nui::MenuItem* join_meshes_2_test = top_menu->addItem(new_test, menus_style);
+					join_meshes_2_test->text = "Join Meshes Complex";
+					join_meshes_2_test->label_callback = createTestScene_joinMeshes_Complex;
+
 					// Instance
 					nui::MenuItem* copy_instance_test = top_menu->addItem(new_test, menus_style);
 					copy_instance_test->text = "Copy Instance";
@@ -762,11 +671,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 					nui::MenuItem* delete_instance_test = top_menu->addItem(new_test, menus_style);
 					delete_instance_test->text = "Delete Instance";
-					delete_instance_test->label_callback = createTestScene_DeleteInstance;
-
-					nui::MenuItem* join_meshes_test = top_menu->addItem(new_test, menus_style);
-					join_meshes_test->text = "Join Meshes";
-					join_meshes_test->label_callback = createTestScene_joinMeshes;
+					delete_instance_test->label_callback = createTestScene_DeleteInstance;		
 				}
 
 				nui::MenuItem* load = top_menu->addItem(scene, menus_style);
@@ -842,9 +747,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				nui::MenuItem* aabbs = top_menu->addItem(display_menu, menus_style);
 				aabbs->text = "Octree";
 				{
-					nui::MenuItem* show = top_menu->addItem(aabbs, menus_style);
-					show->text = "Show";
-					show->label_callback = showAABBs;
+					nui::MenuItem* normal = top_menu->addItem(aabbs, menus_style);
+					normal->text = "Render Normal";
+					normal->label_callback = renderAABBs_Normal;
+
+					nui::MenuItem* leaf_only = top_menu->addItem(aabbs, menus_style);
+					leaf_only->text = "Leaf Only";
+					leaf_only->label_callback = renderAABBs_LeafOnly;
 
 					nui::MenuItem* hide = top_menu->addItem(aabbs, menus_style);
 					hide->text = "Hide";

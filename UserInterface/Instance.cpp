@@ -583,6 +583,11 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		w.delta_owner_elem = nullptr;
 	}
 
+	// Events
+	{
+		w.finalEvent = nullptr;
+	}
+
 	// Swapchain
 	if (!_bruteForceCreateSwapchain(w, w.swapchain1)) {
 		throw std::exception("failed to create swapchain1 for hwnd");

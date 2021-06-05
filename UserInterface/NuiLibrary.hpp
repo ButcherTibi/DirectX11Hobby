@@ -81,6 +81,7 @@ namespace nui {
 
 	// Events Component /////////////////////////////////////////////////////////////////
 	typedef void (*EventCallback)(Window* window, StoredElement* source, void* user_data);
+	typedef void (*WindowCallback)(Window* window, void* user_data);
 
 	enum class MouseEventState {
 		OUTSIDE,
@@ -467,6 +468,10 @@ namespace nui {
 		uint32_t begin_mouse_x;
 		uint32_t begin_mouse_y;
 
+		// Events
+		void* final_event_user_data;
+		WindowCallback finalEvent;
+
 		// DirectX 11
 		ComPtr<IDXGISwapChain1> swapchain1;
 		ComPtr<ID3D11Texture2D> present_img;
@@ -490,6 +495,7 @@ namespace nui {
 		Menu* createMenu(Element* parent = nullptr);
 
 		// Events
+		void setFinalEvent(WindowCallback callback, void* user_data = nullptr);
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void endMouseDeltaEffect();
 

@@ -132,7 +132,7 @@
     <ClInclude Include="RenderDocIntegration.hpp">
       <Filter>Source Files\Tooling</Filter>
     </ClInclude>
-    <ClInclude Include="DeferredVector.hpp">
+    <ClInclude Include="SparseVector.hpp">
       <Filter>Source Files\CustomContainers</Filter>
     </ClInclude>
   </ItemGroup>

@@ -70,13 +70,19 @@ struct CameraLight {
 	float intensity;
 };
 
+enum class AABB_RenderMode {
+	NO_RENDER,
+	LEAF_ONLY,
+	NORMAL
+};
+
 // how to display a set of instances of a mesh
 struct MeshDrawcall {
 	std::string name;
 
 	DisplayMode display_mode;
 	bool is_back_culled;
-	bool render_aabbs;
+	AABB_RenderMode aabb_render_mode;
 };
 
 
@@ -162,12 +168,11 @@ struct MeshInstanceSet {
 
 	// the instances of the mesh to be rendered in one drawcall
 	// adding or removing cause MeshInstance* to be invalid
-	DeferredVector<MeshInstance> instances;
+	SparseVector<MeshInstance> instances;
 	std::vector<ModifiedMeshInstance> modified_instances;
 	dx11::ArrayBuffer<GPU_MeshInstance> gpu_instances;
 	ComPtr<ID3D11ShaderResourceView> gpu_instances_srv;
 };
-
 
 // Vertices and indexes of geometry
 struct Mesh {
@@ -175,9 +180,9 @@ struct Mesh {
 
 	std::list<MeshInstanceSet> sets;
 
-	// should vertices for AABBs be generated for rendering
-	// and should they be rendered
-	bool render_aabbs;
+	// should vertices for AABBs be generated for rendering and should they be rendered
+	AABB_RenderMode aabb_render_mode;
+	AABB_RenderMode prev_aabb_mode;
 };
 
 
@@ -322,7 +327,7 @@ public:
 
 	// Iterate over all instances that are rendered with that drawcall and turn on AABB
 	// vertex generation
-	void shouldRenderAABBsForDrawcall(MeshDrawcall* drawcall, bool yes_or_no);
+	void setAABB_RenderModeForDrawcall(MeshDrawcall* drawcall, AABB_RenderMode aabb_render_mode);
 
 
 	// Layers
@@ -349,9 +354,9 @@ public:
 		std::vector<MeshInstanceRef>* r_instances = nullptr);
 	//MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
-	// all children get converted into meshes and added to parent mesh
+	// all children get converted into geometry and added to the parent mesh
 	// Invalidates MeshInstance*
-	void joinMeshes(std::vector<MeshInstanceRef>& children, MeshInstanceRef& parent);
+	void joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t destination_idx);
 
 
 	// Raycasts
@@ -395,3 +400,5 @@ public:
 };
 
 extern Application application;
+
+void endFrameEvents(nui::Window*, void*);

@@ -91,6 +91,12 @@ Menu* Window::createMenu(Element* parent_element)
 	return &new_menu;
 }
 
+void Window::setFinalEvent(WindowCallback callback, void* user_data)
+{
+	this->finalEvent = callback;
+	this->final_event_user_data = user_data;
+}
+
 void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
 {
 	Root* root = std::get_if<Root>(&elements.front());

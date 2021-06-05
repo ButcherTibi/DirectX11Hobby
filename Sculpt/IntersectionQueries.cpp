@@ -111,14 +111,14 @@ bool SculptMesh::raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, ui
 
 	if (poly->is_tris) {
 
-		Vertex* vs[3];
+		std::array<Vertex*, 3> vs;
 		getTrisPrimitives(poly, vs);
 
 		return raycastTrisMollerTrumbore(ray_origin, ray_direction,
 			vs[0]->pos, vs[1]->pos, vs[2]->pos, r_point);
 	}
 	else {
-		Vertex* vs[4];
+		std::array<Vertex*, 4> vs;
 		getQuadPrimitives(poly, vs);
 
 		if (poly->tesselation_type == 0) {

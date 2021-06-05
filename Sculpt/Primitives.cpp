@@ -17,14 +17,14 @@ bool Vertex::isPoint()
 	return edge == 0xFFFF'FFFF;
 }
 
-bool VertexBoundingBox::isUnused()
-{
-	return verts.size() - verts_deleted_count == 0 && children[0] == 0xFFFF'FFFF;
-}
-
 bool VertexBoundingBox::isLeaf()
 {
 	return children[0] == 0xFFFF'FFFF;
+}
+
+bool VertexBoundingBox::hasVertices()
+{
+	return verts.size() > 0;
 }
 
 uint32_t& Edge::nextEdgeOf(uint32_t vertex_idx)
@@ -84,7 +84,7 @@ void SculptMesh::_deletePolyMemory(uint32_t poly_idx)
 	modified_poly.state = ModifiedPolyState::DELETED;
 }
 
-void SculptMesh::_printEdgeListOfVertex(uint32_t vertex_idx)
+void SculptMesh::printEdgeListOfVertex(uint32_t vertex_idx)
 {
 	Vertex& vertex = verts[vertex_idx];
 
@@ -169,7 +169,7 @@ void SculptMesh::deleteVertex(uint32_t)
 	// if quad then trim to triangle
 }
 
-void SculptMesh::transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
+void SculptMesh::_transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
 {
 	Vertex* vertex = &verts[v];
 	VertexBoundingBox& destination_aabb = aabbs[dest_aabb];
@@ -188,7 +188,7 @@ void SculptMesh::transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
 	destination_aabb.verts.push_back(v);
 }
 
-void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
+void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 {
 	Vertex& vertex = verts[vertex_idx];
 
@@ -217,7 +217,7 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 					// leaf not full
 					if (child_vertex_count < max_vertices_in_AABB) {
 
-						transferVertexToAABB(vertex_idx, aabb_idx);
+						_transferVertexToAABB(vertex_idx, aabb_idx);
 						return;
 					}
 					// Subdivide
@@ -304,11 +304,11 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 							child_aabb.parent = aabb_idx;
 							child_aabb.children[0] = 0xFFFF'FFFF;
 							child_aabb.verts_deleted_count = 0;
-							child_aabb.verts.reserve(max_vertices_in_AABB / 4);
+							child_aabb.verts.reserve(max_vertices_in_AABB / 4);  // just a guess
 
-							// transfer the vertex to one of child AABBs
+							// transfer the excess vertex to one of child AABBs
 							if (!found && child_aabb.aabb.isPositionInside(vertex.pos)) {
-								transferVertexToAABB(vertex_idx, child_aabb_idx);
+								_transferVertexToAABB(vertex_idx, child_aabb_idx);
 								found = true;
 							}
 						}
@@ -317,6 +317,11 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 
 						// transfer the rest of vertices of the parent to children
 						for (uint32_t aabb_vertex_idx : aabb->verts) {
+
+							// skip deleted vertex index from AABB
+							if (aabb_vertex_idx == 0xFFFF'FFFF) {
+								continue;
+							}
 
 							Vertex& aabb_vertex = verts[aabb_vertex_idx];
 
@@ -364,8 +369,14 @@ void SculptMesh::registerVertexToAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 	}
 }
 
-void SculptMesh::recreateAABBs()
+void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 {
+	if (new_max_vertices_in_AABB) {
+		this->max_vertices_in_AABB = new_max_vertices_in_AABB;
+	}
+
+	assert_cond(this->max_vertices_in_AABB > 0, "maximum number of vertices for AABB is not specified");
+
 	aabbs.resize(1);
 	root_aabb = 0;
 
@@ -376,7 +387,8 @@ void SculptMesh::recreateAABBs()
 	root.verts.clear();
 
 	// Calculate Root Bounding Box size
-	{
+	if (verts.size()) {
+
 		Vertex& first = verts.front();
 		root.aabb.min = first.pos;
 		root.aabb.max = first.pos;
@@ -384,11 +396,10 @@ void SculptMesh::recreateAABBs()
 		float root_aabb_size = 0;
 
 		// skip first vertex
-		auto iter = verts.begin();
-		iter.next();
-		for (; iter != verts.end(); iter.next()) {
+		for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
 
 			Vertex& vertex = iter.get();
+			vertex.aabb = 0xFFFF'FFFF;
 
 			if (std::abs(vertex.pos.x) > root_aabb_size) {
 				root_aabb_size = vertex.pos.x;
@@ -407,11 +418,9 @@ void SculptMesh::recreateAABBs()
 		root.aabb.max = { +root_aabb_size, +root_aabb_size, +root_aabb_size };
 	}
 	
-	auto iter = verts.begin();
-	iter.next();
-	for (; iter != verts.end(); iter.next()) {
+	for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
 
-		registerVertexToAABBs(iter.index(), root_aabb);
+		moveVertexInAABBs(iter.index(), root_aabb);
 	}
 }
 
@@ -710,9 +719,10 @@ void SculptMesh::deletePoly(uint32_t delete_poly_idx)
 	_deletePolyMemory(delete_poly_idx);
 }
 
-void SculptMesh::getTrisPrimitives(Poly* poly, uint32_t (&r_vs_idxs)[3], Vertex* (&r_vs)[3])
+void SculptMesh::getTrisPrimitives(Poly* poly,
+	std::array<uint32_t, 3>& r_vs_idxs, std::array<Vertex*, 3>& r_vs)
 {
-	Edge* r_es[3];
+	std::array<Edge*, 3> r_es;
 	r_es[0] = &edges[poly->edges[0]];
 	r_es[1] = &edges[poly->edges[1]];
 	r_es[2] = &edges[poly->edges[2]];
@@ -726,9 +736,39 @@ void SculptMesh::getTrisPrimitives(Poly* poly, uint32_t (&r_vs_idxs)[3], Vertex*
 	r_vs[2] = &verts[r_vs_idxs[2]];
 }
 
-void SculptMesh::getQuadPrimitives(Poly* poly, uint32_t(&r_vs_idxs)[4], Vertex* (&r_vs)[4])
+void SculptMesh::getTrisPrimitives(Poly* poly, std::array<uint32_t, 3>& r_vs_idxs)
 {
-	Edge* r_es[4];
+	std::array<Edge*, 3> r_es;
+	r_es[0] = &edges[poly->edges[0]];
+	r_es[1] = &edges[poly->edges[1]];
+	r_es[2] = &edges[poly->edges[2]];
+
+	r_vs_idxs[0] = poly->flip_edge_0 ? r_es[0]->v1 : r_es[0]->v0;
+	r_vs_idxs[1] = poly->flip_edge_1 ? r_es[1]->v1 : r_es[1]->v0;
+	r_vs_idxs[2] = poly->flip_edge_2 ? r_es[2]->v1 : r_es[2]->v0;
+}
+
+void SculptMesh::getTrisPrimitives(Poly* poly, std::array<Vertex*, 3>& r_vs)
+{
+	std::array<Edge*, 3> r_es;
+	r_es[0] = &edges[poly->edges[0]];
+	r_es[1] = &edges[poly->edges[1]];
+	r_es[2] = &edges[poly->edges[2]];
+
+	std::array<uint32_t, 3> r_vs_idxs;
+	r_vs_idxs[0] = poly->flip_edge_0 ? r_es[0]->v1 : r_es[0]->v0;
+	r_vs_idxs[1] = poly->flip_edge_1 ? r_es[1]->v1 : r_es[1]->v0;
+	r_vs_idxs[2] = poly->flip_edge_2 ? r_es[2]->v1 : r_es[2]->v0;
+
+	r_vs[0] = &verts[r_vs_idxs[0]];
+	r_vs[1] = &verts[r_vs_idxs[1]];
+	r_vs[2] = &verts[r_vs_idxs[2]];
+}
+
+void SculptMesh::getQuadPrimitives(Poly* poly,
+	std::array<uint32_t, 4>& r_vs_idxs, std::array<Vertex*, 4>& r_vs)
+{
+	std::array<Edge*, 4> r_es;
 	r_es[0] = &edges[poly->edges[0]];
 	r_es[1] = &edges[poly->edges[1]];
 	r_es[2] = &edges[poly->edges[2]];
@@ -745,32 +785,29 @@ void SculptMesh::getQuadPrimitives(Poly* poly, uint32_t(&r_vs_idxs)[4], Vertex* 
 	r_vs[3] = &verts[r_vs_idxs[3]];
 }
 
-void SculptMesh::getTrisPrimitives(Poly* poly, Vertex* (&r_vs)[3])
+void SculptMesh::getQuadPrimitives(Poly* poly, std::array<uint32_t, 4>& r_vs_idxs)
 {
-	Edge* r_es[3];
-	r_es[0] = &edges[poly->edges[0]];
-	r_es[1] = &edges[poly->edges[1]];
-	r_es[2] = &edges[poly->edges[2]];
-
-	uint32_t r_vs_idxs[3];
-	r_vs_idxs[0] = poly->flip_edge_0 ? r_es[0]->v1 : r_es[0]->v0;
-	r_vs_idxs[1] = poly->flip_edge_1 ? r_es[1]->v1 : r_es[1]->v0;
-	r_vs_idxs[2] = poly->flip_edge_2 ? r_es[2]->v1 : r_es[2]->v0;
-
-	r_vs[0] = &verts[r_vs_idxs[0]];
-	r_vs[1] = &verts[r_vs_idxs[1]];
-	r_vs[2] = &verts[r_vs_idxs[2]];
-}
-
-void SculptMesh::getQuadPrimitives(Poly* poly, Vertex* (&r_vs)[4])
-{
-	Edge* r_es[4];
+	std::array<Edge*, 4> r_es;
 	r_es[0] = &edges[poly->edges[0]];
 	r_es[1] = &edges[poly->edges[1]];
 	r_es[2] = &edges[poly->edges[2]];
 	r_es[3] = &edges[poly->edges[3]];
 
-	uint32_t r_vs_idxs[4];
+	r_vs_idxs[0] = poly->flip_edge_0 ? r_es[0]->v1 : r_es[0]->v0;
+	r_vs_idxs[1] = poly->flip_edge_1 ? r_es[1]->v1 : r_es[1]->v0;
+	r_vs_idxs[2] = poly->flip_edge_2 ? r_es[2]->v1 : r_es[2]->v0;
+	r_vs_idxs[3] = poly->flip_edge_3 ? r_es[3]->v1 : r_es[3]->v0;
+}
+
+void SculptMesh::getQuadPrimitives(Poly* poly, std::array<Vertex*, 4>& r_vs)
+{
+	std::array<Edge*, 4> r_es;
+	r_es[0] = &edges[poly->edges[0]];
+	r_es[1] = &edges[poly->edges[1]];
+	r_es[2] = &edges[poly->edges[2]];
+	r_es[3] = &edges[poly->edges[3]];
+
+	std::array<uint32_t, 4> r_vs_idxs;
 	r_vs_idxs[0] = poly->flip_edge_0 ? r_es[0]->v1 : r_es[0]->v0;
 	r_vs_idxs[1] = poly->flip_edge_1 ? r_es[1]->v1 : r_es[1]->v0;
 	r_vs_idxs[2] = poly->flip_edge_2 ? r_es[2]->v1 : r_es[2]->v0;
@@ -780,4 +817,19 @@ void SculptMesh::getQuadPrimitives(Poly* poly, Vertex* (&r_vs)[4])
 	r_vs[1] = &verts[r_vs_idxs[1]];
 	r_vs[2] = &verts[r_vs_idxs[2]];
 	r_vs[3] = &verts[r_vs_idxs[3]];
+}
+
+void SculptMesh::printVerices()
+{
+	for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
+
+		Vertex& vertex = iter.get();
+
+		printf("vertex[%d].pos = { %.2f, %.2f %.2f } \n",
+			iter.index(),
+			vertex.pos.x,
+			vertex.pos.y,
+			vertex.pos.z
+		);
+	}
 }

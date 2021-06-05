@@ -147,7 +147,7 @@
     <ClInclude Include="GLTF_File.hpp" />
     <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
     <ClInclude Include="JSON_File.hpp" />
-    <ClInclude Include="DeferredVector.hpp" />
+    <ClInclude Include="SparseVector.hpp" />
     <ClInclude Include="RenderDocIntegration.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="SculptMesh.hpp" />

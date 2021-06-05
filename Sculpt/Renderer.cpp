@@ -8,6 +8,8 @@
 #include "Application.hpp"
 
 
+// vertex buffer has one extra vertex, which will be the deleted vertex
+// cpu vertex index == gpu vertex index + 1
 void MeshRenderer::loadVertices()
 {
 	DirectX::XMFLOAT3 gpu_aabbs_positions[8];
@@ -52,18 +54,24 @@ void MeshRenderer::loadVertices()
 
 				for (scme::ModifiedPoly& modified_poly : sculpt_mesh.modified_polys) {
 
-					scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
-
 					switch (modified_poly.state) {
 					case scme::ModifiedPolyState::UPDATE: {
 
+						if (sculpt_mesh.polys.isDeleted(modified_poly.idx)) {
+							continue;
+						}
+
 						GPU_MeshTriangle tris;
+						scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
 
 						if (poly.is_tris) {
 
-							uint32_t vs_idx[3];
-							scme::Vertex* vs[3];
-							sculpt_mesh.getTrisPrimitives(&poly, vs_idx, vs);
+							std::array<uint32_t, 3> vs_idx;
+							sculpt_mesh.getTrisPrimitives(&poly, vs_idx);
+
+							for (uint32_t i = 0; i < 3; i++) {
+								vs_idx[i] += 1;
+							}
 
 							gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
 							gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[1]);
@@ -74,9 +82,6 @@ void MeshRenderer::loadVertices()
 							gpu_indexs.update(6 * modified_poly.idx + 4, zero);
 							gpu_indexs.update(6 * modified_poly.idx + 5, zero);
 
-							// Triangle Normal
-							poly.normal = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
-
 							// GPU Triangle
 							tris.poly_normal = dxConvert(poly.normal);
 							tris.tess_normal = dxConvert(poly.normal);
@@ -85,16 +90,15 @@ void MeshRenderer::loadVertices()
 							gpu_triangles.update(2 * modified_poly.idx, tris);
 						}
 						else {
-							uint32_t vs_idx[4];
-							scme::Vertex* vs[4];
-							sculpt_mesh.getQuadPrimitives(&poly, vs_idx, vs);
+							std::array<uint32_t, 4> vs_idx;
+							sculpt_mesh.getQuadPrimitives(&poly, vs_idx);
+
+							for (uint32_t i = 0; i < 4; i++) {
+								vs_idx[i] += 1;
+							}
 
 							// Tesselation and Normals
-							if (glm::distance(vs[0]->pos, vs[2]->pos) < glm::distance(vs[1]->pos, vs[3]->pos)) {
-
-								poly.tesselation_type = 0;
-								poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
-								poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[0], vs[2], vs[3]);
+							if (poly.tesselation_type == 0) {
 
 								gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
 								gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[2]);
@@ -108,10 +112,6 @@ void MeshRenderer::loadVertices()
 								tris.tess_vertex_1 = vs_idx[2];
 							}
 							else {
-								poly.tesselation_type = 1;
-								poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[3]);
-								poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[1], vs[2], vs[3]);
-
 								gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
 								gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[1]);
 								gpu_indexs.update(6 * modified_poly.idx + 2, vs_idx[3]);
@@ -123,7 +123,6 @@ void MeshRenderer::loadVertices()
 								tris.tess_vertex_0 = vs_idx[1];
 								tris.tess_vertex_1 = vs_idx[3];
 							}
-							poly.normal = glm::normalize((poly.tess_normals[0] + poly.tess_normals[1]) / 2.f);
 
 							// GPU Triangles
 							tris.poly_normal = dxConvert(poly.normal);
@@ -168,15 +167,49 @@ void MeshRenderer::loadVertices()
 			}
 		}
 
-		// AABBs
-		if (mesh.render_aabbs &&
-			(sculpt_mesh.modified_verts.size() || sculpt_mesh.aabb_vbuff.buff == nullptr))
-		{
+		auto load_aabbs = [&]() {
+
+			mesh.prev_aabb_mode = mesh.aabb_render_mode;
+
+			uint32_t aabb_count = 0;
+			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
+
+				switch (mesh.aabb_render_mode) {
+				case AABB_RenderMode::LEAF_ONLY: {
+					if (aabb.isLeaf() && aabb.hasVertices()) {
+						aabb_count++;
+					}
+					break;
+				}
+				case AABB_RenderMode::NORMAL: {
+					if (aabb.isLeaf()) {
+						aabb_count++;
+					}
+					break;
+				}
+				}
+			}
+
 			auto& gpu_aabb_verts = sculpt_mesh.gpu_aabb_verts;
-			gpu_aabb_verts.resize(sculpt_mesh.aabbs.size() * 36);
+			gpu_aabb_verts.resize(aabb_count * 36);
 
 			uint32_t vertex_idx = 0;
 			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
+
+				switch (mesh.aabb_render_mode) {
+				case AABB_RenderMode::LEAF_ONLY: {
+					if (aabb.isLeaf() == false || aabb.hasVertices() == false) {
+						continue;
+					}
+					break;
+				}
+				case AABB_RenderMode::NORMAL: {
+					if (aabb.isLeaf() == false) {
+						continue;
+					}
+					break;
+				}
+				}
 
 				glm::vec3& min = aabb.aabb.min;
 				glm::vec3& max = aabb.aabb.max;
@@ -305,11 +338,24 @@ void MeshRenderer::loadVertices()
 			}
 
 			sculpt_mesh.aabb_vbuff.load(
-				sculpt_mesh.gpu_aabb_verts.data(),
-				sculpt_mesh.gpu_aabb_verts.size() * sizeof(GPU_MeshVertex));
+				gpu_aabb_verts.data(),
+				gpu_aabb_verts.size() * sizeof(GPU_MeshVertex));
+		};
+
+		// AABBs
+		if (mesh.aabb_render_mode != AABB_RenderMode::NO_RENDER)
+		{
+			if (mesh.aabb_render_mode != mesh.prev_aabb_mode) {
+				sculpt_mesh.aabb_vbuff.buff = nullptr;
+
+				load_aabbs();
+			}
+			else if (sculpt_mesh.modified_verts.size() || sculpt_mesh.aabb_vbuff.buff == nullptr) {
+				load_aabbs();
+			}
 		}
 		// Free GPU Memory
-		else if (mesh.render_aabbs == false && sculpt_mesh.aabb_vbuff.buff != nullptr) {
+		else if (mesh.aabb_render_mode == AABB_RenderMode::NO_RENDER && sculpt_mesh.aabb_vbuff.buff != nullptr) {
 			sculpt_mesh.aabb_vbuff.buff = nullptr;
 		}
 
@@ -327,22 +373,25 @@ void MeshRenderer::loadVertices()
 					gpu_verts.init_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 				}
 
-				gpu_verts.resize(sculpt_mesh.verts.capacity());
+				gpu_verts.resize(sculpt_mesh.verts.capacity() + 1);
 
 				for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
 
 					switch (modified_v.state) {
 					case scme::ModifiedVertexState::UPDATE: {
 
-						sculpt_mesh.calcVertexNormal(modified_v.idx);
+						// it is posible to have the vertex as both deleted and updated multiple times
+						// when running multiple sculpt mesh operations
+						if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
 
-						scme::Vertex& cpu_v = sculpt_mesh.verts[modified_v.idx];
+							scme::Vertex& cpu_v = sculpt_mesh.verts[modified_v.idx];
 
-						GPU_MeshVertex gpu_v;
-						gpu_v.pos = dxConvert(cpu_v.pos);
-						gpu_v.normal = dxConvert(cpu_v.normal);
+							GPU_MeshVertex gpu_v;
+							gpu_v.pos = dxConvert(cpu_v.pos);
+							gpu_v.normal = dxConvert(cpu_v.normal);
 
-						gpu_verts.update(modified_v.idx, gpu_v);
+							gpu_verts.update(modified_v.idx + 1, gpu_v);
+						}
 						break;
 					}
 
@@ -350,7 +399,7 @@ void MeshRenderer::loadVertices()
 						GPU_MeshVertex gpu_v;
 						gpu_v.normal.x = 999'999.f;
 
-						gpu_verts.update(modified_v.idx, gpu_v);
+						gpu_verts.update(modified_v.idx + 1, gpu_v);
 						break;
 					}
 					}
@@ -383,30 +432,33 @@ void MeshRenderer::loadVertices()
 
 					for (ModifiedMeshInstance& modified_instance : set.modified_instances) {
 
-						MeshInstance& instance = set.instances[modified_instance.idx];
 						GPU_MeshInstance gpu_inst;
 
 						switch (modified_instance.type) {
 						case ModifiedInstanceType::UPDATE: {
-						
-							gpu_inst.pos = dxConvert(instance.transform.pos);
-							gpu_inst.rot = dxConvert(instance.transform.rot);
+							
+							if (set.instances.isDeleted(modified_instance.idx) == false) {
 
-							PhysicalBasedMaterial& pbr_mat = instance.pbr_material;
-							gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
-							gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
-							gpu_inst.metallic = pbr_mat.metallic;
-							gpu_inst.specular = pbr_mat.specular;
+								MeshInstance& instance = set.instances[modified_instance.idx];
+								gpu_inst.pos = dxConvert(instance.transform.pos);
+								gpu_inst.rot = dxConvert(instance.transform.rot);
 
-							MeshWireframeColors wire_colors = instance.wireframe_colors;
-							gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
-							gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
-							gpu_inst.wireframe_tess_front_color = dxConvert(wire_colors.tesselation_front_color);
-							gpu_inst.wireframe_tess_back_color = dxConvert(wire_colors.tesselation_back_color);
-							gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
-							gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
+								PhysicalBasedMaterial& pbr_mat = instance.pbr_material;
+								gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
+								gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
+								gpu_inst.metallic = pbr_mat.metallic;
+								gpu_inst.specular = pbr_mat.specular;
 
-							gpu_instances.update(modified_instance.idx, gpu_inst);
+								MeshWireframeColors wire_colors = instance.wireframe_colors;
+								gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
+								gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
+								gpu_inst.wireframe_tess_front_color = dxConvert(wire_colors.tesselation_front_color);
+								gpu_inst.wireframe_tess_back_color = dxConvert(wire_colors.tesselation_back_color);
+								gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
+								gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
+
+								gpu_instances.update(modified_instance.idx, gpu_inst);
+							}
 							break;
 						}
 
@@ -1078,7 +1130,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 			}
 
 			// Render AABBs
-			if (mesh.render_aabbs) {
+			if (mesh.aabb_render_mode != AABB_RenderMode::NO_RENDER) {
 
 				// Input Assembly
 				{

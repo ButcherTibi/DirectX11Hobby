@@ -246,16 +246,14 @@ void EventsComponent::setKeyUpEvent(EventCallback callback, uint32_t key, void* 
 
 void EventsComponent::beginMouseLoopDeltaEffect(Element* elem)
 {
-	assert_cond(_window->delta_owner_elem == nullptr, "previous delta effect did not end");
-
+	_window->endMouseDeltaEffect();
 	_window->delta_effect = Window::DeltaEffectType::LOOP;
 	_window->delta_owner_elem = elem;
 }
 
 void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
 {
-	assert_cond(_window->delta_owner_elem == nullptr, "previous delta effect did not end");
-
+	_window->endMouseDeltaEffect();
 	_window->delta_effect = Window::DeltaEffectType::HIDDEN;
 	_window->delta_owner_elem = elem;
 
