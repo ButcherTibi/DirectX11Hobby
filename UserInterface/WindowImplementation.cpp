@@ -16,7 +16,7 @@ Text* Window::createText(Element* parent)
 	auto& new_text = new_stored_elem.emplace<Text>();
 	new_text._window = this;
 	new_text._parent = parent;
-	new_text._self = &new_stored_elem;
+	new_text._self_elements = std::prev(elements.end());
 	new_text._init();
 
 	// Text Specific
@@ -26,7 +26,12 @@ Text* Window::createText(Element* parent)
 	new_text.line_height = 0;
 	new_text.color.rgba = { 1, 1, 1, 1 };
 
-	parent->_children.push_back(&new_text);
+	// Change
+	auto& new_change = changes.emplace_back();
+	auto& add_change = new_change.emplace<AddChange>();
+	add_change.parent = parent;
+	add_change.elem = &new_text;
+
 	return &new_text;
 }
 
@@ -41,15 +46,19 @@ RelativeWrap* Window::createRelativeWrap(Element* parent_element)
 	auto& new_rel = new_stored_elem.emplace<RelativeWrap>();
 	new_rel._window = this;
 	new_rel._parent = parent_element;
-	new_rel._self = &new_stored_elem;
+	new_rel._self_elements = std::prev(elements.end());
 	new_rel._init();
 
-	parent_element->_children.push_back(&new_rel);
+	// Change
+	auto& new_change = changes.emplace_back();
+	auto& add_change = new_change.emplace<AddChange>();
+	add_change.parent = parent_element;
+	add_change.elem = &new_rel;
 
 	return &new_rel;
 }
 
-Grid* Window::createGrid(Element* parent_element)
+Flex* Window::createGrid(Element* parent_element)
 {
 	if (parent_element == nullptr) {
 		parent_element = std::get_if<Root>(&elements.front());
@@ -57,17 +66,21 @@ Grid* Window::createGrid(Element* parent_element)
 
 	StoredElement& new_stored_elem = elements.emplace_back();
 
-	auto& new_grid = new_stored_elem.emplace<Grid>();
+	auto& new_grid = new_stored_elem.emplace<Flex>();
 	new_grid._window = this;
 	new_grid._parent = parent_element;
-	new_grid._self = &new_stored_elem;
+	new_grid._self_elements = std::prev(elements.end());
 	new_grid._init();
 
-	new_grid.orientation = GridOrientation::ROW;
-	new_grid.items_spacing = GridSpacing::START;
-	new_grid.lines_spacing = GridSpacing::START;
+	new_grid.orientation = Flex::Orientation::ROW;
+	new_grid.items_spacing = Flex::Spacing::START;
+	new_grid.lines_spacing = Flex::Spacing::START;
 
-	parent_element->_children.push_back(&new_grid);
+	// Change
+	auto& new_change = changes.emplace_back();
+	auto& add_change = new_change.emplace<AddChange>();
+	add_change.parent = parent_element;
+	add_change.elem = &new_grid;
 
 	return &new_grid;
 }
@@ -83,15 +96,42 @@ Menu* Window::createMenu(Element* parent_element)
 	auto& new_menu = new_stored_elem.emplace<Menu>();
 	new_menu._window = this;
 	new_menu._parent = parent_element;
-	new_menu._self = &new_stored_elem;
+	new_menu._self_elements = std::prev(elements.end());
 	new_menu._init();
 
-	parent_element->_children.push_back(&new_menu);
+	// Change
+	auto& new_change = changes.emplace_back();
+	auto& add_change = new_change.emplace<AddChange>();
+	add_change.parent = parent_element;
+	add_change.elem = &new_menu;
 
 	return &new_menu;
 }
 
-void Window::setFinalEvent(WindowCallback callback, void* user_data)
+void Window::deleteElement(Element* elem)
+{
+	assert_cond(elements.begin() != elem->_self_elements, "root cannot be deleted");
+
+	auto& delete_change = changes.emplace_back().emplace<DeleteChange>();
+	delete_change.target = elem->_self_elements;
+}
+
+void Window::deleteAllElements()
+{
+	// schedule all elements to be deleted except root
+
+	// skip first
+	auto iter = elements.begin();
+	iter++;
+
+	for (; iter != elements.end(); iter++) {
+
+		auto& delete_change = changes.emplace_back().emplace<DeleteChange>();
+		delete_change.target = iter;
+	}
+}
+
+void Window::setEndEvent(WindowCallback callback, void* user_data)
 {
 	this->finalEvent = callback;
 	this->final_event_user_data = user_data;

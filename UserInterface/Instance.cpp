@@ -572,7 +572,7 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		auto& root = root_elem.emplace<Root>();
 		root._window = &w;
 		root._parent = nullptr;
-		root._self = &root_elem;
+		root._self_elements = w.elements.begin();
 		root.Element::_init();
 
 		root._events._init(&w);

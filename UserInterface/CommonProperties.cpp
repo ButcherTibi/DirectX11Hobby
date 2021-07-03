@@ -97,6 +97,22 @@ void Color::setRGBA_UNORM(float r, float g, float b, float a)
 	this->rgba.a = a;
 }
 
+ElementSize::ElementSize()
+{
+	this->type = ElementSizeType::FIT;
+}
+
+ElementSize::ElementSize(int32_t size_px)
+{
+	this->type = ElementSizeType::ABSOLUTE;
+	this->absolute_size = (uint32_t)size_px;
+}
+
+ElementSize::ElementSize(float percentage)
+{
+	this->type = ElementSizeType::RELATIVE;
+	this->relative_size = percentage / 100.f;
+}
 
 ElementSize& ElementSize::operator=(int32_t size_px)
 {

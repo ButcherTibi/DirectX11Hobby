@@ -10,6 +10,11 @@
 Application application;
 
 
+scme::SculptMesh& MeshInstance::getSculptMesh()
+{
+	return instance_set->parent_mesh->mesh;
+}
+
 void MeshInstance::markFullUpdate()
 {
 	ModifiedMeshInstance& modified_inst = instance_set->modified_instances.emplace_back();
@@ -17,9 +22,134 @@ void MeshInstance::markFullUpdate()
 	modified_inst.type = ModifiedInstanceType::UPDATE;
 }
 
+bool MeshInstanceRef::operator==(MeshInstanceRef& other)
+{
+	return this->instance_set == other.instance_set &&
+		this->index_in_buffer == other.index_in_buffer;
+}
+
 MeshInstance* MeshInstanceRef::get()
 {
 	return &instance_set->instances[index_in_buffer];
+}
+
+//void selectInstance(nui::Window*, nui::StoredElement*, void*)
+//{
+//	// add or remove from selection buffer
+//	RaytraceInstancesResult result;
+//	if (application.mouseRaycastInstances(result)) {
+//
+//		auto& selection = application.instance_selection;
+//
+//		for (auto i = selection.begin(); i != selection.end(); i++) {
+//			
+//			MeshInstanceRef& selected = *i;
+//			if (selected == result.inst_ref) {
+//				selection.erase(i);
+//				return;
+//			}
+//		}
+//
+//		// instance not found so add to selection
+//		selection.push_back(result.inst_ref);
+//	}
+//}
+//
+//void Application::setMode_InstanceSelection()
+//{
+//	ui.viewport->setKeyDownEvent(selectInstance, nui::VirtualKeys::LEFT_MOUSE_BUTTON);
+//}
+//
+//void Application::setMode_InstanceMove()
+//{
+//	
+//}
+
+void Application::navigateUp()
+{
+	auto& now = interactions[now_interaction];
+	now.exit();
+
+	now_interaction = now.parent;
+}
+
+void Application::navigateToChild(uint32_t interaction_mode)
+{
+	auto& now = interactions[now_interaction];
+
+	for (uint32_t child : now.children) {
+
+		if (child == interaction_mode) {
+
+			interactions[child].enter();
+			now_interaction = child;
+			return;
+		}
+	}
+
+	throw std::exception("interaction mode not found in children");
+}
+
+void Application::resetScene()
+{
+	// Meshes
+	meshes.clear();
+
+	// Drawcalls
+	drawcalls.clear();
+	{
+		MeshDrawcall& root = drawcalls.emplace_back();
+		root.display_mode = DisplayMode::SOLID;
+		root.is_back_culled = false;
+		root.aabb_render_mode = AABB_RenderMode::NO_RENDER;
+	}
+
+	// Layers
+	layers.clear();
+	{
+		MeshLayer& root = layers.emplace_back();
+		root._parent = nullptr;
+	}
+
+	// Shading
+	shading_normal = GPU_ShadingNormal::POLY;
+
+	// Lighting
+	lights[0].normal = toNormal(45, 45);
+	lights[0].color = { 1, 1, 1 };
+	lights[0].intensity = 1.f;
+
+	lights[1].normal = toNormal(-45, 45);
+	lights[1].color = { 1, 1, 1 };
+	lights[1].intensity = 1.f;
+
+	lights[2].normal = toNormal(45, -45);
+	lights[2].color = { 1, 1, 1 };
+	lights[2].intensity = 1.f;
+
+	lights[3].normal = toNormal(-45, -45);
+	lights[3].color = { 1, 1, 1 };
+	lights[3].intensity = 1.f;
+
+	lights[4].intensity = 0.f;
+	lights[5].intensity = 0.f;
+	lights[6].intensity = 0.f;
+	lights[7].intensity = 0.f;
+
+	ambient_intensity = 0.03f;
+
+	// Camera
+	camera_focus = { 0, 0, 0 };
+	camera_field_of_view = 15.f;
+	camera_z_near = 0.1f;
+	camera_z_far = 100'000.f;
+	camera_pos = { 0, 0, 0 };
+	camera_quat_inv = { 1, 0, 0, 0 };
+	camera_forward = { 0, 0, -1 };
+
+	camera_orbit_sensitivity = 0.01f;
+	camera_pan_sensitivity = 0.0001f;
+	camera_dolly_sensitivity = 0.001f;
 }
 
 MeshInstanceRef Application::copyInstance(MeshInstanceRef& source_ref)
@@ -148,9 +278,11 @@ void Application::transferInstanceToLayer(MeshInstanceRef& ref, MeshLayer* dest_
 //	return &new_instance;
 //}
 
-void Application::rotateInstanceAroundY(MeshInstance* mesh_instance, float radians)
+void Application::rotateInstance(MeshInstance* mesh_instance, float x, float y, float z)
 {
-	mesh_instance->transform.rot = glm::rotate(mesh_instance->transform.rot, radians, { 0.f, 1.f, 0.f });
+	mesh_instance->transform.rot = glm::rotate(mesh_instance->transform.rot, x, { 1.f, 0.f, 0.f });
+	mesh_instance->transform.rot = glm::rotate(mesh_instance->transform.rot, y, { 0.f, 1.f, 0.f });
+	mesh_instance->transform.rot = glm::rotate(mesh_instance->transform.rot, z, { 0.f, 0.f, 1.f });
 }
 
 MeshDrawcall* Application::createDrawcall()
@@ -180,8 +312,8 @@ void Application::setAABB_RenderModeForDrawcall(MeshDrawcall* drawcall, AABB_Ren
 
 				// Free CPU Memory
 				if (render_mode == AABB_RenderMode::NO_RENDER) {
-					mesh.mesh.gpu_aabb_verts.clear();
-					mesh.mesh.gpu_aabb_verts.shrink_to_fit();
+					mesh.mesh.aabb_verts.clear();
+					mesh.mesh.aabb_verts.shrink_to_fit();
 				}
 				break;
 			}
@@ -189,18 +321,23 @@ void Application::setAABB_RenderModeForDrawcall(MeshDrawcall* drawcall, AABB_Ren
 	}
 }
 
-MeshLayer* Application::createLayer()
+MeshLayer* Application::createLayer(MeshLayer* parent)
 {
+	if (parent == nullptr) {
+		parent = &layers.front();
+	}
+
 	MeshLayer* new_layer = &this->layers.emplace_back();
-	new_layer->_parent = nullptr;
+	new_layer->_parent = parent;
+
+	parent->_children.insert(new_layer);
+
 	return new_layer;
 }
 
 void Application::transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer)
 {
-	if (child_layer->_parent != nullptr) {
-		child_layer->_parent->_children.erase(child_layer);
-	}
+	child_layer->_parent->_children.erase(child_layer);
 
 	child_layer->_parent = parent_layer;
 	parent_layer->_children.insert(child_layer);
@@ -221,8 +358,7 @@ Mesh& Application::_createMesh()
 {
 	Mesh& new_mesh = this->meshes.emplace_back();
 
-	scme::SculptMesh& sculpt_mesh = new_mesh.mesh;
-	sculpt_mesh.gpu_triangles_srv = nullptr;
+	new_mesh.mesh.init();
 
 	return new_mesh;
 }
@@ -230,11 +366,11 @@ Mesh& Application::_createMesh()
 MeshInstanceRef Application::_addInstance(Mesh& mesh, MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
 	if (dest_layer == nullptr) {
-		dest_layer = last_used_layer;
+		dest_layer = &layers.front();
 	}
 
 	if (dest_drawcall == nullptr) {
-		dest_drawcall = last_used_drawcall;
+		dest_drawcall = &drawcalls.front();
 	}
 
 	MeshInstanceSet& new_set = mesh.sets.emplace_back();
@@ -276,7 +412,12 @@ void Application::_unparentInstanceFromParentLayer(MeshInstanceRef& ref)
 
 MeshInstanceRef Application::createEmptyMesh(MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	return _addInstance(_createMesh(), dest_layer, dest_drawcall);
+	MeshInstanceRef& new_ref = _addInstance(_createMesh(), dest_layer, dest_drawcall);
+
+	// a newly created mesh is always selected
+	instance_selection.push_back(new_ref);
+	
+	return new_ref;
 }
 
 MeshInstanceRef Application::createTriangle(CreateTriangleInfo& info,
@@ -301,6 +442,18 @@ MeshInstanceRef Application::createQuad(CreateQuadInfo& info,
 
 	Mesh* mesh = new_instance->instance_set->parent_mesh;
 	mesh->mesh.createAsQuad(info.size, 1024);
+
+	return new_ref;
+}
+
+MeshInstanceRef Application::createWavyGrid(CreateWavyGridInfo& info, MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
+{
+	MeshInstanceRef new_ref = createEmptyMesh(dest_layer, dest_drawcall);
+	MeshInstance* new_instance = new_ref.get();
+	new_instance->transform = info.transform;
+
+	Mesh* mesh = new_instance->instance_set->parent_mesh;
+	mesh->mesh.createAsWavyGrid(info.size, 1024);
 
 	return new_ref;
 }
@@ -351,11 +504,11 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 	ErrStack err_stack;
 
 	if (settings.dest_layer == nullptr) {
-		settings.dest_layer = last_used_layer;
+		settings.dest_layer = &layers.front();
 	}
 
 	if (settings.dest_drawcall == nullptr) {
-		settings.dest_drawcall = last_used_drawcall;
+		settings.dest_drawcall = &drawcalls.front();
 	}
 
 	gltf::Structure structure;
@@ -525,6 +678,7 @@ void Application::joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t des
 	MeshInstance* dest_inst = sources[destination_idx].get();
 
 	scme::SculptMesh dest_mesh;
+	dest_mesh.init();
 	{
 		uint32_t vertex_count = 0;
 		uint32_t edge_count = 0;
@@ -658,15 +812,30 @@ void Application::joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t des
 	source_mesh = dest_mesh;
 }
 
-bool Application::mouseRaycastInstances(MeshInstanceRef& r_isect_inst, uint32_t& r_isect_poly,
-	glm::vec3& r_isect_point)
+bool Application::enterSculptMode()
+{
+	MeshInstance* inst = instance_selection.back().get();
+	sculpt_target = inst->instance_set->parent_mesh;
+
+	navigateToChild(InteractionModes::SCULPT);
+
+	return true;
+}
+
+bool Application::mouseRaycastInstances(RaytraceInstancesResult& r_isect)
 {
 	nui::Input& input = main_window->input;
-	renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, r_isect_point);
+	glm::vec3 pixel_world_pos;
+	renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
 
-	if (r_isect_point.x == FLT_MAX) {
+	// nothing under cursor
+	if (pixel_world_pos.x == FLT_MAX) {
 		return false;
 	}
+
+	triggerBreakpointOnKey();
+
+	float min_distance = FLT_MAX;
 
 	for (Mesh& mesh : meshes) {
 
@@ -677,17 +846,34 @@ bool Application::mouseRaycastInstances(MeshInstanceRef& r_isect_inst, uint32_t&
 
 				MeshInstance& inst = iter.get();
 				glm::vec3 ray_origin = camera_pos - inst.transform.pos;
-				glm::vec3 ray_target = r_isect_point - inst.transform.pos;
+				glm::vec3 ray_target = pixel_world_pos - inst.transform.pos;
 				glm::vec3 ray_dir = glm::normalize(ray_target - ray_origin);
 
 				// TODO: account for rotation
 
+				uint32_t r_isect_poly;
+				glm::vec3 r_local_isect;
 
+				if (sculpt_mesh.raycastPolys(ray_origin, ray_dir, r_isect_poly, r_local_isect)) {
+					
+					glm::vec3 global_isect = inst.transform.pos + r_local_isect;
+					float new_distance = glm::distance(camera_pos, global_isect);
+
+					if (new_distance < min_distance) {
+
+						min_distance = new_distance;
+						r_isect.inst_ref.instance_set = &set;
+						r_isect.inst_ref.index_in_buffer = inst.index_in_buffer;
+						r_isect.poly = r_isect_poly;
+						r_isect.local_isect = r_local_isect;
+						r_isect.global_isect = global_isect;
+					}
+				}
 			}
 		}
 	}
 
-	return false;
+	return min_distance != FLT_MAX;
 }
 
 void Application::setCameraFocus(glm::vec3& new_focus)
@@ -834,133 +1020,26 @@ void Application::setCameraRotation(float x, float y, float z)
 
 void Application::resetToHardcodedStartup()
 {
-	// Meshes
-	meshes.clear();
-
-	// Drawcalls
-	drawcalls.clear();
-	last_used_drawcall = createDrawcall();
-
-	// Layers
-	layers.clear();
-	last_used_layer = &layers.emplace_back();
-	last_used_layer->_parent = nullptr;
-
-	// Shading
-	shading_normal = GPU_ShadingNormal::POLY;
-
-	// Lighting
-	lights[0].normal = toNormal(45, 45);
-	lights[0].color = { 1, 1, 1 };
-	lights[0].intensity = 1.f;
-
-	lights[1].normal = toNormal(-45, 45);
-	lights[1].color = { 1, 1, 1 };
-	lights[1].intensity = 1.f;
-
-	lights[2].normal = toNormal(45, -45);
-	lights[2].color = { 1, 1, 1 };
-	lights[2].intensity = 1.f;
-
-	lights[3].normal = toNormal(-45, -45);
-	lights[3].color = { 1, 1, 1 };
-	lights[3].intensity = 1.f;
-
-	lights[4].intensity = 0.f;
-	lights[5].intensity = 0.f;
-	lights[6].intensity = 0.f;
-	lights[7].intensity = 0.f;
-
-	ambient_intensity = 0.03f;
-
-	// Camera
-	camera_focus = { 0, 0, 0 };
-	camera_field_of_view = 15.f;
-	camera_z_near = 0.1f;
-	camera_z_far = 100'000.f;
-	camera_pos = { 0, 0, 0 };
-	camera_quat_inv = { 1, 0, 0, 0 };
-	camera_forward = { 0, 0, -1 };
-
-	camera_orbit_sensitivity = 0.01f;
-	camera_pan_sensitivity = 0.0001f;
-	camera_dolly_sensitivity = 0.001f;
+	resetScene();
 }
 
 void Application::setShadingNormal(uint32_t new_shading_normal)
 {
-	this->shading_normal = new_shading_normal;
+	if (this->shading_normal != new_shading_normal) {
+
+		for (Mesh& mesh : meshes) {
+			mesh.mesh.markAllVerticesForNormalUpdate();
+		}
+
+		this->shading_normal = new_shading_normal;
+	}
 }
 
-void endFrameEvents(nui::Window*, void*)
+void Application::triggerBreakpointOnKey(uint32_t key_down)
 {
-	for (Mesh& mesh : application.meshes) {
+	nui::Input& input = main_window->input;
 
-		scme::SculptMesh& sculpt_mesh = mesh.mesh;
-
-		if (sculpt_mesh.modified_polys.size() > 0) {
-
-			for (scme::ModifiedPoly& modified_poly : sculpt_mesh.modified_polys) {
-
-				switch (modified_poly.state) {
-				case scme::ModifiedPolyState::UPDATE: {
-
-					if (sculpt_mesh.polys.isDeleted(modified_poly.idx)) {
-						continue;
-					}
-
-					scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
-
-					if (poly.is_tris) {
-
-						std::array<scme::Vertex*, 3> vs;
-						sculpt_mesh.getTrisPrimitives(&poly, vs);
-
-						// Triangle Normal
-						poly.normal = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
-					}
-					else {
-						std::array<scme::Vertex*, 4> vs;
-						sculpt_mesh.getQuadPrimitives(&poly, vs);
-
-						// Tesselation and Normals
-						if (glm::distance(vs[0]->pos, vs[2]->pos) < glm::distance(vs[1]->pos, vs[3]->pos)) {
-
-							poly.tesselation_type = 0;
-							poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[2]);
-							poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[0], vs[2], vs[3]);
-						}
-						else {
-							poly.tesselation_type = 1;
-							poly.tess_normals[0] = sculpt_mesh.calcWindingNormal(vs[0], vs[1], vs[3]);
-							poly.tess_normals[1] = sculpt_mesh.calcWindingNormal(vs[1], vs[2], vs[3]);
-						}
-						poly.normal = glm::normalize((poly.tess_normals[0] + poly.tess_normals[1]) / 2.f);
-					}
-					break;
-				}
-				}
-			}
-		}
-
-		if (sculpt_mesh.modified_verts.size() > 0) {
-
-			for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
-
-				switch (modified_v.state) {
-				case scme::ModifiedVertexState::UPDATE: {
-
-					// it is posible to have the vertex as both deleted and updated multiple times
-					// when running multiple sculpt mesh operations
-					if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
-
-						sculpt_mesh.moveVertexInAABBs(modified_v.idx);
-						sculpt_mesh.calcVertexNormal(modified_v.idx);
-					}
-					break;
-				}
-				}
-			}
-		}
+	if (input.key_list[key_down].is_down) {
+		__debugbreak();
 	}
 }

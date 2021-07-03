@@ -7,8 +7,8 @@
 // GLM
 #include "glm\ext\quaternion_common.hpp"
 
-
-bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
+template<typename T>
+bool AxisBoundingBox3D<T>::isPositionInside(glm::vec3& pos)
 {
 	if (min.x <= pos.x && pos.x <= max.x &&
 		min.y <= pos.y && pos.y <= max.y &&
@@ -18,8 +18,10 @@ bool AxisBoundingBox3D::isPositionInside(glm::vec3& pos)
 	}
 	return false;
 }
+template bool AxisBoundingBox3D<float>::isPositionInside(glm::vec3& pos);
 
-bool AxisBoundingBox3D::isRayIsect(glm::vec3& origin, glm::vec3& direction)
+template<typename T>
+bool AxisBoundingBox3D<T>::isRayIsect(glm::vec3& origin, glm::vec3& direction)
 {
 	/* From Stack exchange
 	The 3 slabs method
@@ -55,6 +57,7 @@ bool AxisBoundingBox3D::isRayIsect(glm::vec3& origin, glm::vec3& direction)
 	// dist_until_isect = tmin;
 	return true;
 }
+template bool AxisBoundingBox3D<float>::isRayIsect(glm::vec3& origin, glm::vec3& direction);
 
 float toRad(float degree)
 {

@@ -47,6 +47,10 @@ namespace nui {
 		float relative_size;
 
 	public:
+		ElementSize();
+		ElementSize(int32_t size_px);
+		ElementSize(float percentage);
+
 		ElementSize& operator=(int32_t size_px);
 		ElementSize& operator=(float percentage);
 	};

@@ -428,7 +428,7 @@ void TextRender::addInstance(TextInstance& props, uint32_t& r_width, uint32_t& r
 		line_height = font_size->ascender;
 	}
 
-	glm::ivec2 pen = { props.pos[0], props.pos[1] };
+	glm::ivec2 pen = { props.screen_pos[0], props.screen_pos[1] };
 	pen.y += line_height;
 
 	uint32_t i = 0;;
@@ -450,7 +450,7 @@ void TextRender::addInstance(TextInstance& props, uint32_t& r_width, uint32_t& r
 			// Move the writing pen to the next character
 			pen.x += chara->advance_X;
 
-			uint32_t new_width = pen.x - props.pos[0];
+			uint32_t new_width = pen.x - props.screen_pos[0];
 
 			if (new_width > r_width) {
 				r_width = new_width;
@@ -461,7 +461,7 @@ void TextRender::addInstance(TextInstance& props, uint32_t& r_width, uint32_t& r
 		i++;
 	}
 
-	r_height = (pen.y + font_size->descender) - props.pos[1];
+	r_height = (pen.y + font_size->descender) - props.screen_pos[1];
 
 	instance.color = props.color;
 }

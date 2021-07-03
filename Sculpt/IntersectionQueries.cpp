@@ -174,7 +174,7 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 	std::vector<VertexBoundingBox*>& traced_aabbs = _traced_aabbs;
 
 	now_aabbs.resize(1);
-	now_aabbs[0] = &aabbs[root_aabb];
+	now_aabbs[0] = &aabbs[root_aabb_idx];
 
 	traced_aabbs.clear();
 
@@ -210,6 +210,8 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 
 	// Find the closest triangle in the closest AABB
 	for (VertexBoundingBox* aabb : traced_aabbs) {
+
+		_tested_edges.clear();
 
 		uint32_t closest_poly;
 		float closest_distance = FLT_MAX;
@@ -256,6 +258,10 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 							}
 						}
 
+						// mark edge as tested
+						edge->was_raycast_tested = true;
+						_tested_edges.push_back(edge_idx);
+
 						// Iter
 						edge_idx = edge->nextEdgeOf(v_idx);
 						edge = &edges[edge_idx];
@@ -263,6 +269,11 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 					while (edge_idx != vertex->edge);
 				}
 			}
+		}
+
+		// mark all tested edges as untested for next function call
+		for (uint32_t edge_idx : _tested_edges) {
+			edges[edge_idx].was_raycast_tested = false;
 		}
 
 		// stop at the first (closest) AABB for hit

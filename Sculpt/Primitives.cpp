@@ -27,6 +27,64 @@ bool VertexBoundingBox::hasVertices()
 	return verts.size() > 0;
 }
 
+uint32_t VertexBoundingBox::inWhichChildDoesPositionReside(glm::vec3& pos)
+{
+	assert_cond(isLeaf() == false, "should not be called for leafs because leafs don't have children");
+
+	// above
+	if (pos.y >= mid.y) {
+
+		// forward
+		if (pos.z >= mid.z) {
+
+			// left
+			if (pos.x <= mid.x) {
+				return children[0];
+			}
+			// right
+			else {
+				return children[1];
+			}
+		}
+		// back
+		else {
+			// left
+			if (pos.x <= mid.x) {
+				return children[2];
+			}
+			// right
+			else {
+				return children[3];
+			}
+		}
+	}
+	// below
+	else {
+		// forward
+		if (pos.z >= mid.z) {
+
+			// left
+			if (pos.x <= mid.x) {
+				return children[4];
+			}
+			// right
+			else {
+				return children[5];
+			}
+		}
+		// back
+		else {
+			// left
+			if (pos.x <= mid.x) {
+				return children[6];
+			}
+		}
+	}
+
+	// right
+	return children[7];
+}
+
 uint32_t& Edge::nextEdgeOf(uint32_t vertex_idx)
 {
 	if (v0 == vertex_idx) {
@@ -82,6 +140,8 @@ void SculptMesh::_deletePolyMemory(uint32_t poly_idx)
 	ModifiedPoly& modified_poly = modified_polys.emplace_back();
 	modified_poly.idx = poly_idx;
 	modified_poly.state = ModifiedPolyState::DELETED;
+
+	dirty_index_buff = true;
 }
 
 void SculptMesh::printEdgeListOfVertex(uint32_t vertex_idx)
@@ -146,6 +206,10 @@ void SculptMesh::markVertexFullUpdate(uint32_t vertex)
 	ModifiedVertex& modified_vertex = modified_verts.emplace_back();
 	modified_vertex.idx = vertex;
 	modified_vertex.state = ModifiedVertexState::UPDATE;
+
+	this->dirty_vertex_list = true;
+	this->dirty_vertex_pos = true;
+	this->dirty_vertex_normals = true;
 }
 
 void SculptMesh::deleteVertex(uint32_t)
@@ -188,13 +252,24 @@ void SculptMesh::_transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
 	destination_aabb.verts.push_back(v);
 }
 
-void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
+void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 {
 	Vertex& vertex = verts[vertex_idx];
 
+	// did it even leave the original AABB heuristic
+	if (vertex.aabb != 0xFFFF'FFFF) {
+
+		VertexBoundingBox& original_aabb = aabbs[vertex.aabb];
+
+		// no significant change in position
+		if (original_aabb.aabb.isPositionInside(vertex.pos)) {
+			return;
+		}
+	}
+
 	uint32_t now_count = 1;
 	std::array<uint32_t, 8> now_aabbs = {
-		start_aabb
+		root_aabb_idx
 	};
 
 	uint32_t next_count = 0;
@@ -210,7 +285,7 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 			if (aabb->aabb.isPositionInside(vertex.pos)) {
 
 				// Leaf
-				if (aabb->children[0] == 0xFFFF'FFFF) {
+				if (aabb->isLeaf()) {
 
 					uint32_t child_vertex_count = aabb->verts.size() - aabb->verts_deleted_count;
 
@@ -226,72 +301,15 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 						aabbs.resize(aabbs.size() + 8);
 
 						aabb = &aabbs[aabb_idx];  // old AABB pointer invalidated because octrees resize
-						glm::vec3& min = aabb->aabb.min;
-						glm::vec3& max = aabb->aabb.max;
 
-						float x_mid = (aabb->aabb.max.x + aabb->aabb.min.x) / 2.0f;
-						float y_mid = (aabb->aabb.max.y + aabb->aabb.min.y) / 2.0f;
-						float z_mid = (aabb->aabb.max.z + aabb->aabb.min.z) / 2.0f;
+						aabb->aabb.subdivide(
+							aabbs[base_idx + 0].aabb, aabbs[base_idx + 1].aabb,
+							aabbs[base_idx + 2].aabb, aabbs[base_idx + 3].aabb,
 
-						//              +------------+------------+
-						//             /|           /|           /|
-						//           /      0     /      1     /  |
-						//         /            /            /    |
-						//        +------------+------------+     |
-						//       /|     |     /|     |     /|     |
-						//     /        + - / - - - -+ - / -|- - -+
-						//   /         /  /    |    /  /    |    /
-						//  +------------+------------+     |  /
-						//  |     | /    |     | /    |     |/
-						//  |     + - - -| - - + - - -|- - -+     ^ Y    ^ Z
-						//  |    /       |    /       |    /      |     /
-						//  |        2   |        3   |  /        |   /
-						//  | /          | /          |/          | /
-						//  +------------+------------+           *-------> X
-
-						{
-							// Top Forward Left
-							AxisBoundingBox3D& box_0 = aabbs[base_idx].aabb;
-							box_0.max = { x_mid, max.y, max.z };
-							box_0.min = { min.x, y_mid, z_mid };
-
-							// Top Forward Right
-							AxisBoundingBox3D& box_1 = aabbs[base_idx + 1].aabb;
-							box_1.max = { max.x, max.y, max.z };
-							box_1.min = { x_mid, y_mid, z_mid };
-
-							// Top Backward Left
-							AxisBoundingBox3D& box_2 = aabbs[base_idx + 2].aabb;
-							box_2.max = { x_mid, max.y, z_mid };
-							box_2.min = { min.x, y_mid, min.z };
-
-							// Top Backward Right
-							AxisBoundingBox3D& box_3 = aabbs[base_idx + 3].aabb;
-							box_3.max = { max.x, max.y, z_mid };
-							box_3.min = { x_mid, y_mid, min.z };
-						}
-
-						{
-							// Bot Forward Left
-							AxisBoundingBox3D& box_0 = aabbs[base_idx + 4].aabb;
-							box_0.max = { x_mid, y_mid, max.z };
-							box_0.min = { min.x, min.y, z_mid };
-
-							// Bot Forward Right
-							AxisBoundingBox3D& box_1 = aabbs[base_idx + 5].aabb;
-							box_1.max = { max.x, y_mid, max.z };
-							box_1.min = { x_mid, min.y, z_mid };
-
-							// Bot Backward Left
-							AxisBoundingBox3D& box_2 = aabbs[base_idx + 6].aabb;
-							box_2.max = { x_mid, y_mid, z_mid };
-							box_2.min = { min.x, min.y, min.z };
-
-							// Bot Backward Right
-							AxisBoundingBox3D& box_3 = aabbs[base_idx + 7].aabb;
-							box_3.max = { max.x, y_mid, z_mid };
-							box_3.min = { x_mid, min.y, min.z };
-						}
+							aabbs[base_idx + 4].aabb, aabbs[base_idx + 5].aabb,
+							aabbs[base_idx + 6].aabb, aabbs[base_idx + 7].aabb,
+							aabb->mid
+						);
 
 						bool found = false;
 
@@ -347,10 +365,20 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 						return;
 					}
 				}
-				// Schedule recursive call
+				// Schedule going down the graph call
 				else {
-					for (i = 0; i < 8; i++) {
-						next_aabbs[next_count] = aabb->children[i];
+					uint32_t child_idx = aabb->inWhichChildDoesPositionReside(vertex.pos);
+
+					// unlikelly only float point errors
+					if (child_idx == 0xFFFF'FFFF) {
+
+						for (i = 0; i < 8; i++) {
+							next_aabbs[next_count] = aabb->children[i];
+							next_count++;
+						}
+					}
+					else {
+						next_aabbs[next_count] = child_idx;
 						next_count++;
 					}
 					break;
@@ -361,12 +389,70 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx, uint32_t start_aabb)
 		now_aabbs.swap(next_aabbs);
 		now_count = next_count;
 		next_count = 0;
-
-		// TODO:
-		// - merge upward
-		// - expand upward
-		// - seek upward
 	}
+
+	// position is not found in the AABB graph
+	uint32_t new_root_idx = aabbs.size();
+	VertexBoundingBox& new_root = aabbs.emplace_back();
+	new_root.verts_deleted_count = 0;
+
+	VertexBoundingBox& old_root = aabbs[root_aabb_idx];
+	{
+		float size = old_root.aabb.sizeX();
+
+		if (vertex.pos.y > old_root.aabb.max.y) {
+			new_root.aabb.min.y = old_root.aabb.min.y;
+			new_root.aabb.max.y = new_root.aabb.min.y + size;
+		}
+		else {
+			new_root.aabb.max.y = old_root.aabb.max.y;
+			new_root.aabb.min.y = new_root.aabb.max.y - size;
+		}
+
+		if (vertex.pos.z > old_root.aabb.max.z) {
+			new_root.aabb.min.z = old_root.aabb.min.z;
+			new_root.aabb.max.z = new_root.aabb.min.z + size;
+		}
+		else {
+			new_root.aabb.max.z = old_root.aabb.max.z;
+			new_root.aabb.min.z = new_root.aabb.max.z - size;;
+		}
+
+		if (vertex.pos.x > old_root.aabb.max.x) {
+			new_root.aabb.min.x = old_root.aabb.min.x;
+			new_root.aabb.max.x = new_root.aabb.min.x + size;
+		}
+		else {
+			new_root.aabb.max.x = old_root.aabb.max.x;
+			new_root.aabb.min.x = new_root.aabb.max.x - size;
+		}
+	}
+
+	AxisBoundingBox3D<> boxes[8];
+
+	new_root.aabb.subdivide(boxes[0], boxes[1], boxes[2], boxes[3],
+		boxes[4], boxes[5], boxes[6], boxes[7],
+		new_root.mid);
+
+	//VertexBoundingBox* aabb[7];
+
+	for (uint32_t i = 0; i < 8; i++) {
+
+		uint32_t child_idx;
+
+		if (boxes[i].isPositionInside(old_root.mid)) {
+			// 
+		}
+		else {
+			child_idx = aabbs.size();
+
+			VertexBoundingBox& child_aabb = aabbs.emplace_back();
+
+		}
+
+		new_root.children[i] = child_idx;
+	}
+
 }
 
 void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
@@ -378,9 +464,9 @@ void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 	assert_cond(this->max_vertices_in_AABB > 0, "maximum number of vertices for AABB is not specified");
 
 	aabbs.resize(1);
-	root_aabb = 0;
+	root_aabb_idx = 0;
 
-	VertexBoundingBox& root = aabbs[root_aabb];
+	VertexBoundingBox& root = aabbs[root_aabb_idx];
 	root.parent = 0xFFFF'FFFF;
 	root.children[0] = 0xFFFF'FFFF;
 	root.verts_deleted_count = 0;
@@ -389,11 +475,7 @@ void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 	// Calculate Root Bounding Box size
 	if (verts.size()) {
 
-		Vertex& first = verts.front();
-		root.aabb.min = first.pos;
-		root.aabb.max = first.pos;
-
-		float root_aabb_size = 0;
+		float new_root_aabb_size = 0;
 
 		// skip first vertex
 		for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
@@ -401,26 +483,28 @@ void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 			Vertex& vertex = iter.get();
 			vertex.aabb = 0xFFFF'FFFF;
 
-			if (std::abs(vertex.pos.x) > root_aabb_size) {
-				root_aabb_size = vertex.pos.x;
+			if (std::abs(vertex.pos.x) > new_root_aabb_size) {
+				new_root_aabb_size = std::abs(vertex.pos.x);
 			}
 
-			if (std::abs(vertex.pos.y) > root_aabb_size) {
-				root_aabb_size = vertex.pos.y;
+			if (std::abs(vertex.pos.y) > new_root_aabb_size) {
+				new_root_aabb_size = std::abs(vertex.pos.y);
 			}
 
-			if (std::abs(vertex.pos.z) > root_aabb_size) {
-				root_aabb_size = vertex.pos.z;
+			if (std::abs(vertex.pos.z) > new_root_aabb_size) {
+				new_root_aabb_size = std::abs(vertex.pos.z);
 			}
 		}
 
-		root.aabb.min = { -root_aabb_size, -root_aabb_size, -root_aabb_size };
-		root.aabb.max = { +root_aabb_size, +root_aabb_size, +root_aabb_size };
+		root.aabb.min = { -new_root_aabb_size, -new_root_aabb_size, -new_root_aabb_size };
+		root.aabb.max = { +new_root_aabb_size, +new_root_aabb_size, +new_root_aabb_size };
+		root.mid.x = (root.aabb.max.x + root.aabb.min.x) / 2.0f;
+		root.mid.y = (root.aabb.max.y + root.aabb.min.y) / 2.0f;
+		root.mid.x = (root.aabb.max.z + root.aabb.min.z) / 2.0f;
 	}
 	
 	for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
-
-		moveVertexInAABBs(iter.index(), root_aabb);
+		moveVertexInAABBs(iter.index());
 	}
 }
 
@@ -555,6 +639,7 @@ void SculptMesh::setEdge(uint32_t existing_edge_idx, uint32_t v0_idx, uint32_t v
 	existing_edge->v1 = v1_idx;
 	existing_edge->p0 = 0xFFFF'FFFF;
 	existing_edge->p1 = 0xFFFF'FFFF;
+	existing_edge->was_raycast_tested = false;
 
 	registerEdgeToVertexList(existing_edge_idx, v0_idx);
 	registerEdgeToVertexList(existing_edge_idx, v1_idx);
@@ -575,11 +660,46 @@ glm::vec3 SculptMesh::calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2)
 	return -glm::normalize(glm::cross(v1->pos - v0->pos, v2->pos - v0->pos));
 }
 
+void SculptMesh::calcPolyNormal(Poly* poly)
+{
+	if (poly->is_tris) {
+
+		std::array<scme::Vertex*, 3> vs;
+		getTrisPrimitives(poly, vs);
+
+		// Triangle Normal
+		poly->normal = calcWindingNormal(vs[0], vs[1], vs[2]);
+		poly->tess_normals[0] = poly->normal;
+		poly->tess_normals[1] = poly->normal;
+	}
+	else {
+		std::array<scme::Vertex*, 4> vs;
+		getQuadPrimitives(poly, vs);
+
+		// Tesselation and Normals
+		if (glm::distance(vs[0]->pos, vs[2]->pos) < glm::distance(vs[1]->pos, vs[3]->pos)) {
+
+			poly->tesselation_type = 0;
+			poly->tess_normals[0] = calcWindingNormal(vs[0], vs[1], vs[2]);
+			poly->tess_normals[1] = calcWindingNormal(vs[0], vs[2], vs[3]);
+		}
+		else {
+			poly->tesselation_type = 1;
+			poly->tess_normals[0] = calcWindingNormal(vs[0], vs[1], vs[3]);
+			poly->tess_normals[1] = calcWindingNormal(vs[1], vs[2], vs[3]);
+		}
+		poly->normal = glm::normalize((poly->tess_normals[0] + poly->tess_normals[1]) / 2.f);
+	}
+}
+
 void SculptMesh::markPolyFullUpdate(uint32_t poly)
 {
 	ModifiedPoly& modified_poly = modified_polys.emplace_back();
 	modified_poly.idx = poly;
 	modified_poly.state = ModifiedPolyState::UPDATE;
+
+	dirty_index_buff = true;
+	dirty_tess_tris = true;
 }
 
 void SculptMesh::setTris(uint32_t new_poly_idx, uint32_t v0, uint32_t v1, uint32_t v2)

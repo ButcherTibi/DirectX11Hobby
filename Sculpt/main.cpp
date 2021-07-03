@@ -4,25 +4,21 @@
 #include "Application.hpp"
 
 
-void renderDocTriggerCapture(nui::Window*, nui::StoredElement*, void*)
+void renderDocBeginCapture(nui::Window*, nui::StoredElement*, void*)
 {
-	render_doc.triggerCapture();
+	render_doc.startCapture();
 }
 
-void onMouseMove(nui::Window*, nui::StoredElement*, void*)
+void renderDocEndCapture(nui::Window*, nui::StoredElement*, void*)
 {
-	/*uint32_t isect_poly;
-	glm::vec3 isect_point;
-	if (application.mouseRaycastInstances(isect_poly, isect_point) != nullptr) {
-		printf("point = %.3f %.3f %.3f \n", isect_point.x, isect_point.y, isect_point.z);
-	}*/
+	render_doc.endCapture();
 }
 
 void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void*)
 {
 	nui::Input& input = window->input;
 	glm::vec3 pixel_world_pos;
-	application.renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
+	renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
 
 	//printf("%.2f %.2f %.2f \n", pixel_world_pos.x, pixel_world_pos.y, pixel_world_pos.z);
 
@@ -30,7 +26,7 @@ void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void*
 		application.setCameraFocus(pixel_world_pos);
 	}
 
-	nui::Grid* grid = std::get_if<nui::Grid>(source);
+	nui::Flex* grid = std::get_if<nui::Flex>(source);
 	grid->beginMouseFixedDeltaEffect();
 }
 
@@ -45,13 +41,13 @@ void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement*, void*)
 
 void onCameraOrbitKeyUp(nui::Window* window, nui::StoredElement*, void*)
 {
-	// nui::Grid* grid = std::get_if<nui::Grid>(source);
+	// nui::Flex* grid = std::get_if<nui::Flex>(source);
 	window->endMouseDeltaEffect();
 }
 
 void onCameraPanKeyDown(nui::Window*, nui::StoredElement* source, void*)
 {
-	auto grid = std::get_if<nui::Grid>(source);
+	auto grid = std::get_if<nui::Flex>(source);
 	grid->beginMouseLoopDeltaEffect();
 }
 
@@ -71,6 +67,14 @@ void onCameraPanKeyUp(nui::Window* window, nui::StoredElement*, void*)
 
 void onCameraDollyScroll(nui::Window* window, nui::StoredElement*, void*)
 {
+	nui::Input& input = window->input;
+	glm::vec3 pixel_world_pos;
+	renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
+
+	if (pixel_world_pos.x != FLT_MAX) {
+		application.setCameraFocus(pixel_world_pos);
+	}
+
 	application.dollyCamera(window->input.mouse_wheel_delta * application.camera_dolly_sensitivity);
 }
 
@@ -146,21 +150,6 @@ void hideAABBs(nui::Window*, nui::StoredElement*, void*)
 void createTestScene_EmptyScene(nui::Window*, nui::StoredElement*, void*)
 {
 	application.resetToHardcodedStartup();
-}
-
-void createTestScene_SimpleTriangle(nui::Window*, nui::StoredElement*, void*)
-{
-	application.resetToHardcodedStartup();
-
-	CreateTriangleInfo info;
-	application.createTriangle(info);
-
-	// Camera positions
-	glm::vec2 center = { 0, 0 };
-	application.setCameraPosition(center.x, center.y, 10);
-
-	glm::vec3 focus = { center.x, center.y, 0 };
-	application.setCameraFocus(focus);
 }
 
 void createTestScene_CopyInstance(nui::Window*, nui::StoredElement*, void*)
@@ -273,11 +262,6 @@ void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement*, void*
 
 	application.joinMeshes(new_refs, 0);
 
-	application.setAABB_RenderModeForDrawcall(
-		&application.getRootDrawcall(),
-		AABB_RenderMode::LEAF_ONLY
-	);
-
 	// Camera
 	glm::vec2 center = { 0, 100 };
 	application.setCameraPosition(center.x, center.y, 1000);
@@ -306,6 +290,21 @@ void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement*, void*
 //	glm::vec3 focus = { center.x, center.y, 0 };
 //	application.setCameraFocus(focus);
 //}
+
+void createTestScene_SingleTriangle(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateTriangleInfo info;
+	application.createTriangle(info);
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
 
 void createTestScene_Triangle(nui::Window*, nui::StoredElement*, void*)
 {
@@ -339,6 +338,21 @@ void createTestScene_Triangle(nui::Window*, nui::StoredElement*, void*)
 		pos_x += step_x;
 		i++;
 	}
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_SingleQuad(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateQuadInfo info;
+	application.createQuad(info);
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
@@ -392,6 +406,21 @@ void createTestScene_Quad(nui::Window*, nui::StoredElement*, void*)
 			pos_x += step_x;
 		}
 	}
+
+	// Camera positions
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createTestScene_WavyGrid(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateWavyGridInfo info;
+	application.createWavyGrid(info);
 
 	// Camera positions
 	glm::vec2 center = { 0, 0 };
@@ -516,26 +545,146 @@ void createTestScene_ImportGLTF(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
+void createPerformanceTestScene_AABBs(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	io::FilePath file_path;
+	ErrStack err_stack = file_path.recreateRelative("Sculpt/Meshes/Journey/scene.gltf");
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	std::vector<MeshInstanceRef> new_refs;
+
+	GLTF_ImporterSettings settings;
+	err_stack = application.importMeshesFromGLTF_File(file_path, settings, &new_refs);
+	if (err_stack.isBad()) {
+		err_stack.debugPrint();
+		return;
+	}
+
+	application.joinMeshes(new_refs, 0);
+
+	application.setAABB_RenderModeForDrawcall(
+		&application.getRootDrawcall(),
+		AABB_RenderMode::LEAF_ONLY
+	);
+
+	// Camera
+	glm::vec2 center = { 0, 100 };
+	application.setCameraPosition(center.x, center.y, 1000);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createPerformanceTestScene_ManySpheres(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	float spacing = 2;
+
+	CreateUV_SphereInfo info;
+	info.rows = 32;
+	info.columns = 64;
+	MeshInstanceRef source_ref = application.createUV_Sphere(info);
+	MeshInstance* source = source_ref.get();
+	source->transform.pos.y = -spacing;
+
+	uint32_t amount = 20;
+
+	for (uint32_t depth = 0; depth < amount; depth++) {
+		for (uint32_t row = 0; row < amount; row++) {
+			for (uint32_t col = 0; col < amount; col++) {
+
+				MeshInstanceRef copy_ref = application.copyInstance(source_ref);
+				MeshInstance* copy = copy_ref.get();
+				copy->transform.pos.x = spacing * col;
+				copy->transform.pos.y = spacing * row;
+				copy->transform.pos.z = -spacing * depth;
+			}
+		}
+	}
+
+	// Camera
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createPerformanceTestScene_DenseSphere(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	CreateUV_SphereInfo info;
+	info.rows = 300;
+	info.columns = info.rows * 2;
+	MeshInstanceRef source_ref = application.createUV_Sphere(info);
+
+	// Camera
+	glm::vec2 center = { 0, 0 };
+	application.setCameraPosition(center.x, center.y, 10);
+
+	glm::vec3 focus = { center.x, center.y, 0 };
+	application.setCameraFocus(focus);
+}
+
+void createInputTestScene_TabletMapping(nui::Window*, nui::StoredElement*, void*)
+{
+	application.resetToHardcodedStartup();
+
+	double ratio = 0.7;
+
+	double screen_aspect_ratio = 16 / 9;
+	
+	// Y
+	double tablet_size_y = 13500;
+	double height = tablet_size_y * ratio;
+
+	double top = (tablet_size_y - height) / 2;
+	double bot = top + height;
+
+	// X
+	double tablet_size_x = 21600;
+	double width = tablet_size_x * ratio * screen_aspect_ratio;
+
+	double left = (tablet_size_x - width) / 2;
+	double right = left + width;
+
+	printf("top = %d \n", (uint32_t)(top));
+	printf("bot = %d \n", (uint32_t)(bot));
+	printf("left = %d \n", (uint32_t)(left));
+	printf("right = %d \n", (uint32_t)(right));
+}
+
+//void createUITestScene_Flex()
+//{
+//	application.resetScene();
+//
+//	application.navigateUp();
+//}
+
 void exit_application(nui::Window*, nui::StoredElement*, void*)
 {
 	application.main_window->win_messages.should_close = true;
 }
 
-//void createDebugLine()
-//{
-//	MeshDrawcall* drawcall = application.createDrawcall();
-//	drawcall->name = "Debug Line Drawcall";
-//	drawcall->display_mode = DisplayMode::WIREFRAME_PURE;
-//
-//	CreateLineInfo info;
-//	info.origin = { 0, 0, 0 };
-//	info.direction = { 0, 0, 1 };
-//	info.length = 1000.f;
-//
-//	MeshInstance* inst = application.createLine(info, nullptr, drawcall);
-//	inst->name = "Debug Line";
-//	inst->wireframe_colors.front_color = { 1, 0, 1 };
-//}
+
+// Mode title
+
+void enterInstanceMode(nui::Window*, nui::StoredElement*, void*)
+{
+
+}
+
+void enterSculptMode(nui::Window*, nui::StoredElement*, void*)
+{
+	application.navigateToChild(InteractionModes::SCULPT);
+}
 
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -551,21 +700,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		// Set flag to the new value.
 		_CrtSetDbgFlag(tmpFlag);
 	}
-
-	// GPU Debug
-	{
-		render_doc.init();
-	}
 #endif
 
-	// Application
-	application.resetToHardcodedStartup();
-
-#ifdef _DEBUG
-	createTestScene_SimpleTriangle(nullptr, nullptr, nullptr);
+	// GPU Debugging using Render Doc
+#ifndef NDEBUG
+	render_doc.init();
 #endif
 
-	// User Interface
+	// Interactions Init
 	{
 		nui::Instance& instance = application.ui_instance;
 		instance.create();
@@ -579,215 +721,311 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 			application.main_window = instance.createWindow(info);
 			window = application.main_window;
-
-			window->setFinalEvent(endFrameEvents);
-			window->setKeyDownEvent(renderDocTriggerCapture, nui::VirtualKeys::F11);
 		}
 
-		nui::Grid* window_grid = window->createGrid();
-		window_grid->size[0] = 100.f;
-		window_grid->size[1] = 100.f;
-		window_grid->orientation = nui::GridOrientation::COLUMN;
-
-		nui::Menu* top_menu = window->createMenu(window_grid);
-		top_menu->z_index = 2;
-		top_menu->titles_background_color.setRGBA_UNORM(0.f, 0.05f, 0.05f, 1.f);
-		top_menu->select_background_color.setRGBA_UNORM(1.f, 1.f, 1.f, 0.05f);
+		auto& inters = application.interactions;
 		{
-			nui::MenuStyle title_style;
-			title_style.font_size = 15;
-			title_style.top_padding = 4;
-			title_style.bot_padding = title_style.top_padding;
-			title_style.left_padding = 5;
-			title_style.right_padding = title_style.left_padding;
-			title_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+			auto& nothing = inters[InteractionModes::NOTHING];
+			nothing.parent = InteractionModes::ENUM_SIZE;
+			nothing.children = {
+				InteractionModes::DEFAULT
+			};
 
-			nui::MenuStyle menus_style;
-			menus_style.font_size = 15;
-			menus_style.top_padding = 4;
-			menus_style.bot_padding = menus_style.top_padding;
-			menus_style.left_padding = 7;
-			menus_style.right_padding = menus_style.left_padding;
-			menus_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+			nothing.enter = []() {
+				// do nothing
+			};
 
-			nui::MenuItem* scene = top_menu->addItem(nullptr, title_style);
-			scene->text = "Scene";
-			{
-				nui::MenuItem* create = top_menu->addItem(scene, menus_style);
-				create->text = "New";
-
-				nui::MenuItem* new_test = top_menu->addItem(scene, menus_style);
-				new_test->text = "New Test Scene";
-				{
-					nui::MenuItem* empty_test = top_menu->addItem(new_test, menus_style);
-					empty_test->text = "Empty Scene";
-					empty_test->label_callback = createTestScene_EmptyScene;
-
-					nui::MenuItem* triangle_test = top_menu->addItem(new_test, menus_style);
-					triangle_test->text = "Simple Triangle";
-					triangle_test->label_callback = createTestScene_SimpleTriangle;
-
-					nui::MenuItem* tris_drawcalls = top_menu->addItem(new_test, menus_style);
-					tris_drawcalls->text = "Triangle";
-					tris_drawcalls->label_callback = createTestScene_Triangle;
-
-					nui::MenuItem* quad_test = top_menu->addItem(new_test, menus_style);
-					quad_test->text = "Quad";
-					quad_test->label_callback = createTestScene_Quad;
-
-					nui::MenuItem* cube_test = top_menu->addItem(new_test, menus_style);
-					cube_test->text = "Cube";
-					cube_test->label_callback = createTestScene_Cube;
-
-					nui::MenuItem* cylinder_test = top_menu->addItem(new_test, menus_style);
-					cylinder_test->text = "Cylinder";
-					cylinder_test->label_callback = createTestScene_Cylinder;
-
-					nui::MenuItem* uv_sphere_test = top_menu->addItem(new_test, menus_style);
-					uv_sphere_test->text = "UV Sphere";
-					uv_sphere_test->label_callback = createTestScene_UV_Sphere;
-
-					nui::MenuItem* import_gltf = top_menu->addItem(new_test, menus_style);
-					import_gltf->text = "Import GLTF file";
-					import_gltf->label_callback = createTestScene_ImportGLTF;
-
-					// Mesh
-					nui::MenuItem* delete_poly_test = top_menu->addItem(new_test, menus_style);
-					delete_poly_test->text = "Delete poly";
-					delete_poly_test->label_callback = createTestScene_DeletePoly;
-
-					nui::MenuItem* join_meshes_test = top_menu->addItem(new_test, menus_style);
-					join_meshes_test->text = "Join Meshes Simple";
-					join_meshes_test->label_callback = createTestScene_joinMeshes;
-
-					nui::MenuItem* join_meshes_2_test = top_menu->addItem(new_test, menus_style);
-					join_meshes_2_test->text = "Join Meshes Complex";
-					join_meshes_2_test->label_callback = createTestScene_joinMeshes_Complex;
-
-					// Instance
-					nui::MenuItem* copy_instance_test = top_menu->addItem(new_test, menus_style);
-					copy_instance_test->text = "Copy Instance";
-					copy_instance_test->label_callback = createTestScene_CopyInstance;
-
-					nui::MenuItem* delete_instance_test = top_menu->addItem(new_test, menus_style);
-					delete_instance_test->text = "Delete Instance";
-					delete_instance_test->label_callback = createTestScene_DeleteInstance;		
-				}
-
-				nui::MenuItem* load = top_menu->addItem(scene, menus_style);
-				load->text = "Load";
-
-				nui::MenuItem* save = top_menu->addItem(scene, menus_style);
-				save->text = "Save";
-
-				nui::MenuItem* save_as = top_menu->addItem(scene, menus_style);
-				save_as->text = "Save As";
-
-				nui::MenuItem* exit_app = top_menu->addItem(scene, menus_style);
-				exit_app->text = "Exit";
-				exit_app->label_callback = exit_application;
-			}
-
-			// Mesh
-			nui::MenuItem* mesh_menu = top_menu->addItem(nullptr, title_style);
-			mesh_menu->text = "Mesh";
-
-			// Layer
-			nui::MenuItem* layer_menu = top_menu->addItem(nullptr, title_style);
-			layer_menu->text = "Layer";
-
-			// Display
-			nui::MenuItem* display_menu = top_menu->addItem(nullptr, title_style);
-			display_menu->text = "Display";
-			{
-				nui::MenuItem* back_culling = top_menu->addItem(display_menu, menus_style);
-				back_culling->text = "Back Culling";
-				{
-					nui::MenuItem* back = top_menu->addItem(back_culling, menus_style);
-					back->text = "Back";
-					back->label_callback = setBackCullingTrue;
-
-					nui::MenuItem* none = top_menu->addItem(back_culling, menus_style);
-					none->text = "None";
-					none->label_callback = setBackCullingFalse;
-				}
-
-				nui::MenuItem* shading_normal = top_menu->addItem(display_menu, menus_style);
-				shading_normal->text = "Shading Normal";
-				{
-					nui::MenuItem* vertex = top_menu->addItem(shading_normal, menus_style);
-					vertex->text = "Vertex";
-					vertex->label_callback = setShadingNormalVertex;
-
-					nui::MenuItem* poly = top_menu->addItem(shading_normal, menus_style);
-					poly->text = "Poly";
-					poly->label_callback = setShadingNormalPoly;
-
-					nui::MenuItem* tesselation = top_menu->addItem(shading_normal, menus_style);
-					tesselation->text = "Tesselation";
-					tesselation->label_callback = setShadingNormalTesselation;
-				}
-
-				nui::MenuItem* display_mode = top_menu->addItem(display_menu, menus_style);
-				display_mode->text = "Display Mode";
-				{
-					nui::MenuItem* solid_mode = top_menu->addItem(display_mode, menus_style);
-					solid_mode->text = "Solid";
-					solid_mode->label_callback = setDisplayModeSolid;
-
-					nui::MenuItem* wire_overlay_mode = top_menu->addItem(display_mode, menus_style);
-					wire_overlay_mode->text = "Wireframe Overlay";
-					wire_overlay_mode->label_callback = setDisplayModeWireframeOverlay;
-
-					nui::MenuItem* wire_mode = top_menu->addItem(display_mode, menus_style);
-					wire_mode->text = "Wireframe";
-					wire_mode->label_callback = setDisplayModeWireframe;
-				}
-
-				nui::MenuItem* aabbs = top_menu->addItem(display_menu, menus_style);
-				aabbs->text = "Octree";
-				{
-					nui::MenuItem* normal = top_menu->addItem(aabbs, menus_style);
-					normal->text = "Render Normal";
-					normal->label_callback = renderAABBs_Normal;
-
-					nui::MenuItem* leaf_only = top_menu->addItem(aabbs, menus_style);
-					leaf_only->text = "Leaf Only";
-					leaf_only->label_callback = renderAABBs_LeafOnly;
-
-					nui::MenuItem* hide = top_menu->addItem(aabbs, menus_style);
-					hide->text = "Hide";
-					hide->label_callback = hideAABBs;
-
-					/*nui::MenuItem* wire_mode = top_menu->addItem(display_mode, menus_style);
-					wire_mode->text = "Wireframe";
-					wire_mode->label_callback = setDisplayModeWireframe;*/
-				}
-			}
+			nothing.exit = []() {
+				// do nothing
+			};
 		}
 
-		// Viewport Grid
-		nui::Grid* viewport = window->createGrid(window_grid);
-		viewport->size[0] = 90.f;
-		viewport->size[1] = 90.f;
-		viewport->coloring = nui::BackgroundColoring::RENDERING_SURFACE;
-		viewport->setRenderingSurfaceEvent(geometryDraw);
+		{
+			auto& default = inters[InteractionModes::DEFAULT];
+			default.parent = InteractionModes::NOTHING;
+			default.children = {
+				InteractionModes::INSTANCE_SELECTION,
+				InteractionModes::MESH,
+				InteractionModes::SCULPT
+			};
 
-		// Camera Rotation
-		viewport->setKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
-		viewport->setKeyHeldDownEvent(onCameraOrbitKeyHeld, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
-		viewport->setKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+			default.enter = []() {
 
-		// Camera Pan
-		viewport->setKeyDownEvent(onCameraPanKeyDown, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
-		viewport->setKeyHeldDownEvent(onCameraPanKeyHeld, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
-		viewport->setKeyUpEvent(onCameraPanKeyUp, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+				nui::Window* window = application.main_window;
+				UserInterface& ui = application.ui;
 
-		// Camera Zoom
-		viewport->setMouseScrollEvent(onCameraDollyScroll);
+				nui::Flex* window_grid = window->createGrid();
+				window_grid->setSize(100.f, 100.f);
+				window_grid->setOrientation(nui::Flex::Orientation::COLUMN);
 
-		// Shading Normal
-		viewport->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
+				nui::Menu* top_menu = window->createMenu(window_grid);
+				top_menu->setZ_Index(2);
+				top_menu->setTitleBackColor({ 0.f, 0.05f, 0.05f, 1.f });
+				top_menu->setSelectBackColor({ 1.f, 1.f, 1.f, 0.05f });
+				{
+					nui::MenuStyle title_style;
+					title_style.font_size = 15;
+					title_style.top_padding = 4;
+					title_style.bot_padding = title_style.top_padding;
+					title_style.left_padding = 5;
+					title_style.right_padding = title_style.left_padding;
+					title_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+
+					nui::MenuStyle menus_style;
+					menus_style.font_size = 15;
+					menus_style.top_padding = 4;
+					menus_style.bot_padding = menus_style.top_padding;
+					menus_style.left_padding = 7;
+					menus_style.right_padding = menus_style.left_padding;
+					menus_style.menu_background_color.setRGBA_UNORM(0.f, 0.025f, 0.025f, 0.75f);
+
+					nui::MenuItem* scene = top_menu->addTitle(title_style);
+					scene->setItemText("Scene");
+					{
+						nui::MenuItem* create = scene->addItem(menus_style);
+						create->text = "New";
+
+						nui::MenuItem* new_test = scene->addItem(menus_style);
+						new_test->text = "New Creation Test Scene";
+						{
+							nui::MenuItem* empty_test = new_test->addItem(menus_style);
+							empty_test->text = "Empty Scene";
+							empty_test->label_callback = createTestScene_EmptyScene;
+
+							nui::MenuItem* triangle_test = new_test->addItem(menus_style);
+							triangle_test->text = "Single Triangle";
+							triangle_test->label_callback = createTestScene_SingleTriangle;
+
+							nui::MenuItem* tris_drawcalls = new_test->addItem(menus_style);
+							tris_drawcalls->text = "Triangle";
+							tris_drawcalls->label_callback = createTestScene_Triangle;
+
+							nui::MenuItem* quad_test = new_test->addItem(menus_style);
+							quad_test->text = "Single Quad";
+							quad_test->label_callback = createTestScene_SingleQuad;
+
+							nui::MenuItem* quad_drawcalls = new_test->addItem(menus_style);
+							quad_drawcalls->text = "Quad";
+							quad_drawcalls->label_callback = createTestScene_Quad;
+
+							nui::MenuItem* wavy_grid = new_test->addItem(menus_style);
+							wavy_grid->text = "Wavy Grid";
+							wavy_grid->label_callback = createTestScene_WavyGrid;
+
+							nui::MenuItem* cube_test = new_test->addItem(menus_style);
+							cube_test->text = "Cube";
+							cube_test->label_callback = createTestScene_Cube;
+
+							nui::MenuItem* cylinder_test = new_test->addItem(menus_style);
+							cylinder_test->text = "Cylinder";
+							cylinder_test->label_callback = createTestScene_Cylinder;
+
+							nui::MenuItem* uv_sphere_test = new_test->addItem(menus_style);
+							uv_sphere_test->text = "UV Sphere";
+							uv_sphere_test->label_callback = createTestScene_UV_Sphere;
+
+							nui::MenuItem* import_gltf = new_test->addItem(menus_style);
+							import_gltf->text = "Import GLTF file";
+							import_gltf->label_callback = createTestScene_ImportGLTF;
+						}
+
+						nui::MenuItem* new_mesh_edit_test = scene->addItem(menus_style);
+						new_mesh_edit_test->text = "New Mesh edit test scene";
+						{
+							nui::MenuItem* delete_poly_test = new_mesh_edit_test->addItem(menus_style);
+							delete_poly_test->text = "Delete poly";
+							delete_poly_test->label_callback = createTestScene_DeletePoly;
+
+							nui::MenuItem* join_meshes_test = new_mesh_edit_test->addItem(menus_style);
+							join_meshes_test->text = "Join Meshes Simple";
+							join_meshes_test->label_callback = createTestScene_joinMeshes;
+
+							nui::MenuItem* join_meshes_2_test = new_mesh_edit_test->addItem(menus_style);
+							join_meshes_2_test->text = "Join Meshes Complex";
+							join_meshes_2_test->label_callback = createTestScene_joinMeshes_Complex;
+						}
+
+						nui::MenuItem* new_instance_edit_test = scene->addItem(menus_style);
+						new_instance_edit_test->text = "New Instance edit test scene";
+						{
+							nui::MenuItem* copy_instance_test = new_instance_edit_test->addItem(menus_style);
+							copy_instance_test->text = "Copy Instance";
+							copy_instance_test->label_callback = createTestScene_CopyInstance;
+
+							nui::MenuItem* delete_instance_test = new_instance_edit_test->addItem(menus_style);
+							delete_instance_test->text = "Delete Instance";
+							delete_instance_test->label_callback = createTestScene_DeleteInstance;
+						}
+
+						nui::MenuItem* new_performance_test = scene->addItem(menus_style);
+						new_performance_test->text = "New Performance test scene";
+						{
+							nui::MenuItem* aabbs = new_performance_test->addItem(menus_style);
+							aabbs->text = "Octree";
+							aabbs->label_callback = createPerformanceTestScene_AABBs;
+
+							nui::MenuItem* many_spheres = new_performance_test->addItem(menus_style);
+							many_spheres->text = "Many Spheres";
+							many_spheres->label_callback = createPerformanceTestScene_ManySpheres;
+
+							nui::MenuItem* dense_sphere = new_performance_test->addItem(menus_style);
+							dense_sphere->text = "Dense Sphere";
+							dense_sphere->label_callback = createPerformanceTestScene_DenseSphere;
+						}
+
+						nui::MenuItem* new_input_test = scene->addItem(menus_style);
+						new_input_test->text = "New Input test scene";
+						{
+							nui::MenuItem* tablet_mapping = new_input_test->addItem(menus_style);
+							tablet_mapping->text = "Tablet Mapping";
+							tablet_mapping->label_callback = createInputTestScene_TabletMapping;
+						}
+
+						nui::MenuItem* load = scene->addItem(menus_style);
+						load->text = "Load";
+
+						nui::MenuItem* save = scene->addItem(menus_style);
+						save->text = "Save";
+
+						nui::MenuItem* save_as = scene->addItem(menus_style);
+						save_as->text = "Save As";
+
+						nui::MenuItem* exit_app = scene->addItem(menus_style);
+						exit_app->text = "Exit";
+						exit_app->label_callback = exit_application;
+					}
+
+					// Mode
+					nui::MenuItem* mode_menu = top_menu->addTitle(title_style);
+					mode_menu->text = "Mode";
+					{
+						
+					}
+
+					// Layer
+					nui::MenuItem* layer_menu = top_menu->addTitle(title_style);
+					layer_menu->text = "Layer";
+
+					// Display
+					nui::MenuItem* display_menu = top_menu->addTitle(title_style);
+					display_menu->text = "Display";
+					{
+					nui::MenuItem* back_culling = display_menu->addItem(menus_style);
+					back_culling->text = "Back Culling";
+					{
+						nui::MenuItem* back = back_culling->addItem(menus_style);
+						back->text = "Back";
+						back->label_callback = setBackCullingTrue;
+
+						nui::MenuItem* none = back_culling->addItem(menus_style);
+						none->text = "None";
+						none->label_callback = setBackCullingFalse;
+					}
+
+					nui::MenuItem* shading_normal = display_menu->addItem(menus_style);
+					shading_normal->text = "Shading Normal";
+					{
+						nui::MenuItem* vertex = shading_normal->addItem(menus_style);
+						vertex->text = "Vertex";
+						vertex->label_callback = setShadingNormalVertex;
+
+						nui::MenuItem* poly = shading_normal->addItem(menus_style);
+						poly->text = "Poly";
+						poly->label_callback = setShadingNormalPoly;
+
+						nui::MenuItem* tesselation = shading_normal->addItem(menus_style);
+						tesselation->text = "Tesselation";
+						tesselation->label_callback = setShadingNormalTesselation;
+					}
+
+					nui::MenuItem* display_mode = display_menu->addItem(menus_style);
+					display_mode->text = "Display Mode";
+					{
+						nui::MenuItem* solid_mode = display_mode->addItem(menus_style);
+						solid_mode->text = "Solid";
+						solid_mode->label_callback = setDisplayModeSolid;
+
+						nui::MenuItem* wire_overlay_mode = display_mode->addItem(menus_style);
+						wire_overlay_mode->text = "Wireframe Overlay";
+						wire_overlay_mode->label_callback = setDisplayModeWireframeOverlay;
+
+						nui::MenuItem* wire_mode = display_mode->addItem(menus_style);
+						wire_mode->text = "Wireframe";
+						wire_mode->label_callback = setDisplayModeWireframe;
+					}
+
+					nui::MenuItem* aabbs = display_menu->addItem(menus_style);
+					aabbs->text = "Octree";
+					{
+						nui::MenuItem* normal = aabbs->addItem(menus_style);
+						normal->text = "Hierarchy";
+						normal->label_callback = renderAABBs_Normal;
+
+						nui::MenuItem* leaf_only = aabbs->addItem(menus_style);
+						leaf_only->text = "Leaf Only";
+						leaf_only->label_callback = renderAABBs_LeafOnly;
+
+						nui::MenuItem* hide = aabbs->addItem(menus_style);
+						hide->text = "Hide";
+						hide->label_callback = hideAABBs;
+					}
+					}
+				}
+
+				// Viewport Flex
+				ui.viewport = window->createGrid(window_grid);
+				ui.viewport->size[0] = 90.f;
+				ui.viewport->size[1] = 90.f;
+				ui.viewport->coloring = nui::BackgroundColoring::RENDERING_SURFACE;
+				ui.viewport->setRenderingSurfaceEvent(geometryDraw);
+
+				// Camera Rotation
+				ui.viewport->setKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+				ui.viewport->setKeyHeldDownEvent(onCameraOrbitKeyHeld, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+				ui.viewport->setKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+
+				// Camera Pan
+				ui.viewport->setKeyDownEvent(onCameraPanKeyDown, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+				ui.viewport->setKeyHeldDownEvent(onCameraPanKeyHeld, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+				ui.viewport->setKeyUpEvent(onCameraPanKeyUp, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+
+				// Camera Zoom
+				ui.viewport->setMouseScrollEvent(onCameraDollyScroll);
+
+				// Shading Normal
+				ui.viewport->setKeyDownEvent(changeShadingNormal, nui::VirtualKeys::N);
+			};
+
+			default.exit = []() {
+				application.main_window->deleteAllElements();
+				application.navigateUp();
+			};
+
+			// set this interaction as default
+			application.now_interaction = InteractionModes::DEFAULT;
+			default.enter();
+		}
+
+		{
+			auto& sculpt = inters[InteractionModes::SCULPT];
+			sculpt.parent = InteractionModes::DEFAULT;
+			sculpt.children = {
+				InteractionModes::STANDARD_BRUSH
+			};
+
+			sculpt.enter = []() {
+				application.enterSculptMode();
+			};
+
+			sculpt.exit = []() {
+				application.navigateUp();
+			};
+		}
+	}
+
+	// Scene Init
+	{
+		application.resetScene();
 	}
 
 	nui::WindowMessages& win_messages = application.main_window->win_messages;

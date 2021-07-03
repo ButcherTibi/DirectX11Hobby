@@ -1,12 +1,7 @@
 
 #include "MeshPixelIn.hlsli"
 
-struct VertexIn {
-	float3 pos : POSITION;
-	float3 normal : NORMAL;
-};
-
-
+StructuredBuffer<Vertex> verts;
 StructuredBuffer<Instance> instances;
 
 
@@ -60,15 +55,16 @@ float getLerp(float min, float center, float max)
 }
 
 #pragma warning( disable : 3578 )
-PixelIn main(VertexIn vertex,
-	uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID)
+PixelIn main(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID)
 {
+	Vertex vertex = verts.Load(vertex_id);
+	
 	PixelIn output;
 	Instance instance = instances.Load(instance_id);
 	
-	// Discard instance or vertex
+	// Discard instance, polygon or vertex
 	if (instance.inst_rot.w == 2.f || vertex_id == 0) {
-		output.pos = float4(0.f, 0.f, 0.f, 0.f);
+		output.pos.w = 0;
 		return output;
 	}
 	

@@ -2,19 +2,21 @@
 
 // Standard
 #include <unordered_set>
+#include <set>
 #include <list>
+#include <functional>
 
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
 
 
 /* TODO:
-- change shading normal from menu
-- change root drawcall from menu
-- show Bounding Boxes
+- select stuff
+  implement UI clear elements function to remove elements in the next frame
+  need some kind of context for input
+  need selection overlay FX
 - delete vertex
 - delete edge
-- select stuff
 
 - createUnorderedPoly, winding based on normal
 - frame camera to mesh
@@ -39,12 +41,11 @@ struct MeshInstanceSet;
 struct MeshInstance;
 struct Mesh;
 
-// SOLID_WITH_WIREFRAME_NONE not that usefull, hard to read wireframe among the shading
+
 enum class DisplayMode {
 	SOLID,
 	WIREFRAME_OVERLAY,
-	WIREFRANE,
-	AABB
+	WIREFRANE
 };
 
 /* which subprimitive holds the surface data to respond to the light */
@@ -52,7 +53,7 @@ namespace GPU_ShadingNormal {
 	enum {
 		VERTEX,
 		POLY,
-		TESSELATION
+		TESSELATION  // quads are split into 2 triangles and each has a normal
 	};
 }
 
@@ -71,14 +72,15 @@ struct CameraLight {
 };
 
 enum class AABB_RenderMode {
-	NO_RENDER,
-	LEAF_ONLY,
-	NORMAL
+	NO_RENDER,  // disable AABB rendering
+	LEAF_ONLY,  // only render AABB that have vertices assigned to it
+	NORMAL  // render leafs and AABB that have child AABBs
 };
 
 // how to display a set of instances of a mesh
 struct MeshDrawcall {
 	std::string name;
+	std::string description;
 
 	DisplayMode display_mode;
 	bool is_back_culled;
@@ -93,7 +95,7 @@ enum class ModifiedInstanceType {
 
 // What instance was modified and what was modified
 struct ModifiedMeshInstance {
-	uint32_t idx;  // 0xFFFF'FFFF to mark as deleted
+	uint32_t idx;
 
 	ModifiedInstanceType type;
 };
@@ -132,8 +134,9 @@ struct MeshInstance {
 
 	MeshLayer* parent_layer;
 
-	std::string name;  // user given name
-	bool visible;  // whether to render or not
+	std::string name;
+	std::string description;
+	bool visible;  // not really used
 	// bool can_collide;
 
 	// Instance Data
@@ -142,11 +145,16 @@ struct MeshInstance {
 	PhysicalBasedMaterial pbr_material;
 	MeshWireframeColors wireframe_colors;
 
+	bool instance_select_outline;
+
 public:
+	scme::SculptMesh& getSculptMesh();
+
 	// Scheduling methods
-	// Each of the below methods will schedule the renderer to update data on the GPU
+	// Each of the below methods will schedule the renderer to load data on the GPU
 	// Avoid calling more than one method
 
+	// mark to have it's data updated on the GPU
 	void markFullUpdate();
 };
 
@@ -154,6 +162,9 @@ public:
 struct MeshInstanceRef {
 	MeshInstanceSet* instance_set;
 	uint32_t index_in_buffer;
+
+public:
+	bool operator==(MeshInstanceRef& other);
 
 public:
 	MeshInstance* get();
@@ -182,7 +193,7 @@ struct Mesh {
 
 	// should vertices for AABBs be generated for rendering and should they be rendered
 	AABB_RenderMode aabb_render_mode;
-	AABB_RenderMode prev_aabb_mode;
+	AABB_RenderMode prev_aabb_mode;  // to make AABB vertex buffer be recreated on AABB render mode switch
 };
 
 
@@ -191,7 +202,48 @@ struct MeshLayer {
 	std::unordered_set<MeshLayer*> _children;
 
 	std::string name;
+	std::string description;
 	std::list<MeshInstanceRef> instances;
+};
+
+
+namespace SelectionMode {
+	enum {
+		INSTANCE = 1 << 0,
+		POLY     = 1 << 1,
+		EDGE     = 1 << 2,
+		VERTEX   = 1 << 3
+	};
+}
+
+namespace InteractionModes {
+	enum {
+		NOTHING,
+		DEFAULT,
+
+		INSTANCE_SELECTION,
+		INSTANCE_MOVE,
+		INSTANCE_ROTATION,
+		INSTANCE_SCALE,
+
+		MESH,
+		VERTEX_SELECT,
+		EDGE_SELECT,
+		POLY_SELECT,
+
+		SCULPT,
+		STANDARD_BRUSH,
+
+		ENUM_SIZE
+	};
+}
+
+struct InteractionMode {
+	uint32_t parent;
+	std::vector<uint32_t> children;
+
+	std::function<void()> enter;
+	std::function<void()> exit;
 };
 
 
@@ -203,6 +255,11 @@ struct CreateTriangleInfo {
 };
 
 struct CreateQuadInfo {
+	MeshTransform transform;
+	float size = 1.f;
+};
+
+struct CreateWavyGridInfo {
 	MeshTransform transform;
 	float size = 1.f;
 };
@@ -242,58 +299,107 @@ struct CreateLineInfo {
 };
 
 
+struct RaytraceInstancesResult {
+	MeshInstanceRef inst_ref;
+	uint32_t poly;
+	glm::vec3 local_isect;  // local position of intersection same for instances of the same mesh
+	glm::vec3 global_isect;  // local position of intersection
+};
+
+struct UserInterface {
+	nui::Flex* viewport;
+};
+
+
 class Application {
 public:
-	// User Interface
 	nui::Instance ui_instance;
 	nui::Window* main_window;
+	UserInterface ui;
 
-	// Renderer
-	MeshRenderer renderer;
+	// Interaction
+	uint32_t now_interaction;
+	std::array<InteractionMode, InteractionModes::ENUM_SIZE> interactions;
 
 	// Meshes
 	std::list<Mesh> meshes;
 
 	// Drawcalls
 	std::list<MeshDrawcall> drawcalls;
-	MeshDrawcall* last_used_drawcall;
 
 	// Layers
 	std::list<MeshLayer> layers;
-	MeshLayer* last_used_layer;
+
 
 	// Selection
-	//std::list<MeshInstanceRef> mesh_selection;
+
+	// current selection of instances
+	std::list<MeshInstanceRef> instance_selection;
+
+
+	// current mesh in sculpt mode
+	Mesh* sculpt_target;
 
 	// Shading
-	uint32_t shading_normal;
+	uint32_t shading_normal;  // what normal to use when shading the mesh in the pixel shader
 
 	// Lighting
-	std::array<CameraLight, 8> lights;
-	float ambient_intensity;
+	std::array<CameraLight, 8> lights;  // lights don't have position the only have a direction
+	float ambient_intensity;  // base ambient light added to the color
+
 
 	// Camera
+
+	// 3D position in space where the camera is starring at,
+	// used to tweak camera sensitivity to make movement consistent across al mesh sizes
 	glm::vec3 camera_focus;
+
+	// horizontal field of view used in the perspective matrix
 	float camera_field_of_view;
+
+	// defines the clipping planes used in rendering (does not affect depth)
 	float camera_z_near;
 	float camera_z_far;
+
+	// camera position in global space
 	glm::vec3 camera_pos;
+
+	// reverse camera rotation applied in vertex shader
 	glm::quat camera_quat_inv;
+
+	// camera's direction of pointing
 	glm::vec3 camera_forward;
 
+	// camera movement sensitivity
 	float camera_orbit_sensitivity;
 	float camera_pan_sensitivity;
 	float camera_dolly_sensitivity;
 
 public:
-	// TODO: what happens if the last used drawcall is deleted
-	// void setLastUsedDrawcall();
-
 	Mesh& _createMesh();
 	MeshInstanceRef _addInstance(Mesh& mesh, MeshLayer* dest_layer, MeshDrawcall* dest_drawcall);
 	void _unparentInstanceFromParentLayer(MeshInstanceRef& instance);
 
+	struct _RaytraceInstancesResult {
+		MeshInstance* inst;
+		uint32_t poly;
+		glm::vec3 local_isect;  // local position of intersection same for instances of the same mesh
+		glm::vec3 global_isect;  // local position of intersection
+	};
 public:
+
+	// Interaction
+	
+	void navigateUp();
+
+	void navigateToChild(uint32_t interaction_mode);
+
+
+	// Scene
+
+	// clear scene state and inits to default values
+	void resetScene();
+
 
 	// Instances
 
@@ -303,6 +409,7 @@ public:
 	// Invalidates MeshInstance*
 	void deleteInstance(MeshInstanceRef& inst);
 
+	// unparent from parent layer and make child to destination layer
 	void transferInstanceToLayer(MeshInstanceRef& instance, MeshLayer* dest_layer);
 
 	// Copies Instance from one set to another set of the same Mesh that has a set with the
@@ -312,7 +419,7 @@ public:
 	// Invalidates MeshInstance* and MeshInstanceRef
 	//MeshInstanceRef moveInstanceToDrawcall(MeshInstanceRef& instance, MeshDrawcall* dest_drawcall);
 
-	void rotateInstanceAroundY(MeshInstance* mesh_instance, float radians);
+	void rotateInstance(MeshInstance* mesh_instance, float x, float y, float z);
 
 
 	// Drawcalls
@@ -323,18 +430,21 @@ public:
 	// Deletes a drawcall and moves instances to the last used drawcall
 	//void deleteDrawcall();
 
+	// get's the default drawcall referenced in the menus
 	MeshDrawcall& getRootDrawcall();
 
 	// Iterate over all instances that are rendered with that drawcall and turn on AABB
 	// vertex generation
+	// needs to be retoggled if mesh changes to recreate AABB vertex buffers
 	void setAABB_RenderModeForDrawcall(MeshDrawcall* drawcall, AABB_RenderMode aabb_render_mode);
 
 
 	// Layers
 
-	// Creates a new orfan layer
-	MeshLayer* createLayer();
+	// Creates a new layer by default parented to root
+	MeshLayer* createLayer(MeshLayer* parent = nullptr);
 
+	// unparent and make child to parent layer
 	void transferLayer(MeshLayer* child_layer, MeshLayer* parent_layer);
 
 	// Recursivelly sets the visibility state for all instances of a layer
@@ -347,42 +457,55 @@ public:
 	MeshInstanceRef createEmptyMesh(MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstanceRef createTriangle(CreateTriangleInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstanceRef createQuad(CreateQuadInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	MeshInstanceRef createWavyGrid(CreateWavyGridInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstanceRef createCube(CreateCubeInfo& infos, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstanceRef createCylinder(CreateCylinderInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	MeshInstanceRef createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
+	
+	// import a GLTF from path
 	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
 		std::vector<MeshInstanceRef>* r_instances = nullptr);
+
 	//MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
-	// all children get converted into geometry and added to the parent mesh
+	// all sources get converted into geometry and added to the destination mesh
 	// Invalidates MeshInstance*
 	void joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t destination_idx);
 
 
+	// Sculpt Mode
+
+	bool enterSculptMode();
+
+
 	// Raycasts
 
-	// performs a raycast in the instance regardless of properties
-	//bool raycast(MeshInstance* mesh_instance, glm::vec3& ray_origin, glm::vec3& ray_direction,
-	//	uint32_t& r_isect_poly, float& r_isect_distance, glm::vec3& r_isect_point);*/
-
 	// performs a raycast from camera position to pixel world position of the mouse
-	bool mouseRaycastInstances(MeshInstanceRef& r_isect_inst, uint32_t& r_isect_poly, glm::vec3& r_isect_point);
+	bool mouseRaycastInstances(RaytraceInstancesResult& r_isect);
 
 
 	// Camera
 
+	// sets the camera point of focus to adjust sensitivity
 	void setCameraFocus(glm::vec3& new_focus);
 
+	// orbit camera around focus
 	void arcballOrbitCamera(float deg_x, float deg_y);
 
+	// not really used
 	void pivotCameraAroundY(float deg_x, float deg_y);
 
+	// moves the camera along the camera's up and right axes
 	void panCamera(float amount_x, float amount_y);
 
+	// moves the camera along the camera's forward axis
 	void dollyCamera(float amount);
 
+	// sets the camera's global position
 	void setCameraPosition(float x, float y, float z);
 
+	// sets the camera's rotation
+	// arguments are Euler and get converted to quartenion
 	void setCameraRotation(float x, float y, float z);
 
 	//void frameCameraToSelection();
@@ -390,13 +513,20 @@ public:
 
 	// Scene
 
-	// reset everything
+	// reset everything, also used for initialization
 	void resetToHardcodedStartup();
 
 
 	// Other
 
+	// which primitive type will have it's normal interact with the lighting
 	void setShadingNormal(uint32_t shading_normal);
+
+
+	// Debug
+
+	// trigger Visual Studio breakpoint when key is down
+	void triggerBreakpointOnKey(uint32_t key_down = nui::VirtualKeys::F8);
 };
 
 extern Application application;

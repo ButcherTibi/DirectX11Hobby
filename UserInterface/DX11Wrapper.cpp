@@ -104,6 +104,73 @@ size_t dx11::Buffer::getMemorySizeMegaBytes()
 	return desc.ByteWidth / (1024LL * 1024);
 }
 
+void dx11::StagingBuffer::create(ID3D11Device5* device, ID3D11DeviceContext3* context)
+{
+	this->dev = device;
+	this->ctx3 = context;
+
+	this->init_desc = {};
+	init_desc.Usage = D3D11_USAGE_STAGING;
+	init_desc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
+
+	this->mapped.pData = nullptr;
+}
+
+void dx11::StagingBuffer::resizeDiscard(size_t new_size)
+{
+	// fresh buffer
+	if (buff == nullptr) {
+
+		init_desc.ByteWidth = new_size;
+		throwDX11(dev->CreateBuffer(&init_desc, NULL, &buff));
+	}
+	// resize but discard old
+	else if (init_desc.ByteWidth < new_size) {
+
+		ensureUnMapped();
+
+		// destroy old
+		buff->Release();
+
+		// create new
+		init_desc.ByteWidth = new_size;
+		throwDX11(dev->CreateBuffer(&init_desc, NULL, &buff));
+	}
+}
+
+void* dx11::StagingBuffer::dataReadOnly()
+{
+	if (mapped.pData == nullptr) {
+
+		throwDX11(ctx3->Map(buff, 0, D3D11_MAP_READ, 0, &mapped));
+	}
+
+	return mapped.pData;
+}
+
+void dx11::StagingBuffer::ensureUnMapped()
+{
+	if (mapped.pData != nullptr) {
+
+		ctx3->Unmap(buff, 0);
+		mapped.pData = nullptr;
+	}
+}
+
+ID3D11Buffer* dx11::StagingBuffer::get()
+{
+	ensureUnMapped();
+
+	return buff;
+}
+
+dx11::StagingBuffer::~StagingBuffer()
+{
+	if (buff != nullptr) {
+		buff->Release();
+	}
+}
+
 void dx11::ConstantBuffer::_ensureCreateAndMapped()
 {
 	// ensure buffer is create
@@ -135,16 +202,35 @@ void dx11::ConstantBuffer::create(ID3D11Device5* device, ID3D11DeviceContext3* c
 	total_offset = 0;
 }
 
-void dx11::ConstantBuffer::addFloat()
+void dx11::ConstantBuffer::_add4BytesField(ConstantBufferField::FieldType type)
 {
 	ConstantBufferField& new_field = this->fields.emplace_back();
+	new_field.type = type;
 	new_field.offset = total_offset;
+
 	total_offset = new_field.offset + 4;
+}
+
+void dx11::ConstantBuffer::addUint()
+{
+	_add4BytesField(ConstantBufferField::FieldType::UINT);
+}
+
+void dx11::ConstantBuffer::addInt()
+{
+	_add4BytesField(ConstantBufferField::FieldType::INT);
+}
+
+void dx11::ConstantBuffer::addFloat()
+{
+	_add4BytesField(ConstantBufferField::FieldType::FLOAT);
 }
 
 void dx11::ConstantBuffer::addFloat2()
 {
 	ConstantBufferField& new_field = this->fields.emplace_back();
+	new_field.type = ConstantBufferField::FieldType::FLOAT2;
+
 	size_t remainder = total_offset % 16;
 
 	if (remainder >= 8) {
@@ -160,6 +246,8 @@ void dx11::ConstantBuffer::addFloat2()
 void dx11::ConstantBuffer::addFloat4()
 {
 	ConstantBufferField& new_field = this->fields.emplace_back();
+	new_field.type = ConstantBufferField::FieldType::FLOAT4;
+
 	size_t remainder = total_offset % 16;
 
 	if (remainder != 0) {
@@ -175,6 +263,8 @@ void dx11::ConstantBuffer::addFloat4()
 void dx11::ConstantBuffer::addFloat4Array(uint32_t array_size)
 {
 	ConstantBufferField& new_field = this->fields.emplace_back();
+	new_field.type = ConstantBufferField::FieldType::FLOAT_ARR;
+
 	size_t padding = total_offset % 16;
 
 	// arrays elements are always 16 bytes wide, so round up
@@ -183,16 +273,37 @@ void dx11::ConstantBuffer::addFloat4Array(uint32_t array_size)
 	total_offset = new_field.offset + 16 * array_size;
 }
 
-void dx11::ConstantBuffer::setFloat(uint32_t field_idx, float value)
+void dx11::ConstantBuffer::_set4BytesField(uint32_t field_idx, void* data, ConstantBufferField::FieldType type)
 {
+	assert_cond(fields[field_idx].type == type,
+		"wrong field index, field type mismatch");
+
 	_ensureCreateAndMapped();
 
 	uint8_t* mem = ((uint8_t*)mapped_subres.pData) + fields[field_idx].offset;
-	std::memcpy(mem, &value, sizeof(float));
+	std::memcpy(mem, data, 4);
+}
+
+void dx11::ConstantBuffer::setUint(uint32_t field_idx, uint32_t value)
+{
+	_set4BytesField(field_idx, &value, ConstantBufferField::FieldType::UINT);
+}
+
+void dx11::ConstantBuffer::setInt(uint32_t field_idx, int32_t value)
+{
+	_set4BytesField(field_idx, &value, ConstantBufferField::FieldType::INT);
+}
+
+void dx11::ConstantBuffer::setFloat(uint32_t field_idx, float value)
+{
+	_set4BytesField(field_idx, &value, ConstantBufferField::FieldType::FLOAT);
 }
 
 void dx11::ConstantBuffer::setFloat2(uint32_t field_idx, DirectX::XMFLOAT2& value)
 {
+	assert_cond(fields[field_idx].type == ConstantBufferField::FieldType::FLOAT2,
+		"wrong field index, field type mismatch");
+
 	_ensureCreateAndMapped();
 
 	uint8_t* mem = ((uint8_t*)mapped_subres.pData) + fields[field_idx].offset;
@@ -201,6 +312,9 @@ void dx11::ConstantBuffer::setFloat2(uint32_t field_idx, DirectX::XMFLOAT2& valu
 
 void dx11::ConstantBuffer::setFloat4(uint32_t field_idx, float x, float y, float z, float w)
 {
+	assert_cond(fields[field_idx].type == ConstantBufferField::FieldType::FLOAT4,
+		"wrong field index, field type mismatch");
+
 	_ensureCreateAndMapped();
 
 	uint8_t* mem = ((uint8_t*)mapped_subres.pData) + fields[field_idx].offset;
@@ -212,6 +326,9 @@ void dx11::ConstantBuffer::setFloat4(uint32_t field_idx, float x, float y, float
 
 void dx11::ConstantBuffer::setFloat4Array(uint32_t field_idx, uint32_t array_idx, DirectX::XMFLOAT4& value)
 {
+	assert_cond(fields[field_idx].type == ConstantBufferField::FieldType::FLOAT_ARR,
+		"wrong field index, field type mismatch");
+
 	_ensureCreateAndMapped();
 
 	uint8_t* mem = ((uint8_t*)mapped_subres.pData) + fields[field_idx].offset + 16 * array_idx;
@@ -220,6 +337,9 @@ void dx11::ConstantBuffer::setFloat4Array(uint32_t field_idx, uint32_t array_idx
 
 void dx11::ConstantBuffer::setFloat4Array(uint32_t field_idx, uint32_t array_idx, float x, float y, float z, float w)
 {
+	assert_cond(fields[field_idx].type == ConstantBufferField::FieldType::FLOAT_ARR,
+		"wrong field index, field type mismatch");
+
 	_ensureCreateAndMapped();
 
 	uint8_t* mem = ((uint8_t*)mapped_subres.pData) + fields[field_idx].offset + 16 * array_idx;
@@ -501,6 +621,26 @@ void dx11::createPixelShaderFromPath(std::string path_to_file, ID3D11Device5* de
 	throwDX11(device->CreatePixelShader(read_buffer->data(), read_buffer->size(), nullptr,
 		r_pixel_shader),
 		"failed to create pixel shader");
+}
+
+void dx11::createComputeShaderFromPath(std::string path_to_file, ID3D11Device5* device,
+	ID3D11ComputeShader** r_compute_shader,
+	std::vector<char>* read_buffer)
+{
+	std::vector<char> empty_vec;
+
+	if (read_buffer == nullptr) {
+		read_buffer = &empty_vec;
+	}
+
+	ErrStack err_stack = io::readLocalFile(path_to_file, *read_buffer);
+	if (err_stack.isBad()) {
+		throw WindowsException("failed to read compiled pixel shader code from path");
+	}
+
+	throwDX11(device->CreateComputeShader(read_buffer->data(), read_buffer->size(), nullptr,
+		r_compute_shader),
+		"failed to create compute shader");
 }
 
 void dx11::RasterizerState::create(ID3D11Device5* new_dev, D3D11_RASTERIZER_DESC& new_desc)

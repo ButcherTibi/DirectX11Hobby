@@ -123,9 +123,11 @@ namespace nui {
 	// start the timer on key down and stop only on key up event.
 	// DO NOT extend time on each key down event or else a weird ~500 time delay will occur as the keyboard repeat function buffer
 	// fills up and generates a key down message
+
+	// The Input class contains all input state from mouse and keyboard
 	class Input {
 	public:
-		// this list contains non-existent, reserved, unused virtual key codes
+		// this list also contains non-existent, reserved, unused virtual key codes
 		std::array<KeyState, 0xFF> key_list;
 
 		// Local Mouse Position
@@ -133,10 +135,11 @@ namespace nui {
 		uint16_t mouse_y;
 
 		// Mouse Delta Unbuffered
-		int32_t mouse_delta_x;  // TODO: sum frame inputs instead of keep last
+		// will contain the sum total of inputs within a frame
+		int32_t mouse_delta_x;
 		int32_t mouse_delta_y;
 
-		// Mouse Wheel
+		// Mouse Wheel Delta
 		int16_t mouse_wheel_delta;
 
 	public:

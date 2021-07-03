@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <list>
+#include <chrono>
 
 // GLM
 #include "glm\vec3.hpp"
@@ -15,6 +16,9 @@
 #include "Geometry.hpp"
 #include "SparseVector.hpp"
 #include "GPU_ShaderTypesMesh.hpp"
+
+
+using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
 
 
 // Needs:
@@ -45,7 +49,7 @@ namespace scme {
 	};
 
 	struct ModifiedVertex {
-		uint32_t idx;
+		uint32_t idx;  // vertex that is changed and must be updated on the GPU
 		ModifiedVertexState state;
 	};
 
@@ -59,15 +63,15 @@ namespace scme {
 
 		uint32_t edge;  // any edge attached to vertex
 
-		uint32_t aabb;
-		uint32_t idx_in_aabb;
+		uint32_t aabb;  // to leaf AABB does this vertex belong
+		uint32_t idx_in_aabb;  // where to find vertex in parent AABB (makes AABB transfers faster)
 
 	public:
 		Vertex() {};
 
 		void init();
 
-		bool isPoint();
+		bool isPoint();  // is the vertex atached to anything
 	};
 
 
@@ -81,16 +85,27 @@ namespace scme {
 		uint32_t parent;
 		uint32_t children[8];
 
-		AxisBoundingBox3D aabb;
+		AxisBoundingBox3D<> aabb;
+		glm::vec3 mid;
 
-		uint32_t verts_deleted_count;
-		std::vector<uint32_t> verts;
+		uint32_t verts_deleted_count;  // how many empty slots does this AABB have
+		std::vector<uint32_t> verts;  // indexes of contained vertices
 
 		//bool _debug_show_tesselation;  // TODO:
 
 	public:
 		bool isLeaf();
 		bool hasVertices();
+
+		uint32_t inWhichChildDoesPositionReside(glm::vec3& pos);
+	};
+
+
+	struct VertexBoundingBox2 {
+		//AxisBoundingBox3D<> aabb;
+
+		//uint32_t verts_deleted_count;  // how many empty slots does this AABB have
+		std::vector<uint32_t> verts;  // indexes of contained vertices
 	};
 
 
@@ -99,16 +114,19 @@ namespace scme {
 	public:
 		// Double Linked list of edges around vertices
 		uint32_t v0;
-		uint32_t v0_next_edge;
+		uint32_t v0_next_edge;  // next/prev edge around vertex 0
 		uint32_t v0_prev_edge;
 
 		uint32_t v1;
-		uint32_t v1_next_edge;
+		uint32_t v1_next_edge;  // next/prev edge around vertex 1
 		uint32_t v1_prev_edge;
 
 		// Polygons
 		uint32_t p0;
 		uint32_t p1;
+
+		uint8_t was_raycast_tested : 1,  // used in poly raycasting to mark edge as tested
+			: 7;
 
 		Edge() {};
 
@@ -145,11 +163,35 @@ namespace scme {
 			flip_edge_0 : 1,  // orientation of the edges for faster iteration of vertices around poly
 			flip_edge_1 : 1,  // do not replace with edges[i].v0 == edges[i + 1].v0 stuff, it's slower
 			flip_edge_2 : 1,
-			flip_edge_3 : 1, : 2;
+			flip_edge_3 : 1,
+			: 2;
 
 		Poly() {};
 	};
 	// NOTE TO SELF: wrong bit field syntax breaks MSVC hard
+
+
+	struct StandardBrushInfo {
+		SteadyTime last_sample_time;
+
+		glm::vec3 last_pos;
+
+		glm::vec3 end_pos;
+		SteadyTime end_time;
+		
+		float diameter;
+		float focus;
+		float strength;
+	};
+
+
+	enum class TesselationModificationBasis {
+		MODIFIED_POLYS,  // update the tesselation for each polygon
+
+		// update the tesselation for each polygon around a modified vertex
+		// this is slower and is used only when vertices are modified
+		MODIFIED_VERTICES  
+	};
 
 
 	// History:
@@ -158,48 +200,57 @@ namespace scme {
 	// Version 4: Partial GPU updatable buffer with change log, merged rendering data
 	// Version 5: Moved from Helf Edge to Winged Edge Data Structure, 
 	//   removed support for multiple connected polygons
+	// Version 6: All updates are batched and send to compute shaders to be applied,
+	//   vertex normal generation is on demand
 	class SculptMesh {
 	public:
-		uint32_t root_aabb;
+		// AABBs
+		uint32_t root_aabb_idx;
 		std::vector<VertexBoundingBox> aabbs;
+		std::vector<GPU_MeshVertex> aabb_verts;
+		dx11::ArrayBuffer<GPU_MeshVertex> gpu_aabb_verts;
 
+		// New AABBs
+		//uint32_t root_aabb_size;  // the size of the root AABB that contains all other AABBs
+		//uint32_t aabbs_levels;  // the depth of the AABB graph
+
+		// Vertex
 		SparseVector<Vertex> verts;
 		std::vector<ModifiedVertex> modified_verts;
 		dx11::ArrayBuffer<GPU_MeshVertex> gpu_verts;
 
+		// Edge
 		SparseVector<Edge> edges;
 
+		// Poly
 		SparseVector<Poly> polys;
 		std::vector<ModifiedPoly> modified_polys;
 		dx11::ArrayBuffer<uint32_t> gpu_indexes;
 		dx11::ArrayBuffer<GPU_MeshTriangle> gpu_triangles;
-		ComPtr<ID3D11ShaderResourceView> gpu_triangles_srv;
-
-		// AABBs
-		std::vector<GPU_MeshVertex> gpu_aabb_verts;
-		dx11::Buffer aabb_vbuff;
 
 		// Settings
 		uint32_t max_vertices_in_AABB;
 
 	public:
-		// Memory caching for intersections
-		std::vector<VertexBoundingBox*> _now_aabbs;
-		std::vector<VertexBoundingBox*> _next_aabbs;
-		std::vector<VertexBoundingBox*> _traced_aabbs;
-
+		// mark vertex as deleted in both CPU and GPU memory
 		void _deleteVertexMemory(uint32_t vertex);
+
+		// mark edge as deleted in CPU
 		void _deleteEdgeMemory(uint32_t edge);
+
+		// mark poly as deleted in both CPU and GPU memory
 		void _deletePolyMemory(uint32_t poly);
 
 		void printEdgeListOfVertex(uint32_t vertex_idx);
 
 	public:
+		void init();
+
 		// Axis Aligned Bounding Box ////////////////////////////////
 
 		void _transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
 
-		void moveVertexInAABBs(uint32_t vertex, uint32_t starting_aabb = 0);
+		void moveVertexInAABBs(uint32_t vertex);
 
 		void recreateAABBs(uint32_t max_vertices_in_AABB = 0);
 
@@ -220,21 +271,18 @@ namespace scme {
 
 		void unregisterPolyFromEdge(uint32_t delete_poly, uint32_t edge);
 
+
 		// Vertex ///////////////////////////////////////////////////
 
 		// calculates vertex normal based on the average normals of the connected polygons
 		// only called when updating vertex gpu data
 		void calcVertexNormal(uint32_t vertex);
 
-		// schedule a vertex to have it's data updated on the GPU side
-		void markVertexFullUpdate(uint32_t vertex);
-
 		//
 		void deleteVertex(uint32_t vertex);
 
-		// TODO: move vertex, register vertex if no AABB or nothing if vertex is still in its own AABB
 
-		// Loop ////////////////////////////////////////////////////
+		// Edge ////////////////////////////////////////////////////
 
 		// create a edge between vertices
 		uint32_t createEdge(uint32_t v0, uint32_t v1);
@@ -251,8 +299,9 @@ namespace scme {
 		// only called when updating poly gpu data
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
-		// schedule a poly to have it's data updated on the GPU side
-		void markPolyFullUpdate(uint32_t poly);
+		void calcPolyNormal(Poly* poly);
+
+		
 
 		// creates a new triangle from existing vertices, creates new edges between the vertices 
 		// if they are not already present
@@ -289,11 +338,16 @@ namespace scme {
 		// TODO: mark vertices that are processed to avoid duplicate runs and increse performance
 		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
+		std::vector<VertexBoundingBox*> _now_aabbs;
+		std::vector<VertexBoundingBox*> _next_aabbs;
+		std::vector<VertexBoundingBox*> _traced_aabbs;
+		std::vector<uint32_t> _tested_edges;
 
 
 		// Creation //////////////////////////////////////////////////////////
 		void createAsTriangle(float size, uint32_t max_vertices_in_AABB);
 		void createAsQuad(float size, uint32_t max_vertices_in_AABB);
+		void createAsWavyGrid(float size, uint32_t max_vertices_in_AABB);
 		void createAsCube(float size, uint32_t max_vertices_AABB);
 		void createAsCylinder(float height, float diameter, uint32_t rows, uint32_t columns, bool capped, uint32_t max_vertices_AABB);
 		void createAsUV_Sphere(float diameter, uint32_t rows, uint32_t columns, uint32_t max_vertices_AABB);
@@ -307,11 +361,51 @@ namespace scme {
 			std::vector<glm::vec3>& normals, uint32_t max_vertices_AABB);
 	
 		
-		// Prints /////////////////////////////////////////////////////////////
+		// Sculpt /////////////////////////////////////////////////////////////
+
+		void standardBrush(StandardBrushInfo& info);
+
+
+		// GPU Updates
+
+		// schedule a vertex to have it's data updated on the GPU side
+		void markVertexFullUpdate(uint32_t vertex);
+
+		// schedule a poly to have it's data updated on the GPU side
+		void markPolyFullUpdate(uint32_t poly);
+
+		void markAllVerticesForNormalUpdate();
+
+		// upload vertex additions and removals to GPU
+		void uploadVertexAddsRemoves();
+		bool dirty_vertex_list;
+
+		// upload vertex positions changes to GPU
+		void uploadVertexPositions();
+		bool dirty_vertex_pos;
+
+		// upload vertex normals changes to GPU
+		void uploadVertexNormals();
+		bool dirty_vertex_normals;
+
+		// upload poly additions and removals to GPU
+		void uploadIndexBufferChanges();
+		bool dirty_index_buff;
+
+		// uploads which tesselation triangles have changed
+		// computes on the GPU normals for polygons
+		// downloads the results and applies them
+		// 
+		// the based_on parameter is used to determine on what basis should the tesselation be updated
+		void uploadTesselationTriangles(
+			TesselationModificationBasis based_on = TesselationModificationBasis::MODIFIED_POLYS);
+		bool dirty_tess_tris;
+
+
+		// Debug /////////////////////////////////////////////////////////////
 
 		void printVerices();
 
-
-		// Other
+		void validateCPU_GPU_Mirroring();
 	};
 }

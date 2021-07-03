@@ -19,6 +19,8 @@ DirectX::XMFLOAT4 dxConvert(glm::quat& value);
 DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
 DirectX::XMMATRIX dxConvertMatrix(glm::mat4& value);
 
+glm::vec3 glmConvert(DirectX::XMFLOAT3& value);
+
 
 struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
@@ -121,6 +123,53 @@ struct GPU_MeshInstance {
 	//	return elems;
 	//}
 };
+
+
+struct GPU_UnplacedVertexGroup {
+	uint32_t vert_idxs[21];
+};
+
+struct GPU_PlacedVertexGroup {
+	// vertex ,axis, level
+	int32_t vert_idxs[21][3][5];
+};
+
+struct GPU_VertexPositionUpdateGroup {
+	uint32_t vertex_id[64];
+	DirectX::XMFLOAT3 new_pos[64];
+};
+
+struct GPU_VertexNormalUpdateGroup {
+	uint32_t vertex_id[64];
+	DirectX::XMFLOAT3 new_normal[64];
+};
+
+// each poly is made of TWO tesselation triangles
+struct GPU_PolyNormalUpdateGroup {
+	uint32_t tess_idxs[32][2];  // idx of tess triangles to update
+	uint32_t poly_verts[32][4];  // vertices of polygon
+	uint32_t tess_type[32];  // how is the polygon split
+	uint32_t tess_split_vertices[32][2];
+};
+
+struct GPU_Result_PolyNormalUpdateGroup {
+	glm::vec3 poly_normal[32];
+	glm::vec3 tess_normals[32][2];
+};
+
+//struct GPU_PolyListUpdateGroup {
+//	uint32_t tess_idxs[32][2];
+//	uint32_t tess_vertex_0[32];
+//	uint32_t tess_vertex_1[32];
+//};
+
+
+namespace GPU_AABB_Graph_Fields {
+	enum {
+		ROOT_SIZE,
+		LEVELS
+	};
+}
 
 
 /* WARNING: All structs below are HLSL binary compatible with shader constant buffer */

@@ -9,20 +9,8 @@ using namespace nui;
 //#pragma warning(4701 : disable)
 void Window::_updateCPU()
 {
-	// not here not good
-	std::vector<Element*> leafs;
-	{
-		for (StoredElement& stored_elem : elements) {
-			
-			Element* elem = getElementBase(&stored_elem);
-			if (elem->_children.size() == 0) {
-				leafs.push_back(elem);
-			}
-		}
-	}
-
 	// Element Events
-	{
+	auto emit_element_events = [this]() {
 		bool emit_inside_events = true;
 
 		for (auto i = draw_stacks.rbegin(); i != draw_stacks.rend(); ++i) {
@@ -35,7 +23,8 @@ void Window::_updateCPU()
 				elem->_emitEvents(emit_inside_events);
 			}
 		}
-	}
+	};
+	emit_element_events();
 
 	// Window Events
 	{
@@ -44,7 +33,125 @@ void Window::_updateCPU()
 		}
 	}
 
-	// Top Down Pass for elements that depend on parents
+	// Apply changes requested by elements from change log
+	{
+		for (auto& change : changes) {
+
+			switch (change.index()) {
+			case ElementGraphChangeType::ADD: {
+				
+				auto& add = std::get<AddChange>(change);
+
+				auto& parent = add.parent;
+				parent->_children.push_back(add.elem);
+
+				auto& elem = add.elem;
+				elem->_self_children = std::prev(parent->_children.end());
+				break;
+			}
+
+			case ElementGraphChangeType::UPDATE: {
+
+				auto& update = std::get<UpdateChange>(change);
+
+				// Update Element
+				switch (update.source.index()) {
+				case ChangedElementType::FLEX: {
+
+					auto* dest = std::get_if<Flex>(update.dest);
+					auto& source = std::get<Flex::Change>(update.source);
+
+					if (source.orientation.has_value()) {
+						dest->orientation = source.orientation.value();
+					}
+					break;
+				}
+				case ChangedElementType::MENU: {
+					auto* dest = std::get_if<Menu>(update.dest);
+					auto& source = std::get<Menu::Change>(update.source);
+
+					if (source.titles_background_color.has_value()) {
+						dest->titles_background_color = source.titles_background_color.value();
+					}
+
+					if (source.select_background_color.has_value()) {
+						dest->select_background_color = source.select_background_color.value();
+					}
+
+					// Items
+					for (auto& item_change : source.item_changes) {
+						switch (item_change.index()) {
+						case MenuItemChangeType::ADD: {
+
+							auto& added_change = std::get<Menu::Change::AddItem>(item_change);
+
+							// establish link between parent -> child
+							added_change.parent->children.push_back(added_change.item);
+							break;
+						}
+
+						case MenuItemChangeType::UPDATE: {
+							auto& update_change = std::get<Menu::Change::UpdateItem>(item_change);
+							MenuItem* item = update_change.item;
+							
+							if (update_change.text.has_value()) {
+								item->text = update_change.text.value();
+							}
+
+							if (update_change.callback.has_value()) {
+								item->label_callback = update_change.callback.value();
+							}
+							break;
+						}
+						}
+					}
+
+					source.item_changes.clear();
+					break;
+				}
+				}
+
+				// Update Base Element
+				Element* dest_elem = getElementBase(update.dest);
+				ChangedElement& source_elem = update.source_elem;
+
+				if (source_elem.z_index.has_value()) {
+					dest_elem->z_index = source_elem.z_index.value();
+				}
+
+				if (source_elem.size.has_value()) {
+					dest_elem->size = source_elem.size.value();
+				}
+				break;
+			}
+
+			case ElementGraphChangeType::REMOVE: {
+
+				auto& remove = std::get<DeleteChange>(change);
+				Element* elem = getElementBase(&(*remove.target));
+
+				// unreference from parent
+				if (elem->_parent != nullptr) {
+					elem->_parent->_children.erase(elem->_self_children);
+				}
+
+				// unreference from children
+				for (auto& children : elem->_children) {
+					children->_parent = nullptr;
+				}
+
+				elements.erase(remove.target);
+				break;
+			}
+			}
+		}
+
+		changes.clear();
+	}
+
+	// Top Down Pass for calculating size for elements that
+	// have absolute size
+	// have relative size dependent on computed parent size
 	{
 		std::vector<Element*> now_elems;
 
@@ -62,7 +169,32 @@ void Window::_updateCPU()
 
 			for (Element* now_elem : now_elems) {
 
-				now_elem->_calcSizeRelativeToParent();
+				auto calc_size_for_axis = [now_elem](uint32_t axis) {
+			
+					auto& elem_size = now_elem->size[axis];
+					auto& computed_size = now_elem->_size[axis];
+
+					switch (elem_size.type) {
+					case ElementSizeType::RELATIVE: {
+						auto& _parent_size = now_elem->_parent->_size[axis];
+						computed_size = std::lroundf(_parent_size * elem_size.relative_size);
+						break;
+					}
+
+					case ElementSizeType::ABSOLUTE: {
+						computed_size = elem_size.absolute_size;
+						break;
+					}
+
+					case ElementSizeType::FIT: {
+						// size cannot be calculated at this pass
+						computed_size = 0;
+						break;
+					}
+					}
+				};
+				calc_size_for_axis(0);
+				calc_size_for_axis(1);
 
 				for (Element* child : now_elem->_children) {
 					next_elems.push_back(child);
@@ -74,8 +206,21 @@ void Window::_updateCPU()
 		}
 	}
 
-	// Down Up Pass for elements that depend on children (starts from leafs)
+	// Gather Leafs
+	std::vector<Element*> leafs;
 	{
+		for (StoredElement& stored_elem : elements) {
+
+			Element* elem = getElementBase(&stored_elem);
+			if (elem->_children.size() == 0) {
+				leafs.push_back(elem);
+			}
+		}
+	}
+
+	// Down Up Pass for elements that depend on children (starts from leafs)
+	auto layout_down_up = [&]() {
+
 		std::unordered_set<Element*> now_elems;
 		now_elems.reserve(leafs.size());
 
@@ -89,13 +234,18 @@ void Window::_updateCPU()
 
 			for (Element* now_elem : now_elems) {
 
-				now_elem->_calcSizeAndRelativeChildPositions(next_elems);
+				if (now_elem != nullptr) {
+
+					now_elem->_calcSizeAndRelativeChildPositions();
+					next_elems.insert(now_elem->_parent);
+				}
 			}
 
 			now_elems.swap(next_elems);
 			next_elems.clear();
 		}
-	}
+	};
+	layout_down_up();
 
 	// Convert local to parent positions to screen relative
 	// And generate GPU Data

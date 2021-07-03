@@ -4,14 +4,94 @@
 #include <glm/vec3.hpp>
 
 
+template<typename T = float>
 class AxisBoundingBox3D {
 public:
-	glm::vec3 min;
-	glm::vec3 max;
+	glm::vec<3, T, glm::defaultp> min;
+	glm::vec<3, T, glm::defaultp> max;
 
 public:
+	T sizeX()
+	{
+		return max.x - min.x;
+	}
+
+	T sizeY()
+	{
+		return max.y - min.y;
+	}
+
+	T sizeZ()
+	{
+		return max.z - min.z;
+	}
+
 	bool isPositionInside(glm::vec3& pos);
 	bool isRayIsect(glm::vec3& origin, glm::vec3& direction);
+
+	void subdivide(
+		AxisBoundingBox3D<T>& box_0, AxisBoundingBox3D<T>& box_1,
+		AxisBoundingBox3D<T>& box_2, AxisBoundingBox3D<T>& box_3,
+		AxisBoundingBox3D<T>& box_4, AxisBoundingBox3D<T>& box_5,
+		AxisBoundingBox3D<T>& box_6, AxisBoundingBox3D<T>& box_7,
+		glm::vec3& mid)
+	{
+		mid.x = (max.x + min.x) / 2.0f;
+		mid.y = (max.y + min.y) / 2.0f;
+		mid.z = (max.z + min.z) / 2.0f;
+
+		//              +------------+------------+
+		//             /|           /|           /|
+		//           /      0     /      1     /  |
+		//         /            /            /    |
+		//        +------------+------------+     |
+		//       /|     |     /|     |     /|     |
+		//     /        + - / - - - -+ - / -|- - -+
+		//   /         /  /    |    /  /    |    /
+		//  +------------+------------+     |  /
+		//  |     | /    |     | /    |     |/
+		//  |     + - - -| - - + - - -|- - -+     ^ Y    ^ Z
+		//  |    /       |    /       |    /      |     /
+		//  |        2   |        3   |  /        |   /
+		//  | /          | /          |/          | /
+		//  +------------+------------+           *-------> X
+
+		{
+			// Top Forward Left
+			box_0.max = { mid.x, max.y, max.z };
+			box_0.min = { min.x, mid.y, mid.z };
+
+			// Top Forward Right
+			box_1.max = { max.x, max.y, max.z };
+			box_1.min = { mid.x, mid.y, mid.z };
+
+			// Top Backward Left
+			box_2.max = { mid.x, max.y, mid.z };
+			box_2.min = { min.x, mid.y, min.z };
+
+			// Top Backward Right
+			box_3.max = { max.x, max.y, mid.z };
+			box_3.min = { mid.x, mid.y, min.z };
+		}
+
+		{
+			// Bot Forward Left
+			box_4.max = { mid.x, mid.y, max.z };
+			box_4.min = { min.x, min.y, mid.z };
+
+			// Bot Forward Right
+			box_5.max = { max.x, mid.y, max.z };
+			box_5.min = { mid.x, min.y, mid.z };
+
+			// Bot Backward Left
+			box_6.max = { mid.x, mid.y, mid.z };
+			box_6.min = { min.x, min.y, min.z };
+
+			// Bot Backward Right
+			box_7.max = { max.x, mid.y, mid.z };
+			box_7.min = { mid.x, min.y, min.z };
+		}
+	}
 };
 
 float toRad(float degree);

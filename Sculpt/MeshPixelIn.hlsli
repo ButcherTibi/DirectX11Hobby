@@ -1,4 +1,9 @@
 
+struct Vertex {
+	float3 pos : POSITION;
+	float3 normal : NORMAL;
+};
+
 struct Instance {
 	float3 inst_pos : INSTANCE_POSITION;
 	float4 inst_rot : INSTANCE_ROTATION;

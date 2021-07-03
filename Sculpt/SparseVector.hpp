@@ -212,7 +212,7 @@ public:
 
 // made specifically for holding primitive data
 // deletions are cheap as they don't have to reallocate the whole vector
-// preserves indexes
+// preserves indexes but traversals can skip mai not be required to be in order
 template<typename T>
 class SparseVector {
 public:

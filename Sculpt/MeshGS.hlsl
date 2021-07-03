@@ -7,6 +7,10 @@ StructuredBuffer<MeshTriangle> mesh_triangles;
 void main(triangle PixelIn input[3], uint primitive_id : SV_PrimitiveID,
 	inout TriangleStream<PixelIn> output)
 {
+	if (input[0].pos.w == 0) {
+		return;
+	}
+	
 	for (uint i = 0; i < 3; i++) {
 		
 		PixelIn vertex;

@@ -2,6 +2,8 @@
 
 #include "NuiLibrary.hpp"
 
+#include "SculptMesh.hpp"
+
 
 // must release this before UI
 class MeshRenderer {
@@ -11,12 +13,13 @@ public:
 
 	std::vector<char> shader_cso;
 
-	// Update
 	bool load_uniform;
 
 public:
 	ID3D11Device5* dev5 = nullptr;
 	ID3D11DeviceContext3* im_ctx3;
+
+	dx11::StagingBuffer staging_buff;
 
 	// for overall proper rendering
 	dx11::Texture scene_dtex;
@@ -34,7 +37,7 @@ public:
 	//dx11::ConstantBuffer frame_ubuff;
 	dx11::Buffer frame_ubuff;
 
-	ComPtr<ID3D11InputLayout> mesh_il;
+	//ComPtr<ID3D11InputLayout> mesh_il;
 
 	ComPtr<ID3D11VertexShader> mesh_vs;
 	ComPtr<ID3D11VertexShader> octree_vs;
@@ -63,16 +66,57 @@ public:
 	uint32_t render_target_width;
 	uint32_t render_target_height;
 
+	// Compute Shaders with common/temp buffer data
+	ComPtr<ID3D11ComputeShader> distribute_AABB_verts_cs;
+	ComPtr<ID3D11ComputeShader> update_vertex_positions_cs;
+	ComPtr<ID3D11ComputeShader> update_vertex_normals_cs;
+	ComPtr<ID3D11ComputeShader> update_tesselation_triangles;
+
+	dx11::ConstantBuffer mesh_aabb_graph;
+
+	std::vector<GPU_UnplacedVertexGroup> unplaced_verts;
+	dx11::ArrayBuffer<GPU_UnplacedVertexGroup> gpu_unplaced_verts;
+
+	std::vector<GPU_PlacedVertexGroup> placed_verts;
+	dx11::ArrayBuffer<GPU_PlacedVertexGroup> gpu_placed_verts;
+
+	std::vector<GPU_VertexPositionUpdateGroup> vert_pos_updates;
+	dx11::ArrayBuffer<GPU_VertexPositionUpdateGroup> gpu_vert_pos_updates;
+
+	std::vector<GPU_VertexNormalUpdateGroup> vert_normal_updates;
+	dx11::ArrayBuffer<GPU_VertexNormalUpdateGroup> gpu_vert_normal_updates;
+
+	std::vector<GPU_PolyNormalUpdateGroup> poly_normal_updates;
+	dx11::ArrayBuffer<GPU_PolyNormalUpdateGroup> gpu_poly_normal_updates;
+	dx11::ArrayBuffer<GPU_Result_PolyNormalUpdateGroup> gpu_r_poly_normal_updates;
+	std::vector<GPU_Result_PolyNormalUpdateGroup> poly_r_normal_updates;
+
+	std::vector<GPU_MeshTriangle> debug_triangles;
+
+	//dx11::ComputeCall<> poly_adds_removes_compute;
+
+
 public:
 	// Internal
 	void loadVertices();
 	void loadUniform();
 
 public:
+	// used to shift the wireframe closer to the camera in order not have it be obscured by the solid mesh
 	void setWireframeDepthBias(int32_t depth_bias);
+
+	// performs a readback of one pixel for `world_pos_tex` texture
 	void getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_world_pos);
+	struct CachedPixelWorldPosition {
+		int32_t x;
+		int32_t y;
+		glm::vec3 world_pos;
+	};
+	std::vector<CachedPixelWorldPosition> _cached_pixel_world_pos;
 
 	void draw(nui::SurfaceEvent& event);
 };
+
+extern MeshRenderer renderer;
 
 void geometryDraw(nui::Window* window, nui::StoredElement* source, nui::SurfaceEvent& event, void* user_data);

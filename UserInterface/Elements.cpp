@@ -246,14 +246,34 @@ void EventsComponent::setKeyUpEvent(EventCallback callback, uint32_t key, void* 
 
 void EventsComponent::beginMouseLoopDeltaEffect(Element* elem)
 {
-	_window->endMouseDeltaEffect();
+	if (_window->delta_owner_elem != nullptr) {
+
+		switch (_window->delta_effect) {
+		case Window::DeltaEffectType::HIDDEN: {
+			_window->setMouseVisibility(true);
+		}
+		}
+
+		ClipCursor(nullptr);
+	}
+
 	_window->delta_effect = Window::DeltaEffectType::LOOP;
 	_window->delta_owner_elem = elem;
 }
 
 void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
 {
-	_window->endMouseDeltaEffect();
+	if (_window->delta_owner_elem != nullptr) {
+
+		switch (_window->delta_effect) {
+		case Window::DeltaEffectType::HIDDEN: {
+			_window->setMouseVisibility(true);
+		}
+		}
+
+		ClipCursor(nullptr);
+	}
+
 	_window->delta_effect = Window::DeltaEffectType::HIDDEN;
 	_window->delta_owner_elem = elem;
 
@@ -431,6 +451,52 @@ void Element::_init()
 	z_index = 0;
 }
 
+void Element::_ensureHasChange()
+{
+	if (_update == nullptr) {
+
+		auto& new_change = _window->changes.emplace_back();
+
+		_update = &new_change.emplace<UpdateChange>();
+		_update->dest = &(*_self_elements);
+
+		switch (_self_elements->index()) {
+		case ElementType::FLEX: {
+			_update->source.emplace<Flex::Change>();
+			break;
+		}
+		case ElementType::MENU: {
+			_update->source.emplace<Menu::Change>();
+			break;
+		}
+		}
+	}
+}
+
+ChangedElement& Element::_ensureChangedElement()
+{
+	_ensureHasChange();
+	return _update->source_elem;
+}
+
+void Element::setZ_Index(uint32_t new_z_index)
+{
+	ChangedElement& changed = _ensureChangedElement();
+	changed.z_index = new_z_index;
+}
+
+void Element::setSize(ElementSize x, ElementSize y)
+{
+	ChangedElement& changed = _ensureChangedElement();
+	changed.size = { x, y };
+}
+
+void Element::getSize(ElementSize& r_x, ElementSize& r_y)
+{
+	r_x = size[0];
+	r_y = size[1];
+}
+
 void Element::_calcSizeRelativeToParent()
 {
 	auto calc_size_for_axis = [&](uint32_t axis) {
@@ -457,30 +523,26 @@ void Element::_calcSizeRelativeToParent()
 	calc_size_for_axis(1);
 }
 
-#pragma warning(disable : 4100)
-void Element::_emitEvents(bool& allow_inside_events)
+void Element::_emitEvents(bool&)
 {
 	// no events
 };
 
-void Element::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
+void Element::_calcSizeAndRelativeChildPositions()
 {
 	// assume size is relative or absolute so it's already calculated
 	// and don't alter child positions
-
-	r_next_parents.insert(_parent);
 };
 
 void Element::_generateGPU_Data()
 {
-	// no resource is used
+	// no GPU resource is used
 };
 
 void Element::_draw()
 {
 	// no rendering commands present
 };
-#pragma warning(default : 4100)
 
 Element* nui::getElementBase(StoredElement* elem)
 {
@@ -489,10 +551,10 @@ Element* nui::getElementBase(StoredElement* elem)
 		return std::get_if<Root>(elem);
 	case ElementType::TEXT:
 		return std::get_if<Text>(elem);
-	case ElementType::RELATIVE_WRAP:
+	case ElementType::RELATIVE:
 		return std::get_if<RelativeWrap>(elem);
-	case ElementType::GRID:
-		return std::get_if<Grid>(elem);
+	case ElementType::FLEX:
+		return std::get_if<Flex>(elem);
 	case ElementType::MENU:
 		return std::get_if<Menu>(elem);
 	}
@@ -500,15 +562,12 @@ Element* nui::getElementBase(StoredElement* elem)
 	return nullptr;
 }
 
-#pragma warning(disable : 4100)
-void Root::_emitEvents(bool& allow_inside_events)
+void Root::_emitEvents(bool&)
 {
-	_events._emitInsideEvents(_self);
+	_events._emitInsideEvents(&(*_self_elements));
 }
-#pragma warning(default : 4100)
 
-#pragma warning(disable : 4100)
-void Root::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
+void Root::_calcSizeAndRelativeChildPositions()
 {
 	auto calc_size = [&](uint32_t axis) {
 
@@ -538,9 +597,8 @@ void Root::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 
 	// Root element has no parents
 }
-#pragma warning(default : 4100)
 
-void RelativeWrap::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
+void RelativeWrap::_calcSizeAndRelativeChildPositions()
 {
 	auto calc_child_positions = [&](uint32_t axis) {
 
@@ -582,8 +640,6 @@ void RelativeWrap::_calcSizeAndRelativeChildPositions(std::unordered_set<Element
 
 	calc_child_positions(0);
 	calc_child_positions(1);
-
-	r_next_parents.insert(_parent);
 }
 
 void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)
@@ -679,7 +735,7 @@ void BackgroundElement::_draw()
 		surface_event.viewport_pos = { _position[0], _position[1] };
 		surface_event.viewport_size = { _size[0], _size[1] };
 
-		this->_onRenderingSurface(_window, _self, surface_event, _surface_event_user_data);
+		this->_onRenderingSurface(_window, &(*_self_elements), surface_event, _surface_event_user_data);
 
 		im_ctx3->ClearState();
 		break;
@@ -693,7 +749,7 @@ void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callba
 	this->_surface_event_user_data = user_data;
 }
 
-void Grid::_emitEvents(bool& allow_inside_events)
+void Flex::_emitEvents(bool& allow_inside_events)
 {
 	if (allow_inside_events) {
 
@@ -707,21 +763,21 @@ void Grid::_emitEvents(bool& allow_inside_events)
 		if (left <= input.mouse_x && input.mouse_x < right &&
 			top <= input.mouse_y && input.mouse_y < bot)
 		{
-			_events._emitInsideEvents(_self);
+			_events._emitInsideEvents(&(*_self_elements));
 			allow_inside_events = false;
 		}
 		else {
-			_events._emitOutsideEvents(_self);
+			_events._emitOutsideEvents(&(*_self_elements));
 			allow_inside_events = true;
 		}
 	}
 	else {
-		_events._emitOutsideEvents(_self);
+		_events._emitOutsideEvents(&(*_self_elements));
 		allow_inside_events = true;
 	}
 }
 
-void Grid::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
+void Flex::_calcSizeAndRelativeChildPositions()
 {
 	auto calc_child_positions = [&](uint32_t x_axis, uint32_t y_axis) {
 
@@ -811,22 +867,22 @@ void Grid::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			int32_t step = 0;
 
 			switch (items_spacing) {
-			case GridSpacing::START: {
+			case Spacing::START: {
 				x = 0;
 				break;
 			}
 
-			case GridSpacing::END: {
+			case Spacing::END: {
 				x = _size[x_axis] - lines.front().line_length;
 				break;
 			}
 
-			case GridSpacing::CENTER: {
+			case Spacing::CENTER: {
 				x = (_size[x_axis] - lines.front().line_length) / 2;
 				break;
 			}
 
-			case GridSpacing::SPACE_BETWEEN: {
+			case Spacing::SPACE_BETWEEN: {
 
 				x = 0;
 				GridLine& first_line = lines.front();
@@ -852,22 +908,22 @@ void Grid::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 				}
 				else {
 					switch (items_spacing) {
-					case GridSpacing::START: {
+					case Spacing::START: {
 						x = 0;
 						break;
 					}
 
-					case GridSpacing::END: {
+					case Spacing::END: {
 						x = _size[x_axis] - line->line_length;
 						break;
 					}
 
-					case GridSpacing::CENTER: {
+					case Spacing::CENTER: {
 						x = (_size[x_axis] - line->line_length) / 2;
 						break;
 					}
 
-					case GridSpacing::SPACE_BETWEEN: {
+					case Spacing::SPACE_BETWEEN: {
 						x = 0;
 
 						line = &lines[line_idx + 1];
@@ -898,22 +954,22 @@ void Grid::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			uint32_t step = 0;
 
 			switch (lines_spacing) {
-			case GridSpacing::START: {
+			case Spacing::START: {
 				y = 0;
 				break;
 			}
 
-			case GridSpacing::END: {
+			case Spacing::END: {
 				y = _size[y_axis] - height;
 				break;
 			}
 
-			case GridSpacing::CENTER: {
+			case Spacing::CENTER: {
 				y = (_size[y_axis] - height) / 2;
 				break;
 			}
 
-			case GridSpacing::SPACE_BETWEEN: {
+			case Spacing::SPACE_BETWEEN: {
 				y = 0;
 				if (lines.size() > 1) {
 					step = (_size[y_axis] - height) / (lines.size() - 1);
@@ -955,48 +1011,84 @@ void Grid::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 	};
 
 	switch (orientation) {
-	case GridOrientation::ROW: {
+	case Orientation::ROW: {
 		calc_child_positions(0, 1);
 		break;
 	}
 
-	case GridOrientation::COLUMN: {
+	case Orientation::COLUMN: {
 		calc_child_positions(1, 0);
 		break;
 	}
 	}
-
-	r_next_parents.insert(_parent);
 }
 
-void Grid::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
+Flex::Change& Flex::ensureChangedFlex()
+{
+	_ensureHasChange();
+	return std::get<Flex::Change>(_update->source);
+}
+
+Flex::Orientation Flex::getOrientation()
+{
+	return orientation;
+}
+void Flex::setOrientation(Orientation new_orientation)
+{
+	Flex::Change& change = ensureChangedFlex();
+	change.orientation = new_orientation;
+}
+
+void Flex::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
 {
 	_events.setKeyDownEvent(callback, key, user_data);
 }
 
-void Grid::setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data)
+void Flex::setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data)
 {
 	_events.setKeyHeldDownEvent(callback, key, user_data);
 }
 
-void Grid::setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data)
+void Flex::setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data)
 {
 	_events.setKeyUpEvent(callback, key, user_data);
 }
 
-void Grid::setMouseScrollEvent(EventCallback callback, void* user_data)
+void Flex::setMouseMoveEvent(EventCallback callback, void* user_data)
+{
+	_events.setMouseMoveEvent(callback, user_data);
+}
+
+void Flex::setMouseScrollEvent(EventCallback callback, void* user_data)
 {
 	_events.setMouseScrollEvent(callback, user_data);
 }
 
-void Grid::beginMouseLoopDeltaEffect()
+void Flex::beginMouseLoopDeltaEffect()
 {
 	_events.beginMouseLoopDeltaEffect(this);
 }
 
-void Grid::beginMouseFixedDeltaEffect()
+void Flex::beginMouseFixedDeltaEffect()
 {
 	_events.beginMouseFixedDeltaEffect(this);
+}
+
+void MenuItem::setItemText(std::string new_text)
+{
+	auto& update_item = menu->_addItemUpdatedChange(this);
+	update_item.text = new_text;
+}
+
+void MenuItem::setItemCallback(EventCallback new_callback)
+{
+	auto& update_item = menu->_addItemUpdatedChange(this);
+	update_item.callback = new_callback;
+}
+
+MenuItem* MenuItem::addItem(MenuStyle& style)
+{
+	return menu->_addItem(this, style);
 }
 
 void Menu::_init()
@@ -1004,13 +1096,78 @@ void Menu::_init()
 	Element::_init();
 
 	MenuItem& root = _items.emplace_back();
-	root._parent = nullptr;
+	root.parent = nullptr;
 
 	_menu_background_render.init(_window);
 	_select_background_render.init(_window);
 	_label_render.init(_window);
 
 	_visible_menus.push_back(&root);
+}
+
+Menu::Change& Menu::_ensureChangedMenu()
+{
+	_ensureHasChange();
+	return std::get<Menu::Change>(_update->source);
+}
+
+Menu::Change::UpdateItem& Menu::_addItemUpdatedChange(MenuItem* item)
+{
+	Change& new_change = _ensureChangedMenu();
+	auto& update_item_change = new_change.item_changes.emplace_back();
+	auto& update_item = update_item_change.emplace<Change::UpdateItem>();
+	update_item.item = item;
+
+	return update_item;
+}
+
+MenuItem* Menu::_addItem(MenuItem* parent, MenuStyle& style)
+{
+	MenuItem& new_item = _items.emplace_back();
+	new_item.menu = this;
+	new_item.parent = parent;;
+	new_item.label_callback = nullptr;
+
+	// Label
+	new_item.font_family = style.font_family;
+	new_item.font_style = style.font_style;
+	new_item.font_size = style.font_size;
+	new_item.line_height = style.line_height;
+	new_item.text_color.rgba = style.text_color.rgba;
+
+	new_item.top_padding = style.top_padding;
+	new_item.bot_padding = style.bot_padding;
+	new_item.left_padding = style.left_padding;
+	new_item.right_padding = style.right_padding;
+
+	// Menu
+	new_item.menu_background_color.rgba = style.menu_background_color.rgba;
+
+	// Schedule change
+	Menu::Change& new_change = _ensureChangedMenu();
+	auto& new_item_change = new_change.item_changes.emplace_back();
+	auto& add_item = new_item_change.emplace<Menu::Change::AddItem>();
+	add_item.parent = parent;
+	add_item.item = &new_item;
+
+	return &new_item;
+}
+
+void Menu::setTitleBackColor(Color new_color)
+{
+	Menu::Change& change = _ensureChangedMenu();
+	change.titles_background_color = new_color;
+}
+
+void Menu::setSelectBackColor(Color new_color)
+{
+	Menu::Change& change = _ensureChangedMenu();
+	change.select_background_color = new_color;
+}
+
+MenuItem* Menu::addTitle(MenuStyle& style)
+{
+	return _addItem(&_items.front(), style);
 }
 
 void Menu::_emitEvents(bool& allow_inside_events)
@@ -1024,15 +1181,15 @@ void Menu::_emitEvents(bool& allow_inside_events)
 
 		MenuItem* visible_menu = _visible_menus[i];
 
-		for (MenuItem* item : visible_menu->_children) {
+		for (MenuItem* item : visible_menu->children) {
 
 			if (item->_label_box.isInside(input.mouse_x, input.mouse_y)) {
 
 				if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition &&
-					item->_children.size() == 0 &&  // item is not a submenu
+					item->children.size() == 0 &&  // item is not a submenu
 					item->label_callback != nullptr)
 				{
-					item->label_callback(_window, _self, item->label_user_data);
+					item->label_callback(_window, &(*_self_elements), item->label_user_data);
 					is_clicked = true;
 				}
 
@@ -1064,7 +1221,7 @@ void Menu::_emitEvents(bool& allow_inside_events)
 	}
 }
 
-void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents)
+void Menu::_calcSizeAndRelativeChildPositions()
 {
 	_menu_background_render.reset();
 	_select_background_render.reset();
@@ -1078,14 +1235,14 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 	int32_t pen_y = _position[1];
 	{
 		MenuItem* root = _visible_menus.front();
-		for (MenuItem* item : root->_children) {
+		for (MenuItem* item : root->children) {
 
 			uint32_t width;
 			uint32_t height;
 
 			TextInstance props;
-			props.pos[0] = item->left_padding + pen_x;
-			props.pos[1] = item->top_padding + pen_y;
+			props.screen_pos[0] = item->left_padding + pen_x;
+			props.screen_pos[1] = item->top_padding + pen_y;
 			props.text = item->text;
 			props.font_family = item->font_family;
 			props.font_style = item->font_style;
@@ -1109,7 +1266,7 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			title_menu_width += item->_label_box.size[0];
 		}
 
-		for (MenuItem* item : root->_children) {
+		for (MenuItem* item : root->children) {
 			item->_label_box.size[1] = title_menu_height;
 		}
 
@@ -1135,14 +1292,14 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			int32_t menu_y = pen_y;
 			uint32_t menu_width = 0;
 
-			for (MenuItem* item : menu->_children) {
+			for (MenuItem* item : menu->children) {
 
 				uint32_t width;
 				uint32_t height;
 
 				TextInstance props;
-				props.pos[0] = item->left_padding + pen_x;
-				props.pos[1] = item->top_padding + pen_y;
+				props.screen_pos[0] = item->left_padding + pen_x;
+				props.screen_pos[1] = item->top_padding + pen_y;
 				props.text = item->text;
 				props.font_family = item->font_family;
 				props.font_style = item->font_style;
@@ -1165,7 +1322,7 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			}
 
 			// Labels
-			for (MenuItem* item : menu->_children) {
+			for (MenuItem* item : menu->children) {
 				item->_label_box.size[0] = menu_width;
 			}
 
@@ -1180,7 +1337,7 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 			}
 
 			// Menu Background
-			if (menu->_children.size()) {
+			if (menu->children.size()) {
 
 				menu->_menu_box.pos = { menu_x, menu_y };
 				menu->_menu_box.size = { menu_width, (uint32_t)(pen_y - menu_y) };
@@ -1209,8 +1366,6 @@ void Menu::_calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_ne
 	// The size of the menu
 	_size[0] = title_menu_width;
 	_size[1] = title_menu_height;
-
-	r_next_parents.insert(_parent);
 }
 
 void Menu::_generateGPU_Data()
@@ -1225,34 +1380,4 @@ void Menu::_draw()
 	_menu_background_render.draw();
 	_select_background_render.draw();
 	_label_render.draw();
-}
-
-MenuItem* Menu::addItem(MenuItem* parent, MenuStyle& style)
-{
-	if (parent == nullptr) {	
-		parent = &_items.front();
-	}
-
-	MenuItem& new_item = _items.emplace_back();
-	new_item._parent = parent;;
-	new_item.label_callback = nullptr;
-
-	// Label
-	new_item.font_family = style.font_family;
-	new_item.font_style = style.font_style;
-	new_item.font_size = style.font_size;
-	new_item.line_height = style.line_height;
-	new_item.text_color.rgba = style.text_color.rgba;
-
-	new_item.top_padding = style.top_padding;
-	new_item.bot_padding = style.bot_padding;
-	new_item.left_padding = style.left_padding;
-	new_item.right_padding = style.right_padding;
-
-	// Menu
-	new_item.menu_background_color.rgba = style.menu_background_color.rgba;
-
-	parent->_children.push_back(&new_item);
-
-	return &new_item;
 }

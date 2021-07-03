@@ -5,166 +5,24 @@
 // GLM
 #include <glm/gtc/matrix_transform.hpp>
 
+// Mine
 #include "Application.hpp"
+#include "RenderDocIntegration.hpp"
+
+
+MeshRenderer renderer;
 
 
 // vertex buffer has one extra vertex, which will be the deleted vertex
 // cpu vertex index == gpu vertex index + 1
 void MeshRenderer::loadVertices()
 {
-	DirectX::XMFLOAT3 gpu_aabbs_positions[8];
-
 	for (Mesh& mesh : application.meshes) {
 
 		scme::SculptMesh& sculpt_mesh = mesh.mesh;
 
-		// Polygons
-		// polygons normals need to be generated before
-		// so they can be used to generate vertex normal
-		{
-			if (sculpt_mesh.modified_polys.size() > 0) {
-
-				auto& gpu_indexs = sculpt_mesh.gpu_indexes;
-
-				if (gpu_indexs.buff == nullptr) {
-					gpu_indexs.dev = this->dev5;
-					gpu_indexs.ctx3 = this->im_ctx3;
-					gpu_indexs.init_desc = {};
-					gpu_indexs.init_desc.Usage = D3D11_USAGE_DEFAULT;
-					gpu_indexs.init_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-				}
-
-				// regardless if a poly is tris or quad, always load 6 indexes
-				gpu_indexs.resize(sculpt_mesh.polys.capacity() * 6);
-
-				auto& gpu_triangles = sculpt_mesh.gpu_triangles;
-
-				if (gpu_triangles.buff == nullptr) {
-					gpu_triangles.dev = this->dev5;
-					gpu_triangles.ctx3 = this->im_ctx3;
-					gpu_triangles.init_desc = {};
-					gpu_triangles.init_desc.Usage = D3D11_USAGE_DEFAULT;
-					gpu_triangles.init_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-					gpu_triangles.init_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-					gpu_triangles.init_desc.StructureByteStride = sizeof(GPU_MeshTriangle);
-				}
-
-				// regardless if a poly is tris or quad, always load 2 triangles
-				gpu_triangles.resize(sculpt_mesh.polys.capacity() * 2);
-
-				for (scme::ModifiedPoly& modified_poly : sculpt_mesh.modified_polys) {
-
-					switch (modified_poly.state) {
-					case scme::ModifiedPolyState::UPDATE: {
-
-						if (sculpt_mesh.polys.isDeleted(modified_poly.idx)) {
-							continue;
-						}
-
-						GPU_MeshTriangle tris;
-						scme::Poly& poly = sculpt_mesh.polys[modified_poly.idx];
-
-						if (poly.is_tris) {
-
-							std::array<uint32_t, 3> vs_idx;
-							sculpt_mesh.getTrisPrimitives(&poly, vs_idx);
-
-							for (uint32_t i = 0; i < 3; i++) {
-								vs_idx[i] += 1;
-							}
-
-							gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
-							gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[1]);
-							gpu_indexs.update(6 * modified_poly.idx + 2, vs_idx[2]);
-
-							uint32_t zero = 0;
-							gpu_indexs.update(6 * modified_poly.idx + 3, zero);
-							gpu_indexs.update(6 * modified_poly.idx + 4, zero);
-							gpu_indexs.update(6 * modified_poly.idx + 5, zero);
-
-							// GPU Triangle
-							tris.poly_normal = dxConvert(poly.normal);
-							tris.tess_normal = dxConvert(poly.normal);
-							tris.tess_vertex_0 = 0;
-							tris.tess_vertex_1 = 0;
-							gpu_triangles.update(2 * modified_poly.idx, tris);
-						}
-						else {
-							std::array<uint32_t, 4> vs_idx;
-							sculpt_mesh.getQuadPrimitives(&poly, vs_idx);
-
-							for (uint32_t i = 0; i < 4; i++) {
-								vs_idx[i] += 1;
-							}
-
-							// Tesselation and Normals
-							if (poly.tesselation_type == 0) {
-
-								gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
-								gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[2]);
-								gpu_indexs.update(6 * modified_poly.idx + 2, vs_idx[3]);
-
-								gpu_indexs.update(6 * modified_poly.idx + 3, vs_idx[0]);
-								gpu_indexs.update(6 * modified_poly.idx + 4, vs_idx[1]);
-								gpu_indexs.update(6 * modified_poly.idx + 5, vs_idx[2]);
-
-								tris.tess_vertex_0 = vs_idx[0];
-								tris.tess_vertex_1 = vs_idx[2];
-							}
-							else {
-								gpu_indexs.update(6 * modified_poly.idx + 0, vs_idx[0]);
-								gpu_indexs.update(6 * modified_poly.idx + 1, vs_idx[1]);
-								gpu_indexs.update(6 * modified_poly.idx + 2, vs_idx[3]);
-
-								gpu_indexs.update(6 * modified_poly.idx + 3, vs_idx[1]);
-								gpu_indexs.update(6 * modified_poly.idx + 4, vs_idx[2]);
-								gpu_indexs.update(6 * modified_poly.idx + 5, vs_idx[3]);
-
-								tris.tess_vertex_0 = vs_idx[1];
-								tris.tess_vertex_1 = vs_idx[3];
-							}
-
-							// GPU Triangles
-							tris.poly_normal = dxConvert(poly.normal);
-							tris.tess_normal = dxConvert(poly.tess_normals[0]);
-							gpu_triangles.update(2 * modified_poly.idx, tris);
-
-							tris.tess_normal = dxConvert(poly.tess_normals[1]);
-							gpu_triangles.update(2 * modified_poly.idx + 1, tris);
-						}
-						break;
-					}
-
-					case scme::ModifiedPolyState::DELETED: {
-
-						uint32_t zero = 0;
-						gpu_indexs.update(6 * modified_poly.idx + 0, zero);
-						gpu_indexs.update(6 * modified_poly.idx + 1, zero);
-						gpu_indexs.update(6 * modified_poly.idx + 2, zero);
-
-						gpu_indexs.update(6 * modified_poly.idx + 3, zero);
-						gpu_indexs.update(6 * modified_poly.idx + 4, zero);
-						gpu_indexs.update(6 * modified_poly.idx + 5, zero);
-						break;
-					}
-					}
-				}
-
-				sculpt_mesh.modified_polys.clear();
-
-				// Shader Resource View
-				sculpt_mesh.gpu_triangles_srv = nullptr;
-
-				D3D11_SHADER_RESOURCE_VIEW_DESC desc;
-				desc.Format = DXGI_FORMAT_UNKNOWN;
-				desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-				desc.Buffer.ElementOffset = 0;
-				desc.Buffer.ElementWidth = sizeof(GPU_MeshTriangle);
-				desc.Buffer.NumElements = sculpt_mesh.gpu_triangles.size();  // this may not be correct
-
-				throwDX11(dev5->CreateShaderResourceView(
-					sculpt_mesh.gpu_triangles.get(), &desc, sculpt_mesh.gpu_triangles_srv.GetAddressOf()));
-			}
+		if (sculpt_mesh.verts.size() == 0) {
+			continue;
 		}
 
 		auto load_aabbs = [&]() {
@@ -190,8 +48,8 @@ void MeshRenderer::loadVertices()
 				}
 			}
 
-			auto& gpu_aabb_verts = sculpt_mesh.gpu_aabb_verts;
-			gpu_aabb_verts.resize(aabb_count * 36);
+			auto& aabb_verts = sculpt_mesh.aabb_verts;
+			aabb_verts.resize(aabb_count * 36);
 
 			uint32_t vertex_idx = 0;
 			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
@@ -215,6 +73,7 @@ void MeshRenderer::loadVertices()
 				glm::vec3& max = aabb.aabb.max;
 
 				// Forward (Classic winding)
+				DirectX::XMFLOAT3 gpu_aabbs_positions[8];
 				gpu_aabbs_positions[0] = dxConvert(glm::vec3{ min.x, max.y, max.z });  // top left
 				gpu_aabbs_positions[1] = dxConvert(glm::vec3{ max.x, max.y, max.z });  // top right
 				gpu_aabbs_positions[2] = dxConvert(glm::vec3{ max.x, min.y, max.z });  // bot right
@@ -227,153 +86,159 @@ void MeshRenderer::loadVertices()
 				gpu_aabbs_positions[7] = dxConvert(glm::vec3{ min.x, min.y, min.z });  // bot left
 
 				// Front Face
-				gpu_aabb_verts[vertex_idx + 0].pos = gpu_aabbs_positions[0];
-				gpu_aabb_verts[vertex_idx + 1].pos = gpu_aabbs_positions[1];
-				gpu_aabb_verts[vertex_idx + 2].pos = gpu_aabbs_positions[3];
+				aabb_verts[vertex_idx + 0].pos = gpu_aabbs_positions[0];
+				aabb_verts[vertex_idx + 1].pos = gpu_aabbs_positions[1];
+				aabb_verts[vertex_idx + 2].pos = gpu_aabbs_positions[3];
 
-				gpu_aabb_verts[vertex_idx + 3].pos = gpu_aabbs_positions[1];
-				gpu_aabb_verts[vertex_idx + 4].pos = gpu_aabbs_positions[2];
-				gpu_aabb_verts[vertex_idx + 5].pos = gpu_aabbs_positions[3];
+				aabb_verts[vertex_idx + 3].pos = gpu_aabbs_positions[1];
+				aabb_verts[vertex_idx + 4].pos = gpu_aabbs_positions[2];
+				aabb_verts[vertex_idx + 5].pos = gpu_aabbs_positions[3];
 
 				// Right Face
-				gpu_aabb_verts[vertex_idx + 6].pos = gpu_aabbs_positions[1];
-				gpu_aabb_verts[vertex_idx + 7].pos = gpu_aabbs_positions[5];
-				gpu_aabb_verts[vertex_idx + 8].pos = gpu_aabbs_positions[2];
+				aabb_verts[vertex_idx + 6].pos = gpu_aabbs_positions[1];
+				aabb_verts[vertex_idx + 7].pos = gpu_aabbs_positions[5];
+				aabb_verts[vertex_idx + 8].pos = gpu_aabbs_positions[2];
 
-				gpu_aabb_verts[vertex_idx + 9].pos = gpu_aabbs_positions[5];
-				gpu_aabb_verts[vertex_idx + 10].pos = gpu_aabbs_positions[6];
-				gpu_aabb_verts[vertex_idx + 11].pos = gpu_aabbs_positions[2];
+				aabb_verts[vertex_idx + 9].pos = gpu_aabbs_positions[5];
+				aabb_verts[vertex_idx + 10].pos = gpu_aabbs_positions[6];
+				aabb_verts[vertex_idx + 11].pos = gpu_aabbs_positions[2];
 
 				// Back Face
-				gpu_aabb_verts[vertex_idx + 12].pos = gpu_aabbs_positions[5];
-				gpu_aabb_verts[vertex_idx + 13].pos = gpu_aabbs_positions[4];
-				gpu_aabb_verts[vertex_idx + 14].pos = gpu_aabbs_positions[6];
+				aabb_verts[vertex_idx + 12].pos = gpu_aabbs_positions[5];
+				aabb_verts[vertex_idx + 13].pos = gpu_aabbs_positions[4];
+				aabb_verts[vertex_idx + 14].pos = gpu_aabbs_positions[6];
 
-				gpu_aabb_verts[vertex_idx + 15].pos = gpu_aabbs_positions[4];
-				gpu_aabb_verts[vertex_idx + 16].pos = gpu_aabbs_positions[7];
-				gpu_aabb_verts[vertex_idx + 17].pos = gpu_aabbs_positions[6];
+				aabb_verts[vertex_idx + 15].pos = gpu_aabbs_positions[4];
+				aabb_verts[vertex_idx + 16].pos = gpu_aabbs_positions[7];
+				aabb_verts[vertex_idx + 17].pos = gpu_aabbs_positions[6];
 
 				// Left Face
-				gpu_aabb_verts[vertex_idx + 18].pos = gpu_aabbs_positions[4];
-				gpu_aabb_verts[vertex_idx + 19].pos = gpu_aabbs_positions[0];
-				gpu_aabb_verts[vertex_idx + 20].pos = gpu_aabbs_positions[7];
+				aabb_verts[vertex_idx + 18].pos = gpu_aabbs_positions[4];
+				aabb_verts[vertex_idx + 19].pos = gpu_aabbs_positions[0];
+				aabb_verts[vertex_idx + 20].pos = gpu_aabbs_positions[7];
 
-				gpu_aabb_verts[vertex_idx + 21].pos = gpu_aabbs_positions[0];
-				gpu_aabb_verts[vertex_idx + 22].pos = gpu_aabbs_positions[3];
-				gpu_aabb_verts[vertex_idx + 23].pos = gpu_aabbs_positions[7];
+				aabb_verts[vertex_idx + 21].pos = gpu_aabbs_positions[0];
+				aabb_verts[vertex_idx + 22].pos = gpu_aabbs_positions[3];
+				aabb_verts[vertex_idx + 23].pos = gpu_aabbs_positions[7];
 
 				// Top Face	
-				gpu_aabb_verts[vertex_idx + 24].pos = gpu_aabbs_positions[4];
-				gpu_aabb_verts[vertex_idx + 25].pos = gpu_aabbs_positions[5];
-				gpu_aabb_verts[vertex_idx + 26].pos = gpu_aabbs_positions[0];
+				aabb_verts[vertex_idx + 24].pos = gpu_aabbs_positions[4];
+				aabb_verts[vertex_idx + 25].pos = gpu_aabbs_positions[5];
+				aabb_verts[vertex_idx + 26].pos = gpu_aabbs_positions[0];
 
-				gpu_aabb_verts[vertex_idx + 27].pos = gpu_aabbs_positions[5];
-				gpu_aabb_verts[vertex_idx + 28].pos = gpu_aabbs_positions[1];
-				gpu_aabb_verts[vertex_idx + 29].pos = gpu_aabbs_positions[0];
+				aabb_verts[vertex_idx + 27].pos = gpu_aabbs_positions[5];
+				aabb_verts[vertex_idx + 28].pos = gpu_aabbs_positions[1];
+				aabb_verts[vertex_idx + 29].pos = gpu_aabbs_positions[0];
 
 				// Back Face
-				gpu_aabb_verts[vertex_idx + 30].pos = gpu_aabbs_positions[6];
-				gpu_aabb_verts[vertex_idx + 31].pos = gpu_aabbs_positions[7];
-				gpu_aabb_verts[vertex_idx + 32].pos = gpu_aabbs_positions[2];
+				aabb_verts[vertex_idx + 30].pos = gpu_aabbs_positions[6];
+				aabb_verts[vertex_idx + 31].pos = gpu_aabbs_positions[7];
+				aabb_verts[vertex_idx + 32].pos = gpu_aabbs_positions[2];
 
-				gpu_aabb_verts[vertex_idx + 33].pos = gpu_aabbs_positions[7];
-				gpu_aabb_verts[vertex_idx + 34].pos = gpu_aabbs_positions[3];
-				gpu_aabb_verts[vertex_idx + 35].pos = gpu_aabbs_positions[2];
+				aabb_verts[vertex_idx + 33].pos = gpu_aabbs_positions[7];
+				aabb_verts[vertex_idx + 34].pos = gpu_aabbs_positions[3];
+				aabb_verts[vertex_idx + 35].pos = gpu_aabbs_positions[2];
 
 				// Front Face
-				gpu_aabb_verts[vertex_idx + 1].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 2].normal.x = 1;
+				aabb_verts[vertex_idx + 1].normal.x = 1;
+				aabb_verts[vertex_idx + 2].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 3].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 5].normal.x = 1;
+				aabb_verts[vertex_idx + 3].normal.x = 1;
+				aabb_verts[vertex_idx + 5].normal.x = 1;
 
 				// Right Face
-				gpu_aabb_verts[vertex_idx + 7].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 8].normal.x = 1;
+				aabb_verts[vertex_idx + 7].normal.x = 1;
+				aabb_verts[vertex_idx + 8].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 9].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 11].normal.x = 1;
+				aabb_verts[vertex_idx + 9].normal.x = 1;
+				aabb_verts[vertex_idx + 11].normal.x = 1;
 
 				// Back Face
-				gpu_aabb_verts[vertex_idx + 13].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 14].normal.x = 1;
+				aabb_verts[vertex_idx + 13].normal.x = 1;
+				aabb_verts[vertex_idx + 14].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 15].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 17].normal.x = 1;
+				aabb_verts[vertex_idx + 15].normal.x = 1;
+				aabb_verts[vertex_idx + 17].normal.x = 1;
 
 				// Left Face
-				gpu_aabb_verts[vertex_idx + 19].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 20].normal.x = 1;
+				aabb_verts[vertex_idx + 19].normal.x = 1;
+				aabb_verts[vertex_idx + 20].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 21].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 23].normal.x = 1;
+				aabb_verts[vertex_idx + 21].normal.x = 1;
+				aabb_verts[vertex_idx + 23].normal.x = 1;
 
 				// Top Face
-				gpu_aabb_verts[vertex_idx + 25].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 26].normal.x = 1;
+				aabb_verts[vertex_idx + 25].normal.x = 1;
+				aabb_verts[vertex_idx + 26].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 27].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 29].normal.x = 1;
+				aabb_verts[vertex_idx + 27].normal.x = 1;
+				aabb_verts[vertex_idx + 29].normal.x = 1;
 
 				// Bot Face
-				gpu_aabb_verts[vertex_idx + 31].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 32].normal.x = 1;
+				aabb_verts[vertex_idx + 31].normal.x = 1;
+				aabb_verts[vertex_idx + 32].normal.x = 1;
 
-				gpu_aabb_verts[vertex_idx + 27].normal.x = 1;
-				gpu_aabb_verts[vertex_idx + 35].normal.x = 1;
+				aabb_verts[vertex_idx + 27].normal.x = 1;
+				aabb_verts[vertex_idx + 35].normal.x = 1;
 
 				// normal.xy is unused
 
 				vertex_idx += 36;
 			}
 
-			if (sculpt_mesh.aabb_vbuff.buff == nullptr) {
-
-				D3D11_BUFFER_DESC desc = {};
-				desc.Usage = D3D11_USAGE_DYNAMIC;
-				desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-				desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-				sculpt_mesh.aabb_vbuff.create(dev5, im_ctx3, desc);
-			}
-
-			sculpt_mesh.aabb_vbuff.load(
-				gpu_aabb_verts.data(),
-				gpu_aabb_verts.size() * sizeof(GPU_MeshVertex));
+			sculpt_mesh.gpu_aabb_verts.upload(aabb_verts);
 		};
 
-		// AABBs
+		// Update AABBs (does not depend GPU data being updated)
 		if (mesh.aabb_render_mode != AABB_RenderMode::NO_RENDER)
 		{
+			// redo render mode changed
 			if (mesh.aabb_render_mode != mesh.prev_aabb_mode) {
-				sculpt_mesh.aabb_vbuff.buff = nullptr;
 
+				mesh.prev_aabb_mode = mesh.aabb_render_mode;
 				load_aabbs();
 			}
-			else if (sculpt_mesh.modified_verts.size() || sculpt_mesh.aabb_vbuff.buff == nullptr) {
+			// positions updated
+			else if (sculpt_mesh.modified_verts.size()) {
+				load_aabbs();
+			}
+			// no data so load
+			else if (sculpt_mesh.gpu_aabb_verts.count() == 0) {
 				load_aabbs();
 			}
 		}
 		// Free GPU Memory
-		else if (mesh.aabb_render_mode == AABB_RenderMode::NO_RENDER && sculpt_mesh.aabb_vbuff.buff != nullptr) {
-			sculpt_mesh.aabb_vbuff.buff = nullptr;
+		else if (mesh.aabb_render_mode == AABB_RenderMode::NO_RENDER && sculpt_mesh.gpu_aabb_verts.count() != 0) {
+			sculpt_mesh.gpu_aabb_verts.deallocate();
+
+			mesh.prev_aabb_mode = mesh.aabb_render_mode;
 		}
 
-		// Vertices
+		// Update Mesh Data
 		{
-			auto& gpu_verts = sculpt_mesh.gpu_verts;
+			if (sculpt_mesh.dirty_vertex_list) {
+				sculpt_mesh.uploadVertexAddsRemoves();
+			}
+
+			if (sculpt_mesh.dirty_vertex_pos) {
+				sculpt_mesh.uploadVertexPositions();
+			}
+
+			if (sculpt_mesh.dirty_index_buff) {
+				sculpt_mesh.uploadIndexBufferChanges();
+			}
+
+			if (sculpt_mesh.dirty_tess_tris) {
+				sculpt_mesh.uploadTesselationTriangles(scme::TesselationModificationBasis::MODIFIED_POLYS);
+			}
+
+			if (application.shading_normal == GPU_ShadingNormal::VERTEX &&
+				sculpt_mesh.dirty_vertex_normals)
+			{
+				sculpt_mesh.uploadVertexNormals();
+			}
 
 			if (sculpt_mesh.modified_verts.size() > 0) {
-
-				if (gpu_verts.buff == nullptr) {
-					gpu_verts.dev = this->dev5;
-					gpu_verts.ctx3 = this->im_ctx3;
-					gpu_verts.init_desc = {};
-					gpu_verts.init_desc.Usage = D3D11_USAGE_DEFAULT;
-					gpu_verts.init_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-				}
-
-				gpu_verts.resize(sculpt_mesh.verts.capacity() + 1);
 
 				for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
 
@@ -384,30 +249,17 @@ void MeshRenderer::loadVertices()
 						// when running multiple sculpt mesh operations
 						if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
 
-							scme::Vertex& cpu_v = sculpt_mesh.verts[modified_v.idx];
-
-							GPU_MeshVertex gpu_v;
-							gpu_v.pos = dxConvert(cpu_v.pos);
-							gpu_v.normal = dxConvert(cpu_v.normal);
-
-							gpu_verts.update(modified_v.idx + 1, gpu_v);
+							sculpt_mesh.moveVertexInAABBs(modified_v.idx);
+							//sculpt_mesh.calcVertexNormal(modified_v.idx);
 						}
-						break;
-					}
-
-					case scme::ModifiedVertexState::DELETED: {
-						GPU_MeshVertex gpu_v;
-						gpu_v.normal.x = 999'999.f;
-
-						gpu_verts.update(modified_v.idx + 1, gpu_v);
 						break;
 					}
 					}
 				}
-
-				// Clear
-				sculpt_mesh.modified_verts.clear();
 			}
+
+			sculpt_mesh.modified_verts.clear();
+			sculpt_mesh.modified_polys.clear();
 		}
 
 		// Instances
@@ -457,14 +309,14 @@ void MeshRenderer::loadVertices()
 								gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
 								gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
 
-								gpu_instances.update(modified_instance.idx, gpu_inst);
+								gpu_instances.upload(modified_instance.idx, gpu_inst);
 							}
 							break;
 						}
 
 						case ModifiedInstanceType::DELETED: {
 							gpu_inst.rot.w = 2.f;
-							gpu_instances.update(modified_instance.idx, gpu_inst);
+							gpu_instances.upload(modified_instance.idx, gpu_inst);
 							break;
 						}
 						}
@@ -480,7 +332,7 @@ void MeshRenderer::loadVertices()
 					desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
 					desc.Buffer.ElementOffset = 0;
 					desc.Buffer.ElementWidth = sizeof(GPU_MeshInstance);
-					desc.Buffer.NumElements = set.gpu_instances.size();
+					desc.Buffer.NumElements = set.gpu_instances.capacity();
 
 					throwDX11(dev5->CreateShaderResourceView(
 						set.gpu_instances.get(), &desc, set.gpu_instances_srv.GetAddressOf()));
@@ -513,7 +365,7 @@ void MeshRenderer::loadUniform()
 		normal = glm::normalize(normal);
 
 		GPU_CameraLight& gpu_light = uniform.lights[i];
-		gpu_light.normal = dxConvert(light.normal);  // change back to relative
+		gpu_light.normal = dxConvert(normal);
 		gpu_light.color = dxConvert(light.color);
 		gpu_light.intensity = light.intensity;
 		
@@ -540,6 +392,14 @@ void MeshRenderer::setWireframeDepthBias(int32_t depth_bias)
 
 void MeshRenderer::getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_world_pos)
 {
+	// try to use previous results
+	for (auto& cache : _cached_pixel_world_pos) {
+		if (cache.x == x && cache.y == y) {
+			r_world_pos = cache.world_pos;
+			return;
+		}
+	}
+
 	D3D11_BOX box = {};
 	box.top = y;
 	box.bottom = box.top + 1;
@@ -559,6 +419,11 @@ void MeshRenderer::getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_worl
 	
 	// copy only RGB and ignore A
 	std::memcpy(&r_world_pos, rgba.data(), sizeof(uint32_t) * 3);
+
+	CachedPixelWorldPosition& new_cache = _cached_pixel_world_pos.emplace_back();
+	new_cache.x = x;
+	new_cache.y = y;
+	new_cache.world_pos = r_world_pos;
 }
 
 void MeshRenderer::draw(nui::SurfaceEvent& event)
@@ -573,8 +438,6 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 
 		render_target_width = 0;
 		render_target_height = 0;
-		
-		load_uniform = true;
 
 		// Scene Depth Resource
 		{
@@ -700,6 +563,11 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 			world_pos_cputex.create(dev5, im_ctx3, desc);
 		}
 
+		// Staging Buffer
+		{
+			staging_buff.create(dev5, im_ctx3);
+		}
+
 		// Frame Buffer
 		{
 			D3D11_BUFFER_DESC desc = {};
@@ -712,37 +580,10 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 			frame_ubuff.create(dev5, im_ctx3, desc);
 		}
 
-		// Octree Vertex Buffer
-		/*{
-			D3D11_BUFFER_DESC desc = {};
-			desc.Usage = D3D11_USAGE_DYNAMIC;
-			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-			desc.MiscFlags = 0;
-			desc.StructureByteStride = 0;
-
-			octree_vbuff.create(dev5, im_ctx3, desc);
-		}*/
-
 		// PBR Mesh Vertex Shader
 		{
 			dx11::createVertexShaderFromPath("Sculpt/CompiledShaders/MeshVS.cso", dev5,
 				mesh_vs.GetAddressOf(), &shader_cso);
-
-			// Vertex Input Layout
-			auto vertex_elems = GPU_MeshVertex::getInputLayout();
-
-			std::vector<D3D11_INPUT_ELEMENT_DESC> nodes;
-			nodes.resize(vertex_elems.size());
-
-			uint32_t idx = 0;
-			for (D3D11_INPUT_ELEMENT_DESC& elem : vertex_elems) {
-				nodes[idx++] = elem;
-			}
-
-			throwDX11(dev5->CreateInputLayout(nodes.data(), nodes.size(),
-				shader_cso.data(), shader_cso.size(), mesh_il.GetAddressOf()),
-				"failed to create mesh vertex input layout");
 		}
 
 		// Mesh Geometry Shader
@@ -862,6 +703,83 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 			throwDX11(dev5->CreateDepthStencilState(&desc, depth_stencil.GetAddressOf()),
 				"failed to create mesh depth stencil state");
 		}
+
+		// Compute Shaders
+		{
+			dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/DistributeAABB_VertsCS.cso", dev5,
+				distribute_AABB_verts_cs.GetAddressOf(), &shader_cso);
+
+			dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexPositionsCS.cso", dev5,
+				update_vertex_positions_cs.GetAddressOf(), &shader_cso);
+
+			dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexNormalsCS.cso", dev5,
+				update_vertex_normals_cs.GetAddressOf(), &shader_cso);
+
+			dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateTesselationTriangles.cso", dev5,
+				update_tesselation_triangles.GetAddressOf(), &shader_cso);
+		}
+
+		// Mesh Compute Data Constant Buffer
+		{
+			mesh_aabb_graph.create(dev5, im_ctx3, D3D11_USAGE_DYNAMIC, D3D10_CPU_ACCESS_WRITE);
+			mesh_aabb_graph.addUint();
+			mesh_aabb_graph.addUint();
+		}
+
+		// Vertex AABB placements
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_unplaced_verts.create(dev5, im_ctx3, desc);
+
+			//
+			desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_placed_verts.create(dev5, im_ctx3, desc);
+		}
+
+		// Vertex Position Update Buffer
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_vert_pos_updates.create(dev5, im_ctx3, desc);
+		}
+
+		// Vertex Normal Update Buffer
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_vert_normal_updates.create(dev5, im_ctx3, desc);
+		}
+
+		// Poly Normal Update Buffers
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_poly_normal_updates.create(dev5, im_ctx3, desc);
+
+			desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			gpu_r_poly_normal_updates.create(dev5, im_ctx3, desc);
+		}
 	}
 
 	loadVertices();
@@ -882,6 +800,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 	}
 
 	// Rendering Commands ///////////////////////////////////////////////////////////////////////////////////
+	im_ctx3->ClearState();
 
 	im_ctx3->ClearDepthStencilView(scene_dtex.getDSV(), D3D11_CLEAR_DEPTH, 1, 0);
 	{
@@ -897,13 +816,15 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 	}
 
 	// Input Assembly
-	{
-		im_ctx3->IASetInputLayout(mesh_il.Get());
-		im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	}
+	im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// Vertex Shader
-	im_ctx3->VSSetConstantBuffers(0, 1, frame_ubuff.buff.GetAddressOf());
+	{
+		std::array<ID3D11Buffer*, 1> buffers = {
+			frame_ubuff.buff.Get()
+		};
+		im_ctx3->VSSetConstantBuffers(0, buffers.size(), buffers.data());
+	}
 
 	// Rasterizer Viewport
 	{
@@ -940,24 +861,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		scme::SculptMesh& sculpt_mesh = mesh.mesh;
 
 		// Input Assembly (mesh is the same for all instances)
-		{
-			std::array<ID3D11Buffer*, 1> buffs = {
-				sculpt_mesh.gpu_verts.get()
-			};
-
-			std::array<uint32_t, 1> strides = {
-				sizeof(GPU_MeshVertex)
-			};
-
-			std::array<uint32_t, 2> offsets = {
-				0
-			};
-
-			im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(),
-				strides.data(), offsets.data());
-
-			im_ctx3->IASetIndexBuffer(sculpt_mesh.gpu_indexes.get(), DXGI_FORMAT_R32_UINT, 0);
-		}
+		im_ctx3->IASetIndexBuffer(sculpt_mesh.gpu_indexes.get(), DXGI_FORMAT_R32_UINT, 0);
 
 		for (MeshInstanceSet& set : mesh.sets) {
 			
@@ -982,7 +886,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 
 				// Vertex Shader
 				{
-					std::array<ID3D11ShaderResourceView*, 1> srvs = {
+					std::array<ID3D11ShaderResourceView*, 2> srvs = {
+						sculpt_mesh.gpu_verts.getSRV(),
 						set.gpu_instances_srv.Get()
 					};
 					im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
@@ -1001,7 +906,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 				// Pixel Shader
 				{
 					std::array<ID3D11ShaderResourceView*, 2> srvs = {
-						sculpt_mesh.gpu_triangles_srv.Get(), set.gpu_instances_srv.Get()
+						sculpt_mesh.gpu_triangles.getSRV(),
+						set.gpu_instances_srv.Get()
 					};
 					im_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());
 
@@ -1021,7 +927,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
 
-				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.size(), set.gpu_instances.size(),
+				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.capacity(), set.gpu_instances.capacity(),
 					0, 0, 0);
 			};
 
@@ -1047,7 +953,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 				// Geometry Shader
 				{
 					std::array<ID3D11ShaderResourceView*, 1> srvs = {
-						sculpt_mesh.gpu_triangles_srv.Get()
+						sculpt_mesh.gpu_triangles.getSRV(),
 					};
 					im_ctx3->GSSetShaderResources(0, srvs.size(), srvs.data());
 
@@ -1085,7 +991,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
 
-				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.size(), set.gpu_instances.size(),
+				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.capacity(), set.gpu_instances.capacity(),
 					0, 0, 0);
 				break;
 			}
@@ -1094,7 +1000,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
  
 				// Vertex Shader
 				{
-					std::array<ID3D11ShaderResourceView*, 1> srvs = {
+					std::array<ID3D11ShaderResourceView*, 2> srvs = {
+						sculpt_mesh.gpu_verts.getSRV(),
 						set.gpu_instances_srv.Get()
 					};
 					im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
@@ -1122,39 +1029,20 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());  // scene_dtex.getDSV()
 				}
 
-				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.size(), set.gpu_instances.size(),
+				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.capacity(), set.gpu_instances.capacity(),
 					0, 0, 0);
 
 				break;
 			}
 			}
 
-			// Render AABBs
+			// Render AABBs 
 			if (mesh.aabb_render_mode != AABB_RenderMode::NO_RENDER) {
-
-				// Input Assembly
-				{
-					std::array<ID3D11Buffer*, 1> buffs = {
-						sculpt_mesh.aabb_vbuff.get()
-					};
-
-					std::array<uint32_t, 1> strides = {
-						sizeof(GPU_MeshVertex)
-					};
-
-					std::array<uint32_t, 2> offsets = {
-						0
-					};
-
-					im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(),
-						strides.data(), offsets.data());
-
-					// Index buffer unused
-				}
 
 				// Vertex Shader
 				{
-					std::array<ID3D11ShaderResourceView*, 1> srvs = {
+					std::array<ID3D11ShaderResourceView*, 2> srvs = {
+						sculpt_mesh.gpu_aabb_verts.getSRV(),
 						set.gpu_instances_srv.Get()
 					};
 					im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
@@ -1188,7 +1076,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
 
-				im_ctx3->DrawInstanced(sculpt_mesh.gpu_aabb_verts.size(), set.gpu_instances.size(),
+				im_ctx3->DrawInstanced(sculpt_mesh.aabb_verts.size(), set.gpu_instances.capacity(),
 					0, 0);
 			}
 		}
@@ -1202,24 +1090,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		scme::SculptMesh& sculpt_mesh = mesh.mesh;
 
 		// Input Assembly (mesh is the same for all instances)
-		{
-			std::array<ID3D11Buffer*, 1> buffs = {
-				sculpt_mesh.gpu_verts.get()
-			};
-
-			std::array<uint32_t, 1> strides = {
-				sizeof(GPU_MeshVertex)
-			};
-
-			std::array<uint32_t, 2> offsets = {
-				0
-			};
-
-			im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(),
-				strides.data(), offsets.data());
-
-			im_ctx3->IASetIndexBuffer(sculpt_mesh.gpu_indexes.get(), DXGI_FORMAT_R32_UINT, 0);
-		}
+		im_ctx3->IASetIndexBuffer(sculpt_mesh.gpu_indexes.get(), DXGI_FORMAT_R32_UINT, 0);
 
 		for (MeshInstanceSet& set : mesh.sets) {
 
@@ -1246,7 +1117,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 
 				// Vertex Shader
 				{
-					std::array<ID3D11ShaderResourceView*, 1> srvs = {
+					std::array<ID3D11ShaderResourceView*, 2> srvs = {
+						sculpt_mesh.gpu_verts.getSRV(),
 						set.gpu_instances_srv.Get()
 					};
 					im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
@@ -1257,7 +1129,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 				// Geometry Shader
 				{
 					std::array<ID3D11ShaderResourceView*, 1> srvs = {
-						sculpt_mesh.gpu_triangles_srv.Get()
+						sculpt_mesh.gpu_triangles.getSRV(),
 					};
 					im_ctx3->GSSetShaderResources(0, srvs.size(), srvs.data());
 
@@ -1295,16 +1167,19 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_dtex.getDSV());
 				}
 
-				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.size(), set.gpu_instances.size(),
+				im_ctx3->DrawIndexedInstanced(sculpt_mesh.gpu_indexes.capacity(), set.gpu_instances.capacity(),
 					0, 0, 0);
 				break;
 			}
 			}
 		}
 	}
+
+	// Clear previous cached pixel world position
+	_cached_pixel_world_pos.clear();
 }
 
 void geometryDraw(nui::Window*, nui::StoredElement*, nui::SurfaceEvent& event, void*)
 {
-	application.renderer.draw(event);
+	renderer.draw(event);
 }

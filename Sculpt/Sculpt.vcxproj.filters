@@ -56,6 +56,9 @@
     <Filter Include="Source Files\Shaders\AABBs">
       <UniqueIdentifier>{dadc4d94-3243-47f2-bfaa-fb8643ebf1c4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\Compute">
+      <UniqueIdentifier>{f209ca96-9259-4c3f-ba3e-d3ba0a4f09b9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -99,6 +102,15 @@
     </ClCompile>
     <ClCompile Include="RenderDocIntegration.cpp">
       <Filter>Source Files\Tooling</Filter>
+    </ClCompile>
+    <ClCompile Include="AABBs.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshUpdates.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="MeshDebug.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -160,6 +172,18 @@
     </FxCompile>
     <FxCompile Include="AABB_PS.hlsl">
       <Filter>Source Files\Shaders\AABBs</Filter>
+    </FxCompile>
+    <FxCompile Include="DistributeAABB_VertsCS.hlsl">
+      <Filter>Source Files\Shaders\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="UpdateVertexPositionsCS.hlsl">
+      <Filter>Source Files\Shaders\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="UpdateTesselationTriangles.hlsl">
+      <Filter>Source Files\Shaders\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="UpdateVertexNormalsCS.hlsl">
+      <Filter>Source Files\Shaders\Compute</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

@@ -11,6 +11,7 @@
 #include <list>
 #include <map>
 #include <unordered_set>
+#include <optional>
 
 // GLM
 #include <glm\vec4.hpp>
@@ -71,18 +72,20 @@ namespace nui {
 	struct Root;
 	struct Text;
 	struct RelativeWrap;
-	class Grid;
+	class Flex;
 	struct MenuItem;
 	class Menu;
+	struct UpdateChange;
 
 	// Typedefs
-	typedef std::variant<Root, Text, RelativeWrap, Grid, Menu> StoredElement;
+	typedef std::variant<Root, Text, RelativeWrap, Flex, Menu> StoredElement;
 
 
 	// Events Component /////////////////////////////////////////////////////////////////
 	typedef void (*EventCallback)(Window* window, StoredElement* source, void* user_data);
 	typedef void (*WindowCallback)(Window* window, void* user_data);
 
+	// is the mouse inside or outside
 	enum class MouseEventState {
 		OUTSIDE,
 		INSIDE
@@ -109,6 +112,7 @@ namespace nui {
 		void* user_data;
 	};
 
+	// Complex event handling component
 	class EventsComponent {
 	public:
 		// Internal
@@ -118,7 +122,7 @@ namespace nui {
 
 		EventCallback _onMouseEnter;
 		void* _mouse_enter_user_data;
-		SteadyTime _mouse_enter_time;
+		SteadyTime _mouse_enter_time;  // when did the mouse entered, used to calculated hover duration
 
 		EventCallback _onMouseHover;
 		void* _mouse_hover_user_data;
@@ -142,9 +146,16 @@ namespace nui {
 
 		std::vector<Shortcut1KeyCallback> _key_ups;
 
+	public:
 		void _init(Window* window);
 
+		// emit events where the mouse is inside the element
+		// note that it's not this class responsability to perform collision detection with the mouse
+		// it is assumend to be already decided
 		void _emitInsideEvents(StoredElement* self);
+
+		// emit events where the mouse is outside the element
+		// for now only leave event fits this case
 		void _emitOutsideEvents(StoredElement* self);
 
 	public:
@@ -154,20 +165,32 @@ namespace nui {
 		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseLeaveEvent(EventCallback callback, void* user_data = nullptr);
 
+		// call function ONCE when all specified keys are down in order
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
 		void setKeysDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
 
+		// call function EVERY FRAME when all specified keys are down in order
 		void setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, void* user_data = nullptr);
 		void setKeysHeldDownEvent(EventCallback callback, uint32_t key_0, uint32_t key_1, uint32_t key_2, void* user_data = nullptr);
 
+		// call function once when key transitiones from down to up
 		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+
+
+		// Special Effects
 
 		// Loops the mouse around the element
 		void beginMouseLoopDeltaEffect(Element* elem);
+
+		// hides the mouse and on end restore mouse position to original position
 		void beginMouseFixedDeltaEffect(Element* elem);
 
+
+		// Other
+
+		// get how long is the mouse inside component in milliseconds
 		float getInsideDuration();
 	};
 
@@ -183,72 +206,125 @@ namespace nui {
 		enum {
 			ROOT,
 			TEXT,
-			RELATIVE_WRAP,
-			GRID,
+			RELATIVE,
+			FLEX,
 			MENU
 		};
 	}
 
-	struct ResourceIndexes {
-		uint32_t char_vertex_idx;
-		uint32_t char_index_idx;
-		uint32_t text_inst_idx;
+	namespace ChangedElementType {
+		enum {
+			FLEX,
+			MENU
+		};
+	}
 
-		uint32_t rect_vertex_idx;
-		uint32_t rect_index_idx;
+	struct ChangedElement {
+		std::optional<uint32_t> z_index;
+		std::optional<std::array<ElementSize, 2>> size;
 	};
 
+
+	// Base element class used by all elements
 	class Element {
 	public:
-		Window* _window;
+		Window* _window;  // pointer to parent window some little things
 
-		Element* _parent;
-		StoredElement* _self;
+		Element* _parent;  // parent element that may determine layout or size
+
+		// reference to self from the children if the parent used only for deletion
+		std::list<Element*>::iterator _self_children;
+
+		// reference to self as a specific element from window elements
+		std::list<StoredElement>::iterator _self_elements;
+
+		// children that this element contains
 		std::list<Element*> _children;
 
+		// the origin of the element expresed as 0% to 100% from computed size
+		// used to center the element in relative layout, work the same as the origin of a mesh in a 3D app
 		std::array<float, 2> origin;
-		std::array<ElementPosition, 2> relative_position;  // also works under Window/Root
-		std::array<int32_t, 2> _position;  // calculated position
 
-		uint32_t z_index;  // z_index is not inherited
+		// the position relative to parent expresed in relative or absolute units
+		// also works under Window/Root
+		std::array<ElementPosition, 2> relative_position;
+
+		// the computed position to be sent to the GPU
+		std::array<int32_t, 2> _position;
+
+		// 
+		float flex_grow;
+
+		// the order in which to render the element and it's descendants
+		// is 0 by default meaning inherit from parent
+		uint32_t z_index;
+
+		// the computed Z index that controls in which draw stack will this element be assigned
 		uint32_t _z_index;
 
+		// absolute size in pixels
+		// relative size as 0% to 100% of parent computed size
+		// fit size is based on the size of children
 		std::array<ElementSize, 2> size;
-		std::array<uint32_t, 2> _size;  // calculated size
+
+		// the computed size used in layout calculation
+		std::array<uint32_t, 2> _size;
+
+		UpdateChange* _update;
 
 	public:
 		void _init();
 
+		void _ensureHasChange();
+
+		ChangedElement& _ensureChangedElement();
+
+
+		// Update
+
+		void setZ_Index(uint32_t new_z_index);
+		
+		void setSize(ElementSize x, ElementSize y);
+
+		void getSize(ElementSize& r_x, ElementSize& r_y);
+
+
+		// Virtuals in order of usage
+
 		// eg. width = 50% of parent or width = 100px
+		// only called in one location
 		void _calcSizeRelativeToParent();
 
-		// takes a list of next chilldren and appends it's own children if any
-		virtual void _emitEvents(bool& allow_inside_events);
+		// element may implement this in order process events
+		virtual void _emitEvents(bool& r_allow_inside_events);
 
-		// calculate size if size requires computation
+		// element may implement this if size requires computation
 		// Example:
 		// if element size[0] = Fit then size of the element depends on calculating the size of children
 		// if element size cannot be determined ahead of time as in the case of the Menu element
-		virtual void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents);
+		virtual void _calcSizeAndRelativeChildPositions();
 
+		// element may use this to generate data to be loaded on the GPU
 		virtual void _generateGPU_Data();
 
+		// implemented to load data to the GPU and draw
 		virtual void _draw();
 	};
-
 
 	Element* getElementBase(StoredElement* elem);
 
 
+	// having a mostly unused root element is helpfull for symentric graph traversal
 	struct Root : Element {
 		EventsComponent _events;
 
 		void _emitEvents(bool& allow_inside_events) override;
 
-		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+		void _calcSizeAndRelativeChildPositions() override;
 	};
 
 
+	// TODO: reimplement
 	struct Text : Element {
 		std::string text;  // TODO: unicode
 		std::string font_family;
@@ -307,47 +383,60 @@ namespace nui {
 		// Element does not have any properties, but children do
 
 	public:
-		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+		void _calcSizeAndRelativeChildPositions() override;
 	};
 
 
-	// Grid ///////////////////////////////////////////////////////////////////////////////
+	// Flex ///////////////////////////////////////////////////////////////////////////////
 
-	enum class GridOrientation {
-		ROW,
-		COLUMN
-	};
-
-	enum class GridSpacing {
-		START,
-		CENTER,
-		END,
-		SPACE_BETWEEN,
-	};
-
-	enum class GridSelfAlign {
-		START,
-		CENTER,
-		END,
-	};
-
-	class Grid : public BackgroundElement {
+	class Flex : public BackgroundElement {
 	public:
-		GridOrientation orientation;
-		GridSpacing items_spacing;
-		GridSpacing lines_spacing;
+		enum class Orientation {
+			ROW,
+			COLUMN
+		};
+
+		enum class Spacing {
+			START,
+			CENTER,
+			END,
+			SPACE_BETWEEN,
+		};
+
+		// TODO: not implmented
+		enum class SelfAlign {
+			START,
+			CENTER,
+			END,
+		};
+
+		Orientation orientation;
+		Spacing items_spacing;
+		Spacing lines_spacing;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
-		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+		struct Change {
+			std::optional<Flex::Orientation> orientation;
+		};
+		Change& ensureChangedFlex();
 
+		// Updates
+		Orientation getOrientation();
+		void setOrientation(Orientation new_orientation);
+
+		// Events
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void setKeyHeldDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void setKeyUpEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
+
+		void setMouseMoveEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
 
 		void beginMouseLoopDeltaEffect();
 		void beginMouseFixedDeltaEffect();
+
+		void _emitEvents(bool& allow_inside_events) override;
+		void _calcSizeAndRelativeChildPositions() override;
 	};
 
 
@@ -372,8 +461,10 @@ namespace nui {
 	// it is a child entry of a menu
 	// and a parent title of a sub menu
 	struct MenuItem {
-		MenuItem* _parent;
-		std::list<MenuItem*> _children;
+		Menu* menu;
+
+		MenuItem* parent;
+		std::list<MenuItem*> children;
 
 		// Label
 		std::string text;
@@ -395,7 +486,22 @@ namespace nui {
 		Color menu_background_color;
 
 		Box2D _menu_box;
+
+	public:
+		void setItemText(std::string text);
+
+		void setItemCallback(EventCallback callback);
+
+		MenuItem* addItem(MenuStyle& style);
 	};
+
+	namespace MenuItemChangeType {
+		enum {
+			ADD,
+			UPDATE,
+			REMOVE
+		};
+	}
 
 	class Menu : public Element {
 	public:
@@ -416,16 +522,52 @@ namespace nui {
 	public:
 		void _init();
 
+		struct Change {
+
+			struct AddItem {
+				MenuItem* parent;
+				MenuItem* item;  // where was the element added
+			};
+
+			struct UpdateItem {
+				MenuItem* item;
+
+				std::optional<std::string> text;
+				std::optional<EventCallback> callback;
+			};
+			std::vector<std::variant<AddItem, UpdateItem>> item_changes;
+
+			std::optional<Color> titles_background_color;
+			std::optional<Color> select_background_color;
+		};
+
+		Change& _ensureChangedMenu();
+
+		Change::UpdateItem& _addItemUpdatedChange(MenuItem* item);
+
+		MenuItem* _addItem(MenuItem* parent, MenuStyle& style);
+
+
+		// Updates
+
+		void setTitleBackColor(Color new_color);
+
+		void setSelectBackColor(Color new_color);
+
+		MenuItem* addTitle(MenuStyle& style);
+
+
+		// Virtuals
 		void _emitEvents(bool& allow_inside_events) override;
 
-		void _calcSizeAndRelativeChildPositions(std::unordered_set<Element*>& r_next_parents) override;
+		void _calcSizeAndRelativeChildPositions() override;
 
 		void _generateGPU_Data() override;
 
 		void _draw() override;
-
-		MenuItem* addItem(MenuItem* parent, MenuStyle& style);
 	};
+
+	//////////////////////////////////////////////////////////////////////////////
 
 
 	struct WindowMessages {
@@ -433,13 +575,40 @@ namespace nui {
 		bool is_minimized;
 	};
 
+	namespace ElementGraphChangeType {
+		enum {
+			ADD,
+			UPDATE,  // update element fields
+			REMOVE  // remove element
+		};
+	}
+
+	// added elements just get added to the elements list directly and only need to be linked
+	struct AddChange {
+		Element* parent;
+		Element* elem;
+	};
+
+	struct UpdateChange {
+		StoredElement* dest;  // who to update
+
+		// what to update
+		ChangedElement source_elem;
+		std::variant<Flex::Change, Menu::Change> source;
+	};
+
+	// where to delete
+	struct DeleteChange {
+		std::list<StoredElement>::iterator target;
+	};
+
 
 	class Window {
 	public:
-		Instance* instance;
+		Instance* instance;  // parent instance to which this window belongs
 
-		WNDCLASSA window_class;
-		HWND hwnd;
+		WNDCLASSA window_class;  // Win32 Window class used on creation
+		HWND hwnd;  // handle to the window
 
 		// Input data updated by WinProc
 		Input input;
@@ -453,8 +622,12 @@ namespace nui {
 		WindowMessages win_messages;
 
 		// Elements
-		std::list<StoredElement> elements;
+		std::list<StoredElement> elements;  // where all the elements in the graph are stored
+		
+		std::vector<std::variant<AddChange, UpdateChange, DeleteChange>> changes;  // scheduled changes to be aplied to elements
 
+		// the order in which to draw the elements on screen
+		// also used for occlusion in emiting events
 		std::map<uint32_t, std::list<Element*>> draw_stacks;
 
 		// Mouse Delta Handling
@@ -462,9 +635,11 @@ namespace nui {
 			LOOP,
 			HIDDEN
 		};
-		DeltaEffectType delta_effect;
+		DeltaEffectType delta_effect;  // type of delta effect to apply, only one delta effect can be present
 		
-		Element* delta_owner_elem;
+		Element* delta_owner_elem;  // who owns the delta efect
+
+		// initial mouse coordinates at the start of the delta effect (only for HIDDEN)
 		uint32_t begin_mouse_x;
 		uint32_t begin_mouse_y;
 
@@ -491,15 +666,29 @@ namespace nui {
 	public:
 		Text* createText(Element* parent = nullptr);
 		RelativeWrap* createRelativeWrap(Element* parent = nullptr);
-		Grid* createGrid(Element* parent = nullptr);
+		Flex* createGrid(Element* parent = nullptr);
 		Menu* createMenu(Element* parent = nullptr);
 
+		// deletes an element from graph and leaves it detached
+		void deleteElement(Element* elem);
+
+		// delete all elements (does not delete root)
+		void deleteAllElements();
+
 		// Events
-		void setFinalEvent(WindowCallback callback, void* user_data = nullptr);
+
+		// event to be executed before all element events are executed 
+		// void setStartEvent(WindowCallback callback, void* user_data = nullptr);
+
+		// event to be executed after all element events are executed
+		void setEndEvent(WindowCallback callback, void* user_data = nullptr);
+
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
 		void endMouseDeltaEffect();
 
 		// Window
+
+		// get rect of the actual rendered surface excludes border shadows and top bar
 		RECT getClientRectangle();
 
 		// Mouse
