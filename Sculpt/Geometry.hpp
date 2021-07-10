@@ -11,6 +11,13 @@ public:
 	glm::vec<3, T, glm::defaultp> max;
 
 public:
+	void zero()
+	{
+		// TODO: memset zero
+		min = { 0, 0, 0 };
+		max = { 0, 0, 0 };
+	}
+
 	T sizeX()
 	{
 		return max.x - min.x;
@@ -26,6 +33,21 @@ public:
 		return max.z - min.z;
 	}
 
+	T midX()
+	{
+		return (T)((max.x + min.x) / 2.0f);
+	}
+
+	T midY()
+	{
+		return (T)((max.y + min.y) / 2.0);
+	}
+
+	T midZ()
+	{
+		return (T)((max.z + min.z) / 2.0f);
+	}
+
 	bool isPositionInside(glm::vec3& pos);
 	bool isRayIsect(glm::vec3& origin, glm::vec3& direction);
 
@@ -36,9 +58,9 @@ public:
 		AxisBoundingBox3D<T>& box_6, AxisBoundingBox3D<T>& box_7,
 		glm::vec3& mid)
 	{
-		mid.x = (max.x + min.x) / 2.0f;
-		mid.y = (max.y + min.y) / 2.0f;
-		mid.z = (max.z + min.z) / 2.0f;
+		mid.x = midX();
+		mid.y = midY();
+		mid.z = midZ();
 
 		//              +------------+------------+
 		//             /|           /|           /|

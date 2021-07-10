@@ -55,5 +55,15 @@ void Window::_render()
 		}
 	}
 
+#if _DEBUG
 	throwDX11(swapchain1->Present(0, 0));
+#else
+	// go fuck yourself DXGI, just ignore my presentation attempt if you can't handle it
+	// NOTE: never rely on presentation being correct or incorrect as the context of presenting and it's
+	// meaning can vary depending on Windows's behaviour
+	// Example:
+	// if you minimize the app via buttons or context menu it works
+	// if press the taskbar To Desktop button it crashes, apparently that was not a minimization
+	swapchain1->Present(0, 0);
+#endif
 }

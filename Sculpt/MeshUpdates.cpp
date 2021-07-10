@@ -390,7 +390,7 @@ void SculptMesh::uploadTesselationTriangles(TesselationModificationBasis based_o
 
 					update->tess_type[thread_idx] = poly->tesselation_type;
 
-					if (poly->tesselation_type) {
+					if (poly->tesselation_type == 0) {
 						update->tess_split_vertices[thread_idx][0] = verts_idxes[0];
 						update->tess_split_vertices[thread_idx][1] = verts_idxes[2];
 					}

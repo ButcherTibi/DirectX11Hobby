@@ -64,7 +64,7 @@ PixelIn main(uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID)
 	
 	// Discard instance, polygon or vertex
 	if (instance.inst_rot.w == 2.f || vertex_id == 0) {
-		output.pos.w = 0;
+		output.pos.xyz = float3( 0, 0, 0 );
 		return output;
 	}
 	

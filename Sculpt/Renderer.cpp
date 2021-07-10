@@ -49,9 +49,19 @@ void MeshRenderer::loadVertices()
 			}
 
 			auto& aabb_verts = sculpt_mesh.aabb_verts;
-			aabb_verts.resize(aabb_count * 36);
+			aabb_verts.resize(aabb_count * 36 + 3);
 
-			uint32_t vertex_idx = 0;
+			// AABB rendering uses the Vertex shader in which the 0 index is discarded
+			// with non-indexing drawing
+			{
+				auto& second = aabb_verts[1];
+				second.pos = { 0, 0, 0 };
+
+				auto& third = aabb_verts[2];
+				third.pos = { 0, 0, 0 };
+			}
+
+			uint32_t vertex_idx = 3;
 			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
 
 				switch (mesh.aabb_render_mode) {

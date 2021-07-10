@@ -250,6 +250,8 @@ namespace scme {
 
 		void _transferVertexToAABB(uint32_t vertex, uint32_t destination_aabb);
 
+		void _recreateAABBs();
+
 		void moveVertexInAABBs(uint32_t vertex);
 
 		void recreateAABBs(uint32_t max_vertices_in_AABB = 0);

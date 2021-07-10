@@ -191,13 +191,13 @@ namespace dx11 {
 
 		// upload entire vector from the start
 		// resizes the destination buffer to fit all data
-		void upload(std::vector<GPU_T>& src)
+		void upload(std::vector<GPU_T>& src, uint32_t start_idx = 0)
 		{
-			resizeDiscard(src.size());
+			resizeDiscard(start_idx + src.size());
 
 			D3D11_BOX dest_box = {};
-			dest_box.left = 0;
-			dest_box.right = sizeof(GPU_T) * src.size();
+			dest_box.left = sizeof(GPU_T) * start_idx;
+			dest_box.right = dest_box.left + sizeof(GPU_T) * src.size();
 			dest_box.top = 0;
 			dest_box.bottom = 1;
 			dest_box.front = 0;
