@@ -106,6 +106,7 @@ public:
 	void setWireframeDepthBias(int32_t depth_bias);
 
 	// performs a readback of one pixel for `world_pos_tex` texture
+	// if pixel is unused then r_world_pos.x == FLT_MAX
 	void getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_world_pos);
 	struct CachedPixelWorldPosition {
 		int32_t x;

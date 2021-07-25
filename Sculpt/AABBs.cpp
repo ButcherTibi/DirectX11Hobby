@@ -19,7 +19,7 @@ void SculptMesh::_transferVertexToAABB(uint32_t v, uint32_t dest_aabb)
 
 		VertexBoundingBox& source_aabb = aabbs[vertex->aabb];
 
-		source_aabb.verts_deleted_count -= 1;
+		source_aabb.verts_deleted_count += 1;
 		source_aabb.verts[vertex->idx_in_aabb] = 0xFFFF'FFFF;
 
 		// NOTE: the process of merging empty leafs or under ocupied leafs into parent AABB has been deliberatly omited
@@ -176,7 +176,7 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 							aabb->mid
 						);
 
-						bool found = false;
+						bool is_vertex_assigned = false;
 
 						for (i = 0; i < 8; i++) {
 
@@ -190,13 +190,13 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 							child_aabb.verts.reserve(max_vertices_in_AABB / 4);  // just a guess
 
 							// transfer the excess vertex to one of child AABBs
-							if (!found && child_aabb.aabb.isPositionInside(vertex.pos)) {
+							if (!is_vertex_assigned && child_aabb.aabb.isPositionInside(vertex.pos)) {
 								_transferVertexToAABB(vertex_idx, child_aabb_idx);
-								found = true;
+								is_vertex_assigned = true;
 							}
 						}
 
-						assert_cond(found == true, "vertex was not found in subdivided leaf");
+						assert_cond(is_vertex_assigned == true, "vertex was not found in subdivided leaf");
 
 						// transfer the rest of vertices of the parent to children
 						for (uint32_t aabb_vertex_idx : aabb->verts) {
@@ -208,6 +208,9 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 
 							Vertex& aabb_vertex = verts[aabb_vertex_idx];
 
+							is_vertex_assigned = false;
+
+							// normal way
 							for (i = 0; i < 8; i++) {
 
 								uint32_t child_aabb_idx = base_idx + i;
@@ -219,8 +222,36 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 									aabb_vertex.idx_in_aabb = child_aabb.verts.size();
 
 									child_aabb.verts.push_back(aabb_vertex_idx);
+									is_vertex_assigned = true;
 									break;
 								}
+							}
+
+							// above code failed to assign vertex to child AABB, due to float point inprecision
+							// happens when vertex is on the walls of the boxes
+							if (is_vertex_assigned == false) {
+
+								float closest_dist = FLT_MAX;
+								uint32_t closest_aabb_idx = 0xFFFF'FFFF;
+
+								for (i = 0; i < 8; i++) {
+
+									uint32_t child_aabb_idx = base_idx + i;
+									VertexBoundingBox& child_aabb = aabbs[child_aabb_idx];
+
+									float dist = glm::distance(aabb_vertex.pos, child_aabb.mid);
+
+									if (dist < closest_dist) {
+										closest_dist = dist;
+										closest_aabb_idx = child_aabb_idx;
+									}
+								}
+
+								VertexBoundingBox& child_aabb = aabbs[closest_aabb_idx];
+
+								aabb_vertex.aabb = closest_aabb_idx;
+								aabb_vertex.idx_in_aabb = child_aabb.verts.size();
+								child_aabb.verts.push_back(aabb_vertex_idx);
 							}
 						}
 
@@ -257,123 +288,112 @@ void SculptMesh::moveVertexInAABBs(uint32_t vertex_idx)
 	}
 
 	// At this point position is not found in the AABB graph
-
-	VertexBoundingBox& old_root = aabbs[root_aabb_idx];
-	float root_size = old_root.aabb.sizeX();
-
-	// would the position fit inside the graph if it would be enlarged by one level up
-	if (old_root.aabb.min.x - root_size < vertex.pos.x &&
-		vertex.pos.x < old_root.aabb.max.x + root_size &&
-		// Y
-		old_root.aabb.min.y - root_size < vertex.pos.y &&
-		vertex.pos.y < old_root.aabb.max.y + root_size &&
-		// Z
-		old_root.aabb.min.z - root_size < vertex.pos.z &&
-		vertex.pos.z < old_root.aabb.max.z + root_size)
-	{
-		// NOTE: taking this path is quicker but increases the graph traversal cost for all vertices by one level
-
-		uint32_t new_root_idx = aabbs.size();
-		VertexBoundingBox& new_root = aabbs.emplace_back();
-		new_root.parent = 0xFFFF'FFFF;
-		new_root.verts_deleted_count = 0;
-
-		/* create a new AABB that is twice as big and is positioned so that
-		  it contains the vertex
-
-		  2D ZX Top Down example:
-		  +---+---+    +---+---+    +---+---+    +---+---+
-		  | O |   |	   |   |   |    | O |   |    |   | O |
-		  +---+---+	   +---+---+    +---+---+    +---+---+
-		  |   |   |	   | O |   |    |   |   |    |   |   |
-		  +---+---+	   +---+---+    +---+---+    +---+---+
-
-		  O is the old root AABB
-		*/
-		old_root.parent = new_root_idx;
-		{
-			if (vertex.pos.y > old_root.aabb.max.y) {
-				new_root.aabb.min.y = old_root.aabb.min.y;
-				new_root.aabb.max.y = new_root.aabb.min.y + root_size;
-			}
-			else {
-				new_root.aabb.max.y = old_root.aabb.max.y;
-				new_root.aabb.min.y = new_root.aabb.max.y - root_size;
-			}
-
-			if (vertex.pos.z > old_root.aabb.max.z) {
-				new_root.aabb.min.z = old_root.aabb.min.z;
-				new_root.aabb.max.z = new_root.aabb.min.z + root_size;
-			}
-			else {
-				new_root.aabb.max.z = old_root.aabb.max.z;
-				new_root.aabb.min.z = new_root.aabb.max.z - root_size;;
-			}
-
-			if (vertex.pos.x > old_root.aabb.max.x) {
-				new_root.aabb.min.x = old_root.aabb.min.x;
-				new_root.aabb.max.x = new_root.aabb.min.x + root_size;
-			}
-			else {
-				new_root.aabb.max.x = old_root.aabb.max.x;
-				new_root.aabb.min.x = new_root.aabb.max.x - root_size;
-			}
-		}
-
-		AxisBoundingBox3D<> boxes[8];
-
-		new_root.aabb.subdivide(boxes[0], boxes[1], boxes[2], boxes[3],
-			boxes[4], boxes[5], boxes[6], boxes[7],
-			new_root.mid);
-
-		// it's cheaper to check for a bool than is position inside
-		bool aabb_placed = false;
-		bool vertex_placed = false;
-
-		// create and link children
-		for (uint32_t i = 0; i < 8; i++) {
-
-			uint32_t child_idx;
-
-			if (aabb_placed == false &&
-				boxes[i].isPositionInside(old_root.mid))
-			{
-				child_idx = root_aabb_idx;
-
-				aabb_placed = true;
-			}
-			else {
-				child_idx = aabbs.size();
-
-				VertexBoundingBox& child_aabb = aabbs.emplace_back();
-				child_aabb.parent = new_root_idx;
-				child_aabb.children[0] = 0xFFFF'FFFF;
-				child_aabb.aabb = boxes[i];
-				child_aabb.mid = { boxes->midX(), boxes->midY(), boxes->midZ() };
-				child_aabb.verts_deleted_count = 0;
-
-				if (vertex_placed == false &&
-					child_aabb.aabb.isPositionInside(vertex.pos))
-				{
-					child_aabb.verts.push_back(vertex_idx);
-
-					vertex.aabb = child_idx;
-					vertex.idx_in_aabb = 0;
-
-					vertex_placed = true;
-				}
-			}
-
-			new_root.children[i] = child_idx;
-		}
-
-		root_aabb_idx = new_root_idx;
-	}
-	// recreate the graph big enough to fit the vertex and a bit more
-	else {
-		_recreateAABBs();
-	}
+	_recreateAABBs();
 }
+
+// The code below was used to grow the AABB by one level in a direction based on a vertex
+// BAD IDEA
+// 
+//uint32_t new_root_idx = aabbs.size();
+//VertexBoundingBox* new_root = &aabbs.emplace_back();
+//old_root = &aabbs[root_aabb_idx];
+//
+//new_root->parent = 0xFFFF'FFFF;
+//new_root->verts_deleted_count = 0;
+//
+///* create a new AABB that is twice as big and is positioned so that
+//  it contains the vertex
+//
+//  2D ZX Top Down example:
+//  +---+---+    +---+---+    +---+---+    +---+---+
+//  | O |   |	   |   |   |    | O |   |    |   | O |
+//  +---+---+	   +---+---+    +---+---+    +---+---+
+//  |   |   |	   | O |   |    |   |   |    |   |   |
+//  +---+---+	   +---+---+    +---+---+    +---+---+
+//
+//  O is the old root AABB
+//*/
+//old_root->parent = new_root_idx;
+//{
+//	if (vertex.pos.y > old_root->aabb.max.y) {
+//		new_root->aabb.min.y = old_root->aabb.min.y;
+//		new_root->aabb.max.y = old_root->aabb.max.y + root_size;
+//	}
+//	else {
+//		new_root->aabb.min.y = old_root->aabb.min.y - root_size;
+//		new_root->aabb.max.y = old_root->aabb.max.y;
+//	}
+//
+//	if (vertex.pos.z > old_root->aabb.max.z) {
+//		new_root->aabb.min.z = old_root->aabb.min.z;
+//		new_root->aabb.max.z = old_root->aabb.max.z + root_size;
+//	}
+//	else {
+//		new_root->aabb.min.z = old_root->aabb.min.z - root_size;
+//		new_root->aabb.max.z = old_root->aabb.max.z;
+//	}
+//
+//	if (vertex.pos.x > old_root->aabb.max.x) {
+//		new_root->aabb.min.x = old_root->aabb.min.x;
+//		new_root->aabb.max.x = old_root->aabb.max.x + root_size;
+//	}
+//	else {
+//		new_root->aabb.min.x = old_root->aabb.min.x - root_size;
+//		new_root->aabb.max.x = old_root->aabb.max.x;
+//	}
+//}
+//
+//AxisBoundingBox3D<> boxes[8];
+//
+//new_root->aabb.subdivide(boxes[0], boxes[1], boxes[2], boxes[3],
+//	boxes[4], boxes[5], boxes[6], boxes[7],
+//	new_root->mid);
+//
+//// it's cheaper to check for a bool than is position inside
+//bool aabb_placed = false;
+//bool vertex_placed = false;
+//
+//// create and link children
+//for (uint32_t i = 0; i < 8; i++) {
+//
+//	uint32_t child_idx;
+//
+//	if (aabb_placed == false &&
+//		boxes[i].isPositionInside(old_root->mid))
+//	{
+//		child_idx = root_aabb_idx;
+//
+//		aabb_placed = true;
+//	}
+//	else {
+//		child_idx = aabbs.size();
+//
+//		VertexBoundingBox& child_aabb = aabbs.emplace_back();
+//		old_root = &aabbs[root_aabb_idx];
+//		new_root = &aabbs[new_root_idx];
+//
+//		child_aabb.parent = new_root_idx;
+//		child_aabb.children[0] = 0xFFFF'FFFF;
+//		child_aabb.aabb = boxes[i];
+//		child_aabb.mid = { boxes->midX(), boxes->midY(), boxes->midZ() };
+//		child_aabb.verts_deleted_count = 0;
+//
+//		if (vertex_placed == false &&
+//			child_aabb.aabb.isPositionInside(vertex.pos))
+//		{
+//			child_aabb.verts.push_back(vertex_idx);
+//
+//			vertex.aabb = child_idx;
+//			vertex.idx_in_aabb = 0;
+//
+//			vertex_placed = true;
+//		}
+//	}
+//
+//	new_root->children[i] = child_idx;
+//}
+//
+//root_aabb_idx = new_root_idx;
 
 void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 {
@@ -384,9 +404,4 @@ void SculptMesh::recreateAABBs(uint32_t new_max_vertices_in_AABB)
 	assert_cond(this->max_vertices_in_AABB > 0, "maximum number of vertices for AABB is not specified");
 
 	_recreateAABBs();
-}
-
-void SculptMesh::standardBrush(StandardBrushInfo&)
-{
-
 }

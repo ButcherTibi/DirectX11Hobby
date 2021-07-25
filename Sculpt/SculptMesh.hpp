@@ -41,6 +41,61 @@ using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
 	} while (edge_idx != start_edge_idx);
 
 
+// Brush Settings
+
+enum class BrushFalloffType {
+	BEZIER_SIMPLE,
+	// BEZIER
+};
+
+struct BrushFalloff {
+	BrushFalloffType type;
+
+	float spread;
+	float steepness;
+
+	//glm::vec2 handle_0;
+	//glm::vec2 handle_1;
+};
+
+struct BrushSpeedInfluence {
+	bool enable;
+
+	// speed = distance between positions / duration
+	float min_speed;
+	float max_speed;
+
+	// a percentage of value
+	float min_factor;
+	float max_factor;
+
+	float calcFactor(float speed);
+};
+
+template<typename T>
+struct BrushProperty {
+	bool local;  // should this property be local or influenced by global settings
+
+	T factor;  // local fine tuning of the global value
+	T local_value;  // local value
+
+	BrushSpeedInfluence speed_influence;
+
+	T _value;
+
+	void calcStrokeValue(T& global_value);
+	void calcStepValue(float speed);
+};
+
+
+struct BrushStep {
+	glm::vec3 target;  // ray target
+	// pressure
+
+	SteadyTime time;
+};
+
+
 namespace scme {
 
 	enum class ModifiedVertexState {
@@ -101,14 +156,6 @@ namespace scme {
 	};
 
 
-	struct VertexBoundingBox2 {
-		//AxisBoundingBox3D<> aabb;
-
-		//uint32_t verts_deleted_count;  // how many empty slots does this AABB have
-		std::vector<uint32_t> verts;  // indexes of contained vertices
-	};
-
-
 	/* Winged-edge data structure */
 	struct Edge {
 	public:
@@ -158,6 +205,7 @@ namespace scme {
 
 		uint32_t edges[4];
 
+		// NOTE TO SELF: wrong bit field syntax breaks MSVC hard
 		uint8_t tesselation_type : 1,  // split from 0 to 2 or from 1 to 3
 			is_tris : 1,  // is it a triangle or quad	
 			flip_edge_0 : 1,  // orientation of the edges for faster iteration of vertices around poly
@@ -166,22 +214,8 @@ namespace scme {
 			flip_edge_3 : 1,
 			: 2;
 
+
 		Poly() {};
-	};
-	// NOTE TO SELF: wrong bit field syntax breaks MSVC hard
-
-
-	struct StandardBrushInfo {
-		SteadyTime last_sample_time;
-
-		glm::vec3 last_pos;
-
-		glm::vec3 end_pos;
-		SteadyTime end_time;
-		
-		float diameter;
-		float focus;
-		float strength;
 	};
 
 
@@ -301,9 +335,7 @@ namespace scme {
 		// only called when updating poly gpu data
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
-		void calcPolyNormal(Poly* poly);
-
-		
+		void calcPolyNormal(Poly* poly);	
 
 		// creates a new triangle from existing vertices, creates new edges between the vertices 
 		// if they are not already present
@@ -337,13 +369,21 @@ namespace scme {
 
 		bool raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, uint32_t poly, glm::vec3& r_point);
 
-		// TODO: mark vertices that are processed to avoid duplicate runs and increse performance
-		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-			uint32_t& r_isect_poly, glm::vec3& r_isect_position);
+		// memory cache for traversals
 		std::vector<VertexBoundingBox*> _now_aabbs;
 		std::vector<VertexBoundingBox*> _next_aabbs;
 		std::vector<VertexBoundingBox*> _traced_aabbs;
+
+		// result is sorted and stored in _traced_aabbs
+		void _raytraceAABB(glm::vec3& ray_origin, glm::vec3& ray_direction);
+
+		// Version 2: stored the edge on traversal to reduce redundant traversals
+		bool raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
+			uint32_t& r_isect_poly, glm::vec3& r_isect_position);	
 		std::vector<uint32_t> _tested_edges;
+
+		// results are in _traced_aabbs
+		void sphereIsectAABBs(glm::vec3& origin, float radius);
 
 
 		// Creation //////////////////////////////////////////////////////////
@@ -365,7 +405,13 @@ namespace scme {
 		
 		// Sculpt /////////////////////////////////////////////////////////////
 
-		void standardBrush(StandardBrushInfo& info);
+		//
+		void applyStandardBrush(
+			glm::vec3& ray_origin,
+			BrushProperty<float>& radius,
+			BrushProperty<float>& strength,
+			BrushProperty<BrushFalloff>& falloff,
+			std::vector<BrushStep>& steps, uint32_t start_step);
 
 
 		// GPU Updates
@@ -373,9 +419,12 @@ namespace scme {
 		// schedule a vertex to have it's data updated on the GPU side
 		void markVertexFullUpdate(uint32_t vertex);
 
+		void markVertexMoved(uint32_t vertex);
+
 		// schedule a poly to have it's data updated on the GPU side
 		void markPolyFullUpdate(uint32_t poly);
 
+		// used changing the mesh shading mode
 		void markAllVerticesForNormalUpdate();
 
 		// upload vertex additions and removals to GPU

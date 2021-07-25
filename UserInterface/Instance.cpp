@@ -316,6 +316,11 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			case WM_MOUSEMOVE: {
 				w->input.mouse_x = getLowOrder((uint32_t)lParam);
 				w->input.mouse_y = getHighOrder((uint32_t)lParam);
+
+				auto& new_pos = w->input.mouse_pos_history.emplace_back();
+				new_pos.x = w->input.mouse_x;
+				new_pos.y = w->input.mouse_y;
+				new_pos.time = std::chrono::steady_clock::now();
 				return 0;
 			}
 
@@ -637,6 +642,8 @@ void Instance::update()
 		// Reset Input
 		Input& input = window.input;
 		{
+			input.mouse_pos_history.clear();
+
 			input.mouse_delta_x = 0;
 			input.mouse_delta_y = 0;
 			input.mouse_wheel_delta = 0;

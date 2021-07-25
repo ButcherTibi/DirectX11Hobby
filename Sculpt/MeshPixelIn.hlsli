@@ -151,3 +151,16 @@ float calcStripe(float gradient, float split_count, float gap_size)
 {
 	return floor(frac(gradient * split_count) + gap_size);
 }
+
+// Brush Circle //////////////////////////////////////////////////////////////////////////////////////
+
+struct GPU_BrushCircleVertex {
+	float2 pos;
+};
+
+struct GPU_BrushCircleInstance {
+	float3 pos;  // position of the brush
+	float3 normal;  // surface normal to angle the brush
+	float radius;
+	float4 color;
+};

@@ -49,7 +49,24 @@ public:
 	}
 
 	bool isPositionInside(glm::vec3& pos);
+
 	bool isRayIsect(glm::vec3& origin, glm::vec3& direction);
+
+	bool isSphereIsect(glm::vec3& origin, float radius)
+	{
+		// get box closest point to sphere center by clamping
+		float x = glm::max(min.x, glm::min(origin.x, max.x));
+		float y = glm::max(min.y, glm::min(origin.y, max.y));
+		float z = glm::max(min.z, glm::min(origin.z, max.z));
+
+		// this is the same as isPointInsideSphere
+		float distance = sqrt(
+			(x - origin.x) * (x - origin.x) +
+			(y - origin.y) * (y - origin.y) +
+			(z - origin.z) * (z - origin.z));
+
+		return distance < radius;
+	}
 
 	void subdivide(
 		AxisBoundingBox3D<T>& box_0, AxisBoundingBox3D<T>& box_1,

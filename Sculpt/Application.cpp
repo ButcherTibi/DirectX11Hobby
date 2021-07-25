@@ -15,6 +15,12 @@ scme::SculptMesh& MeshInstance::getSculptMesh()
 	return instance_set->parent_mesh->mesh;
 }
 
+void MeshInstance::localizePosition(glm::vec3& global_position)
+{
+	// TODO: account for rotation
+	global_position -= transform.pos;
+}
+
 void MeshInstance::markFullUpdate()
 {
 	ModifiedMeshInstance& modified_inst = instance_set->modified_instances.emplace_back();
@@ -90,8 +96,12 @@ void Application::navigateToChild(uint32_t interaction_mode)
 	throw std::exception("interaction mode not found in children");
 }
 
-void Application::resetScene()
+void Application::reset()
 {
+	while (now_interaction != InteractionModes::DEFAULT) {
+		navigateUp();
+	}
+
 	// Meshes
 	meshes.clear();
 
@@ -109,6 +119,42 @@ void Application::resetScene()
 	{
 		MeshLayer& root = layers.emplace_back();
 		root._parent = nullptr;
+	}
+
+	// Selection
+	instance_selection.clear();
+
+	// Sculpt Reset
+	{
+		sculpt.global_brush_radius = 1;
+		sculpt.global_brush_strength = 1;
+		sculpt.global_brush_falloff.type = BrushFalloffType::BEZIER_SIMPLE;
+		sculpt.global_brush_falloff.spread = 0.5f;
+		sculpt.global_brush_falloff.steepness = 0.5f;
+
+		sculpt.stroke_started = false;
+
+		// Standard Brush
+		{
+			auto& standard = sculpt.standard_brush;
+			standard.radius.local = false;
+			standard.radius.factor = 1;
+			standard.radius.local_value = 1;
+			standard.radius.speed_influence.enable = false;
+
+			standard.strength.local = false;
+			standard.strength.factor = 1;
+			standard.strength.local_value = 1;
+			standard.strength.speed_influence.enable = false;
+
+			standard.falloff.local = false;
+			standard.falloff.factor.type = BrushFalloffType::BEZIER_SIMPLE;
+			standard.falloff.factor.spread = 1;
+			standard.falloff.factor.steepness = 1;
+			standard.falloff.local_value.type = BrushFalloffType::BEZIER_SIMPLE;
+			standard.falloff.local_value.spread = 0.5;
+			standard.falloff.local_value.steepness = 0.5;
+		}
 	}
 
 	// Shading
@@ -593,6 +639,9 @@ ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_Importe
 			if (r_instances != nullptr) {
 				r_instances->push_back(new_ref);
 			}
+
+			// Add selection buffer
+			instance_selection.push_back(new_ref);
 		}
 	}
 
@@ -810,16 +859,9 @@ void Application::joinMeshes(std::vector<MeshInstanceRef>& sources, uint32_t des
 	dest_mesh.recreateAABBs(source_mesh.max_vertices_in_AABB);
 
 	source_mesh = dest_mesh;
-}
 
-bool Application::enterSculptMode()
-{
-	MeshInstance* inst = instance_selection.back().get();
-	sculpt_target = inst->instance_set->parent_mesh;
-
-	navigateToChild(InteractionModes::SCULPT);
-
-	return true;
+	// Add to selection buffer
+	instance_selection.push_back(sources[destination_idx]);
 }
 
 bool Application::mouseRaycastInstances(RaytraceInstancesResult& r_isect)
@@ -1020,7 +1062,7 @@ void Application::setCameraRotation(float x, float y, float z)
 
 void Application::resetToHardcodedStartup()
 {
-	resetScene();
+	reset();
 }
 
 void Application::setShadingNormal(uint32_t new_shading_normal)

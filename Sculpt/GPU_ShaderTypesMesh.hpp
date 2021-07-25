@@ -26,7 +26,7 @@ struct GPU_MeshVertex {
 	DirectX::XMFLOAT3 pos;
 	DirectX::XMFLOAT3 normal;
 
-	static auto getInputLayout()
+	/*static auto getInputLayout()
 	{
 		std::array<D3D11_INPUT_ELEMENT_DESC, 2> nodes;
 		nodes[0].SemanticName = "POSITION";
@@ -44,7 +44,7 @@ struct GPU_MeshVertex {
 		}
 
 		return nodes;
-	}
+	}*/
 };
 
 
@@ -122,6 +122,13 @@ struct GPU_MeshInstance {
 
 	//	return elems;
 	//}
+};
+
+struct GPU_BrushCircleInstance {
+	DirectX::XMFLOAT3 pos;  // position of the brush
+	DirectX::XMFLOAT3 normal;  // surface normal to angle the brush
+	float radius;
+	DirectX::XMFLOAT4 color;
 };
 
 

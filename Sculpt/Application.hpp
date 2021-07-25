@@ -11,10 +11,7 @@
 
 
 /* TODO:
-- select stuff
-  implement UI clear elements function to remove elements in the next frame
-  need some kind of context for input
-  need selection overlay FX
+- add brush circle
 - delete vertex
 - delete edge
 
@@ -150,6 +147,8 @@ struct MeshInstance {
 public:
 	scme::SculptMesh& getSculptMesh();
 
+	void localizePosition(glm::vec3& global_position);
+
 	// Scheduling methods
 	// Each of the below methods will schedule the renderer to load data on the GPU
 	// Avoid calling more than one method
@@ -218,7 +217,7 @@ namespace SelectionMode {
 
 namespace InteractionModes {
 	enum {
-		NOTHING,
+		BLANK_WINDOW,
 		DEFAULT,
 
 		INSTANCE_SELECTION,
@@ -306,8 +305,80 @@ struct RaytraceInstancesResult {
 	glm::vec3 global_isect;  // local position of intersection
 };
 
+
 struct UserInterface {
 	nui::Flex* viewport;
+};
+
+
+namespace Brushes {
+	enum {
+		STANDARD,
+		SMOOTH
+	};
+}
+
+struct StandardBrushSettings {
+	// the max number inputs to be applied
+	// usefull for high message amounts from device
+	// uint32_t max_points;
+
+	// the number of points to average position before
+	// applying one
+	// uint32_t average_count;
+
+	// TODO: drag behind dot elasticy
+
+	BrushProperty<float> radius;
+	BrushProperty<float> strength;
+	BrushProperty<BrushFalloff> falloff;  // only the local value is used
+
+	std::vector<BrushStep> steps;
+
+	// Secondary brush usully on SHIFT key
+	//uint32_t second_brush;
+};
+
+
+struct SmoothBrushSettings {
+
+};
+
+// smooth valleys
+// smooth peaks
+
+// carve (pinch + standard)
+// inflate
+// clay strips
+
+// sharpen
+// chamfer
+// bevel
+
+// attract
+// spread
+
+// move
+// move topology
+// snake
+// move contour
+
+
+struct SculptContext {
+	MeshInstanceRef target;
+
+	// size relative to viewport height
+	float global_brush_radius;
+
+	// strength as a fraction of the radius
+	float global_brush_strength;
+
+	// falloff
+	BrushFalloff global_brush_falloff;
+
+	bool stroke_started;
+
+	StandardBrushSettings standard_brush;
 };
 
 
@@ -336,9 +407,7 @@ public:
 	// current selection of instances
 	std::list<MeshInstanceRef> instance_selection;
 
-
-	// current mesh in sculpt mode
-	Mesh* sculpt_target;
+	SculptContext sculpt;
 
 	// Shading
 	uint32_t shading_normal;  // what normal to use when shading the mesh in the pixel shader
@@ -388,17 +457,21 @@ public:
 	};
 public:
 
+	// create the default UI and user interactions
+	void createUI();
+
+	// fully init the application (called when first rendering with the initialization of the renderer)
+	void init();
+
+	// reset the scene
+	void reset();
+
+
 	// Interaction
 	
 	void navigateUp();
 
 	void navigateToChild(uint32_t interaction_mode);
-
-
-	// Scene
-
-	// clear scene state and inits to default values
-	void resetScene();
 
 
 	// Instances
@@ -475,8 +548,6 @@ public:
 
 	// Sculpt Mode
 
-	bool enterSculptMode();
-
 
 	// Raycasts
 
@@ -530,5 +601,9 @@ public:
 };
 
 extern Application application;
+
+
+
+
 
 void endFrameEvents(nui::Window*, void*);

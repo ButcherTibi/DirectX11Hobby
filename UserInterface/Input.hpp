@@ -107,6 +107,7 @@ namespace nui {
 		};
 	}
 	
+
 	struct KeyState {
 		bool is_down;
 		SteadyTime start_time;
@@ -117,6 +118,14 @@ namespace nui {
 	public:
 		uint64_t getDuration_ms();
 	};
+
+
+	struct MousePosition {
+		uint16_t x;
+		uint16_t y;
+		SteadyTime time;
+	};
+
 
 	// Note to self:
 	// If hold down a key the keyboard will not send a key down event every frame, so to measure key down time
@@ -133,6 +142,7 @@ namespace nui {
 		// Local Mouse Position
 		uint16_t mouse_x;
 		uint16_t mouse_y;
+		std::vector<MousePosition> mouse_pos_history;
 
 		// Mouse Delta Unbuffered
 		// will contain the sum total of inputs within a frame

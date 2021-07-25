@@ -260,7 +260,6 @@ void MeshRenderer::loadVertices()
 						if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
 
 							sculpt_mesh.moveVertexInAABBs(modified_v.idx);
-							//sculpt_mesh.calcVertexNormal(modified_v.idx);
 						}
 						break;
 					}
@@ -790,6 +789,9 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 
 			gpu_r_poly_normal_updates.create(dev5, im_ctx3, desc);
 		}
+
+		// Fully init the application because we have device and immediate context
+		application.init();
 	}
 
 	loadVertices();

@@ -166,8 +166,7 @@ bool SculptMesh::raycastPoly(glm::vec3& ray_origin, glm::vec3& ray_direction, ui
 }
 #pragma warning(default : 4702)
 
-bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
-	uint32_t& r_isect_poly, glm::vec3& r_isect_position)
+void SculptMesh::_raytraceAABB(glm::vec3& ray_origin, glm::vec3& ray_direction)
 {
 	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
 	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
@@ -207,8 +206,73 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 		float dist_b = glm::distance(ray_origin, b->aabb.max);
 		return dist_a < dist_b;
 	});
+}
 
-	// Find the closest triangle in the closest AABB
+// print raycastPolys performance stats
+#define raycastPolys_enable_performance_stats 1
+
+// TODO: does not work properly
+bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
+	uint32_t& r_isect_poly, glm::vec3& r_isect_position)
+{
+#if raycastPolys_enable_performance_stats
+	SteadyTime start = std::chrono::steady_clock::now();
+	SteadyTime ray_aabb_isect_time;
+	SteadyTime ray_poly_isect_time;
+#endif
+
+	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
+	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
+	std::vector<VertexBoundingBox*>& traced_aabbs = _traced_aabbs;
+
+	now_aabbs.resize(1);
+	now_aabbs[0] = &aabbs[root_aabb_idx];
+
+	traced_aabbs.clear();
+
+	// gather AABBs that intersect with ray
+	while (now_aabbs.size()) {
+		next_aabbs.clear();
+
+		for (VertexBoundingBox* now_aabb : now_aabbs) {
+
+			if (now_aabb->aabb.isRayIsect(ray_origin, ray_direction)) {
+
+				if (now_aabb->isLeaf()) {
+					traced_aabbs.push_back(now_aabb);
+				}
+				else {
+					// Schedule next
+					for (uint32_t child_idx : now_aabb->children) {
+						next_aabbs.push_back(&aabbs[child_idx]);
+					}
+				}
+			}
+		}
+
+		now_aabbs.swap(next_aabbs);
+	}
+
+#if raycastPolys_enable_performance_stats
+	ray_aabb_isect_time = std::chrono::steady_clock::now();
+#endif
+
+	// Depth sort traced AABBs
+	std::sort(traced_aabbs.begin(), traced_aabbs.end(), [&](VertexBoundingBox* a, VertexBoundingBox* b) {
+		float dist_a = glm::distance(ray_origin, a->aabb.max);
+		float dist_b = glm::distance(ray_origin, b->aabb.max);
+		return dist_a < dist_b;
+	});
+
+	// mark all tested edges as untested for next function call
+	auto unmark_tested_edges = [&]() {
+
+		for (uint32_t edge_idx : _tested_edges) {
+			edges[edge_idx].was_raycast_tested = false;
+		}
+	};
+
+	// Find the closest poly in the closest AABB
 	for (VertexBoundingBox* aabb : traced_aabbs) {
 
 		_tested_edges.clear();
@@ -230,37 +294,40 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 					Edge* edge = &edges[edge_idx];
 
 					do {
-						if (edge->p0 !=  0xFFFF'FFFF) {
+						if (edge->was_raycast_tested == false) {
 
-							glm::vec3 isect_position;
-							if (raycastPoly(ray_origin, ray_direction, edge->p0, isect_position)) {
+							if (edge->p0 != 0xFFFF'FFFF) {
 
-								float dist = glm::distance(ray_origin, isect_position);
-								if (dist < closest_distance) {
-									closest_distance = dist;
-									closest_poly = edge->p0;
-									closest_isect_position = isect_position;
+								glm::vec3 isect_position;
+								if (raycastPoly(ray_origin, ray_direction, edge->p0, isect_position)) {
+
+									float dist = glm::distance(ray_origin, isect_position);
+									if (dist < closest_distance) {
+										closest_distance = dist;
+										closest_poly = edge->p0;
+										closest_isect_position = isect_position;
+									}
 								}
 							}
-						}
 
-						if (edge->p1 != 0xFFFF'FFFF) {
+							if (edge->p1 != 0xFFFF'FFFF) {
 
-							glm::vec3 isect_position;
-							if (raycastPoly(ray_origin, ray_direction, edge->p1, isect_position)) {
+								glm::vec3 isect_position;
+								if (raycastPoly(ray_origin, ray_direction, edge->p1, isect_position)) {
 
-								float dist = glm::distance(ray_origin, isect_position);
-								if (dist < closest_distance) {
-									closest_distance = dist;
-									closest_poly = edge->p1;
-									closest_isect_position = isect_position;
+									float dist = glm::distance(ray_origin, isect_position);
+									if (dist < closest_distance) {
+										closest_distance = dist;
+										closest_poly = edge->p1;
+										closest_isect_position = isect_position;
+									}
 								}
 							}
-						}
 
-						// mark edge as tested
-						edge->was_raycast_tested = true;
-						_tested_edges.push_back(edge_idx);
+							// mark edge as tested
+							edge->was_raycast_tested = true;
+							_tested_edges.push_back(edge_idx);
+						}
 
 						// Iter
 						edge_idx = edge->nextEdgeOf(v_idx);
@@ -271,19 +338,66 @@ bool SculptMesh::raycastPolys(glm::vec3& ray_origin, glm::vec3& ray_direction,
 			}
 		}
 
-		// mark all tested edges as untested for next function call
-		for (uint32_t edge_idx : _tested_edges) {
-			edges[edge_idx].was_raycast_tested = false;
-		}
 
 		// stop at the first (closest) AABB for hit
 		if (closest_distance != FLT_MAX) {
 			
 			r_isect_poly = closest_poly;
 			r_isect_position = closest_isect_position;
+
+			unmark_tested_edges();
+
+#if raycastPolys_enable_performance_stats
+			ray_poly_isect_time = std::chrono::steady_clock::now();
+
+			printf(
+				"Raycast performance stats: \n"
+				"  AABB raycast duration = %zd \n"
+				"  poly raycast duration = %zd \n",
+				std::chrono::duration_cast<std::chrono::microseconds>(ray_aabb_isect_time - start).count(),
+				std::chrono::duration_cast<std::chrono::microseconds>(ray_poly_isect_time - ray_aabb_isect_time).count()
+			);
+#endif
 			return true;
 		}
 	}
 
+	unmark_tested_edges();
 	return false;
+}
+
+void SculptMesh::sphereIsectAABBs(glm::vec3& origin, float radius)
+{
+	std::vector<VertexBoundingBox*>& now_aabbs = _now_aabbs;
+	std::vector<VertexBoundingBox*>& next_aabbs = _next_aabbs;
+	std::vector<VertexBoundingBox*>& traced_aabbs = _traced_aabbs;
+
+	now_aabbs.resize(1);
+	now_aabbs[0] = &aabbs[root_aabb_idx];
+
+	traced_aabbs.clear();
+
+	// gather AABBs that intersect with ray
+	while (now_aabbs.size()) {
+
+		next_aabbs.clear();
+
+		for (VertexBoundingBox* now_aabb : now_aabbs) {
+
+			if (now_aabb->aabb.isSphereIsect(origin, radius)) {
+
+				if (now_aabb->isLeaf()) {
+					traced_aabbs.push_back(now_aabb);
+				}
+				else {
+					// Schedule next
+					for (uint32_t child_idx : now_aabb->children) {
+						next_aabbs.push_back(&aabbs[child_idx]);
+					}
+				}
+			}
+		}
+
+		now_aabbs.swap(next_aabbs);
+	}
 }

@@ -2,8 +2,11 @@
 // Header
 #include "SculptMesh.hpp"
 
-#include "Renderer.hpp"
+// Microsoft
 #include <ppl.h>
+
+// Mine
+#include "Renderer.hpp"
 
 // Debug
 #include "RenderDocIntegration.hpp"
@@ -11,6 +14,7 @@
 
 using namespace scme;
 namespace conc = concurrency;
+using namespace std::chrono_literals;
 
 
 void SculptMesh::markAllVerticesForNormalUpdate()
@@ -334,10 +338,7 @@ void SculptMesh::uploadTesselationTriangles(TesselationModificationBasis based_o
 		// regardless if a poly is tris or quad, always load 2 triangles
 		gpu_triangles.resize(polys.capacity() * 2);
 
-		// Aproximate the number of triangles that need to be updates
-		// because traversal is expensive
 		r.poly_normal_updates.clear();
-		r.poly_normal_updates.reserve(modified_verts.size() * 5);
 
 		GPU_PolyNormalUpdateGroup* update = &r.poly_normal_updates.emplace_back();
 		uint32_t thread_idx = 0;
@@ -514,144 +515,3 @@ void SculptMesh::uploadTesselationTriangles(TesselationModificationBasis based_o
 
 	dirty_tess_tris = false;
 }
-//
-//void SculptMesh::uploadAABBs()
-//{
-//	auto& r = renderer;
-//
-//	// Check if there are out of bounds vertices
-//	float max_size = 0;
-//	uint32_t calls = 0;
-//	{
-//		for (ModifiedVertex& modified : modified_verts) {
-//
-//			if (modified.state == ModifiedVertexState::UPDATE &&
-//				verts.isDeleted(modified.idx) == false)
-//			{
-//				// find if resize is necessary
-//				Vertex& vertex = verts[modified.idx];
-//
-//				if (std::abs(vertex.pos.x) > max_size) {
-//					max_size = std::abs(vertex.pos.x);
-//				}
-//
-//				if (std::abs(vertex.pos.y) > max_size) {
-//					max_size = std::abs(vertex.pos.y);
-//				}
-//
-//				if (std::abs(vertex.pos.z) > max_size) {
-//					max_size = std::abs(vertex.pos.z);
-//				}
-//
-//				calls++;
-//			}
-//		}
-//	}
-//
-//	uint32_t thread_idx = 0;
-//	uint32_t group_idx = 0;
-//
-//	// scale the whole AABB graph and schedule all
-//	if (max_size > root_aabb_size) {
-//
-//		root_aabb_size = max_size;
-//
-//		if (verts.size() % 21 == 0) {
-//			r.unplaced_verts.resize(verts.size() / 21);
-//		}
-//		else {
-//			r.unplaced_verts.resize((verts.size() / 21) + 1);
-//		}
-//
-//		for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
-//
-//			r.unplaced_verts[group_idx].vert_idxs[thread_idx] = iter.index() + 1;
-//
-//			thread_idx++;
-//
-//			if (thread_idx == 21) {
-//				group_idx++;
-//				thread_idx = 0;
-//			}
-//		}
-//	}
-//	else {
-//		if (calls % 21 == 0) {
-//			r.unplaced_verts.resize(calls / 21);
-//		}
-//		else {
-//			r.unplaced_verts.resize((calls / 21) + 1);
-//		}
-//
-//		for (ModifiedVertex& modified : modified_verts) {
-//
-//			if (modified.state == ModifiedVertexState::UPDATE &&
-//				verts.isDeleted(modified.idx) == false)
-//			{
-//				r.unplaced_verts[group_idx].vert_idxs[thread_idx] = modified.idx + 1;
-//
-//				thread_idx++;
-//
-//				if (thread_idx == 21) {
-//					group_idx++;
-//					thread_idx = 0;
-//				}
-//			}
-//		}
-//	}
-//
-//	// round off
-//	uint32_t last_thread = thread_idx;
-//	for (thread_idx = last_thread; thread_idx < 21; thread_idx++) {
-//		r.unplaced_verts[group_idx].vert_idxs[thread_idx] = 0;
-//	}
-//
-//	// Loads
-//	r.gpu_unplaced_verts.upload(r.unplaced_verts);
-//
-//	r.placed_verts.resize(r.unplaced_verts.size());
-//	r.gpu_placed_verts.resizeDiscard(r.placed_verts.size());
-//
-//	r.mesh_aabb_graph.setUint(GPU_AABB_Graph_Fields::ROOT_SIZE, root_aabb_size);
-//	r.mesh_aabb_graph.setUint(GPU_AABB_Graph_Fields::LEVELS, aabbs_levels);
-//
-//	// Commands //////////////////////////////////////////////////////////////////
-//	auto& ctx = r.im_ctx3;
-//	ctx->ClearState();
-//
-//	// Constant buffers
-//	{
-//		std::array<ID3D11Buffer*, 1> buffs = {
-//			renderer.mesh_aabb_graph.get()
-//		};
-//		ctx->CSSetConstantBuffers(0, buffs.size(), buffs.data());
-//	}
-//
-//	// SRV
-//	{
-//		std::array<ID3D11ShaderResourceView*, 3> srvs = {
-//			gpu_verts.getSRV(),
-//			r.gpu_unplaced_verts.getSRV()
-//		};
-//		ctx->CSSetShaderResources(0, srvs.size(), srvs.data());
-//	}
-//
-//	// UAV
-//	{
-//		std::array<ID3D11UnorderedAccessView*, 1> uavs = {
-//			r.gpu_placed_verts.getUAV()
-//		};
-//		ctx->CSSetUnorderedAccessViews(0, uavs.size(), uavs.data(), nullptr);
-//	}
-//
-//	ctx->CSSetShader(renderer.distribute_AABB_verts_cs.Get(), nullptr, 0);
-//
-//	ctx->Dispatch(r.unplaced_verts.size(), 1, 1);
-//
-//	// Apply results to CPU
-//	r.gpu_placed_verts.download(r.placed_verts, r.staging_buff);
-//
-//
-//
-//	// if density too large then increase aabb levels
-//}

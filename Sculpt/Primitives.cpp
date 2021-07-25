@@ -24,7 +24,7 @@ bool VertexBoundingBox::isLeaf()
 
 bool VertexBoundingBox::hasVertices()
 {
-	return verts.size() > 0;
+	return verts.size() - verts_deleted_count > 0;
 }
 
 uint32_t VertexBoundingBox::inWhichChildDoesPositionReside(glm::vec3& pos)
@@ -208,6 +208,16 @@ void SculptMesh::markVertexFullUpdate(uint32_t vertex)
 	modified_vertex.state = ModifiedVertexState::UPDATE;
 
 	this->dirty_vertex_list = true;
+	this->dirty_vertex_pos = true;
+	this->dirty_vertex_normals = true;
+}
+
+void SculptMesh::markVertexMoved(uint32_t vertex)
+{
+	ModifiedVertex& modified_vertex = modified_verts.emplace_back();
+	modified_vertex.idx = vertex;
+	modified_vertex.state = ModifiedVertexState::UPDATE;
+
 	this->dirty_vertex_pos = true;
 	this->dirty_vertex_normals = true;
 }

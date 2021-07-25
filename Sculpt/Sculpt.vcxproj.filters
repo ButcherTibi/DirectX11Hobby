@@ -59,6 +59,12 @@
     <Filter Include="Source Files\Shaders\Compute">
       <UniqueIdentifier>{f209ca96-9259-4c3f-ba3e-d3ba0a4f09b9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Shaders\UI">
+      <UniqueIdentifier>{93f46a60-8ba4-48bc-bc10-e8cdd7ff3fda}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Application">
+      <UniqueIdentifier>{24f02d6a-5629-4693-b21a-39c49dad734f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -88,9 +94,6 @@
     <ClCompile Include="GPU_ShaderTypesMesh.cpp">
       <Filter>Source Files\Shaders</Filter>
     </ClCompile>
-    <ClCompile Include="Application.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MeshCreation.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
@@ -110,6 +113,15 @@
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
     <ClCompile Include="MeshDebug.cpp">
+      <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>Source Files\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="UserInteraction.cpp">
+      <Filter>Source Files\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="Brushes.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
   </ItemGroup>
@@ -135,9 +147,6 @@
     <ClInclude Include="GPU_ShaderTypesMesh.hpp">
       <Filter>Source Files\Shaders</Filter>
     </ClInclude>
-    <ClInclude Include="Application.hpp">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="SculptPCH.hpp">
       <Filter>Source Files\Precompiled Headers</Filter>
     </ClInclude>
@@ -146,6 +155,9 @@
     </ClInclude>
     <ClInclude Include="SparseVector.hpp">
       <Filter>Source Files\CustomContainers</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.hpp">
+      <Filter>Source Files\Application</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -184,6 +196,9 @@
     </FxCompile>
     <FxCompile Include="UpdateVertexNormalsCS.hlsl">
       <Filter>Source Files\Shaders\Compute</Filter>
+    </FxCompile>
+    <FxCompile Include="BrushCirclePS.hlsl">
+      <Filter>Source Files\Shaders\UI</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
