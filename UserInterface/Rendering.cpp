@@ -19,10 +19,13 @@ void Window::_render()
 	auto& dev5 = instance->dev5;
 
 	// Load Character Atlas
-	instance->loadCharacterAtlasToTexture();
+	instance->_loadCharacterAtlasToTexture();
 
-	// Load Constant Buffer
-	cbuff.load(&gpu_constants, sizeof(GPU_Constants));
+	// Constant buffer data
+	{
+		cbuff.setUint(GPU_ConstantsFields::SCREEN_WIDTH, surface_width);
+		cbuff.setUint(GPU_ConstantsFields::SCREEN_HEIGHT, surface_height);
+	}
 
 	// Resize Attachments
 	{
@@ -42,11 +45,18 @@ void Window::_render()
 		}
 	}
 
+	// Viewport
+	{
+		viewport.TopLeftX = 0;
+		viewport.TopLeftY = 0;
+		viewport.Width = (float)surface_width;
+		viewport.Height = (float)surface_height;
+		viewport.MinDepth = 0;
+		viewport.MaxDepth = 1;
+	}
+
 	// Draw
 	im_ctx3->ClearState();
-
-	std::array<float, 4> clear_color = { 0, 0, 0, 0 };
-	im_ctx3->ClearRenderTargetView(present_rtv.Get(), clear_color.data());
 
 	for (auto& stack : draw_stacks) {
 		for (Element* elem : stack.second) {

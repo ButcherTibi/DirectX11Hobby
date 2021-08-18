@@ -123,7 +123,6 @@ namespace nui {
 	struct MousePosition {
 		uint16_t x;
 		uint16_t y;
-		SteadyTime time;
 	};
 
 

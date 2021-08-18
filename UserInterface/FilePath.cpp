@@ -11,6 +11,45 @@ using namespace io;
 uint32_t io::max_path = 1024;
 
 
+Handle::Handle()
+{
+	this->handle = INVALID_HANDLE_VALUE;
+}
+
+Handle::Handle(HANDLE ms_handle)
+{
+	this->handle = ms_handle;
+}
+
+Handle& io::Handle::operator=(HANDLE ms_handle)
+{
+	assert_cond(this->handle == INVALID_HANDLE_VALUE);
+
+	this->handle = ms_handle;
+
+	return *this;
+}
+
+bool io::Handle::isValid()
+{
+	return handle != INVALID_HANDLE_VALUE;
+}
+
+io::Handle::~Handle()
+{
+	if (handle != INVALID_HANDLE_VALUE) {
+
+#if _DEBUG
+		if (CloseHandle(handle) == 0) {
+			printf((std::string(code_location) + "failed close handle" + getLastError()).c_str());
+		}
+#else
+		CloseHandle(_file_handle);
+#endif
+	}
+}
+
+
 static uint32_t findEntryCount(std::string path)
 {
 	size_t last = path.size() - 1;
@@ -42,7 +81,7 @@ static uint32_t findEntryCount(std::string path)
 	return entry_count;
 }
 
-static void pushPathToEntries(std::vector<std::string> &existing, std::string path)
+static void pushPathToEntries(std::vector<std::string> &existing, std::string& path)
 {
 	existing.reserve(existing.size() + findEntryCount(path));
 
@@ -77,62 +116,33 @@ static void pushPathToEntries(std::vector<std::string> &existing, std::string pa
 	}
 }
 
-void FilePath::recreateAbsolute(std::string path)
+Path::Path(std::string path)
 {
 	entries.clear();
 	pushPathToEntries(this->entries, path);
 }
 
-ErrStack FilePath::recreateRelative(std::string path)
+Path::Path(std::string& path)
 {
-	std::string exe_filename;
-	exe_filename.resize(max_path);
+	entries.clear();
+	pushPathToEntries(this->entries, path);
+}
 
-	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-		return ErrStack(code_location, getLastError());
-	}
+ErrStack Path::recreateFromRelativePath(std::string path)
+{
+	ErrStack err_stack;
 
-	// trim excess
-	for (uint32_t i = 0; i < exe_filename.size(); i++) {
-		if (exe_filename[i] == '\0') {
-			exe_filename.erase(i + 1, exe_filename.size() - (i + 1));
-			break;
-		}
-	}
+	std::string solution_path;
+	checkErrStack1(getSolutionPath(solution_path));
 
-	// remove last 3 entries
-	uint32_t slash_pos = 0;
-	uint32_t slash_count = 0;
-	for (int32_t i = exe_filename.size() - 1; i >= 0; i--) {
+	solution_path.append(path);
 
-		char& c = exe_filename[i];
-
-		if (c == '\\' || c == '/') {
-			slash_count++;
-
-			if (slash_count == 3) {
-				slash_pos = i;
-				break;
-			}
-		}
-	}
-	exe_filename.erase(slash_pos + 1, exe_filename.size() - (slash_pos + 1));
-
-	assert_cond(path[0] != '/' && path[0] != '\\', "");
-
-	// convert linux '/' to windows '\'
-	for (char& c : path) {
-		c = c == '/' ? '\\' : c;
-	}
-
-	exe_filename.append(path);
-
-	push_back(exe_filename);
+	push_back(solution_path);
 
 	return ErrStack();
 }
 
-bool FilePath::hasExtension(std::string extension)
+bool Path::hasExtension(std::string extension)
 {
 	std::string last = entries.back();
 	size_t dot_pos = last.find_last_of('.');
@@ -141,19 +151,19 @@ bool FilePath::hasExtension(std::string extension)
 	return extension == entry_ext;
 }
 
-void FilePath::push_back(std::string path)
+void Path::push_back(std::string path)
 {
 	pushPathToEntries(this->entries, path);
 }
 
-void FilePath::pop_back(size_t count)
+void Path::pop_back(size_t count)
 {
 	for (size_t i = 0; i < count; i++) {
 		entries.pop_back();
 	}
 }
 
-void FilePath::push_front(std::string path)
+void Path::push_front(std::string path)
 {
 	std::vector<std::string> append = this->entries;
 	
@@ -165,17 +175,17 @@ void FilePath::push_front(std::string path)
 	}
 }
 
-void FilePath::pop_front(size_t count)
+void Path::pop_front(size_t count)
 {
 	this->entries.erase(entries.begin(), entries.begin() + count);
 }
 
-void FilePath::erase(size_t start, size_t end)
+void Path::erase(size_t start, size_t end)
 {
 	this->entries.erase(entries.begin() + start, entries.begin() + end);
 }
 
-std::string FilePath::toWindowsPath()
+std::string Path::toWindowsPath()
 {
 	std::string path;
 
@@ -197,7 +207,7 @@ std::string FilePath::toWindowsPath()
 }
 
 template<typename T>
-ErrStack FilePath::read(std::vector<T>& content)
+ErrStack Path::readOnce(std::vector<T>& content)
 {
 	// create file handle
 	std::string filename_vec = toWindowsPath();
@@ -239,68 +249,136 @@ ErrStack FilePath::read(std::vector<T>& content)
 	CloseHandle(file_handle);
 	return ErrStack();
 }
-template ErrStack FilePath::read(std::vector<char>& content);
-template ErrStack FilePath::read(std::vector<uint8_t>& content);
+template ErrStack Path::readOnce(std::vector<char>& content);
+template ErrStack Path::readOnce(std::vector<uint8_t>& content);
 
 
-template<typename T>
-ErrStack io::readFile(std::string& path, std::vector<T>& content)
+void File::create(Path& path)
 {
-	// create file handle;
-	HANDLE file_handle = CreateFileA(path.data(),
+	assert_cond(file_path.length() == 0);
+
+	this->file_path = path.toWindowsPath();
+}
+
+ErrStack File::openForParsing()
+{
+	if (_file_handle.isValid()) {
+		CloseHandle(_file_handle.handle);
+		_file_handle.handle = INVALID_HANDLE_VALUE;
+	}
+
+	_file_handle = CreateFileA(file_path.data(),
 		GENERIC_READ, // desired acces
-		0,  // share mode
+		FILE_SHARE_READ | FILE_SHARE_WRITE,  // share mode
 		NULL,  // security atributes
 		OPEN_EXISTING,  // disposition
-		FILE_ATTRIBUTE_NORMAL, // flags and atributes
-		NULL);  // template file
+		FILE_FLAG_SEQUENTIAL_SCAN, // flags and atributes
+		NULL);
 
-	if (file_handle == INVALID_HANDLE_VALUE) {
+	if (_file_handle.isValid() == false) {
 		return ErrStack(code_location,
-			"failed to create file handle for path = " + path);
+			"failed to open file handle for path = " + file_path + " " + getLastError());
 	}
 
-	// find file size
-	LARGE_INTEGER file_size;
-	if (!GetFileSizeEx(file_handle, &file_size)) {
-
-		CloseHandle(file_handle);
-		return ErrStack(code_location,
-			"failed to find file size for path = " + path);
-	}
-	content.resize(file_size.QuadPart);
-
-	// read file
-	DWORD bytes_read;
-
-	if (!ReadFile(file_handle, content.data(), (DWORD)file_size.QuadPart, &bytes_read, NULL)) {
-
-		CloseHandle(file_handle);
-		return ErrStack(code_location,
-			"failed to read path = " + path);
-	}
-
-	CloseHandle(file_handle);
 	return ErrStack();
 }
-template ErrStack io::readFile(std::string& path, std::vector<char>& content);
-template ErrStack io::readFile(std::string& path, std::vector<uint8_t>& content);
 
+ErrStack File::size(size_t& r_byte_count)
+{
+	auto get_size = [&](Handle& file_handle, size_t& r_size) -> ErrStack {
+
+		LARGE_INTEGER file_size;
+
+		if (!GetFileSizeEx(file_handle.handle, &file_size)) {
+			return ErrStack(code_location,
+				"failed to find file size for path = " + file_path + " " + getLastError());
+		}
+		r_size = file_size.QuadPart;
+
+		return ErrStack();
+	};
+
+	// create a temporary file handle
+	if (_file_handle.isValid() == false) {
+
+		// create file handle
+		Handle file_handle = CreateFileA(file_path.data(),
+			GENERIC_READ, // desired acces
+			0,  // share mode
+			NULL,  // security atributes
+			OPEN_EXISTING,  // disposition
+			FILE_ATTRIBUTE_NORMAL, // flags and atributes
+			NULL);
+
+		if (file_handle.isValid() == false) {
+			return ErrStack(code_location,
+				"failed to create file handle for path = " + file_path + " " + getLastError());
+		}
+
+		return get_size(file_handle, r_byte_count);
+	}
+	
+	return get_size(this->_file_handle, r_byte_count);
+}
+
+ErrStack File::getLastWrite(uint32_t& r_day, uint32_t& r_hour, uint32_t& r_minute, uint32_t& r_second)
+{
+	ErrStack err_stack;
+
+	FILETIME last_write_time;
+
+	if (GetFileTime(_file_handle.handle, nullptr, nullptr, &last_write_time) == false) {
+		return ErrStack(code_location,
+			"failed to read file time of file = " + file_path + " " + getLastError());
+	}
+
+	SYSTEMTIME system_time;
+	FileTimeToSystemTime(&last_write_time, &system_time);
+
+	r_day = system_time.wDay;
+	r_hour = system_time.wHour;
+	r_minute = system_time.wMinute;
+	r_second = system_time.wSecond;
+
+	return err_stack;
+}
 
 template<typename T>
-ErrStack io::readLocalFile(std::string path, std::vector<T>& content)
+ErrStack File::read(std::vector<T>& content)
 {
-	std::string exe_filename;
-	exe_filename.resize(max_path);
+	ErrStack err_stack;
 
-	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-		return ErrStack(code_location, getLastError());
+	// read file
+	size_t bytes_to_read;
+	checkErrStack1(size(bytes_to_read));
+
+	//uint32_t bytes_to_read_dword = ;
+	DWORD bytes_read;
+
+	if (ReadFile(_file_handle.handle, content.data(), (uint32_t)bytes_to_read, &bytes_read, NULL) == false) {
+		return ErrStack(code_location,
+			"failed to read whole file = " + file_path + " " + getLastError());
+	}
+
+	return err_stack;
+}
+template ErrStack File::read(std::vector<char>& content);
+template ErrStack File::read(std::vector<uint8_t>& content);
+
+
+ErrStack io::getSolutionPath(std::string& r_path)
+{
+	r_path.resize(max_path);
+
+	if (!GetModuleFileNameA(NULL, r_path.data(), (DWORD)max_path)) {
+		return ErrStack(code_location,
+			"could not obtain solution path " + getLastError());
 	}
 
 	// trim excess
-	for (uint32_t i = 0; i < exe_filename.size(); i++) {
-		if (exe_filename[i] == '\0') {
-			exe_filename.erase(i + 1, exe_filename.size() - (i + 1));
+	for (uint32_t i = 0; i < r_path.size(); i++) {
+		if (r_path[i] == '\0') {
+			r_path.erase(i + 1, r_path.size() - (i + 1));
 			break;
 		}
 	}
@@ -308,9 +386,9 @@ ErrStack io::readLocalFile(std::string path, std::vector<T>& content)
 	// remove last 3 entries
 	uint32_t slash_pos = 0;
 	uint32_t slash_count = 0;
-	for (int32_t i = exe_filename.size() - 1; i >= 0; i--) {
+	for (int32_t i = r_path.size() - 1; i >= 0; i--) {
 
-		char& c = exe_filename[i];
+		char& c = r_path[i];
 
 		if (c == '\\' || c == '/') {
 			slash_count++;
@@ -321,45 +399,37 @@ ErrStack io::readLocalFile(std::string path, std::vector<T>& content)
 			}
 		}
 	}
-	exe_filename.erase(slash_pos + 1, exe_filename.size() - (slash_pos + 1));
+	r_path.erase(slash_pos + 1, r_path.size() - (slash_pos + 1));
 
-	assert_cond(path[0] != '/' && path[0] != '\\', "");
-
-	// convert linux '/' to windows '\'
-	for (char& c : path) {
-		c = c == '/' ? '\\' : c;
+	// convert from windows '\' to linux '/'
+	for (char& c : r_path) {
+		c = c == '\\' ? '/' : c;
 	}
 
-	exe_filename.append(path);
+	return ErrStack();
+}
 
-	return readFile(exe_filename, content);
+template<typename T>
+ErrStack io::readFile(std::string& path, std::vector<T>& content)
+{
+	Path file = std::string(path);  // why won't it call my reference constructor ?
+	return file.readOnce(content);
+}
+template ErrStack io::readFile(std::string& path, std::vector<char>& content);
+template ErrStack io::readFile(std::string& path, std::vector<uint8_t>& content);
+
+
+template<typename T>
+ErrStack io::readLocalFile(std::string path, std::vector<T>& content)
+{
+	ErrStack err_stack;
+
+	std::string solution_path;
+	checkErrStack1(getSolutionPath(solution_path));
+
+	solution_path.append(path);
+
+	return readFile(solution_path, content);
 }
 template ErrStack io::readLocalFile(std::string path, std::vector<char>& content);
 template ErrStack io::readLocalFile(std::string path, std::vector<uint8_t>& content);
-
-//ErrStack FileSysPath::readLocal(std::vector<char>& content)
-//{
-//	std::string exe_filename;
-//	exe_filename.resize(max_path);
-//
-//	if (!GetModuleFileNameA(NULL, exe_filename.data(), (DWORD)max_path)) {
-//
-//		return ErrStack(code_location, getLastError());
-//	}
-//
-//	FileSysPath path(exe_filename);
-//
-//	std::string project_name;
-//	{
-//		std::string& last = path.entries.back();
-//		size_t dot_pos = last.find_last_of('.');
-//		project_name = last.substr(0, dot_pos);	
-//	}
-//
-//	path.pop_back(3);
-//	path.push_back(project_name);
-//
-//	path.push_back(*this);
-//
-//	return path.read(content);
-//}

@@ -106,6 +106,19 @@ inline void assert_cond(bool condition, const char* fail_msg) {
 }
 
 
+#define tryErrStack(err_func, msg) \
+	err_stack = err_func; \
+	if (err_stack.isBad()) { \
+		throw ErrStack(code_location, msg); \
+	}
+
+#define tryErrStack1(err_func) \
+	err_stack = err_func; \
+	if (err_stack.isBad()) { \
+		throw ErrStack(code_location, ""); \
+	}
+
+
 struct DirectX11Exception : std::exception {
 	HRESULT hresult;  // the result handle of the DirectX11 call
 	std::string message;  // message writen by hand by the programer at call site

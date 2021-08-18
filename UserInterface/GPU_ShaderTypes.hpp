@@ -110,15 +110,15 @@ namespace nui {
 		DirectX::XMFLOAT4 color;
 	};
 
+	namespace GPU_ConstantsFields {
+		enum {
+			SCREEN_WIDTH,
+			SCREEN_HEIGHT
+		};
+	}
 
-/* WARNING: All structs below are HLSL binary compatible with shader constant buffer */
-#pragma pack(16)
-
-	struct GPU_Constants {
-		DirectX::XMINT2 screen_size;
-		uint32_t _pad0[2];
-		//--------------------------------
-	};
+	/* WARNING: All structs below are HLSL binary compatible with shader constant buffer */
+	//#pragma pack(16)
+	//
+	//#pragma pack()
 }
-
-#pragma pack()

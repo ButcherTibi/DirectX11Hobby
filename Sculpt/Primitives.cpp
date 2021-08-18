@@ -210,6 +210,7 @@ void SculptMesh::markVertexFullUpdate(uint32_t vertex)
 	this->dirty_vertex_list = true;
 	this->dirty_vertex_pos = true;
 	this->dirty_vertex_normals = true;
+	this->dirty_tess_tris = true;
 }
 
 void SculptMesh::markVertexMoved(uint32_t vertex)
@@ -220,6 +221,7 @@ void SculptMesh::markVertexMoved(uint32_t vertex)
 
 	this->dirty_vertex_pos = true;
 	this->dirty_vertex_normals = true;
+	this->dirty_tess_tris = true;
 }
 
 void SculptMesh::deleteVertex(uint32_t)

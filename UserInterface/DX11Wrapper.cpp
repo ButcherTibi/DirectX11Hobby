@@ -351,8 +351,10 @@ void dx11::ConstantBuffer::setFloat4Array(uint32_t field_idx, uint32_t array_idx
 
 ID3D11Buffer* dx11::ConstantBuffer::get()
 {
-	ctx3->Unmap(buff.Get(), 0);
-	mapped_subres.pData = nullptr;
+	if (mapped_subres.pData != nullptr) {
+		ctx3->Unmap(buff.Get(), 0);
+		mapped_subres.pData = nullptr;
+	}
 
 	return buff.Get();
 }

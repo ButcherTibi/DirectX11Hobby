@@ -178,6 +178,6 @@ namespace gltf {
 		ErrStack _loadVec3FromBuffer(uint64_t acc_idx,
 			std::vector<base64::BitVector>& bin_buffs, std::vector<glm::vec3>& r_vecs);
 
-		ErrStack importGLTF(io::FilePath& path_to_gltf_file);
+		ErrStack importGLTF(io::Path& path_to_gltf_file);
 	};
 }

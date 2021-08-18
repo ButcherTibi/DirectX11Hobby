@@ -284,11 +284,11 @@ void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
 
 float EventsComponent::getInsideDuration()
 {
-	if (_window->instance->frame_start_time < _mouse_enter_time) {
+	if (nui::frame_start_time < _mouse_enter_time) {
 		return 0;
 	}
 
-	auto now = _window->instance->frame_start_time;
+	auto now = nui::frame_start_time;
 
 	return (float)std::chrono::duration_cast<std::chrono::milliseconds>(
 		now - _mouse_enter_time).count();
@@ -306,9 +306,9 @@ void EventsComponent::_init(Window* window)
 	_onMouseLeave = nullptr;
 }
 
-void EventsComponent::_emitInsideEvents(StoredElement* self)
+void EventsComponent::_emitInsideEvents(StoredElement2* self)
 {
-	SteadyTime& now = _window->instance->frame_start_time;
+	SteadyTime& now = nui::frame_start_time;
 
 	// if mouse was previously outside
 	if (_mouse_event_state == MouseEventState::OUTSIDE) {
@@ -425,7 +425,7 @@ void EventsComponent::_emitInsideEvents(StoredElement* self)
 	_mouse_event_state = MouseEventState::INSIDE;
 }
 
-void EventsComponent::_emitOutsideEvents(StoredElement* self)
+void EventsComponent::_emitOutsideEvents(StoredElement2* self)
 {
 	// was inside but now is outside
 	if (_mouse_event_state == MouseEventState::INSIDE) {
@@ -440,89 +440,6 @@ void EventsComponent::_emitOutsideEvents(StoredElement* self)
 	// do nothing if already outside
 }
 
-void Element::_init()
-{
-	for (uint8_t i = 0; i < 2; i++) {
-		origin[i] = 0.f;
-		relative_position[i] = 0;
-		size[i].type = ElementSizeType::FIT;
-	}
-
-	z_index = 0;
-}
-
-void Element::_ensureHasChange()
-{
-	if (_update == nullptr) {
-
-		auto& new_change = _window->changes.emplace_back();
-
-		_update = &new_change.emplace<UpdateChange>();
-		_update->dest = &(*_self_elements);
-
-		switch (_self_elements->index()) {
-		case ElementType::FLEX: {
-			_update->source.emplace<Flex::Change>();
-			break;
-		}
-		case ElementType::MENU: {
-			_update->source.emplace<Menu::Change>();
-			break;
-		}
-		}
-	}
-}
-
-ChangedElement& Element::_ensureChangedElement()
-{
-	_ensureHasChange();
-	return _update->source_elem;
-}
-
-void Element::setZ_Index(uint32_t new_z_index)
-{
-	ChangedElement& changed = _ensureChangedElement();
-	changed.z_index = new_z_index;
-}
-
-void Element::setSize(ElementSize x, ElementSize y)
-{
-	ChangedElement& changed = _ensureChangedElement();
-	changed.size = { x, y };
-}
-
-void Element::getSize(ElementSize& r_x, ElementSize& r_y)
-{
-	r_x = size[0];
-	r_y = size[1];
-}
-
-void Element::_calcSizeRelativeToParent()
-{
-	auto calc_size_for_axis = [&](uint32_t axis) {
-		switch (size[axis].type) {
-		case ElementSizeType::RELATIVE: {
-			_size[axis] = std::lroundf(_parent->_size[axis] * size[axis].relative_size);
-			break;
-		}
-
-		case ElementSizeType::ABSOLUTE: {
-			_size[axis] = size[axis].absolute_size;
-			break;
-		}
-
-		case ElementSizeType::FIT: {
-			// size cannot be calculated at this pass
-			_size[axis] = 0;
-			break;
-		}
-		}
-	};
-
-	calc_size_for_axis(0);
-	calc_size_for_axis(1);
-}
-
 void Element::_emitEvents(bool&)
 {
 	// no events
@@ -530,13 +447,16 @@ void Element::_emitEvents(bool&)
 
 void Element::_calcSizeAndRelativeChildPositions()
 {
-	// assume size is relative or absolute so it's already calculated
-	// and don't alter child positions
-};
+	if (_children.size()) {
 
-void Element::_generateGPU_Data()
-{
-	// no GPU resource is used
+		auto set_size = [&](uint32_t axis) {
+			if (size[axis].type == ElementSizeType::FIT) {
+				_size[axis] = _children[0]->base_elem->_size[axis];
+			}
+		};
+		set_size(0);
+		set_size(1);
+	}
 };
 
 void Element::_draw()
@@ -552,40 +472,239 @@ Element* nui::getElementBase(StoredElement* elem)
 	case ElementType::TEXT:
 		return std::get_if<Text>(elem);
 	case ElementType::RELATIVE:
-		return std::get_if<RelativeWrap>(elem);
+		return std::get_if<Stack>(elem);
 	case ElementType::FLEX:
 		return std::get_if<Flex>(elem);
 	case ElementType::MENU:
 		return std::get_if<Menu>(elem);
+	case ElementType::RECT:
+		return std::get_if<Rect>(elem);
+	default:
+		throw std::exception();
 	}
 
 	return nullptr;
 }
 
-void Root::_emitEvents(bool&)
+TextCreateInfo::TextCreateInfo()
 {
-	_events._emitInsideEvents(&(*_self_elements));
+	this->text = std::string();
+	this->font_family = "Roboto";
+	this->font_style = "Regular";
+	this->font_size = 14;
+	this->line_height = 0xFFFF'FFFF;
+
+	this->color = AnimatedProperty<Color>(Color(1.f, 1.f, 1.f));
 }
 
+void Container::assign(Element& elem, ElementRetainedState* prev, ElementCreateInfo& next)
+{
+	for (uint32_t i = 0; i < 2; i++) {
+		elem.size[i] = prev->size[i].calc(next.size[i]);
+		elem.origin[i] = prev->origin[i].calc(next.origin[i]);
+		elem.relative_position[i] = prev->relative_position[i].calc(next.relative_position[i]);
+	}
+
+	elem.z_index = next.z_index;
+	elem.flex_grow = prev->flex_grow.calc(next.flex_grow);
+}
+
+void Container::createText(TextCreateInfo& info)
+{
+	StoredElement2& new_entry = _window->elements.emplace_back();
+
+	Text& new_text = new_entry.specific_elem.emplace<Text>();
+	new_text._window = _window;
+	new_text._parent = _self;
+	new_entry.base_elem = &new_text;
+	new_text._self = &new_entry;
+
+	TextRetainedState* prev = nullptr;
+	{
+		for (TextRetainedState& state : _window->text_prevs) {
+			if (state.id == info.id) {
+				prev = &state;
+				break;
+			}
+		}
+
+		if (prev == nullptr) {
+			prev = &_window->text_prevs.emplace_back();
+		}
+
+		prev->id = info.id;
+		prev->used = true;
+	}
+	
+	assign(new_text, prev, info);
+
+	new_text.text = info.text;
+	new_text.font_family = info.font_family;
+	new_text.font_style = info.font_style;
+
+	new_text.font_size = prev->font_size.calc(info.font_size);
+	new_text.line_height = prev->line_height.calc(info.line_height);
+	new_text.color = prev->color.calc(info.color);
+
+	_children.push_back(&new_entry);
+}
+
+Flex* Container::createFlex(FlexCreateInfo& info)
+{
+	StoredElement2& new_entry = _window->elements.emplace_back();
+
+	Flex& new_flex = new_entry.specific_elem.emplace<Flex>();
+	new_flex._window = _window;
+	new_flex._parent = _self;
+	new_entry.base_elem = &new_flex;
+	new_flex._self = &new_entry;
+
+	FlexRetainedState* prev = nullptr;
+	{
+		for (FlexRetainedState& state : _window->flex_prevs) {
+			if (state.id == info.id) {
+				prev = &state;
+				break;
+			}
+		}
+
+		if (prev == nullptr) {
+			prev = &_window->flex_prevs.emplace_back();
+		}
+
+		prev->id = info.id;
+		prev->used = true;
+	}
+
+	assign(new_flex, prev, info);
+
+	new_flex.orientation = info.orientation;
+	new_flex.items_spacing = info.items_spacing;
+	new_flex.lines_spacing = info.lines_spacing;
+
+	_children.push_back(&new_entry);
+
+	return &new_flex;
+}
+
+Rect* Container::createRect(RectCreateInfo& info)
+{
+	StoredElement2& new_entry = _window->elements.emplace_back();
+
+	Rect& new_rect = new_entry.specific_elem.emplace<Rect>();
+	new_rect._window = _window;
+	new_rect._parent = _self;
+	new_entry.base_elem = &new_rect;
+	new_rect._self = &new_entry;
+
+	RectRetainedState* prev = nullptr;
+	{
+		for (RectRetainedState& state : _window->rect_prevs) {
+			if (state.id == info.id) {
+				prev = &state;
+				break;
+			}
+		}
+
+		if (prev == nullptr) {
+			prev = &_window->rect_prevs.emplace_back();
+		}
+
+		prev->id = info.id;
+		prev->used = true;
+	}
+
+	assign(new_rect, prev, info);
+
+	new_rect.color = prev->color.calc(info.color);
+
+	_children.push_back(&new_entry);
+
+	return &new_rect;
+}
+
+Menu* Container::createMenu(MenuCreateInfo& info)
+{
+	StoredElement2& new_entry = _window->elements.emplace_back();
+
+	Menu& new_menu = new_entry.specific_elem.emplace<Menu>();
+	new_menu._window = _window;
+	new_menu._parent = _self;
+	new_menu._self = &new_entry;
+
+	new_entry.base_elem = &new_menu;
+	_children.push_back(&new_entry);
+
+	MenuRetainedState* prev = nullptr;
+	{
+		for (MenuRetainedState& state : _window->menu_prevs) {
+			if (state.id == info.id) {
+				prev = &state;
+				break;
+			}
+		}
+
+		if (prev == nullptr) {
+			prev = &_window->menu_prevs.emplace_back();
+		}
+
+		prev->id = info.id;
+		prev->used = true;
+
+		prev->submenus.clear();
+		prev->sections.clear();
+		prev->items.clear();
+
+		SubMenu& root_menu = prev->submenus.emplace_back();
+		root_menu.child_sections.push_back(0);
+
+		prev->sections.resize(1);
+	}
+
+	assign(new_menu, prev, info);
+
+	{
+		SubMenu& root_submenu = prev->submenus[0];
+		root_submenu.info.background_color = info.titles_background_color;
+		root_submenu.info.border_thickness = info.titles_border_thickness;
+		root_submenu.info.border_color = info.titles_border_color;
+	}
+
+	// Init
+	new_menu.state = prev;
+	
+	return &new_menu;
+}
+
+void Root::_emitEvents(bool&)
+{
+	_events._emitInsideEvents(_self);
+}
+
+// works the same as relative wrap but doesn't need to calc size
 void Root::_calcSizeAndRelativeChildPositions()
 {
 	auto calc_size = [&](uint32_t axis) {
 
 		// Calculate child positions
-		for (Element* child : _children) {
+		for (StoredElement2* stored_child : _children) {
+
+			Element* child = stored_child->base_elem;
 
 			int32_t& _child_pos = child->_position[axis];
 
 			// Child origin
 			_child_pos = std::lroundf(child->_size[axis] * -(child->origin[axis] / 100.f));
 
-			switch (child->relative_position[axis].type) {
+			auto& child_relative_pos = child->relative_position[axis];
+
+			switch (child_relative_pos.type) {
 			case ElementPositionType::RELATIVE: {
-				_child_pos += std::lroundf(_size[axis] * child->relative_position[axis].relative_pos);
+				_child_pos += std::lroundf(_size[axis] * child_relative_pos.relative_pos);
 				break;
 			}
 			case ElementPositionType::ABSOLUTE: {
-				_child_pos += child->relative_position[axis].absolute_pos;
+				_child_pos += child_relative_pos.absolute_pos;
 				break;
 			}
 			}
@@ -594,160 +713,238 @@ void Root::_calcSizeAndRelativeChildPositions()
 
 	calc_size(0);
 	calc_size(1);
-
-	// Root element has no parents
 }
 
-void RelativeWrap::_calcSizeAndRelativeChildPositions()
+void Root::_draw()
 {
-	auto calc_child_positions = [&](uint32_t axis) {
+	Instance* instance = _window->instance;
 
-		uint32_t extent = 0;
-
-		// Calculate child positions
-		for (Element* child : _children) {
-
-			int32_t& _child_pos = child->_position[axis];
-
-			// Child origin
-			_child_pos = std::lroundf(child->_size[axis] * -(child->origin[axis] / 100.f));
-
-			switch (child->relative_position[axis].type) {
-			case ElementPositionType::RELATIVE: {
-				_child_pos += std::lroundf(_size[axis] * child->relative_position[axis].relative_pos);
-				break;
-			}
-			case ElementPositionType::ABSOLUTE: {
-				_child_pos += child->relative_position[axis].absolute_pos;
-				break;
-			}
-			}
-
-			// how much does a child size extend in a certain direction
-			int32_t child_extent = _child_pos + child->_size[axis];
-			if (child_extent > (int32_t)extent) {
-				extent = child_extent;
-			}
-		}
-
-		switch (size[axis].type) {
-		case ElementSizeType::FIT: {
-			_size[axis] = extent;
-			break;
-		}
-		}
-	};
-
-	calc_child_positions(0);
-	calc_child_positions(1);
+	std::array<float, 4> clear_color = { 0, 0, 0, 0 };
+	instance->im_ctx3->ClearRenderTargetView(_window->present_rtv.Get(), clear_color.data());
 }
 
-void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)
+void Text::_calcSizeAndRelativeChildPositions()
 {
-	auto& color_anim = _background_color;
-	color_anim.start = background_color.rgba;
-	color_anim.end = end_color.rgba;
-	color_anim.start_time = _window->instance->frame_start_time;
-	color_anim.end_time = color_anim.start_time + std::chrono::milliseconds(duration);
-	color_anim.blend_func = TransitionBlendFunction::LINEAR;
+	TextProps new_inst;
+	new_inst.text = text;
+	new_inst.font_family = font_family;
+	new_inst.font_style = font_style;
+	new_inst.font_size = font_size;
+	new_inst.line_height = line_height;
+	new_inst.color = color;
+
+	Instance* inst = _window->instance;
+	inst->findAndPositionGlyphs(new_inst, 0, 0, _size[0], _size[1], instance.chars);
+
+	instance.color = color;
 }
 
-void BackgroundElement::_init()
+void Text::_draw()
 {
-	Element::_init();
+	Instance* inst = _window->instance;
 
-	coloring = BackgroundColoring::NONE;
-	background_color.setRGBA_UNORM();
-
-	_onRenderingSurface = nullptr;
-
-	_rect_render.init(_window);
-	_events._init(_window);
-}
-
-void BackgroundElement::_generateGPU_Data()
-{
-	switch (coloring) {
-	case BackgroundColoring::FLAT_FILL: {
-
-		SteadyTime& now = _window->instance->frame_start_time;
-		background_color.rgba = _background_color.calculate(now);
-
-		_rect_render.reset();
-
-		RectInstance props;
-		props.screen_pos[0] = _position[0];
-		props.screen_pos[1] = _position[1];
-		props.size[0] = _size[0];
-		props.size[1] = _size[1];
-		props.color.rgba = background_color.rgba;
-		_rect_render.addInstance(props);
-
-		_rect_render.generateGPU_Data();
-		break;
-	}
-	}
-}
-
-void BackgroundElement::_draw()
-{
-	switch (coloring) {
-	case BackgroundColoring::FLAT_FILL: {		
-		_rect_render.draw();
-		break;
+	for (auto& pos_char : instance.chars) {
+		pos_char.pos[0] += _position[0];
+		pos_char.pos[1] += _position[1];
 	}
 
-	case BackgroundColoring::RENDERING_SURFACE: {
-
-		assert_cond(_onRenderingSurface != nullptr,
-			"RenderingSurface callback not set for BackgroundColoring::RENDERING_SURFACE");
-
-		Instance* instance = _window->instance;
-		ID3D11DeviceContext3* im_ctx3 = instance->im_ctx3.Get();
-
-		//auto clear_bindings = [&]() {
-
-		//	// Input Assembly
-		//	{
-		//		std::array<ID3D11Buffer*, 2> buffs = {
-		//			nullptr, nullptr
-		//		};
-		//		std::array<uint32_t, 2> strides = {
-		//			0, 0
-		//		};
-		//		std::array<uint32_t, 2> offsets = {
-		//			0, 0
-		//		};
-		//		im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
-		//	}
-		//};
-
-		im_ctx3->ClearState();
-
-		SurfaceEvent surface_event;
-		surface_event.dev5 = instance->dev5.Get();
-		surface_event.im_ctx3 = im_ctx3;
-
-		surface_event.render_target_width = _window->surface_width;
-		surface_event.render_target_height = _window->surface_height;
-		surface_event.compose_rtv = _window->present_rtv.Get();
-
-		surface_event.viewport_pos = { _position[0], _position[1] };
-		surface_event.viewport_size = { _size[0], _size[1] };
-
-		this->_onRenderingSurface(_window, &(*_self_elements), surface_event, _surface_event_user_data);
-
-		im_ctx3->ClearState();
-		break;
-	}
-	}
+	inst->drawTexts(_window, std::vector<TextInstance*>{ &instance });
 }
 
-void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data)
+//
+//void Stack::_calcSizeAndRelativeChildPositions()
+//{
+//	auto calc_child_positions = [&](uint32_t axis) {
+//
+//		uint32_t extent = 0;
+//
+//		// Calculate child positions
+//		for (Element* child : _children) {
+//
+//			int32_t& _child_pos = child->_position[axis];
+//
+//			// Child origin
+//			_child_pos = std::lroundf(child->_size[axis] * -(child->origin[axis].now / 100.f));
+//
+//			auto& child_relative_pos = child->relative_position[axis].now;
+//
+//			switch (child_relative_pos.type) {
+//			case ElementPositionType::RELATIVE: {
+//				_child_pos += std::lroundf(_size[axis] * child_relative_pos.relative_pos);
+//				break;
+//			}
+//			case ElementPositionType::ABSOLUTE: {
+//				_child_pos += child_relative_pos.absolute_pos;
+//				break;
+//			}
+//			}
+//
+//			// how much does a child size extend in a certain direction
+//			int32_t child_extent = _child_pos + child->_size[axis];
+//			if (child_extent > (int32_t)extent) {
+//				extent = child_extent;
+//			}
+//		}
+//
+//		switch (size[axis].get().type) {
+//		case ElementSizeType::FIT: {
+//			_size[axis] = extent;
+//			break;
+//		}
+//		}
+//	};
+//
+//	calc_child_positions(0);
+//	calc_child_positions(1);
+//}
+//
+//void Rect::_updateProperties()
+//{
+//	Element::_updateProperties();
+//
+//	coloring._update();
+//	color._update();
+//}
+//
+//void Rect::_generateGPU_Data()
+//{
+//	switch (coloring.get()) {
+//	case Coloring::FLAT: {
+//
+//		_rect_render.reset();
+//
+//		RectInstance props;
+//		props.screen_pos[0] = _position[0];
+//		props.screen_pos[1] = _position[1];
+//		props.size[0] = _size[0];
+//		props.size[1] = _size[1];
+//		props.color = color.get();
+//		_rect_render.addInstance(props);
+//
+//		_rect_render.generateGPU_Data();
+//		break;
+//	}
+//	}
+//}
+//
+void Rect::_draw()
 {
-	this->_onRenderingSurface = callback;
-	this->_surface_event_user_data = user_data;
+	Instance* inst = _window->instance;
+
+	RectInstance rect_inst;
+	rect_inst.screen_pos = _position;
+	rect_inst.size = _size;
+	rect_inst.color = color;
+
+	inst->drawRects(_window, std::vector<RectInstance*>{ &rect_inst });
 }
+//
+//void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)
+//{
+//	auto& color_anim = _background_color;
+//	color_anim.start = background_color.rgba;
+//	color_anim.end = end_color.rgba;
+//	color_anim.start_time = nui::frame_start_time;
+//	color_anim.end_time = color_anim.start_time + std::chrono::milliseconds(duration);
+//	color_anim.blend_func = TransitionBlendFunction::LINEAR;
+//}
+//
+//void BackgroundElement::_init()
+//{
+//	Element::_initDefaultProperties();
+//
+//	coloring = BackgroundColoring::NONE;
+//	background_color.setRGBA_UNORM();
+//
+//	_onRenderingSurface = nullptr;
+//
+//	_rect_render.init(_window);
+//	_events._init(_window);
+//}
+//
+//void BackgroundElement::_generateGPU_Data()
+//{
+//	switch (coloring) {
+//	case BackgroundColoring::FLAT_FILL: {
+//
+//		SteadyTime& now = nui::frame_start_time;
+//		background_color.rgba = _background_color.calculate(now);
+//
+//		_rect_render.reset();
+//
+//		RectInstance props;
+//		props.screen_pos[0] = _position[0];
+//		props.screen_pos[1] = _position[1];
+//		props.size[0] = _size[0];
+//		props.size[1] = _size[1];
+//		props.color.rgba = background_color.rgba;
+//		_rect_render.addInstance(props);
+//
+//		_rect_render.generateGPU_Data();
+//		break;
+//	}
+//	}
+//}
+//
+//void BackgroundElement::_draw()
+//{
+//	switch (coloring) {
+//	case BackgroundColoring::FLAT_FILL: {		
+//		_rect_render.draw();
+//		break;
+//	}
+//
+//	case BackgroundColoring::RENDERING_SURFACE: {
+//
+//		assert_cond(_onRenderingSurface != nullptr,
+//			"RenderingSurface callback not set for BackgroundColoring::RENDERING_SURFACE");
+//
+//		Instance* instance = _window->instance;
+//		ID3D11DeviceContext3* im_ctx3 = instance->im_ctx3.Get();
+//
+//		//auto clear_bindings = [&]() {
+//
+//		//	// Input Assembly
+//		//	{
+//		//		std::array<ID3D11Buffer*, 2> buffs = {
+//		//			nullptr, nullptr
+//		//		};
+//		//		std::array<uint32_t, 2> strides = {
+//		//			0, 0
+//		//		};
+//		//		std::array<uint32_t, 2> offsets = {
+//		//			0, 0
+//		//		};
+//		//		im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
+//		//	}
+//		//};
+//
+//		im_ctx3->ClearState();
+//
+//		SurfaceEvent surface_event;
+//		surface_event.dev5 = instance->dev5.Get();
+//		surface_event.im_ctx3 = im_ctx3;
+//
+//		surface_event.render_target_width = _window->surface_width;
+//		surface_event.render_target_height = _window->surface_height;
+//		surface_event.compose_rtv = _window->present_rtv.Get();
+//
+//		surface_event.viewport_pos = { _position[0], _position[1] };
+//		surface_event.viewport_size = { _size[0], _size[1] };
+//
+//		this->_onRenderingSurface(_window, &(*_self_element), surface_event, _surface_event_user_data);
+//
+//		im_ctx3->ClearState();
+//		break;
+//	}
+//	}
+//}
+//
+//void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data)
+//{
+//	this->_onRenderingSurface = callback;
+//	this->_surface_event_user_data = user_data;
+//}
 
 void Flex::_emitEvents(bool& allow_inside_events)
 {
@@ -763,16 +960,16 @@ void Flex::_emitEvents(bool& allow_inside_events)
 		if (left <= input.mouse_x && input.mouse_x < right &&
 			top <= input.mouse_y && input.mouse_y < bot)
 		{
-			_events._emitInsideEvents(&(*_self_elements));
+			_events._emitInsideEvents(_self);
 			allow_inside_events = false;
 		}
 		else {
-			_events._emitOutsideEvents(&(*_self_elements));
+			_events._emitOutsideEvents(_self);
 			allow_inside_events = true;
 		}
 	}
 	else {
-		_events._emitOutsideEvents(&(*_self_elements));
+		_events._emitOutsideEvents(_self);
 		allow_inside_events = true;
 	}
 }
@@ -782,261 +979,206 @@ void Flex::_calcSizeAndRelativeChildPositions()
 	auto calc_child_positions = [&](uint32_t x_axis, uint32_t y_axis) {
 
 		struct GridLine {
-			uint32_t end_idx;
+			uint32_t start_idx;
 			uint32_t count;
 
-			uint32_t line_length;
-			uint32_t line_thickness;
+			uint32_t length;
+			uint32_t thickness;
+
+			float flex_grow_sum;
 		};
 
 		std::vector<GridLine> lines;
 
-		uint32_t line_max_length;
-
-		switch (size[x_axis].type) {
-		case ElementSizeType::ABSOLUTE:
-		case ElementSizeType::RELATIVE: {
-			line_max_length = _size[x_axis];
-			break;
-		}
-
-		case ElementSizeType::FIT: {
-			line_max_length = 0xFFFF'FFFF;
-			break;
-		}
-		default:
-			throw std::exception();
-		}
-
 		// Group items into lines
-		uint32_t width = 0;
-		uint32_t height = 0;
+		uint32_t fit_width = 0;
+		uint32_t fit_height = 0;
 		{
-			int32_t x = 0;
-			uint32_t line_thickness = 0;
-			uint32_t child_idx = 0;
-			uint32_t child_count = 0;
+			uint32_t line_max_length;
 
-			for (Element* child : _children) {
+			switch (size[x_axis].type) {
+			case ElementSizeType::ABSOLUTE:
+			case ElementSizeType::RELATIVE: {
+				line_max_length = _size[x_axis];
+				break;
+			}
 
-				if ((x + child->_size[x_axis] < line_max_length) ||
-					child == _children.front())
-				{
-					x += child->_size[x_axis];
+			case ElementSizeType::FIT: {
+				line_max_length = 0xFFFF'FFFF;
+				break;
+			}
+			default:
+				throw std::exception();
+			}
 
-					if (child->_size[y_axis] > line_thickness) {
-						line_thickness = child->_size[y_axis];
+			GridLine* line = &lines.emplace_back();
+			line->start_idx = 0;
+			line->count = 0;
+			line->length = 0;
+			line->thickness = 0;
+			line->flex_grow_sum = 0;
+
+			for (StoredElement2* stored_child : _children) {
+
+				Element* child = stored_child->base_elem;
+				uint32_t child_length = child->_size[x_axis];
+				uint32_t child_thickness = child->_size[y_axis];
+
+				if ((line->length + child_length < line_max_length)) {
+
+					line->length += child_length;
+
+					if (child_thickness > line->thickness) {
+						line->thickness = child_thickness;
 					}
+
+					line->count++;
+					line->flex_grow_sum += child->flex_grow;
 				}
 				// element does not fit in current line so place to next
 				else {
-					GridLine& new_line = lines.emplace_back();
-					new_line.end_idx = child_idx;
-					new_line.count = child_count;
-					new_line.line_length = x;
-					new_line.line_thickness = line_thickness;
+					uint32_t start_idx = line->start_idx + line->count;
 
-					height += line_thickness;
+					line = &lines.emplace_back();
+					line->start_idx = start_idx;
+					line->count = 1;
+					line->length = child_length;
+					line->thickness = child_thickness;
+					line->flex_grow_sum = child->flex_grow;
 
-					x = child->_size[x_axis];
-					line_thickness = child->_size[y_axis];
-
-					child_count = 0;
+					fit_height += line->thickness;
 				}
 
-				if (x > (int32_t)width) {
-					width = x;
+				if (line->length > (int32_t)fit_width) {
+					fit_width = line->length;
 				}
-
-				child_idx++;
-				child_count++;
 			}
 
-			GridLine& new_line = lines.emplace_back();
-			new_line.end_idx = child_idx;
-			new_line.count = child_count;
-			new_line.line_length = x;
-			new_line.line_thickness = line_thickness;
-
-			height += line_thickness;
-		}
-
-		// Calculate X positions of items
-		{
-			int32_t x;
-			int32_t step = 0;
-
-			switch (items_spacing) {
-			case Spacing::START: {
-				x = 0;
-				break;
-			}
-
-			case Spacing::END: {
-				x = _size[x_axis] - lines.front().line_length;
-				break;
-			}
-
-			case Spacing::CENTER: {
-				x = (_size[x_axis] - lines.front().line_length) / 2;
-				break;
-			}
-
-			case Spacing::SPACE_BETWEEN: {
-
-				x = 0;
-				GridLine& first_line = lines.front();
-				if (first_line.count > 1) {
-					step = (_size[x_axis] - first_line.line_length) / (first_line.count - 1);
-				}
-				break;
-			}
-			default:
-				throw std::exception();
-			}
-
-			uint32_t item_idx = 0;
-			uint32_t line_idx = 0;
-
-			for (Element* child : _children) {
-
-				GridLine* line = &lines[line_idx];
-
-				if (item_idx < line->end_idx) {
-					child->_position[x_axis] = x;
-					x += child->_size[x_axis] + step;
-				}
-				else {
-					switch (items_spacing) {
-					case Spacing::START: {
-						x = 0;
-						break;
-					}
-
-					case Spacing::END: {
-						x = _size[x_axis] - line->line_length;
-						break;
-					}
-
-					case Spacing::CENTER: {
-						x = (_size[x_axis] - line->line_length) / 2;
-						break;
-					}
-
-					case Spacing::SPACE_BETWEEN: {
-						x = 0;
-
-						line = &lines[line_idx + 1];
-
-						if (line->count > 1) {
-							step = (_size[x_axis] - line->line_length) / (line->count - 1);
-						}
-						else {
-							step = 0;
-						}
-						break;
-					}
-					}
-
-					child->_position[x_axis] = x;
-					x += child->_size[x_axis] + step;
-
-					line_idx++;
-				}
-
-				item_idx++;
-			}
-		}
-
-		// Calculate Y positions of lines
-		{
-			int32_t y;
-			uint32_t step = 0;
-
-			switch (lines_spacing) {
-			case Spacing::START: {
-				y = 0;
-				break;
-			}
-
-			case Spacing::END: {
-				y = _size[y_axis] - height;
-				break;
-			}
-
-			case Spacing::CENTER: {
-				y = (_size[y_axis] - height) / 2;
-				break;
-			}
-
-			case Spacing::SPACE_BETWEEN: {
-				y = 0;
-				if (lines.size() > 1) {
-					step = (_size[y_axis] - height) / (lines.size() - 1);
-				}
-				break;
-			}
-			default:
-				throw std::exception();
-			}
-
-			uint32_t item_idx = 0;
-			uint32_t line_idx = 0;
-
-			for (Element* child : _children) {
-
-				GridLine& line = lines[line_idx];
-
-				if (item_idx < line.end_idx) {
-					child->_position[y_axis] = y;
-				}
-				else {
-					y += lines[line_idx].line_thickness + step;
-					child->_position[y_axis] = y;
-
-					line_idx++;
-				}
-
-				item_idx++;
-			}
+			fit_height += lines.front().thickness;
 		}
 
 		if (size[x_axis].type == ElementSizeType::FIT) {
-			_size[x_axis] = width;
+			_size[x_axis] = fit_width;
 		}
 
 		if (size[y_axis].type == ElementSizeType::FIT) {
-			_size[y_axis] = height;
+			_size[y_axis] = fit_height;
+		}
+
+		// Calculate positions of items
+		{
+			uint32_t y_step_space = _size[y_axis] - fit_height;
+
+			int32_t y;
+			uint32_t y_step = 0;
+
+			switch (lines_spacing) {
+			case FlexSpacing::START: {
+				y = 0;
+				break;
+			}
+
+			case FlexSpacing::END: {
+				y = y_step_space;
+				break;
+			}
+
+			case FlexSpacing::CENTER: {
+				y = y_step_space / 2;
+				break;
+			}
+
+			case FlexSpacing::SPACE_BETWEEN: {
+				y = 0;
+				y_step = y_step_space / (lines.size() - 1);
+				break;
+			}
+			default:
+				throw std::exception();
+			}
+
+			for (GridLine& line : lines) {
+
+				uint32_t x_grow_size;
+				uint32_t x_step_space;
+
+				if (line.flex_grow_sum >= 1) {
+					x_grow_size = _size[x_axis] - line.length;
+					x_step_space = 0;
+				}
+				else {
+					uint32_t remainder = _size[x_axis] - line.length;
+
+					x_grow_size = (uint32_t)(remainder * line.flex_grow_sum);
+					x_step_space = remainder - x_grow_size;
+				}
+
+				int32_t x;
+				int32_t x_step = 0;
+
+				switch (items_spacing) {
+				case FlexSpacing::START: {
+					x = 0;
+					break;
+				}
+
+				case FlexSpacing::END: {
+					x = x_step_space;
+					break;
+				}
+
+				case FlexSpacing::CENTER: {
+					x = x_step_space / 2;
+					break;
+				}
+
+				case FlexSpacing::SPACE_BETWEEN: {
+					x = 0;
+					if (line.count > 1) {
+						x_step = x_step_space / (line.count - 1);
+					}
+					else {
+						x = x_step_space / 2;
+					}
+					break;
+				}
+				default:
+					throw std::exception();
+				}
+
+				uint32_t end_idx = line.start_idx + line.count;
+				for (uint32_t child_idx = line.start_idx; child_idx < end_idx; child_idx++) {
+
+					Element* child = _children[child_idx]->base_elem;
+					uint32_t& child_length = child->_size[x_axis];
+
+					child->_position[x_axis] = x;
+					child->_position[y_axis] = y;
+
+					if (line.flex_grow_sum) {
+						float adjusted_grow_factor = child->flex_grow / line.flex_grow_sum;
+						child_length += (uint32_t)(x_grow_size * adjusted_grow_factor);
+					}
+
+					x += child_length + x_step;
+				}
+
+				y += line.thickness + y_step;
+			}
 		}
 	};
 
 	switch (orientation) {
-	case Orientation::ROW: {
+	case FlexOrientation::ROW: {
 		calc_child_positions(0, 1);
 		break;
 	}
 
-	case Orientation::COLUMN: {
+	case FlexOrientation::COLUMN: {
 		calc_child_positions(1, 0);
 		break;
 	}
 	}
-}
-
-Flex::Change& Flex::ensureChangedFlex()
-{
-	_ensureHasChange();
-	return std::get<Flex::Change>(_update->source);
-}
-
-Flex::Orientation Flex::getOrientation()
-{
-	return orientation;
-}
-void Flex::setOrientation(Orientation new_orientation)
-{
-	Flex::Change& change = ensureChangedFlex();
-	change.orientation = new_orientation;
 }
 
 void Flex::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
@@ -1074,310 +1216,578 @@ void Flex::beginMouseFixedDeltaEffect()
 	_events.beginMouseFixedDeltaEffect(this);
 }
 
-void MenuItem::setItemText(std::string new_text)
+SubMenuCreateInfo::SubMenuCreateInfo(Color& new_background_color)
 {
-	auto& update_item = menu->_addItemUpdatedChange(this);
-	update_item.text = new_text;
+	this->background_color = new_background_color;
 }
 
-void MenuItem::setItemCallback(EventCallback new_callback)
+uint32_t Menu::createSection(uint32_t parent_submenu_idx, MenuSectionCreateInfo& new_info)
 {
-	auto& update_item = menu->_addItemUpdatedChange(this);
-	update_item.callback = new_callback;
+	SubMenu& parent_submenu = state->submenus[parent_submenu_idx];
+	parent_submenu.child_sections.push_back(state->sections.size());
+
+	MenuSection& new_section = state->sections.emplace_back();
+	new_section.info = new_info;
+
+	return state->sections.size() - 1;
 }
 
-MenuItem* MenuItem::addItem(MenuStyle& style)
+uint32_t Menu::createItem(uint32_t parent_section_idx, MenuItemCreateInfo& new_info)
 {
-	return menu->_addItem(this, style);
+	MenuSection& parent_section = state->sections[parent_section_idx];
+	parent_section.child_items.push_back(state->items.size());
+
+	MenuItem& new_item = state->items.emplace_back();
+	new_item.sub_menu = 0xFFFF'FFFF;
+	new_item.info = new_info;
+
+	return state->items.size() - 1;
 }
 
-void Menu::_init()
+uint32_t Menu::createSubMenu(uint32_t parent_item_idx, SubMenuCreateInfo& new_info)
 {
-	Element::_init();
+	MenuItem& parent_item = state->items[parent_item_idx];
+	parent_item.sub_menu = state->submenus.size();
 
-	MenuItem& root = _items.emplace_back();
-	root.parent = nullptr;
+	SubMenu& new_submenu = state->submenus.emplace_back();
+	new_submenu.info = new_info;
 
-	_menu_background_render.init(_window);
-	_select_background_render.init(_window);
-	_label_render.init(_window);
-
-	_visible_menus.push_back(&root);
+	return state->submenus.size() - 1;
 }
 
-Menu::Change& Menu::_ensureChangedMenu()
+uint32_t Menu::createTitle(MenuItemCreateInfo& info)
 {
-	_ensureHasChange();
-	return std::get<Menu::Change>(_update->source);
-}
-
-Menu::Change::UpdateItem& Menu::_addItemUpdatedChange(MenuItem* item)
-{
-	Change& new_change = _ensureChangedMenu();
-	auto& update_item_change = new_change.item_changes.emplace_back();
-	auto& update_item = update_item_change.emplace<Change::UpdateItem>();
-	update_item.item = item;
-
-	return update_item;
-}
-
-MenuItem* Menu::_addItem(MenuItem* parent, MenuStyle& style)
-{
-	MenuItem& new_item = _items.emplace_back();
-	new_item.menu = this;
-	new_item.parent = parent;;
-	new_item.label_callback = nullptr;
-
-	// Label
-	new_item.font_family = style.font_family;
-	new_item.font_style = style.font_style;
-	new_item.font_size = style.font_size;
-	new_item.line_height = style.line_height;
-	new_item.text_color.rgba = style.text_color.rgba;
-
-	new_item.top_padding = style.top_padding;
-	new_item.bot_padding = style.bot_padding;
-	new_item.left_padding = style.left_padding;
-	new_item.right_padding = style.right_padding;
-
-	// Menu
-	new_item.menu_background_color.rgba = style.menu_background_color.rgba;
-
-	// Schedule change
-	Menu::Change& new_change = _ensureChangedMenu();
-	auto& new_item_change = new_change.item_changes.emplace_back();
-	auto& add_item = new_item_change.emplace<Menu::Change::AddItem>();
-	add_item.parent = parent;
-	add_item.item = &new_item;
-
-	return &new_item;
-}
-
-void Menu::setTitleBackColor(Color new_color)
-{
-	Menu::Change& change = _ensureChangedMenu();
-	change.titles_background_color = new_color;
-}
-
-void Menu::setSelectBackColor(Color new_color)
-{
-	Menu::Change& change = _ensureChangedMenu();
-	change.select_background_color = new_color;
-}
-
-MenuItem* Menu::addTitle(MenuStyle& style)
-{
-	return _addItem(&_items.front(), style);
+	return createItem(0, info);
 }
 
 void Menu::_emitEvents(bool& allow_inside_events)
 {
 	Input& input = _window->input;
 
-	bool is_hovered = false;
-	bool is_clicked = false;
-	
-	for (int32_t i = _visible_menus.size() - 1; i >= 0; i--) {
+	allow_inside_events = false;
 
-		MenuItem* visible_menu = _visible_menus[i];
+	auto f = [&]() -> void {
 
-		for (MenuItem* item : visible_menu->children) {
+		for (int32_t i = state->visible_menus.size() - 1; i >= 0; i--) {
 
-			if (item->_label_box.isInside(input.mouse_x, input.mouse_y)) {
+			SubMenu& visible_menu = state->submenus[state->visible_menus[i].menu];
 
-				if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition &&
-					item->children.size() == 0 &&  // item is not a submenu
-					item->label_callback != nullptr)
-				{
-					item->label_callback(_window, &(*_self_elements), item->label_user_data);
-					is_clicked = true;
+			if (visible_menu.box.isInside(input.mouse_x, input.mouse_y)) {
+
+				for (uint32_t section_idx : visible_menu.child_sections) {
+
+					MenuSection& section = state->sections[section_idx];
+
+					for (uint32_t item_idx : section.child_items) {
+
+						MenuItem& item = state->items[item_idx];
+
+						if (item.box.isInside(input.mouse_x, input.mouse_y)) {
+
+							// mark item to be hovered
+							state->visible_menus[i].item = item_idx;
+
+							// if item leads to submenu that needs to be displayed
+							if (item.sub_menu != 0xFFFF'FFFF) {
+
+								if (i == 0) {
+
+									// if a submenu is already open
+									if (state->visible_menus.size() > 1) {
+
+										// hide title submenu if reclicked the same
+										if (state->visible_menus[i].item == item_idx &&
+											input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+											state->visible_menus.resize(1);
+											state->visible_menus[0].menu = 0;
+											state->visible_menus[0].item = item_idx;
+										}
+										// show another one without requiring clicking
+										else {
+											state->visible_menus.resize(i + 2);
+											state->visible_menus[i + 1].menu = item.sub_menu;
+											state->visible_menus[i + 1].item = item_idx;
+										}
+									}
+									// display submenu if clicked
+									else if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+										state->visible_menus.resize(i + 2);
+										state->visible_menus[i + 1].menu = item.sub_menu;
+										state->visible_menus[i + 1].item = item_idx;
+									}
+								}
+								// display submenu if hovered
+								else {
+									state->visible_menus.resize(i + 2);
+									state->visible_menus[i + 1].menu = item.sub_menu;
+									state->visible_menus[i + 1].item = item_idx;
+								}
+							}
+							// if item is endpoint
+							else {
+								// try to call item
+								if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+									if (item.info.callback != nullptr) {
+
+										item.info.callback(_window, _self, nullptr);
+
+										// hide menu
+										state->visible_menus.resize(1);
+										state->visible_menus[0].menu = 0;
+										state->visible_menus[0].item = 0xFFFF'FFFF;
+									}
+								}
+								// hide other submenu if hovering item
+								else {
+									state->visible_menus.resize(i + 1);
+								}
+							}
+							return;
+						}
+					}
 				}
-
-				is_hovered = true;
-				_visible_menus.resize(i + 2);
-				_visible_menus[i + 1] = item;
-
-				break;
+				return;
 			}
 		}
-	}
 
-	// is the mouse over the menu
-	if (is_hovered) {
+		// cursor is not over menu at all
 
-		if (is_clicked) {
-			_visible_menus.resize(1);
+		// close menu because user is interacting with something else
+		if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+			state->visible_menus.resize(1);
+			state->visible_menus[0].menu = 0;
+			state->visible_menus[0].item = 0xFFFF'FFFF;
+
+			allow_inside_events = true;
 		}
-		allow_inside_events = false;
-	}
-	else {
-		uint8_t mouse_btns = input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down +
-			input.key_list[VirtualKeys::RIGHT_MOUSE_BUTTON].is_down;
-
-		if (_visible_menus.size() < 3 || mouse_btns) {
-
-			_visible_menus.resize(1);
+		// stop highlighting if out of bounds
+		else {
+			state->visible_menus.back().item = 0xFFFF'FFFF;
 		}
-	}
+		// else keep displaing menu
+	};
+	f();
 }
 
 void Menu::_calcSizeAndRelativeChildPositions()
 {
-	_menu_background_render.reset();
-	_select_background_render.reset();
-	_label_render.reset();
+	Instance* inst = _window->instance;
 
-	uint32_t title_menu_height = 0;
-	uint32_t title_menu_width = 0;
-
-	// Menu Titles
-	int32_t pen_x = _position[0];
-	int32_t pen_y = _position[1];
+	// Diff the prev and current frame graph to see if they changed
+	// if they did then reset visible state
+	// else preserve for emit events
 	{
-		MenuItem* root = _visible_menus.front();
-		for (MenuItem* item : root->children) {
+		auto is_changed = [&]() -> bool {
 
-			uint32_t width;
-			uint32_t height;
-
-			TextInstance props;
-			props.screen_pos[0] = item->left_padding + pen_x;
-			props.screen_pos[1] = item->top_padding + pen_y;
-			props.text = item->text;
-			props.font_family = item->font_family;
-			props.font_style = item->font_style;
-			props.font_size = item->font_size;
-			props.line_height = item->line_height;
-			props.color = item->text_color;
-			_label_render.addInstance(props, width, height);
-
-			item->_label_box.pos[0] = pen_x;
-			item->_label_box.pos[1] = pen_y;
-
-			item->_label_box.size[0] = item->left_padding + width + item->right_padding;
-			item->_label_box.size[1] = item->top_padding + height + item->bot_padding;
-
-			pen_x += item->_label_box.size[0];
-
-			if (item->_label_box.size[1] > title_menu_height) {
-				title_menu_height = item->_label_box.size[1];
+			if (state->prev_submenus.size() != state->submenus.size()) {
+				return true;
 			}
 
-			title_menu_width += item->_label_box.size[0];
-		}
+			if (state->prev_sections.size() != state->sections.size()) {
+				return true;
+			}
 
-		for (MenuItem* item : root->children) {
-			item->_label_box.size[1] = title_menu_height;
-		}
+			if (state->prev_items.size() != state->items.size()) {
+				return true;
+			}
 
-		RectInstance props;
-		props.screen_pos = _position;
-		props.size = { title_menu_width, title_menu_height };
-		props.color = titles_background_color;
+			for (uint32_t i = 0; i < state->submenus.size(); i++) {
 
-		_menu_background_render.addInstance(props);
-	}
+				SubMenu& prev_submenu = state->prev_submenus[i];
+				SubMenu& submenu = state->submenus[i];
 
-	// Menus
-	if (_visible_menus.size() > 1) {
-
-		pen_x = _visible_menus[1]->_label_box.pos[0];
-		pen_y = _position[1] + title_menu_height;
-
-		for (uint32_t i = 1; i < _visible_menus.size(); i++) {
-
-			MenuItem* menu = _visible_menus[i];
-
-			int32_t menu_x = pen_x;
-			int32_t menu_y = pen_y;
-			uint32_t menu_width = 0;
-
-			for (MenuItem* item : menu->children) {
-
-				uint32_t width;
-				uint32_t height;
-
-				TextInstance props;
-				props.screen_pos[0] = item->left_padding + pen_x;
-				props.screen_pos[1] = item->top_padding + pen_y;
-				props.text = item->text;
-				props.font_family = item->font_family;
-				props.font_style = item->font_style;
-				props.font_size = item->font_size;
-				props.line_height = item->line_height;
-				props.color = item->text_color;
-				_label_render.addInstance(props, width, height);
-
-				item->_label_box.pos[0] = pen_x;
-				item->_label_box.pos[1] = pen_y;
-
-				item->_label_box.size[0] = item->left_padding + width + item->right_padding;  // not final, will be menu width 
-				item->_label_box.size[1] = item->top_padding + height + item->bot_padding;
-
-				pen_y += item->_label_box.size[1];
-
-				if (item->_label_box.size[0] > menu_width) {
-					menu_width = item->_label_box.size[0];
+				if (prev_submenu.child_sections != submenu.child_sections) {
+					return true;
 				}
 			}
 
-			// Labels
-			for (MenuItem* item : menu->children) {
-				item->_label_box.size[0] = menu_width;
+			for (uint32_t i = 0; i < state->sections.size(); i++) {
+
+				MenuSection& prev_section = state->prev_sections[i];
+				MenuSection& section = state->sections[i];
+
+				if (prev_section.child_items != section.child_items) {
+					return true;
+				}
 			}
 
-			// Selection
-			{
-				RectInstance props;
-				props.screen_pos = menu->_label_box.pos;
-				props.size = menu->_label_box.size;
-				props.color = select_background_color;
+			for (uint32_t i = 0; i < state->items.size(); i++) {
 
-				_select_background_render.addInstance(props);
+				MenuItem& prev_item = state->prev_items[i];
+				MenuItem& item = state->items[i];
+
+				if (prev_item.info.left_text.text != item.info.left_text.text) {
+					return true;
+				}
 			}
 
-			// Menu Background
-			if (menu->children.size()) {
+			return false;
+		};
 
-				menu->_menu_box.pos = { menu_x, menu_y };
-				menu->_menu_box.size = { menu_width, (uint32_t)(pen_y - menu_y) };
+		if (is_changed()) {
 
-				RectInstance props;
-				props.screen_pos = menu->_menu_box.pos;
-				props.size = menu->_menu_box.size;
-				props.color = menu->menu_background_color;
+			state->visible_menus.resize(1);
 
-				_menu_background_render.addInstance(props);
-			}
-
-			// Next
-			pen_x += menu_width;
-
-			if (i + 1 < _visible_menus.size()) {
-
-				pen_y = _visible_menus[i + 1]->_label_box.pos[1];
-
-				menu->_menu_box.pos = { menu_x, menu_y };
-				menu->_menu_box.size = { menu_width, (uint32_t)(pen_y - menu_y) };
-			}
+			MenuVisibleMenus& visible = state->visible_menus[0];
+			visible.menu = 0;
+			visible.item = 0xFFFF'FFFF;
 		}
+
+		state->prev_submenus = state->submenus;
+		state->prev_sections = state->sections;
+		state->prev_items = state->items;
 	}
 
-	// The size of the menu
-	_size[0] = title_menu_width;
-	_size[1] = title_menu_height;
-}
+	// Menu Titles
+	int32_t pen_x = 0;
+	int32_t pen_y = 0;
+	{
+		SubMenu& root_submenu = state->submenus[0];
+		root_submenu.box = {};
 
-void Menu::_generateGPU_Data()
-{
-	_menu_background_render.generateGPU_Data();
-	_select_background_render.generateGPU_Data();
-	_label_render.generateGPU_Data();
+		for (uint32_t section_idx : root_submenu.child_sections) {
+
+			MenuSection& section = state->sections[section_idx];
+
+			for (uint32_t item_idx : section.child_items) {
+
+				MenuItem& item = state->items[item_idx];
+
+				item.box.pos = { pen_x, pen_y };
+
+				inst->findAndPositionGlyphs(
+					item.info.left_text,
+					(int32_t)item.info.left_padding + pen_x, (int32_t)item.info.top_padding + pen_y,
+					item.box.size[0], item.box.size[1],
+					item._text.chars
+				);
+
+				item._text.color = item.info.left_text.color;
+
+				item.box.size[0] += item.info.left_padding + item.info.right_padding;
+				item.box.size[1] += item.info.top_padding + item.info.bot_padding;
+
+				pen_x += item.box.size[0];
+
+				// menu height
+				if (item.box.size[1] > root_submenu.box.size[1]) {
+					root_submenu.box.size[1] = item.box.size[1];
+				}
+			}
+		}
+
+		root_submenu.box.size[0] = pen_x;
+	}
+
+	// Submenus
+	if (state->visible_menus.size() > 1) {
+
+		for (uint32_t visible_idx = 1; visible_idx < state->visible_menus.size(); visible_idx++) {
+
+			MenuVisibleMenus& visible = state->visible_menus[visible_idx];
+
+			MenuItem* parent_item;
+			{
+				MenuVisibleMenus& prev_visible = state->visible_menus[visible_idx - 1];
+				parent_item = &state->items[prev_visible.item];
+			}
+
+			SubMenu& submenu = state->submenus[visible.menu];
+			uint32_t border_thick = submenu.info.border_thickness;
+
+			if (visible_idx == 1) {
+				pen_x = parent_item->box.pos[0];
+				pen_y = state->submenus[0].box.size[1];
+
+				submenu.box.pos = { pen_x, pen_y };
+
+				pen_y += border_thick;
+			}
+			else {
+				pen_x = parent_item->box.pos[0] + parent_item->box.size[0] - border_thick;
+				pen_y = parent_item->box.pos[1];
+
+				submenu.box.pos = { pen_x, pen_y - (int32_t)border_thick };
+			}
+			
+			uint32_t max_width = 0;
+
+			// First pass to find out text size
+			for (uint32_t section_idx : submenu.child_sections) {
+
+				MenuSection& section = state->sections[section_idx];
+
+				for (uint32_t item_idx : section.child_items) {
+
+					MenuItem& item = state->items[item_idx];
+					MenuItemCreateInfo& info = item.info;
+
+					item.box.pos = { pen_x, pen_y };
+
+					uint32_t text_width;
+					uint32_t text_height;
+
+					// Text
+					{
+						inst->findAndPositionGlyphs(
+							item.info.left_text,
+							pen_x + (int32_t)(border_thick + item.info.left_padding),
+							pen_y + (int32_t)(item.info.top_padding),
+							text_width, text_height,
+							item._text.chars
+						);
+
+						item._text.color = item.info.left_text.color;
+					}
+
+					// Item Size
+					uint32_t item_height = info.top_padding + text_height + info.bot_padding;
+					uint32_t used_item_width =
+						border_thick +
+						info.left_padding + text_width + info.arrow_left_padding +
+						info.arrow_width + info.right_padding +
+						border_thick;
+					
+					// Arrow
+					{
+						item._arrow.screen_pos[1] = pen_y + (item_height - info.arrow_height) / 2;
+						item._arrow.size = { info.arrow_width, info.arrow_height };
+
+						if (item_idx == visible.item) {
+							item._arrow.color = info.arrow_highlight_color;
+						}
+						else {
+							item._arrow.color = info.arrow_color;
+						}
+					}
+
+					// item.box.size[0] = we cannot know how large item will be on first pass
+					item.box.size[1] = item_height;
+
+					if (used_item_width > max_width) {
+						max_width = used_item_width;
+					}
+
+					pen_y += item_height;
+				}
+			}
+
+			// make sure submenu is as wide as parent item
+			if (max_width < parent_item->box.size[0]) {
+				max_width = parent_item->box.size[0];
+			}
+
+			// Second pass
+			for (uint32_t section_idx : submenu.child_sections) {
+
+				MenuSection& section = state->sections[section_idx];
+
+				for (uint32_t item_idx : section.child_items) {
+
+					MenuItem& item = state->items[item_idx];
+					MenuItemCreateInfo& info = item.info;
+
+					item.box.size[0] = max_width;
+
+					// Arrow
+					item._arrow.screen_pos[0] = pen_x +
+						(max_width - border_thick - info.right_padding - info.arrow_width);
+				}
+			}
+
+			submenu.box.size[0] = max_width;
+			submenu.box.size[1] = pen_y - submenu.box.pos[1] + border_thick;
+
+			pen_x += submenu.box.size[0];
+		}
+	}
 }
 
 void Menu::_draw()
 {
-	_menu_background_render.draw();
-	_select_background_render.draw();
-	_label_render.draw();
+	Instance* inst = _window->instance;
+
+	// Menu titles
+	{
+		SubMenu& root_submenu = state->submenus[0];
+		{
+			RectInstance rect_instance;
+			rect_instance.screen_pos = _position;
+			rect_instance.size = root_submenu.box.size;
+			rect_instance.color = root_submenu.info.background_color;
+
+			inst->drawRects(_window, std::vector<RectInstance*>{ &rect_instance });
+		}	
+
+		state->text_instances.clear();
+
+		for (uint32_t section_idx : root_submenu.child_sections) {
+
+			MenuSection& section = state->sections[section_idx];
+
+			for (uint32_t item_idx : section.child_items) {
+
+				MenuItem& item = state->items[item_idx];
+
+				// update box position to screen
+				item.box.pos[0] += _position[0];
+				item.box.pos[1] += _position[1];
+
+				if (item_idx == state->visible_menus[0].item) {
+
+					RectInstance rect_instance;
+					rect_instance.screen_pos = item.box.pos;
+					rect_instance.size = item.box.size;
+					rect_instance.color = item.info.highlight_color;
+
+					inst->drawRects(_window, std::vector<RectInstance*>{ &rect_instance });
+
+					if (state->visible_menus.size() > 1) {
+
+						BorderInstance border_inst;
+						border_inst.screen_pos = item.box.pos;
+						border_inst.size = item.box.size;
+						border_inst.thickness = root_submenu.info.border_thickness;
+						border_inst.color = root_submenu.info.border_color;
+						border_inst.bot = false;
+
+						inst->drawBorder(_window, std::vector<BorderInstance*>{ &border_inst });
+					}
+				}
+
+				// update character positions to screen
+				for (PositionedCharacter& chara : item._text.chars) {
+
+					chara.pos[0] += _position[0];
+					chara.pos[1] += _position[1];
+				}
+
+				state->text_instances.push_back(&item._text);
+			}
+		}
+
+		inst->drawTexts(_window, state->text_instances);
+	}
+
+	// Submenu
+	{
+		for (uint32_t visible_idx = 1; visible_idx < state->visible_menus.size(); visible_idx++) {
+
+			MenuVisibleMenus& visible = state->visible_menus[visible_idx];
+
+			SubMenu& submenu = state->submenus[visible.menu];
+			int32_t border_thick = submenu.info.border_thickness;
+
+			// Menu background
+			{
+				RectInstance rect_instance;
+				rect_instance.screen_pos = { 
+					submenu.box.pos[0],
+					submenu.box.pos[1]
+				};
+				rect_instance.size = {
+					submenu.box.size[0],
+					submenu.box.size[1]
+				};
+				rect_instance.color = submenu.info.background_color;
+
+				inst->drawRects(_window, std::vector<RectInstance*>{ &rect_instance });
+			}
+
+			// Menu border
+			{
+				if (visible_idx == 1) {
+
+					BorderInstance border_inst;
+					border_inst.screen_pos = {
+						submenu.box.pos[0],
+						submenu.box.pos[1]
+					};
+					border_inst.size = {
+						submenu.box.size[0],
+						submenu.box.size[1]
+					};
+					border_inst.thickness = border_thick;
+					border_inst.color = submenu.info.border_color;
+					border_inst.top = false;
+
+					inst->drawBorder(_window, std::vector<BorderInstance*>{ &border_inst });
+				}
+				else {
+					BorderInstance border_inst;
+					border_inst.screen_pos = {
+						submenu.box.pos[0],
+						submenu.box.pos[1]
+					};
+					border_inst.size = {
+						submenu.box.size[0],
+						submenu.box.size[1]
+					};
+					border_inst.thickness = border_thick;
+					border_inst.color = submenu.info.border_color;
+
+					inst->drawBorder(_window, std::vector<BorderInstance*>{ &border_inst });
+				}
+			}
+
+			state->text_instances.clear();
+			state->arrow_instances.clear();
+
+			for (uint32_t section_idx : submenu.child_sections) {
+
+				MenuSection& section = state->sections[section_idx];
+
+				for (uint32_t item_idx : section.child_items) {
+
+					MenuItem& item = state->items[item_idx];
+
+					// update box position to screen
+					item.box.pos[0] += _position[0];
+					item.box.pos[1] += _position[1];
+
+					// Highlight
+					if (item_idx == visible.item) {
+
+						RectInstance rect_instance;
+						rect_instance.screen_pos = {
+							item.box.pos[0] + border_thick,
+							item.box.pos[1]
+						};
+						rect_instance.size = {
+							item.box.size[0] - (2 * border_thick),
+							item.box.size[1]
+						};
+						rect_instance.color = item.info.highlight_color;
+
+						inst->drawRects(_window, std::vector<RectInstance*>{ &rect_instance });
+					}
+
+					// Text
+					for (PositionedCharacter& chara : item._text.chars) {
+
+						chara.pos[0] += _position[0];
+						chara.pos[1] += _position[1];
+					}
+
+					state->text_instances.push_back(&item._text);
+
+					// Arrow
+					if (item.sub_menu != 0xFFFF'FFFF) {
+
+						item._arrow.screen_pos[0] += _position[0];
+						item._arrow.screen_pos[1] += _position[1];
+
+						state->arrow_instances.push_back(&item._arrow);
+					}
+				}
+			}
+
+			inst->drawTexts(_window, state->text_instances);
+			inst->drawArrows(_window, state->arrow_instances);
+		}
+	}
 }

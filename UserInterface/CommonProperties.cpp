@@ -2,11 +2,11 @@
 // Header
 #include "CommonProperties.hpp"
 
-// GLM
-#include "glm\common.hpp"
-
 
 using namespace nui;
+
+
+SteadyTime nui::frame_start_time;
 
 
 Color::Color() {}
@@ -46,6 +46,11 @@ Color::Color(int32_t hex)
 	this->rgba.g = green / 255;
 	this->rgba.b = blue / 255;
 	this->rgba.a = 1.0f;
+}
+
+Color::Color(glm::vec4 new_rgba)
+{
+	this->rgba = new_rgba;
 }
 
 Color Color::red()
@@ -97,6 +102,11 @@ void Color::setRGBA_UNORM(float r, float g, float b, float a)
 	this->rgba.a = a;
 }
 
+bool Color::operator==(Color& other)
+{
+	return rgba == other.rgba;
+}
+
 ElementSize::ElementSize()
 {
 	this->type = ElementSizeType::FIT;
@@ -107,11 +117,35 @@ ElementSize::ElementSize(int32_t size_px)
 	this->type = ElementSizeType::ABSOLUTE;
 	this->absolute_size = (uint32_t)size_px;
 }
+ElementSize::ElementSize(uint32_t size_px)
+{
+	this->type = ElementSizeType::ABSOLUTE;
+	this->absolute_size = (uint32_t)size_px;
+}
 
 ElementSize::ElementSize(float percentage)
 {
 	this->type = ElementSizeType::RELATIVE;
 	this->relative_size = percentage / 100.f;
+}
+
+bool ElementSize::operator==(ElementSize& other)
+{
+	if (this->type == other.type) {
+
+		switch (this->type) {
+		case ElementSizeType::ABSOLUTE:
+			return this->absolute_size == other.absolute_size;
+
+		case ElementSizeType::RELATIVE:
+			return this->relative_size == other.relative_size;
+
+		case ElementSizeType::FIT:
+			return true;
+		}
+	}
+
+	return false;
 }
 
 ElementSize& ElementSize::operator=(int32_t size_px)
@@ -128,6 +162,39 @@ ElementSize& ElementSize::operator=(float percentage)
 	return *this;
 }
 
+ElementPosition::ElementPosition()
+{
+	this->type = ElementPositionType::ABSOLUTE;
+	this->absolute_pos = 0;
+}
+
+ElementPosition::ElementPosition(int32_t new_absolute_pos)
+{
+	this->type = ElementPositionType::ABSOLUTE;
+	this->absolute_pos = new_absolute_pos;
+}
+
+ElementPosition::ElementPosition(float new_relative_pos)
+{
+	this->type = ElementPositionType::RELATIVE;
+	this->relative_pos = new_relative_pos;
+}
+
+bool ElementPosition::operator==(ElementPosition& other)
+{
+	if (this->type == other.type) {
+
+		switch (this->type) {
+		case ElementPositionType::ABSOLUTE:
+			return this->absolute_pos == other.absolute_pos;
+
+		case ElementPositionType::RELATIVE:
+			return this->relative_pos == other.relative_pos;
+		}
+	}
+
+	return false;
+}
 
 ElementPosition& ElementPosition::operator=(int32_t size_px)
 {
@@ -143,42 +210,17 @@ ElementPosition& ElementPosition::operator=(float percentage)
 	return *this;
 }
 
-
-template<typename T>
-bool AnimatedProperty<T>::isAnimated()
+Z_Index::Z_Index()
 {
-	return start_time != end_time;
+	this->type = Z_IndexType::INHERIT;
 }
-template bool AnimatedProperty<float>::isAnimated();
-template bool AnimatedProperty<glm::vec4>::isAnimated();
 
-template<typename T>
-T AnimatedProperty<T>::calculate(SteadyTime& now)
+TextProps::TextProps()
 {
-	switch (blend_func) {
-	case TransitionBlendFunction::LINEAR: {
-		if (end_time < now) {
-			end_time = start_time;  // animation ended
-			return end;
-		}
-		else {
-			float elapsed = (float)(now - start_time).count();
-			float total = (float)(end_time - start_time).count();
-
-			return glm::mix(start, end, elapsed / (total));
-		}
-		break;
-	}
-	}
-
-	throw std::exception();
-	return T();
-}
-template float AnimatedProperty<float>::calculate(SteadyTime& now);
-template glm::vec4 AnimatedProperty<glm::vec4>::calculate(SteadyTime& now);
-
-
-ColorStep::ColorStep(Color& new_color)
-{
-	this->color = new_color;
+	this->text = "";
+	this->font_family = "Roboto";
+	this->font_style = "Regular";
+	this->font_size = 14;
+	this->line_height = 0xFFFF'FFFF;
+	this->color = Color::white();
 }

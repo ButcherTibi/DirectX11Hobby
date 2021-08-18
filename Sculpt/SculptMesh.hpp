@@ -81,18 +81,17 @@ struct BrushProperty {
 
 	BrushSpeedInfluence speed_influence;
 
-	T _value;
+	T _stroke_value;
 
 	void calcStrokeValue(T& global_value);
-	void calcStepValue(float speed);
+	void calcSpeedInfluence(T& value, float speed);
 };
 
 
 struct BrushStep {
+	glm::vec2 mouse_pos;
 	glm::vec3 target;  // ray target
 	// pressure
-
-	SteadyTime time;
 };
 
 
@@ -408,10 +407,11 @@ namespace scme {
 		//
 		void applyStandardBrush(
 			glm::vec3& ray_origin,
-			BrushProperty<float>& radius,
-			BrushProperty<float>& strength,
-			BrushProperty<BrushFalloff>& falloff,
-			std::vector<BrushStep>& steps, uint32_t start_step);
+			BrushProperty<uint32_t>& stroke_sample_count,
+			BrushProperty<float>& stroke_radius,
+			BrushProperty<float>& stroke_strength,
+			BrushProperty<BrushFalloff>& stroke_falloff,
+			std::vector<BrushStep>& raw_steps, uint32_t start_step);
 
 
 		// GPU Updates

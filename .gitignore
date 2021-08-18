@@ -6,3 +6,7 @@ Sculpt/x64
 
 # Library
 UserInterface/x64
+Sculpt/x64
+
+# Program Debug Database
+*.pdb

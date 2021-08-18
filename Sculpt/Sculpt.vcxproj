@@ -145,6 +145,7 @@
     </ClCompile>
     <ClCompile Include="Primitives.cpp" />
     <ClCompile Include="UserInteraction.cpp" />
+    <ClCompile Include="UserInterfaceTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Application.hpp" />
@@ -158,6 +159,7 @@
     <ClInclude Include="SculptMesh.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="SculptPCH.hpp" />
+    <ClInclude Include="UserInterfaceTests.hpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="AABB_PS.hlsl">

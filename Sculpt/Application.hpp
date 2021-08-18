@@ -218,6 +218,7 @@ namespace SelectionMode {
 namespace InteractionModes {
 	enum {
 		BLANK_WINDOW,
+		UI_TESTS,
 		DEFAULT,
 
 		INSTANCE_SELECTION,
@@ -329,11 +330,13 @@ struct StandardBrushSettings {
 
 	// TODO: drag behind dot elasticy
 
+	BrushProperty<uint32_t> sample_count;
 	BrushProperty<float> radius;
 	BrushProperty<float> strength;
 	BrushProperty<BrushFalloff> falloff;  // only the local value is used
 
-	std::vector<BrushStep> steps;
+	std::vector<BrushStep> raw_steps;
+	std::vector<BrushStep> applied_steps;
 
 	// Secondary brush usully on SHIFT key
 	//uint32_t second_brush;
@@ -366,15 +369,14 @@ struct SmoothBrushSettings {
 
 struct SculptContext {
 	MeshInstanceRef target;
-
-	// size relative to viewport height
-	float global_brush_radius;
-
-	// strength as a fraction of the radius
-	float global_brush_strength;
-
-	// falloff
+	
+	// average N steps before applying one
+	uint32_t global_sample_count;
+	float global_brush_radius;  // size relative to viewport height	
+	float global_brush_strength;  // strength as a fraction of the radius
 	BrushFalloff global_brush_falloff;
+
+	//float strength_time_unit;
 
 	bool stroke_started;
 
@@ -536,7 +538,7 @@ public:
 	MeshInstanceRef createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
 	// import a GLTF from path
-	ErrStack importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
+	ErrStack importMeshesFromGLTF_File(io::Path& path, GLTF_ImporterSettings& settings,
 		std::vector<MeshInstanceRef>* r_instances = nullptr);
 
 	//MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);

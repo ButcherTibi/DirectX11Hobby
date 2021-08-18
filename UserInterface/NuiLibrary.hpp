@@ -27,16 +27,17 @@
 
 
 // TODO:
-// - tooltips
-// - menu arrow
-// - menu shortcuts
-// - context menu
-// - button
-// - drop down
-// - tabs
 // - tree list
+// - button
+// - context menu
+// - tabs
+// - tooltips
 // - edit text
 // - slider
+// - check box
+// - dropdown
+// - icon
+// - image
 
 
 // NOTES TO SELF:
@@ -63,26 +64,32 @@
 //  removed Z Index feature
 // Version 3.5: Readded Z index feature, changed how events are propagated, no longer try to pack gpu_data
 //  into large buffers
+// Version 4: 
 namespace nui {
 
 	// Forward declarations
 	class Instance;
 	class Window;
 	class Element;
+
 	struct Root;
-	struct Text;
-	struct RelativeWrap;
+	class Text;
+	struct Stack;
 	class Flex;
+	class Rect;
+
 	struct MenuItem;
+	struct MenuSection;
 	class Menu;
-	struct UpdateChange;
+
+	struct StoredElement2;
 
 	// Typedefs
-	typedef std::variant<Root, Text, RelativeWrap, Flex, Menu> StoredElement;
+	typedef std::variant<Root, Text, Stack, Flex, Menu, Rect> StoredElement;
 
 
 	// Events Component /////////////////////////////////////////////////////////////////
-	typedef void (*EventCallback)(Window* window, StoredElement* source, void* user_data);
+	typedef void (*EventCallback)(Window* window, StoredElement2* source, void* user_data);
 	typedef void (*WindowCallback)(Window* window, void* user_data);
 
 	// is the mouse inside or outside
@@ -152,11 +159,11 @@ namespace nui {
 		// emit events where the mouse is inside the element
 		// note that it's not this class responsability to perform collision detection with the mouse
 		// it is assumend to be already decided
-		void _emitInsideEvents(StoredElement* self);
+		void _emitInsideEvents(StoredElement2* self);
 
 		// emit events where the mouse is outside the element
 		// for now only leave event fits this case
-		void _emitOutsideEvents(StoredElement* self);
+		void _emitOutsideEvents(StoredElement2* self);
 
 	public:
 		void setMouseEnterEvent(EventCallback callback, void* user_data = nullptr);
@@ -208,104 +215,77 @@ namespace nui {
 			TEXT,
 			RELATIVE,
 			FLEX,
-			MENU
+			MENU,
+			RECT
 		};
 	}
 
-	namespace ChangedElementType {
-		enum {
-			FLEX,
-			MENU
-		};
-	}
+	struct ElementRetainedState {
+		std::string id;
+		bool used;
 
-	struct ChangedElement {
-		std::optional<uint32_t> z_index;
-		std::optional<std::array<ElementSize, 2>> size;
+		std::array<InternalAnimatedProperty<ElementSize>, 2> size;
+
+		std::array<InternalAnimatedProperty<float>, 2> origin;
+		std::array<InternalAnimatedProperty<ElementPosition>, 2> relative_position;
+		InternalAnimatedProperty<float> flex_grow;
 	};
-
 
 	// Base element class used by all elements
 	class Element {
 	public:
 		Window* _window;  // pointer to parent window some little things
 
-		Element* _parent;  // parent element that may determine layout or size
+		StoredElement2* _parent;  // parent element that may determine layout or size
 
-		// reference to self from the children if the parent used only for deletion
-		std::list<Element*>::iterator _self_children;
-
-		// reference to self as a specific element from window elements
-		std::list<StoredElement>::iterator _self_elements;
+		StoredElement2* _self;
 
 		// children that this element contains
-		std::list<Element*> _children;
+		std::vector<StoredElement2*> _children;
+
+		// the computed position to be sent to the GPU
+		std::array<int32_t, 2> _position;
+
+		// absolute size in pixels
+		// relative size as 0% to 100% of parent computed size
+		// fit size is based on the size of children
+		std::array<ElementSize, 2> size;
+		std::array<uint32_t, 2> _size;
+
+		// the order in which to render the element and it's descendants
+		// is 0 by default meaning inherit from parent
+		Z_Index z_index;
+
+		// the computed Z index that controls in which draw stack will this element be assigned
+		int32_t _z_index;
+
+
+		// Relative Wrap
 
 		// the origin of the element expresed as 0% to 100% from computed size
-		// used to center the element in relative layout, work the same as the origin of a mesh in a 3D app
+		// works the same as the origin of a mesh in a 3D app
 		std::array<float, 2> origin;
 
 		// the position relative to parent expresed in relative or absolute units
 		// also works under Window/Root
 		std::array<ElementPosition, 2> relative_position;
 
-		// the computed position to be sent to the GPU
-		std::array<int32_t, 2> _position;
+		// Flex
 
-		// 
+		// how much to grow an element
 		float flex_grow;
 
-		// the order in which to render the element and it's descendants
-		// is 0 by default meaning inherit from parent
-		uint32_t z_index;
-
-		// the computed Z index that controls in which draw stack will this element be assigned
-		uint32_t _z_index;
-
-		// absolute size in pixels
-		// relative size as 0% to 100% of parent computed size
-		// fit size is based on the size of children
-		std::array<ElementSize, 2> size;
-
-		// the computed size used in layout calculation
-		std::array<uint32_t, 2> _size;
-
-		UpdateChange* _update;
-
 	public:
-		void _init();
-
-		void _ensureHasChange();
-
-		ChangedElement& _ensureChangedElement();
-
-
-		// Update
-
-		void setZ_Index(uint32_t new_z_index);
-		
-		void setSize(ElementSize x, ElementSize y);
-
-		void getSize(ElementSize& r_x, ElementSize& r_y);
-
-
 		// Virtuals in order of usage
 
-		// eg. width = 50% of parent or width = 100px
-		// only called in one location
-		void _calcSizeRelativeToParent();
-
-		// element may implement this in order process events
+		// element may implement this to process events
 		virtual void _emitEvents(bool& r_allow_inside_events);
 
-		// element may implement this if size requires computation
+		// element may implement this if _size requires computation
 		// Example:
 		// if element size[0] = Fit then size of the element depends on calculating the size of children
 		// if element size cannot be determined ahead of time as in the case of the Menu element
 		virtual void _calcSizeAndRelativeChildPositions();
-
-		// element may use this to generate data to be loaded on the GPU
-		virtual void _generateGPU_Data();
 
 		// implemented to load data to the GPU and draw
 		virtual void _draw();
@@ -314,25 +294,142 @@ namespace nui {
 	Element* getElementBase(StoredElement* elem);
 
 
+	// Container element class for adding children to parent elements
+
+	struct ElementCreateInfo {
+		std::string id;
+
+		std::array<AnimatedProperty<ElementSize>, 2> size;
+		Z_Index z_index;
+
+		std::array<AnimatedProperty<float>, 2> origin;
+		std::array<AnimatedProperty<ElementPosition>, 2> relative_position;
+		AnimatedProperty<float> flex_grow;
+	};
+
+	struct TextCreateInfo : public ElementCreateInfo {
+		std::string text;
+		std::string font_family;
+		std::string font_style;
+		AnimatedProperty<uint32_t> font_size;
+		AnimatedProperty<uint32_t> line_height;
+		AnimatedProperty<Color> color;
+
+		TextCreateInfo();
+	};
+
+	enum class FlexOrientation {
+		ROW,
+		COLUMN
+	};
+
+	enum class FlexSpacing {
+		START,
+		CENTER,
+		END,
+		SPACE_BETWEEN,
+	};
+
+	struct FlexCreateInfo : public ElementCreateInfo {
+		FlexOrientation orientation;
+		FlexSpacing items_spacing;
+		FlexSpacing lines_spacing;
+	};
+
+	struct RectCreateInfo : public ElementCreateInfo {
+		AnimatedProperty<Color> color;
+	};
+
+	struct MenuCreateInfo : public ElementCreateInfo {
+		Color titles_background_color;
+		Color titles_highlight_color;
+
+		uint32_t titles_border_thickness;
+		Color titles_border_color;
+	};
+
+	class Container : public Element {
+	public:
+		void assign(Element& elem, ElementRetainedState* prev, ElementCreateInfo& next);
+
+		void createText(TextCreateInfo& info);
+		Flex* createFlex(FlexCreateInfo& info);
+		Rect* createRect(RectCreateInfo& info);
+		Menu* createMenu(MenuCreateInfo& info);
+
+		//Rect* createRectangle();
+		//RelativeWrap* createRelativeWrap();
+		//Flex* createFlex();
+		//Menu* createMenu();
+	};
+
+
+	// Root ////////////////////////////////////////////////////////////////////////////////////
+
 	// having a mostly unused root element is helpfull for symentric graph traversal
-	struct Root : Element {
+	struct Root : Container {
 		EventsComponent _events;
 
 		void _emitEvents(bool& allow_inside_events) override;
 
 		void _calcSizeAndRelativeChildPositions() override;
+
+		void _draw() override;
 	};
 
 
-	// TODO: reimplement
-	struct Text : Element {
-		std::string text;  // TODO: unicode
+	// Text ////////////////////////////////////////////////////////////////////////////////////
+
+	struct TextRetainedState : public ElementRetainedState {		
+		InternalAnimatedProperty<uint32_t> font_size;
+		InternalAnimatedProperty<uint32_t> line_height;
+		InternalAnimatedProperty<Color> color;
+	};
+
+	class Text : public Element {
+	public:
+		std::string text;
 		std::string font_family;
 		std::string font_style;
-		uint32_t font_size;  // TODO: text font size metrics
+		uint32_t font_size;
 		uint32_t line_height;
 		Color color;
+
+		TextInstance instance;
+
+	public:
+		void _calcSizeAndRelativeChildPositions() override;
+
+		void _draw() override;
 	};
+
+
+	// Rectangle //////////////////////////////////////////////////////////////////////////////////
+
+	struct RectRetainedState : public ElementRetainedState {
+		InternalAnimatedProperty<Color> color;
+	};
+
+	class Rect : public Container {
+	public:
+		Color color;
+
+	public:
+		void _draw() override;
+	};
+
+
+	// Button ///////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+	// DirectX11_Viewport ////////////////////////////////////////////////////////////////////////
+
+	/*class DirectX11_Viewport {
+	public:
+
+	};*/
 
 
 	// Background Element ///////////////////////////////////////////////////////////////////////
@@ -351,78 +448,68 @@ namespace nui {
 		glm::uvec2 viewport_size;
 	};
 
-	typedef void(*RenderingSurfaceCallback)(Window* window, StoredElement* source, SurfaceEvent& event, void* user_data);
+	//typedef void(*RenderingSurfaceCallback)(Window* window, StoredElement* source, SurfaceEvent& event, void* user_data);
 
-	struct BackgroundElement : public Element {
-		BackgroundColoring coloring;
+	//struct BackgroundElement : public Element {
+	//	BackgroundColoring coloring;
 
-		Color background_color;
-		AnimatedProperty<glm::vec4> _background_color;
+	//	Color background_color;
+	//	AnimatedProperty<glm::vec4> _background_color;
 
-		RenderingSurfaceCallback _onRenderingSurface;
-		void* _surface_event_user_data;
+	//	RenderingSurfaceCallback _onRenderingSurface;
+	//	void* _surface_event_user_data;
 
-		RectRender _rect_render;
+	//	RectRender _rect_render;
 
-		EventsComponent _events;
+	//	EventsComponent _events;
 
-	public:
-		void _init();
-		void _generateGPU_Data() override;
-		void _draw() override;
+	//public:
+	//	void _init();
+	//	void _generateGPU_Data() override;
+	//	void _draw() override;
 
-		void setColorTransition(Color& end_color, uint32_t duration);
+	//	void setColorTransition(Color& end_color, uint32_t duration);
 
-		void setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data = nullptr);
-	};
+	//	void setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data = nullptr);
+	//};
 
 
-	// RelativeWrap ///////////////////////////////////////////////////////////////////////
+	// Stack ///////////////////////////////////////////////////////////////////////
 
-	struct RelativeWrap : public BackgroundElement {
+	struct Stack : public Container {
 		// Element does not have any properties, but children do
 
 	public:
-		void _calcSizeAndRelativeChildPositions() override;
+	//	void _calcSizeAndRelativeChildPositions() override;
 	};
 
 
 	// Flex ///////////////////////////////////////////////////////////////////////////////
 
-	class Flex : public BackgroundElement {
+	struct FlexRetainedState : public ElementRetainedState {
+
+	};
+
+	class Flex : public Container {
 	public:
-		enum class Orientation {
-			ROW,
-			COLUMN
-		};
+		//// TODO: not implmented
+		//enum class SelfAlign {
+		//	START,
+		//	CENTER,
+		//	END,
+		//	STRETCH
+		//};
 
-		enum class Spacing {
-			START,
-			CENTER,
-			END,
-			SPACE_BETWEEN,
-		};
+		FlexOrientation orientation;
+		FlexSpacing items_spacing;
+		FlexSpacing lines_spacing;
 
-		// TODO: not implmented
-		enum class SelfAlign {
-			START,
-			CENTER,
-			END,
-		};
-
-		Orientation orientation;
-		Spacing items_spacing;
-		Spacing lines_spacing;
+		EventsComponent _events;
 
 	public:
-		struct Change {
-			std::optional<Flex::Orientation> orientation;
-		};
-		Change& ensureChangedFlex();
+		void _emitEvents(bool& allow_inside_events) override;
 
-		// Updates
-		Orientation getOrientation();
-		void setOrientation(Orientation new_orientation);
+		void _calcSizeAndRelativeChildPositions() override;
 
 		// Events
 		void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
@@ -434,138 +521,133 @@ namespace nui {
 
 		void beginMouseLoopDeltaEffect();
 		void beginMouseFixedDeltaEffect();
-
-		void _emitEvents(bool& allow_inside_events) override;
-		void _calcSizeAndRelativeChildPositions() override;
 	};
 
 
 	// Menu //////////////////////////////////////////////////////////////
 
-	struct MenuStyle {
-		std::string font_family = "Roboto";
-		std::string font_style = "Regular";
-		uint32_t font_size = 14;
-		uint32_t line_height = 0;
-		Color text_color = Color(1.0f, 1.0f, 1.0f);
+	struct SubMenuCreateInfo {
+		Color background_color;
+
+		uint32_t border_thickness = 0;
+		Color border_color;
+
+		// std::array<uint32_t, 2> shadow_offset;
+		// uint32_t shadow_spread;
+		// Color shadow_color;
+
+		SubMenuCreateInfo() = default;
+		SubMenuCreateInfo(Color& new_background_color);
+	};
+
+	struct MenuSectionCreateInfo {
+		//Color background_color;
+
+		//Color separator_color;
+		//uint32_t separator_thickness;
+	};
+
+	struct MenuItemCreateInfo {
+		TextProps left_text;
+		//TextProps right_text;
 
 		uint32_t top_padding = 0;
 		uint32_t bot_padding = 0;
 		uint32_t left_padding = 0;
 		uint32_t right_padding = 0;
+		uint32_t arrow_left_padding = 0;
 
-		Color menu_background_color;
+		Color highlight_color;
+
+		// Arrow
+		uint32_t arrow_width = 14;
+		uint32_t arrow_height = 14;
+		Color arrow_color;
+		Color arrow_highlight_color;
+
+		// Events
+		EventCallback callback = nullptr;
 	};
 
-	// Each Menu Item is both a child and parent
-	// it is a child entry of a menu
-	// and a parent title of a sub menu
+	
+	struct SubMenu {
+		std::vector<uint32_t> child_sections;
+
+		SubMenuCreateInfo info;
+
+		Box2D box;
+
+		// Render
+		RectInstance _background;
+	};
+
+	struct MenuSection {
+		std::vector<uint32_t> child_items;
+
+		MenuSectionCreateInfo info;
+
+		Box2D _section_box;
+
+		// Render
+		RectInstance _background;
+	};
+
 	struct MenuItem {
-		Menu* menu;
+		uint32_t sub_menu;
 
-		MenuItem* parent;
-		std::list<MenuItem*> children;
+		MenuItemCreateInfo info;
+	
+		Box2D box;
 
-		// Label
-		std::string text;
-		std::string font_family;
-		std::string font_style;
-		uint32_t font_size;
-		uint32_t line_height;
-		Color text_color;
-
-		uint32_t top_padding;
-		uint32_t bot_padding;
-		uint32_t left_padding;
-		uint32_t right_padding;
-		Box2D _label_box;
-		EventCallback label_callback;
-		void* label_user_data;
-
-		// Menu
-		Color menu_background_color;
-
-		Box2D _menu_box;
-
-	public:
-		void setItemText(std::string text);
-
-		void setItemCallback(EventCallback callback);
-
-		MenuItem* addItem(MenuStyle& style);
+		// Render
+		TextInstance _text;
+		ArrowInstance _arrow;
 	};
 
-	namespace MenuItemChangeType {
-		enum {
-			ADD,
-			UPDATE,
-			REMOVE
-		};
-	}
+	struct MenuVisibleMenus {
+		uint32_t menu;
+		uint32_t item;
+	};
+
+	struct MenuRetainedState : public ElementRetainedState {
+		// Graph from last frame
+		std::vector<SubMenu> prev_submenus;
+		std::vector<MenuSection> prev_sections;
+		std::vector<MenuItem> prev_items;
+
+		// Current frame graph
+		std::vector<SubMenu> submenus;
+		std::vector<MenuSection> sections;
+		std::vector<MenuItem> items;
+
+		std::vector<MenuVisibleMenus> visible_menus;
+
+		// Memory cache
+		std::vector<TextInstance*> text_instances;
+		std::vector<ArrowInstance*> arrow_instances;
+	};
 
 	class Menu : public Element {
 	public:
-		std::list<MenuItem> _items;
-
-		RectRender _menu_background_render;
-		RectRender _select_background_render;
-		TextRender _label_render;
-
-		Color titles_background_color;
-		Color select_background_color;
-
-		// contains all the visible menus
-		// first is always root the which is always rendered and does not have any events triggered
-		// every menu that is present in this list is rendered
-		std::vector<MenuItem*> _visible_menus;
+		MenuRetainedState* state;
 
 	public:
-		void _init();
-
-		struct Change {
-
-			struct AddItem {
-				MenuItem* parent;
-				MenuItem* item;  // where was the element added
-			};
-
-			struct UpdateItem {
-				MenuItem* item;
-
-				std::optional<std::string> text;
-				std::optional<EventCallback> callback;
-			};
-			std::vector<std::variant<AddItem, UpdateItem>> item_changes;
-
-			std::optional<Color> titles_background_color;
-			std::optional<Color> select_background_color;
-		};
-
-		Change& _ensureChangedMenu();
-
-		Change::UpdateItem& _addItemUpdatedChange(MenuItem* item);
-
-		MenuItem* _addItem(MenuItem* parent, MenuStyle& style);
-
-
-		// Updates
-
-		void setTitleBackColor(Color new_color);
-
-		void setSelectBackColor(Color new_color);
-
-		MenuItem* addTitle(MenuStyle& style);
-
-
-		// Virtuals
 		void _emitEvents(bool& allow_inside_events) override;
-
 		void _calcSizeAndRelativeChildPositions() override;
-
-		void _generateGPU_Data() override;
-
 		void _draw() override;
+
+
+		uint32_t createTitle(MenuItemCreateInfo& info);
+
+		uint32_t createSubMenu(uint32_t parent_item, SubMenuCreateInfo& info);
+		uint32_t createSection(uint32_t parent_submenu, MenuSectionCreateInfo& info = nui::MenuSectionCreateInfo());
+		uint32_t createItem(uint32_t parent_section, MenuItemCreateInfo& info);
 	};
+
+
+	//
+
+
 
 	//////////////////////////////////////////////////////////////////////////////
 
@@ -575,33 +657,16 @@ namespace nui {
 		bool is_minimized;
 	};
 
-	namespace ElementGraphChangeType {
-		enum {
-			ADD,
-			UPDATE,  // update element fields
-			REMOVE  // remove element
-		};
-	}
+	struct StoredElement2 {
+		StoredElement specific_elem;  // where elements are actually stored in memory
+		Element* base_elem;  // for easy access
 
-	// added elements just get added to the elements list directly and only need to be linked
-	struct AddChange {
-		Element* parent;
-		Element* elem;
+		template<typename T>
+		T* get()
+		{
+			return std::get_if<T>(&specific_elem);
+		}
 	};
-
-	struct UpdateChange {
-		StoredElement* dest;  // who to update
-
-		// what to update
-		ChangedElement source_elem;
-		std::variant<Flex::Change, Menu::Change> source;
-	};
-
-	// where to delete
-	struct DeleteChange {
-		std::list<StoredElement>::iterator target;
-	};
-
 
 	class Window {
 	public:
@@ -609,6 +674,11 @@ namespace nui {
 
 		WNDCLASSA window_class;  // Win32 Window class used on creation
 		HWND hwnd;  // handle to the window
+
+		// Timing
+		SteadyTime frame_used_time;  // the last's frame time of usage
+		float delta_time;  // the total duration of the last frame
+		uint32_t min_frame_duration_ms;  // the minimum amount of time a frame must last (60 fps limit)
 
 		// Input data updated by WinProc
 		Input input;
@@ -622,10 +692,14 @@ namespace nui {
 		WindowMessages win_messages;
 
 		// Elements
-		std::list<StoredElement> elements;  // where all the elements in the graph are stored
+		std::list<StoredElement2> elements;  // where all the elements in the graph are stored
+		Root* root;
 		
-		std::vector<std::variant<AddChange, UpdateChange, DeleteChange>> changes;  // scheduled changes to be aplied to elements
-
+		std::list<TextRetainedState> text_prevs;
+		std::list<FlexRetainedState> flex_prevs;
+		std::list<RectRetainedState> rect_prevs;
+		std::list<MenuRetainedState> menu_prevs;
+	
 		// the order in which to draw the elements on screen
 		// also used for occlusion in emiting events
 		std::map<uint32_t, std::list<Element*>> draw_stacks;
@@ -652,28 +726,46 @@ namespace nui {
 		ComPtr<ID3D11Texture2D> present_img;
 		ComPtr<ID3D11RenderTargetView> present_rtv;
 	
-		GPU_Constants gpu_constants;
-		dx11::Buffer cbuff;
+		dx11::ConstantBuffer cbuff;
 
 		// Viewport
 		D3D11_VIEWPORT viewport;
 
 	public:
-		void _updateCPU();
+		//void _applyFileStyles();
+
+		// Memory Cache
+		std::vector<Element*> _downward_now_elems;
+		std::vector<Element*> _downward_next_elems;
+		std::vector<Element*> _leafs;
+		std::unordered_set<Element*> _upward_now_elems;
+		std::unordered_set<Element*> _upward_next_elems;
+
+		struct PassedElement {
+			std::array<int32_t, 2> ancestor_pos;
+			int32_t ancestor_z_index;
+			Element* elem;
+		};
+		std::vector<PassedElement> _now_pelems;
+		std::vector<PassedElement> _next_pelems;
 
 		void _render();
 
+		// void _addElement(Element* parent, Element* new_elem);
+
 	public:
-		Text* createText(Element* parent = nullptr);
-		RelativeWrap* createRelativeWrap(Element* parent = nullptr);
-		Flex* createGrid(Element* parent = nullptr);
-		Menu* createMenu(Element* parent = nullptr);
+		void createText(TextCreateInfo& info);
+		Flex* createFlex(FlexCreateInfo& info);
+		Rect* createRectangle(RectCreateInfo& info);
+		Menu* createMenu(MenuCreateInfo& info);
 
-		// deletes an element from graph and leaves it detached
-		void deleteElement(Element* elem);
+		//Stack* createRelativeWrap(Element* parent = nullptr);
+		//Menu* createMenu(Element* parent = nullptr);
 
-		// delete all elements (does not delete root)
-		void deleteAllElements();
+
+		// Update
+		void update(WindowCallback callback);
+
 
 		// Events
 
@@ -710,12 +802,6 @@ namespace nui {
 	public:
 		HINSTANCE hinstance;
 		HCURSOR arrow_hcursor;
-		
-		// Timing
-		SteadyTime frame_start_time;
-		//SteadyTime prev_frame_start_time;
-		float delta_time;  // the total duration between this frame and previous
-		uint32_t min_frame_duration_ms;
 
 		// DirectX 11 Context
 		ComPtr<IDXGIFactory2> factory2;
@@ -727,28 +813,11 @@ namespace nui {
 		ComPtr<ID3D11DeviceContext3> im_ctx3;
 
 		// Simple Vertex Shader
-		std::vector<char> simple_vs_cso;
 		ComPtr<ID3D11VertexShader> simple_vs;
-		ComPtr<ID3D11InputLayout> simple_input_layout;
-
-		// Character Shaders
-		std::vector<char> char_vs_cso;
-		ComPtr<ID3D11VertexShader> char_vs;
-		ComPtr<ID3D11InputLayout> char_input_layout;
-
-		ComPtr<ID3D11PixelShader> char_ps;
 
 		// Gradient Rect Shaders
 		//ComPtr<ID3D11PixelShader> rect_flat_fill_ps;
 		//ComPtr<ID3D11PixelShader> rect_gradient_linear_ps;
-
-		// Rect Shaders
-		ComPtr<ID3D11PixelShader> rect_ps;
-
-		// Character Atlas
-		CharacterAtlas char_atlas;
-		dx11::Texture char_atlas_tex;
-		ComPtr<ID3D11SamplerState> char_atlas_sampler;
 
 		// Rasterizer State
 		ComPtr<ID3D11RasterizerState> solid_back_rs;
@@ -756,19 +825,75 @@ namespace nui {
 		// Blend State
 		ComPtr<ID3D11BlendState> blend_state;
 
+		// Mini-Renderers
+		struct TextRender {
+			std::vector<GPU_CharacterVertex> verts;
+			dx11::ArrayBuffer<GPU_CharacterVertex> vbuff;
+
+			std::vector<uint32_t> indexes;
+			dx11::ArrayBuffer<uint32_t> idxbuff;
+
+			std::vector<GPU_TextInstance> instances;
+			dx11::ArrayBuffer<GPU_TextInstance> instances_buff;
+
+			// Character Atlas
+			CharacterAtlas char_atlas;
+			dx11::Texture char_atlas_tex;
+			ComPtr<ID3D11SamplerState> char_atlas_sampler;
+
+			// Shaders
+			ComPtr<ID3D11VertexShader> char_vs;
+			ComPtr<ID3D11PixelShader> char_ps;
+		};
+		TextRender text_renderer;
+
+		struct RectRender {
+			std::vector<GPU_SimpleVertex> verts;
+			dx11::ArrayBuffer<GPU_SimpleVertex> vbuff;
+
+			std::vector<uint32_t> indexes;
+			dx11::ArrayBuffer<uint32_t> idxbuff;
+
+			std::vector<GPU_RectInstance> instances;
+			dx11::ArrayBuffer<GPU_RectInstance> instances_buff;
+
+			// Shaders
+			ComPtr<ID3D11PixelShader> rect_ps;
+		};
+		RectRender rect_renderer;
+
 		// Created Windows
 		std::list<Window> windows;
 
 	public:
 		bool _bruteForceCreateSwapchain(Window& window, ComPtr<IDXGISwapChain1>& swapchain1);
 
+		void _loadCharacterAtlasToTexture();
+
 	public:
 		void create();
 
-		void loadCharacterAtlasToTexture();
+		// What is the size of each character
+		// Where it should be placed
+		// How large the container should be to contain the text
+		void findAndPositionGlyphs(TextProps& props,
+			int32_t start_pos_x, int32_t start_pos_y,
+			uint32_t& r_width, uint32_t& r_height,
+			std::vector<PositionedCharacter>& r_chars);
+
+		void drawTexts(Window* window, std::vector<TextInstance*>& instances);
+		
+		void drawRects(Window* window, std::vector<RectInstance*>& instances);
+
+		void drawArrows(Window* window, std::vector<ArrowInstance*>& instances);
+
+		void drawBorder(Window* window, std::vector<BorderInstance*>& instances);
+
+		// acquire file handle to detect changes
+		//void registerStyleFile(io::Path& path);
+
+		// void unregisterStyleFile();
 
 		Window* createWindow(WindowCreateInfo& info);
-
-		void update();
 	};
 }

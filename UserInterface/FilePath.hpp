@@ -1,6 +1,12 @@
 #pragma once
 
+// Standard
+// #include <chrono>
+
 #include "ErrorStack.hpp"
+
+
+// using SteadyTime = std::chrono::time_point<std::chrono::steady_clock>;
 
 
 namespace io {
@@ -8,14 +14,32 @@ namespace io {
 	extern uint32_t max_path;
 
 
-	class FilePath {
+	class Handle {
+	public:
+		HANDLE handle;
+
+	public:
+		Handle();
+		Handle(HANDLE ms_handle);
+
+		Handle& operator=(HANDLE ms_handle);
+
+		bool isValid();
+
+		~Handle();
+	};
+
+
+	class Path {
 	public:
 		std::vector<std::string> entries;
 
 	public:
-		void recreateAbsolute(std::string path);
-		ErrStack recreateRelative(std::string path);
-		//ErrStack recreateRelativeToSolution(std::string path);
+		Path() = default;
+		Path(std::string path);  // create absolute file handle
+		Path(std::string& path);  // create absolute file handle
+
+		ErrStack recreateFromRelativePath(std::string relative_path);
 
 		bool hasExtension(std::string extension);
 
@@ -29,9 +53,37 @@ namespace io {
 
 		std::string toWindowsPath();
 
+		// create temporary file handle and read the whole content
+		template<typename T = char>
+		ErrStack readOnce(std::vector<T>& content);
+	};
+
+
+	class File {
+	public:
+		std::string file_path;
+		Handle _file_handle;
+
+	public:
+		File() = default;
+		File(File& src_file) = delete;
+
+		void create(Path& path);
+
+		// opens the file with minor changes in flags for parsing files
+		ErrStack openForParsing();
+
+		// get size in bytes of the file
+		ErrStack size(size_t& r_byte_count);
+
+		ErrStack getLastWrite(uint32_t& r_day, uint32_t& r_hour, uint32_t& r_minute, uint32_t& r_second);
+
 		template<typename T = char>
 		ErrStack read(std::vector<T>& content);
 	};
+
+
+	ErrStack getSolutionPath(std::string& r_path);
 
 	template<typename T = char>
 	ErrStack readFile(std::string& path, std::vector<T>& content);

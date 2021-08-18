@@ -126,8 +126,10 @@ void Application::reset()
 
 	// Sculpt Reset
 	{
-		sculpt.global_brush_radius = 1;
-		sculpt.global_brush_strength = 1;
+		// Debug
+		sculpt.global_sample_count = 1;
+		sculpt.global_brush_radius = 0.25;
+		sculpt.global_brush_strength = 0.001f;
 		sculpt.global_brush_falloff.type = BrushFalloffType::BEZIER_SIMPLE;
 		sculpt.global_brush_falloff.spread = 0.5f;
 		sculpt.global_brush_falloff.steepness = 0.5f;
@@ -137,6 +139,10 @@ void Application::reset()
 		// Standard Brush
 		{
 			auto& standard = sculpt.standard_brush;
+			standard.sample_count.local = false;
+			standard.sample_count.local_value = 4;
+			standard.sample_count.speed_influence.enable = false;
+
 			standard.radius.local = false;
 			standard.radius.factor = 1;
 			standard.radius.local_value = 1;
@@ -193,8 +199,8 @@ void Application::reset()
 	camera_quat_inv = { 1, 0, 0, 0 };
 	camera_forward = { 0, 0, -1 };
 
-	camera_orbit_sensitivity = 0.01f;
-	camera_pan_sensitivity = 0.0001f;
+	camera_orbit_sensitivity = 0.1f;
+	camera_pan_sensitivity = 0.001f;
 	camera_dolly_sensitivity = 0.001f;
 }
 
@@ -544,7 +550,7 @@ MeshInstanceRef Application::createUV_Sphere(CreateUV_SphereInfo& info,
 	return new_ref;
 }
 
-ErrStack Application::importMeshesFromGLTF_File(io::FilePath& path, GLTF_ImporterSettings& settings,
+ErrStack Application::importMeshesFromGLTF_File(io::Path& path, GLTF_ImporterSettings& settings,
 	std::vector<MeshInstanceRef>* r_instances)
 {
 	ErrStack err_stack;

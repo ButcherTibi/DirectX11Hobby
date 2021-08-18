@@ -203,6 +203,8 @@ namespace dx11 {
 			dest_box.front = 0;
 			dest_box.back = 1;
 
+			assert_cond(dest_box.left < dest_box.right);
+
 			ctx3->UpdateSubresource(buff, 0, &dest_box,
 				src.data(), 0, 0);
 		}

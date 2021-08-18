@@ -215,14 +215,14 @@ ErrStack Structure::_loadVec3FromBuffer(uint64_t acc_idx,
 	return ErrStack();
 }
 
-ErrStack Structure::importGLTF(io::FilePath& path_to_gltf_file)
+ErrStack Structure::importGLTF(io::Path& path_to_gltf_file)
 {
 	ErrStack err_stack;
 
 	json::Graph json_graph;
 	{
 		std::vector<uint8_t> file;
-		err_stack = path_to_gltf_file.read(file);
+		err_stack = path_to_gltf_file.readOnce(file);
 		if (err_stack.isBad()) {
 			err_stack.pushError(code_location, "failed to read GLTF file at the level of bytes");
 			return err_stack;
@@ -586,7 +586,7 @@ ErrStack Structure::importGLTF(io::FilePath& path_to_gltf_file)
 	std::vector<base64::BitVector> bin_buffs;
 	{
 		bin_buffs.resize(buffers.size());
-		io::FilePath relative_uri_root = path_to_gltf_file;
+		io::Path relative_uri_root = path_to_gltf_file;
 		relative_uri_root.pop_back();
 
 		for (uint64_t i = 0; i < buffers.size(); i++) {
@@ -618,12 +618,12 @@ ErrStack Structure::importGLTF(io::FilePath& path_to_gltf_file)
 				// Relative URI
 				else if (hasEnding(uri, bin_suffix)) {
 
-					io::FilePath file_path = relative_uri_root;
+					io::Path file_path = relative_uri_root;
 					file_path.push_back(uri);
 
 					std::vector<uint8_t> bin;
 
-					err_stack = file_path.read(bin);
+					err_stack = file_path.readOnce(bin);
 					if (err_stack.isBad()) {
 						return ErrStack(code_location, "failed to read binary file referenced by URI");
 					}
