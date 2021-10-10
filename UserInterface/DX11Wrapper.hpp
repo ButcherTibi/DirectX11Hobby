@@ -2,6 +2,7 @@
 
 // Standard
 #include <vector>
+#include <array>
 
 // DirectX 11
 #include <d3d11_4.h>
@@ -11,6 +12,7 @@
 // ComPtr
 #include <wrl\client.h>
 
+// Error
 #include "ErrorStack.hpp"
 
 
@@ -19,7 +21,6 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 namespace dx11 {
 
-	// DEPRECATED: to be replaced
 	class Buffer {
 	public:
 		ID3D11Device5* dev;
@@ -32,6 +33,7 @@ namespace dx11 {
 		void _ensureSize(size_t size);
 
 	public:
+		[[deprecated]]
 		void create(ID3D11Device5* dev, ID3D11DeviceContext3* ctx, D3D11_BUFFER_DESC& desc);
 
 		void load(void* data, size_t load_size);
@@ -445,8 +447,8 @@ namespace dx11 {
 
 			this->gpu_uploads.create(device, context, desc);
 
-			dx11::createComputeShaderFromPath(shader_path, device,
-				this->shader.GetAddressOf(), &read_buffer);
+			createComputeShaderFromPath(shader_path, device,
+				this->shader.GetAddressOf(), read_buffer);
 		}
 
 		std::vector<GPU_UP_T>& getUploadData()

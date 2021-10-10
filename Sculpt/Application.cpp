@@ -464,7 +464,7 @@ void Application::_unparentInstanceFromParentLayer(MeshInstanceRef& ref)
 
 MeshInstanceRef Application::createEmptyMesh(MeshLayer* dest_layer, MeshDrawcall* dest_drawcall)
 {
-	MeshInstanceRef& new_ref = _addInstance(_createMesh(), dest_layer, dest_drawcall);
+	MeshInstanceRef new_ref = _addInstance(_createMesh(), dest_layer, dest_drawcall);
 
 	// a newly created mesh is always selected
 	instance_selection.push_back(new_ref);

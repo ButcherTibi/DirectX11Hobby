@@ -154,7 +154,7 @@ public:
 public:
 	DeferredVectorIterator() {};
 
-	bool operator!=(DeferredVectorIterator& iter_right)
+	bool operator!=(DeferredVectorIterator iter_right)
 	{
 		return _parent_vector != iter_right._parent_vector || _current_idx != iter_right._current_idx;
 	}

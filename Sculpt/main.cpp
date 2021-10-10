@@ -3,8 +3,6 @@
 #include "NuiLibrary.hpp"
 #include "Application.hpp"
 
-#include "UserInterfaceTests.hpp"
-
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
@@ -42,31 +40,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 			application.main_window = instance.createWindow(info);
 			window = application.main_window;
 		}
-	}
 
-	using namespace std::chrono_literals;
+		// Create Layers TreeList
+		{
+			nui::TreeListCreateInfo info;
+			application.ui.layers = window->createTreeList(info);
+		}
+	}
 
 	nui::WindowMessages& win_messages = application.main_window->win_messages;
 	while (!win_messages.should_close) {
 
-		application.main_window->update([](nui::Window* win, void*) {
+		application.main_window->update([](nui::Window*, void*) {
 
-			switch (2) {
-			case 0: {
-				ui_test::text(win);
-				break;
-			}
-
-			case 1: {
-				ui_test::flex(win);
-				break;
-			}
-
-			case 2: {
-				ui_test::menu(win);
-				break;
-			}
-			}
+			
 		});
 	}
 

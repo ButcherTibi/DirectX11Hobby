@@ -1,5 +1,9 @@
 #pragma once
 
+// Windows
+#include "DietWindows.hpp"
+#include "Windows.h"
+
 // Standard
 #include <stdint.h>
 #include <string>

@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\x64\Debug\Client.exe</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\AllVS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CharPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CharVS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CirclePS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CopyParentsMaskPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectFlatFillPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectLinearGradient.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectPS.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>E:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\SimpleVS.cso</FullPath>
+    </ContentFile>
+  </ContentFiles>
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

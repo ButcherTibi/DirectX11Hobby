@@ -1,18 +1,19 @@
-
-// Header
-#include "NuiLibrary.hpp"
+module;
 
 // Windows
-#include <TlHelp32.h>
+#undef RELATIVE
+#undef ABSOLUTE
 
-// Mine
-#include "FilePath.hpp"
+// DirectX 11
+#include "DX11Wrapper.hpp"
+
+// GLM
+#include "glm\vec2.hpp"
+
+module NuiLibrary;
 
 
 using namespace nui;
-
-
-std::list<Window*> nui::_created_windows;
 
 
 void Instance::create()
@@ -21,7 +22,7 @@ void Instance::create()
 	arrow_hcursor = LoadCursorA(NULL, IDC_ARROW);
 
 	// Raw Device Input for Mouse
-	{	
+	{
 		RAWINPUTDEVICE raw_input_dev;
 		raw_input_dev.usUsagePage = 0x01;
 		raw_input_dev.usUsage = 0x02; // HID_USAGE_GENERIC_MOUSE
@@ -119,7 +120,7 @@ void Instance::create()
 		desc.ScissorEnable = false;
 		desc.MultisampleEnable = false;
 		desc.AntialiasedLineEnable = false;
-		
+
 		throwDX11(dev5->CreateRasterizerState(&desc, solid_back_rs.GetAddressOf()));
 	}
 
@@ -152,7 +153,7 @@ void Instance::create()
 
 			text_renderer.vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
 		}
-		
+
 		// Index
 		{
 			D3D11_BUFFER_DESC desc = {};
@@ -278,6 +279,45 @@ void Instance::create()
 				dev5.Get(), rect_renderer.rect_ps.GetAddressOf());
 		}
 	}
+
+	// Circle
+	{
+		// Vertex
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			circle_renderer.vbuff.create(dev5.Get(), im_ctx3.Get(), desc);
+		}
+
+		// Index
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+			circle_renderer.idxbuff.create(dev5.Get(), im_ctx3.Get(), desc);
+		}
+
+		// Instance
+		{
+			D3D11_BUFFER_DESC desc = {};
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+
+			circle_renderer.instances_buff.create(dev5.Get(), im_ctx3.Get(), desc);
+		}
+
+		// Shaders
+		{
+			// Circle
+			dx11::createPixelShaderFromPath("UserInterface/CompiledShaders/CirclePS.cso",
+				dev5.Get(), circle_renderer.circle_ps.GetAddressOf());
+		}
+	}
 }
 
 void Instance::findAndPositionGlyphs(TextProps& props,
@@ -337,7 +377,7 @@ void Instance::findAndPositionGlyphs(TextProps& props,
 	r_height = (pen.y + font_size->descender) - start_pos_y;
 }
 
-void Instance::drawTexts(Window* window, std::vector<TextInstance*>& instances)
+void Instance::drawTexts(Window* window, ClipZone& clip_zone, std::vector<TextInstance*>& instances)
 {
 	if (instances.size() == 0) {
 		return;
@@ -476,7 +516,15 @@ void Instance::drawTexts(Window* window, std::vector<TextInstance*>& instances)
 
 		// Rasterizer
 		{
-			im_ctx3->RSSetViewports(1, &window->viewport);
+			D3D11_VIEWPORT viewport;
+			viewport.TopLeftX = (float)clip_zone.pos[0];
+			viewport.TopLeftY = (float)clip_zone.pos[1];
+			viewport.Width = (float)clip_zone.size[0];
+			viewport.Height = (float)clip_zone.size[1];
+			viewport.MinDepth = window->viewport.MinDepth;
+			viewport.MaxDepth = window->viewport.MaxDepth;
+
+			im_ctx3->RSSetViewports(1, &viewport);
 			im_ctx3->RSSetState(solid_back_rs.Get());
 		}
 
@@ -514,20 +562,29 @@ void Instance::drawTexts(Window* window, std::vector<TextInstance*>& instances)
 	}
 }
 
-void Instance::drawRects(Window* window, std::vector<RectInstance*>& instances)
+void Instance::drawTexts(Window* window, std::vector<TextInstance*>& instances)
+{
+	ClipZone clip_zone;
+	clip_zone.pos = { 0, 0 };
+	clip_zone.size = { (uint32_t)window->viewport.Width, (uint32_t)window->viewport.Height };
+
+	drawTexts(window, clip_zone, instances);
+}
+
+void Instance::_drawRects(Window* window, RectInstance** instances_data, size_t instances_count)
 {
 	// Generate GPU Data
 	{
-		rect_renderer.verts.resize(instances.size() * 4);
-		rect_renderer.indexes.resize(instances.size() * 6);
-		rect_renderer.instances.resize(instances.size());
+		rect_renderer.verts.resize(instances_count * 4);
+		rect_renderer.indexes.resize(instances_count * 6);
+		rect_renderer.instances.resize(instances_count);
 
 		uint32_t vertex_idx = 0;
 		uint32_t index_idx = 0;
 
-		for (uint32_t i = 0; i < instances.size(); i++) {
+		for (uint32_t i = 0; i < instances_count; i++) {
 
-			RectInstance* inst = instances[i];
+			RectInstance* inst = instances_data[i];
 
 			// Vertices
 			GPU_SimpleVertex& tl_v = rect_renderer.verts[vertex_idx + 0];
@@ -535,7 +592,7 @@ void Instance::drawRects(Window* window, std::vector<RectInstance*>& instances)
 			GPU_SimpleVertex& br_v = rect_renderer.verts[vertex_idx + 2];
 			GPU_SimpleVertex& bl_v = rect_renderer.verts[vertex_idx + 3];
 
-			glm::ivec2 pos = { inst->screen_pos[0], inst->screen_pos[1] };
+			glm::ivec2 pos = { inst->pos[0], inst->pos[1] };
 			tl_v.pos = toXM(pos);
 			tr_v.pos = toXM(pos.x + inst->size[0], pos.y);
 			br_v.pos = toXM(pos.x + inst->size[0], pos.y + inst->size[1]);;
@@ -623,6 +680,16 @@ void Instance::drawRects(Window* window, std::vector<RectInstance*>& instances)
 		im_ctx3->DrawIndexed(rect_renderer.indexes.size(),
 			0, 0);
 	}
+}
+
+void Instance::drawRect(Window* window, RectInstance* instance)
+{
+	_drawRects(window, &instance, 1);
+}
+
+void Instance::drawRects(Window* window, std::vector<RectInstance*>& instances)
+{
+	_drawRects(window, instances.data(), instances.size());
 }
 
 void Instance::drawArrows(Window* window, std::vector<ArrowInstance*>& instances)
@@ -729,13 +796,12 @@ void Instance::drawBorder(Window* window, std::vector<BorderInstance*>& instance
 	}
 
 	static std::vector<RectInstance*> rect_instances;
+	rect_instances.clear();
 
 	for (BorderInstance* inst : instances) {
 
-		rect_instances.clear();
-
 		RectInstance top_inst;
-		top_inst.screen_pos = {
+		top_inst.pos = {
 			inst->screen_pos[0],
 			inst->screen_pos[1]
 		};
@@ -743,10 +809,10 @@ void Instance::drawBorder(Window* window, std::vector<BorderInstance*>& instance
 			inst->size[0],
 			inst->thickness
 		};
-		top_inst.color = inst->color;		
+		top_inst.color = inst->color;
 
 		RectInstance bot_inst;
-		bot_inst.screen_pos = {
+		bot_inst.pos = {
 			inst->screen_pos[0],
 			(int32_t)(inst->screen_pos[1] + inst->size[1] - inst->thickness)
 		};
@@ -757,7 +823,7 @@ void Instance::drawBorder(Window* window, std::vector<BorderInstance*>& instance
 		bot_inst.color = inst->color;
 
 		RectInstance left_inst;
-		left_inst.screen_pos = {
+		left_inst.pos = {
 			inst->screen_pos[0],
 			inst->screen_pos[1]
 		};
@@ -768,7 +834,7 @@ void Instance::drawBorder(Window* window, std::vector<BorderInstance*>& instance
 		left_inst.color = inst->color;
 
 		RectInstance right_inst;
-		right_inst.screen_pos = {
+		right_inst.pos = {
 			(int32_t)(inst->screen_pos[0] + inst->size[0] - inst->thickness),
 			inst->screen_pos[1]
 		};
@@ -793,9 +859,132 @@ void Instance::drawBorder(Window* window, std::vector<BorderInstance*>& instance
 		if (inst->right) {
 			rect_instances.push_back(&right_inst);
 		}
-
-		drawRects(window, rect_instances);
 	}
+
+	drawRects(window, rect_instances);
+}
+
+void Instance::drawCircles(Window* window, CircleInstance** instances_data, size_t instances_count)
+{
+	if (instances_count == 0) {
+		return;
+	}
+
+	// Generate GPU Data
+	{
+		circle_renderer.verts.resize(instances_count * 4);
+		circle_renderer.indexes.resize(instances_count * 6);
+		circle_renderer.instances.resize(instances_count);
+
+		uint32_t vertex_idx = 0;
+		uint32_t index_idx = 0;
+
+		for (uint32_t i = 0; i < instances_count; i++) {
+
+			CircleInstance* inst = instances_data[i];
+
+			// Vertices
+			GPU_SimpleVertex& tl_v = circle_renderer.verts[vertex_idx + 0];
+			GPU_SimpleVertex& tr_v = circle_renderer.verts[vertex_idx + 1];
+			GPU_SimpleVertex& br_v = circle_renderer.verts[vertex_idx + 2];
+			GPU_SimpleVertex& bl_v = circle_renderer.verts[vertex_idx + 3];
+
+			glm::ivec2 pos = { inst->pos[0], inst->pos[1] };
+			tl_v.pos = toXM(pos.x - inst->radius, pos.y - inst->radius);
+			tr_v.pos = toXM(pos.x + inst->radius, pos.y - inst->radius);
+			br_v.pos = toXM(pos.x + inst->radius, pos.y + inst->radius);
+			bl_v.pos = toXM(pos.x - inst->radius, pos.y + inst->radius);
+
+			tl_v.instance_id = i;
+			tr_v.instance_id = i;
+			br_v.instance_id = i;
+			bl_v.instance_id = i;
+
+			// Indexes
+			circle_renderer.indexes[index_idx + 0] = vertex_idx + 0;
+			circle_renderer.indexes[index_idx + 1] = vertex_idx + 1;
+			circle_renderer.indexes[index_idx + 2] = vertex_idx + 2;
+
+			circle_renderer.indexes[index_idx + 3] = vertex_idx + 2;
+			circle_renderer.indexes[index_idx + 4] = vertex_idx + 3;
+			circle_renderer.indexes[index_idx + 5] = vertex_idx + 0;
+
+			// Instance
+			GPU_CircleInstance& instance = circle_renderer.instances[i];
+			instance.pos.x = (float)inst->pos[0];
+			instance.pos.y = (float)inst->pos[1];
+			instance.radius = (float)inst->radius - 1;  // account for multi sampling
+			instance.color = toXM(inst->color.rgba);
+
+			vertex_idx += 4;
+			index_idx += 6;
+		}
+	}
+
+	// Draw
+	{
+		circle_renderer.vbuff.upload(circle_renderer.verts);
+		circle_renderer.idxbuff.upload(circle_renderer.indexes);
+		circle_renderer.instances_buff.upload(circle_renderer.instances);
+
+		// Input Assembly
+		{
+			im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			im_ctx3->IASetIndexBuffer(circle_renderer.idxbuff.get(), DXGI_FORMAT_R32_UINT, 0);
+		}
+
+		// Vertex Shader
+		{
+			std::array<ID3D11ShaderResourceView*, 1> srvs = {
+				circle_renderer.vbuff.getSRV()
+			};
+			im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
+
+			std::array<ID3D11Buffer*, 1> cbuffs = {
+				window->cbuff.get()
+			};
+			im_ctx3->VSSetConstantBuffers(0, cbuffs.size(), cbuffs.data());
+
+			im_ctx3->VSSetShader(simple_vs.Get(), nullptr, 0);
+		}
+
+		// Rasterizer
+		{
+			im_ctx3->RSSetViewports(1, &window->viewport);
+			im_ctx3->RSSetState(solid_back_rs.Get());
+		}
+
+		// Pixel Shader
+		{
+			std::array<ID3D11ShaderResourceView*, 1> ps_srv = {
+				circle_renderer.instances_buff.getSRV()
+			};
+			im_ctx3->PSSetShaderResources(0, ps_srv.size(), ps_srv.data());
+
+			im_ctx3->PSSetShader(circle_renderer.circle_ps.Get(), nullptr, 0);
+		}
+
+		// Output Merger
+		{
+			std::array<float, 4> blend_factor = {
+				0, 0, 0, 0
+			};
+			im_ctx3->OMSetBlendState(blend_state.Get(), blend_factor.data(), 0xFFFF'FFFF);
+
+			std::array<ID3D11RenderTargetView*, 1> srv = {
+				window->present_rtv.Get()
+			};
+			im_ctx3->OMSetRenderTargets(srv.size(), srv.data(), nullptr);
+		}
+
+		im_ctx3->DrawIndexed(circle_renderer.indexes.size(),
+			0, 0);
+	}
+}
+
+void Instance::drawCircle(Window* window, CircleInstance* instance)
+{
+	drawCircles(window, &instance, 1);
 }
 
 //void Instance::registerStyleFile(io::Path& path)
@@ -815,156 +1004,6 @@ void Instance::_loadCharacterAtlasToTexture()
 	if (atlas.tex_size) {
 		text_renderer.char_atlas_tex.load(atlas.colors.data(), atlas.tex_size, atlas.tex_size);
 	}
-}
-
-FORCEINLINE uint16_t getLowOrder(uint32_t param)
-{
-	return param & 0xFFFF;
-}
-
-FORCEINLINE uint16_t getHighOrder(uint32_t param)
-{
-	return param >> 16;
-}
-
-FORCEINLINE int16_t getSignedLowOrder(uint32_t param)
-{
-	return param & 0xFFFF;
-}
-
-FORCEINLINE int16_t getSignedHighOrder(uint32_t param)
-{
-	return param >> 16;
-}
-
-LRESULT CALLBACK windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	ErrStack err_stack;
-
-	for (Window* w : _created_windows) {
-		if (w->hwnd == hwnd) {
-
-			switch (uMsg) {
-
-			case WM_SIZE: {
-
-				switch (wParam) {
-				case SIZE_MAXIMIZED:
-				case SIZE_RESTORED: {
-					w->win_messages.is_minimized = false;
-
-					w->width = getLowOrder((uint32_t)lParam);
-					w->height = getHighOrder((uint32_t)lParam);
-
-					RECT client_rect;
-					GetClientRect(hwnd, &client_rect);
-
-					w->surface_width = (client_rect.right - client_rect.left);
-					w->surface_height = (client_rect.bottom - client_rect.top);
-
-					//w->_updateCPU();
-					w->_render();
-					break;
-				}
-
-				case SIZE_MINIMIZED: {
-					w->win_messages.is_minimized = true;
-					break;
-				}
-				}
-
-				return 0;
-			}
-
-			case WM_MOUSEMOVE: {
-				w->input.mouse_x = getLowOrder((uint32_t)lParam);
-				w->input.mouse_y = getHighOrder((uint32_t)lParam);
-
-				auto& new_pos = w->input.mouse_pos_history.emplace_back();
-				new_pos.x = w->input.mouse_x;
-				new_pos.y = w->input.mouse_y;
-				return 0;
-			}
-
-			case WM_MOUSEWHEEL: {
-				w->input.mouse_wheel_delta += GET_WHEEL_DELTA_WPARAM(wParam);
-				return 0;
-			}
-
-			case WM_KEYDOWN: {
-				w->input.setKeyDownState((uint32_t)wParam, (uint32_t)lParam);
-				return 0;
-			}
-
-			case WM_KEYUP: {
-				w->input.setKeyUpState((uint32_t)wParam);
-				return 0;
-			}
-
-			case WM_LBUTTONDOWN: {
-				w->input.setKeyDownState(VirtualKeys::LEFT_MOUSE_BUTTON, 0);
-				return 0;
-			}
-
-			case WM_LBUTTONUP: {
-				w->input.setKeyUpState(VirtualKeys::LEFT_MOUSE_BUTTON);
-				return 0;
-			}
-
-			case WM_RBUTTONDOWN: {
-				w->input.setKeyDownState(VirtualKeys::RIGHT_MOUSE_BUTTON, 0);
-				return 0;
-			}
-
-			case WM_RBUTTONUP: {
-				w->input.setKeyUpState(VirtualKeys::RIGHT_MOUSE_BUTTON);
-				return 0;
-			}
-
-			case WM_MBUTTONDOWN: {
-				w->input.setKeyDownState(VirtualKeys::MIDDLE_MOUSE_BUTTON, 0);
-				return 0;
-			}
-
-			case WM_MBUTTONUP: {
-				w->input.setKeyUpState(VirtualKeys::MIDDLE_MOUSE_BUTTON);
-				return 0;
-			}
-
-			case WM_INPUT: {
-				uint32_t count;
-				GetRawInputData((HRAWINPUT)lParam, RID_INPUT, nullptr, &count,
-					sizeof(RAWINPUTHEADER));
-
-				std::vector<uint8_t> raw_input(count);
-				if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, raw_input.data(), &count,
-					sizeof(RAWINPUTHEADER)) == (uint32_t)-1)
-				{
-					printf("failed to get raw input data \n %s \n %s \n", code_location, getLastError().c_str());
-				}
-
-				RAWINPUT* raw = (RAWINPUT*)raw_input.data();
-				w->input.mouse_delta_x += raw->data.mouse.lLastX;
-				w->input.mouse_delta_y += raw->data.mouse.lLastY;
-
-				// printf("mouse delta = %d %d \n", w->input.mouse_delta_x, w->input.mouse_delta_y);
-				return 0;
-			}
-
-			case WM_QUIT:
-			case WM_CLOSE: {
-				w->win_messages.should_close = true;
-				return 0;
-			}
-
-			case WM_DESTROY: {
-				// emergency exit do not save progress
-				std::abort();
-			}
-			}
-		}
-	}
-	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
 }
 
 bool Instance::_bruteForceCreateSwapchain(Window& w, ComPtr<IDXGISwapChain1>& swapchain1)
@@ -1105,22 +1144,6 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 		w.min_frame_duration_ms = 16;
 	}
 
-	// Initialize Input
-	{
-		Input& input = w.input;
-		input.mouse_x = 0;
-		input.mouse_y = 0;
-		input.mouse_delta_x = 0;
-		input.mouse_delta_y = 0;
-		input.mouse_wheel_delta = 0;
-
-		for (nui::KeyState key : input.key_list) {
-			key.is_down = false;
-			key.start_time = frame_start_time;
-			key.end_time = key.start_time;
-		}
-	}
-
 	// Window Size
 	w.width = info.width;
 	w.height = info.height;
@@ -1137,11 +1160,11 @@ Window* Instance::createWindow(WindowCreateInfo& info)
 
 	// Messages
 	w.win_messages.is_minimized = false;
-	w.win_messages.should_close= false;
+	w.win_messages.should_close = false;
 
 	// Root Node
 	{
-		StoredElement2& stored_root = w.elements.emplace_back();
+		StoredElement2& stored_root = w.retained_elements.emplace_back();
 
 		w.root = &stored_root.specific_elem.emplace<Root>();
 		w.root->_window = &w;

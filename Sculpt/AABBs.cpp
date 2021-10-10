@@ -51,7 +51,7 @@ void SculptMesh::_recreateAABBs()
 	auto& max = root.aabb.max;
 	auto& min = root.aabb.min;
 
-	for (auto iter = verts.begin(); iter != verts.end(); iter.next()) {
+	for (DeferredVectorIterator<Vertex> iter = verts.begin(); iter != verts.end(); iter.next()) {
 
 		Vertex& vert = iter.get();
 		vert.aabb = 0xFFFF'FFFF;

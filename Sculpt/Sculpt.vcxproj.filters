@@ -65,9 +65,6 @@
     <Filter Include="Source Files\Application">
       <UniqueIdentifier>{24f02d6a-5629-4693-b21a-39c49dad734f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Tests">
-      <UniqueIdentifier>{20333902-d05c-49e8-93d8-133be7109ce8}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stb_image.cpp">
@@ -127,9 +124,6 @@
     <ClCompile Include="Brushes.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="UserInterfaceTests.cpp">
-      <Filter>Source Files\Tests</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
@@ -164,9 +158,6 @@
     </ClInclude>
     <ClInclude Include="Application.hpp">
       <Filter>Source Files\Application</Filter>
-    </ClInclude>
-    <ClInclude Include="UserInterfaceTests.hpp">
-      <Filter>Source Files\Tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -84,16 +84,16 @@ void MeshRenderer::loadVertices()
 
 				// Forward (Classic winding)
 				DirectX::XMFLOAT3 gpu_aabbs_positions[8];
-				gpu_aabbs_positions[0] = dxConvert(glm::vec3{ min.x, max.y, max.z });  // top left
-				gpu_aabbs_positions[1] = dxConvert(glm::vec3{ max.x, max.y, max.z });  // top right
-				gpu_aabbs_positions[2] = dxConvert(glm::vec3{ max.x, min.y, max.z });  // bot right
-				gpu_aabbs_positions[3] = dxConvert(glm::vec3{ min.x, min.y, max.z });  // bot left
+				gpu_aabbs_positions[0] = dxConvert(min.x, max.y, max.z);  // top left
+				gpu_aabbs_positions[1] = dxConvert(max.x, max.y, max.z);  // top right
+				gpu_aabbs_positions[2] = dxConvert(max.x, min.y, max.z);  // bot right
+				gpu_aabbs_positions[3] = dxConvert(min.x, min.y, max.z);  // bot left
 
 				// Backward
-				gpu_aabbs_positions[4] = dxConvert(glm::vec3{ min.x, max.y, min.z });  // top left
-				gpu_aabbs_positions[5] = dxConvert(glm::vec3{ max.x, max.y, min.z });  // top right
-				gpu_aabbs_positions[6] = dxConvert(glm::vec3{ max.x, min.y, min.z });  // bot right
-				gpu_aabbs_positions[7] = dxConvert(glm::vec3{ min.x, min.y, min.z });  // bot left
+				gpu_aabbs_positions[4] = dxConvert(min.x, max.y, min.z);  // top left
+				gpu_aabbs_positions[5] = dxConvert(max.x, max.y, min.z);  // top right
+				gpu_aabbs_positions[6] = dxConvert(max.x, min.y, min.z);  // bot right
+				gpu_aabbs_positions[7] = dxConvert(min.x, min.y, min.z);  // bot left
 
 				// Front Face
 				aabb_verts[vertex_idx + 0].pos = gpu_aabbs_positions[0];

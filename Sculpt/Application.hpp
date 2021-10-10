@@ -8,6 +8,7 @@
 
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
+#include "FilePath.hpp"
 
 
 /* TODO:
@@ -309,6 +310,8 @@ struct RaytraceInstancesResult {
 
 struct UserInterface {
 	nui::Flex* viewport;
+
+	nui::TreeList* layers;
 };
 
 

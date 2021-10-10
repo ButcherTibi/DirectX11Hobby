@@ -8,14 +8,8 @@
     <Filter Include="Source Files\Error">
       <UniqueIdentifier>{5d9b2bf5-4668-4ce7-a121-ca6befefd590}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Precompiled Headers">
-      <UniqueIdentifier>{73dafea9-e986-44e7-bf35-748c72a1a77f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\FileIO">
       <UniqueIdentifier>{88a39a18-e860-46ff-82f9-a1440c6986ea}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\TextureAtlas">
-      <UniqueIdentifier>{7f3ce26e-1a9c-47fd-8b8f-aa0fc1a51854}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\DX11Wrapper">
       <UniqueIdentifier>{82e32baa-7480-46fd-a483-80a26e0545f0}</UniqueIdentifier>
@@ -29,23 +23,8 @@
     <Filter Include="Source Files\Shaders\CopyParentsMask">
       <UniqueIdentifier>{8ae53808-a1a0-4065-a60e-277173dfdaba}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Implementation">
-      <UniqueIdentifier>{4cd41a8d-fe79-4679-8e08-251b5c388bba}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Input">
-      <UniqueIdentifier>{f77fcdef-9e5d-40a0-8504-c3e18c338fd6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\CharacterAtlas">
-      <UniqueIdentifier>{f57a30c7-5ee3-4e46-a968-673ee7040140}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Shaders\Text">
       <UniqueIdentifier>{d09dbbc3-8cea-42fc-98be-72f8b9655f0e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Math">
-      <UniqueIdentifier>{778bb54a-b5f4-4381-90aa-38a961abd89f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\RenderingObjects">
-      <UniqueIdentifier>{91374992-812c-4a2f-8df2-715715730333}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Shaders\Gradient">
       <UniqueIdentifier>{b98445e5-2983-4445-a73c-32ad25460538}</UniqueIdentifier>
@@ -53,13 +32,19 @@
     <Filter Include="Source Files\Shaders\Rect">
       <UniqueIdentifier>{b073592b-c266-4e36-8d33-eda29dd37023}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Properties">
+      <UniqueIdentifier>{c8ae6e4a-6fc3-4d19-8eea-05c73b4e0a1d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Implementation">
+      <UniqueIdentifier>{33fde87f-cb84-4af0-a865-43e7d5aaf9a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders\Circle">
+      <UniqueIdentifier>{338d5f24-def0-46fa-8b24-90903b4c8736}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
       <Filter>Source Files\Error</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>Source Files\Precompiled Headers</Filter>
     </ClInclude>
     <ClInclude Include="NuiLibrary.hpp">
       <Filter>Source Files</Filter>
@@ -67,28 +52,10 @@
     <ClInclude Include="DX11Wrapper.hpp">
       <Filter>Source Files\DX11Wrapper</Filter>
     </ClInclude>
-    <ClInclude Include="GPU_ShaderTypes.hpp">
-      <Filter>Source Files\Shaders</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.hpp">
-      <Filter>Source Files\Input</Filter>
-    </ClInclude>
     <ClInclude Include="FilePath.hpp">
       <Filter>Source Files\FileIO</Filter>
     </ClInclude>
-    <ClInclude Include="CharacterAtlas.hpp">
-      <Filter>Source Files\CharacterAtlas</Filter>
-    </ClInclude>
-    <ClInclude Include="TextureAtlas.hpp">
-      <Filter>Source Files\TextureAtlas</Filter>
-    </ClInclude>
-    <ClInclude Include="BasicMath.h">
-      <Filter>Source Files\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="RenderingObjects.hpp">
-      <Filter>Source Files\RenderingObjects</Filter>
-    </ClInclude>
-    <ClInclude Include="CommonProperties.hpp">
+    <ClInclude Include="DietWindows.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -96,49 +63,49 @@
     <ClCompile Include="ErrorStack.cpp">
       <Filter>Source Files\Error</Filter>
     </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>Source Files\Precompiled Headers</Filter>
-    </ClCompile>
-    <ClCompile Include="FontRasterization.cpp">
-      <Filter>Source Files\CharacterAtlas</Filter>
-    </ClCompile>
-    <ClCompile Include="TextureAtlas.cpp">
-      <Filter>Source Files\TextureAtlas</Filter>
-    </ClCompile>
     <ClCompile Include="DX11Wrapper.cpp">
       <Filter>Source Files\DX11Wrapper</Filter>
-    </ClCompile>
-    <ClCompile Include="GPU_ShaderTypes.cpp">
-      <Filter>Source Files\Shaders</Filter>
-    </ClCompile>
-    <ClCompile Include="Elements.cpp">
-      <Filter>Source Files\Implementation</Filter>
-    </ClCompile>
-    <ClCompile Include="Rendering.cpp">
-      <Filter>Source Files\Implementation</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>Source Files\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="Instance.cpp">
-      <Filter>Source Files\Implementation</Filter>
-    </ClCompile>
-    <ClCompile Include="WindowImplementation.cpp">
-      <Filter>Source Files\Implementation</Filter>
     </ClCompile>
     <ClCompile Include="FilePath.cpp">
       <Filter>Source Files\FileIO</Filter>
     </ClCompile>
-    <ClCompile Include="Layout.cpp">
+    <ClCompile Include="TextureAtlas.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderInstanceTypes.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MathStuff.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CharacterAtlas.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPU_ShaderTypes.ixx">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.ixx">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NuiLibrary.ixx">
       <Filter>Source Files\Implementation</Filter>
     </ClCompile>
-    <ClCompile Include="BasicMath.cpp">
-      <Filter>Source Files\Math</Filter>
+    <ClCompile Include="Properties.ixx">
+      <Filter>Source Files\Properties</Filter>
     </ClCompile>
-    <ClCompile Include="RenderingObjects.cpp">
-      <Filter>Source Files\RenderingObjects</Filter>
+    <ClCompile Include="EventsComponent.cpp">
+      <Filter>Source Files\Implementation</Filter>
     </ClCompile>
-    <ClCompile Include="CommonProperties.cpp">
+    <ClCompile Include="Elements.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="Instance.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="Window.cpp">
+      <Filter>Source Files\Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -166,6 +133,9 @@
     </FxCompile>
     <FxCompile Include="SimpleVS.hlsl">
       <Filter>Source Files\Shaders\Common</Filter>
+    </FxCompile>
+    <FxCompile Include="CirclePS.hlsl">
+      <Filter>Source Files\Shaders\Circle</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@
 
 
 DirectX::XMFLOAT3 dxConvert(glm::vec3& value);
+DirectX::XMFLOAT3 dxConvert(float x, float y, float z);
 DirectX::XMFLOAT4 dxConvert(glm::vec4& value);
 DirectX::XMFLOAT4 dxConvert(glm::quat& value);
 DirectX::XMFLOAT4X4 dxConvert(glm::mat4& value);
