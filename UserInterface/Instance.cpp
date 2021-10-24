@@ -4,14 +4,15 @@ module;
 #undef RELATIVE
 #undef ABSOLUTE
 
-// DirectX 11
-#include "DX11Wrapper.hpp"
-
 // GLM
-#include "glm\vec2.hpp"
+#include "glm/vec2.hpp"
 
-module NuiLibrary;
+// Mine
+#include "DX11Wrapper.hpp"
+#include "GPU_ShaderTypes.hpp"
+#include "Properties.hpp"
 
+module UserInterface;
 
 using namespace nui;
 
@@ -19,7 +20,7 @@ using namespace nui;
 void Instance::create()
 {
 	hinstance = GetModuleHandleA(NULL);
-	arrow_hcursor = LoadCursorA(NULL, IDC_ARROW);
+	arrow_hcursor = LoadCursorA(NULL, reinterpret_cast<LPCSTR>(IDC_ARROW));
 
 	// Raw Device Input for Mouse
 	{
@@ -562,6 +563,191 @@ void Instance::drawTexts(Window* window, ClipZone& clip_zone, std::vector<TextIn
 	}
 }
 
+void Instance::drawTexts(Window* window, ClipZone& clip_zone, std::vector<TextInstance>& instances)
+{
+	if (instances.size() == 0) {
+		return;
+	}
+
+	// Generate GPU Data
+	{
+		// Counting
+		{
+			uint32_t vertex_count = 0;
+			uint32_t index_count = 0;
+
+			for (TextInstance& inst : instances) {
+				for (auto& positioned_char : inst.chars) {
+
+					if (positioned_char.chara->zone != nullptr) {
+						vertex_count += 4;
+						index_count += 6;
+					}
+				}
+			}
+
+			text_renderer.verts.resize(vertex_count);
+			text_renderer.indexes.resize(index_count);
+			text_renderer.instances.resize(instances.size());
+		}
+
+		uint32_t vertex_idx = 0;
+		uint32_t index_idx = 0;
+		uint32_t instance_idx = 0;
+
+		for (TextInstance& inst : instances) {
+			for (auto& positioned_char : inst.chars) {
+
+				Character* chara = positioned_char.chara;
+
+				if (chara->zone != nullptr) {
+
+					uint32_t bitmap_width = chara->zone->bb_pix.getWidth();
+					uint32_t bitmap_height = chara->zone->bb_pix.getHeight();
+
+					int32_t char_top = chara->bitmap_top;
+
+					glm::ivec2 character_pos = { positioned_char.pos[0], positioned_char.pos[1] };
+					character_pos.x += chara->bitmap_left;
+					character_pos.y += bitmap_height - char_top;
+
+					// Top Left
+					glm::ivec2 pos = character_pos;
+					pos.y -= bitmap_height;
+
+					GPU_CharacterVertex* v = &text_renderer.verts[vertex_idx];
+					v->pos = toXM(pos);
+					v->uv.x = chara->zone->bb_uv.x0;
+					v->uv.y = chara->zone->bb_uv.y0;
+					v->instance_id = instance_idx;
+
+					// Top Right
+					pos = character_pos;
+					pos.x += bitmap_width;
+					pos.y -= bitmap_height;
+
+					v = &text_renderer.verts[vertex_idx + 1];
+					v->pos = toXM(pos);
+					v->uv.x = chara->zone->bb_uv.x1;
+					v->uv.y = chara->zone->bb_uv.y0;
+					v->instance_id = instance_idx;
+
+					// Bot Right
+					pos = character_pos;
+					pos.x += bitmap_width;
+
+					v = &text_renderer.verts[vertex_idx + 2];
+					v->pos = toXM(pos);
+					v->uv.x = chara->zone->bb_uv.x1;
+					v->uv.y = chara->zone->bb_uv.y1;
+					v->instance_id = instance_idx;
+
+					// Bot Left
+					pos = character_pos;
+
+					v = &text_renderer.verts[vertex_idx + 3];
+					v->pos = toXM(pos);
+					v->uv.x = chara->zone->bb_uv.x0;
+					v->uv.y = chara->zone->bb_uv.y1;
+					v->instance_id = instance_idx;
+
+					// Tesselation 0 to 2
+					text_renderer.indexes[index_idx + 0] = vertex_idx + 0;
+					text_renderer.indexes[index_idx + 1] = vertex_idx + 1;
+					text_renderer.indexes[index_idx + 2] = vertex_idx + 2;
+
+					text_renderer.indexes[index_idx + 3] = vertex_idx + 2;
+					text_renderer.indexes[index_idx + 4] = vertex_idx + 3;
+					text_renderer.indexes[index_idx + 5] = vertex_idx + 0;
+
+					vertex_idx += 4;
+					index_idx += 6;
+				}
+			}
+
+			// Text Instance
+			GPU_TextInstance& tex_inst = text_renderer.instances[instance_idx];
+			tex_inst.color = toXM(inst.color.rgba);
+
+			instance_idx += 1;
+		}
+	}
+
+	// Draw
+	{
+		text_renderer.vbuff.upload(text_renderer.verts);
+		text_renderer.idxbuff.upload(text_renderer.indexes);
+		text_renderer.instances_buff.upload(text_renderer.instances);
+
+		// Input Assembly
+		{
+			im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			im_ctx3->IASetIndexBuffer(text_renderer.idxbuff.get(), DXGI_FORMAT_R32_UINT, 0);
+		}
+
+		// Vertex Shader
+		{
+			std::array<ID3D11ShaderResourceView*, 1> srvs = {
+				text_renderer.vbuff.getSRV()
+			};
+			im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
+
+			std::array<ID3D11Buffer*, 1> cbuffs = {
+				window->cbuff.get()
+			};
+			im_ctx3->VSSetConstantBuffers(0, cbuffs.size(), cbuffs.data());
+
+			im_ctx3->VSSetShader(text_renderer.char_vs.Get(), nullptr, 0);
+		}
+
+		// Rasterizer
+		{
+			D3D11_VIEWPORT viewport;
+			viewport.TopLeftX = (float)clip_zone.pos[0];
+			viewport.TopLeftY = (float)clip_zone.pos[1];
+			viewport.Width = (float)clip_zone.size[0];
+			viewport.Height = (float)clip_zone.size[1];
+			viewport.MinDepth = window->viewport.MinDepth;
+			viewport.MaxDepth = window->viewport.MaxDepth;
+
+			im_ctx3->RSSetViewports(1, &viewport);
+			im_ctx3->RSSetState(solid_back_rs.Get());
+		}
+
+		// Pixel Shader
+		{
+			std::array<ID3D11SamplerState*, 1> samplers = {
+				text_renderer.char_atlas_sampler.Get()
+			};
+			im_ctx3->PSSetSamplers(0, samplers.size(), samplers.data());
+
+			std::array<ID3D11ShaderResourceView*, 2> srvs = {
+				text_renderer.char_atlas_tex.getSRV(), text_renderer.instances_buff.getSRV()
+			};
+			im_ctx3->PSSetShaderResources(0, srvs.size(), srvs.data());
+
+			im_ctx3->PSSetShader(text_renderer.char_ps.Get(), nullptr, 0);
+		}
+
+		// Output Merger
+		{
+			std::array<float, 4> blend_factor = {
+				0, 0, 0, 0
+			};
+			im_ctx3->OMSetBlendState(blend_state.Get(), blend_factor.data(), 0xFFFF'FFFF);
+
+			std::array<ID3D11RenderTargetView*, 1> srv = {
+				window->present_rtv.Get()
+			};
+			im_ctx3->OMSetRenderTargets(srv.size(), srv.data(), nullptr);
+		}
+
+		// Draw
+		im_ctx3->DrawIndexed(text_renderer.indexes.size(),
+			0, 0);
+	}
+}
+
 void Instance::drawTexts(Window* window, std::vector<TextInstance*>& instances)
 {
 	ClipZone clip_zone;
@@ -690,6 +876,117 @@ void Instance::drawRect(Window* window, RectInstance* instance)
 void Instance::drawRects(Window* window, std::vector<RectInstance*>& instances)
 {
 	_drawRects(window, instances.data(), instances.size());
+}
+
+void Instance::drawRects(Window* window, std::vector<RectInstance>& instances)
+{
+	// Generate GPU Data
+	{
+		rect_renderer.verts.resize(instances.size() * 4);
+		rect_renderer.indexes.resize(instances.size() * 6);
+		rect_renderer.instances.resize(instances.size());
+
+		uint32_t vertex_idx = 0;
+		uint32_t index_idx = 0;
+
+		for (uint32_t i = 0; i < instances.size(); i++) {
+
+			RectInstance& inst = instances[i];
+
+			// Vertices
+			GPU_SimpleVertex& tl_v = rect_renderer.verts[vertex_idx + 0];
+			GPU_SimpleVertex& tr_v = rect_renderer.verts[vertex_idx + 1];
+			GPU_SimpleVertex& br_v = rect_renderer.verts[vertex_idx + 2];
+			GPU_SimpleVertex& bl_v = rect_renderer.verts[vertex_idx + 3];
+
+			glm::ivec2 pos = { inst.pos[0], inst.pos[1] };
+			tl_v.pos = toXM(pos);
+			tr_v.pos = toXM(pos.x + inst.size[0], pos.y);
+			br_v.pos = toXM(pos.x + inst.size[0], pos.y + inst.size[1]);;
+			bl_v.pos = toXM(pos.x, pos.y + inst.size[1]);
+
+			tl_v.instance_id = i;
+			tr_v.instance_id = i;
+			br_v.instance_id = i;
+			bl_v.instance_id = i;
+
+			// Indexes
+			rect_renderer.indexes[index_idx + 0] = vertex_idx + 0;
+			rect_renderer.indexes[index_idx + 1] = vertex_idx + 1;
+			rect_renderer.indexes[index_idx + 2] = vertex_idx + 2;
+
+			rect_renderer.indexes[index_idx + 3] = vertex_idx + 2;
+			rect_renderer.indexes[index_idx + 4] = vertex_idx + 3;
+			rect_renderer.indexes[index_idx + 5] = vertex_idx + 0;
+
+			// Instance
+			GPU_RectInstance& instance = rect_renderer.instances[i];
+			instance.color = toXM(inst.color.rgba);
+
+			vertex_idx += 4;
+			index_idx += 6;
+		}
+	}
+
+	// Draw
+	{
+		rect_renderer.vbuff.upload(rect_renderer.verts);
+		rect_renderer.idxbuff.upload(rect_renderer.indexes);
+		rect_renderer.instances_buff.upload(rect_renderer.instances);
+
+		// Input Assembly
+		{
+			im_ctx3->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			im_ctx3->IASetIndexBuffer(rect_renderer.idxbuff.get(), DXGI_FORMAT_R32_UINT, 0);
+		}
+
+		// Vertex Shader
+		{
+			std::array<ID3D11ShaderResourceView*, 1> srvs = {
+				rect_renderer.vbuff.getSRV()
+			};
+			im_ctx3->VSSetShaderResources(0, srvs.size(), srvs.data());
+
+			std::array<ID3D11Buffer*, 1> cbuffs = {
+				window->cbuff.get()
+			};
+			im_ctx3->VSSetConstantBuffers(0, cbuffs.size(), cbuffs.data());
+
+			im_ctx3->VSSetShader(simple_vs.Get(), nullptr, 0);
+		}
+
+		// Rasterizer
+		{
+			im_ctx3->RSSetViewports(1, &window->viewport);
+			im_ctx3->RSSetState(solid_back_rs.Get());
+		}
+
+		// Pixel Shader
+		{
+			std::array<ID3D11ShaderResourceView*, 1> ps_srv = {
+				rect_renderer.instances_buff.getSRV()
+			};
+			im_ctx3->PSSetShaderResources(0, ps_srv.size(), ps_srv.data());
+
+			im_ctx3->PSSetShader(rect_renderer.rect_ps.Get(), nullptr, 0);
+		}
+
+		// Output Merger
+		{
+			std::array<float, 4> blend_factor = {
+				0, 0, 0, 0
+			};
+			im_ctx3->OMSetBlendState(blend_state.Get(), blend_factor.data(), 0xFFFF'FFFF);
+
+			std::array<ID3D11RenderTargetView*, 1> srv = {
+				window->present_rtv.Get()
+			};
+			im_ctx3->OMSetRenderTargets(srv.size(), srv.data(), nullptr);
+		}
+
+		im_ctx3->DrawIndexed(rect_renderer.indexes.size(),
+			0, 0);
+	}
 }
 
 void Instance::drawArrows(Window* window, std::vector<ArrowInstance*>& instances)
@@ -987,16 +1284,6 @@ void Instance::drawCircle(Window* window, CircleInstance* instance)
 	drawCircles(window, &instance, 1);
 }
 
-//void Instance::registerStyleFile(io::Path& path)
-//{
-//	ErrStack err_stack;
-//
-//	StyleFile& new_style_file = style_files.emplace_back();
-//	new_style_file.file.create(path);
-//
-//	tryErrStack1(new_style_file.file.openForParsing());
-//}
-
 void Instance::_loadCharacterAtlasToTexture()
 {
 	TextureAtlas& atlas = text_renderer.char_atlas.atlas;
@@ -1079,7 +1366,7 @@ bool Instance::_bruteForceCreateSwapchain(Window& w, ComPtr<IDXGISwapChain1>& sw
 	return false;
 }
 
-Window* Instance::createWindow(WindowCreateInfo& info)
+Window* Instance::createWindow(Window::CreateInfo& info)
 {
 	Window& w = this->windows.emplace_back();
 	_created_windows.push_back(&w);

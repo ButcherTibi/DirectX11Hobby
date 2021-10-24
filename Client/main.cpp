@@ -6,31 +6,28 @@
 #include <chrono>
 
 // Library
-#include "NuiLibrary.hpp"
+import UserInterface;
 
 
 using namespace std::chrono_literals;
 
 
 enum class Tests {
-	// display a simple text with a text color delay
 	TEXT,
-
-	// display a simple rectangle colored blue
 	RECT,
+
 	BUTTON,
 	SLIDER,
+	DROPDOWN,
 
-	// display 3 boxes that stack vertically if the window get's too small
 	FLEX,
 
-	// display a menu
 	MENU,
 	TREELIST
 };
 
 // modify below to test a different feature
-Tests current_test = Tests::SLIDER;
+Tests current_test = Tests::DROPDOWN;
 
 
 void buttonClicked(nui::Window*, nui::StoredElement2*, void*)
@@ -57,47 +54,47 @@ int main()
 
 	nui::Window* window;
 	{
-		nui::WindowCreateInfo win_info;
+		nui::Window::CreateInfo win_info;
 		win_info.width = 1024;
 		win_info.height = 700;
 
 		window = instance.createWindow(win_info);
 	}
 
-	// Retained Mode Elements
-	switch (current_test) {
-	case Tests::TREELIST: {
+	//// Retained Mode Elements
+	//switch (current_test) {
+	//case Tests::TREELIST: {
 
-		// Init
-		{
-			nui::TreeListCreateInfo info;
-			tree_list = window->createTreeList(info);
-		}
+	//	// Init
+	//	{
+	//		nui::TreeListCreateInfo info;
+	//		tree_list = window->createTreeList(info);
+	//	}
 
-		// Populate
-		nui::TreeListItemCreateInfo item_info;
+	//	// Populate
+	//	nui::TreeListItemCreateInfo item_info;
 
-		for (uint32_t i = 1; i <= 3; i++) {
+	//	for (uint32_t i = 1; i <= 3; i++) {
 
-			item_info.text.text = "Item " + std::to_string(i);
-			auto item_1 = tree_list->createItem(item_info);
+	//		item_info.text.text = "Item " + std::to_string(i);
+	//		auto item_1 = tree_list->createItem(item_info);
 
-			for (uint32_t j = 1; j <= 3; j++) {
+	//		for (uint32_t j = 1; j <= 3; j++) {
 
-				item_info.text.text = "Item " + std::to_string(i) + " " + std::to_string(j);
-				auto item_1_1 = tree_list->createItem(item_1, item_info);
+	//			item_info.text.text = "Item " + std::to_string(i) + " " + std::to_string(j);
+	//			auto item_1_1 = tree_list->createItem(item_1, item_info);
 
-				for (uint32_t k = 1; k <= 3; k++) {
+	//			for (uint32_t k = 1; k <= 3; k++) {
 
-					item_info.text.text = "Item " + std::to_string(i) + " " +
-						std::to_string(j) + " " + std::to_string(k);
-					auto item_1_1_1 = tree_list->createItem(item_1_1, item_info);
-				}
-			}
-		}
-		break;
-	}
-	}
+	//				item_info.text.text = "Item " + std::to_string(i) + " " +
+	//					std::to_string(j) + " " + std::to_string(k);
+	//				auto item_1_1_1 = tree_list->createItem(item_1_1, item_info);
+	//			}
+	//		}
+	//	}
+	//	break;
+	//}
+	//}
 
 	while (window->win_messages.should_close == false) {
 
@@ -135,6 +132,7 @@ int main()
 				flex_info.id = "flex_id";
 				flex_info.size[0] = 100.f;
 				flex_info.size[1] = 100.f;
+				flex_info.orientation = nui::FlexOrientation::COLUMN;
 				flex_info.items_spacing = nui::FlexSpacing::CENTER;
 				flex_info.lines_spacing = nui::FlexSpacing::CENTER;
 
@@ -164,6 +162,21 @@ int main()
 				btn_info.click.on.callback = buttonClicked;
 
 				flex->createButton(btn_info);
+
+				// Variations
+				btn_info.id = "button_2_id";
+				btn_info.size[0] = 25.f;
+				flex->createButton(btn_info);
+
+				btn_info.id = "button_3_id";
+				btn_info.size[0] = nui::ElementSize();
+				btn_info.size[1] = 25.f;
+				flex->createButton(btn_info);
+
+				btn_info.id = "button_4_id";
+				btn_info.size[0] = 25.f;
+				btn_info.size[1] = 25.f;
+				flex->createButton(btn_info);
 				break;
 			}
 
@@ -173,6 +186,7 @@ int main()
 				flex_info.id = "flex_id";
 				flex_info.size[0] = 100.f;
 				flex_info.size[1] = 100.f;
+				flex_info.orientation = nui::FlexOrientation::COLUMN;
 				flex_info.items_spacing = nui::FlexSpacing::CENTER;
 				flex_info.lines_spacing = nui::FlexSpacing::CENTER;
 
@@ -195,6 +209,40 @@ int main()
 				slider_info.press.thumb_color = nui::AnimatedProperty(nui::Color::hsl(220.f, 1.f, .5f), 500ms);
 
 				flex->createSlider(slider_info);
+
+				// Size Variations
+				slider_info.id = "slider_2_id";
+				slider_info.size[0] = 400;
+				flex->createSlider(slider_info);
+				break;
+			}
+
+			case Tests::DROPDOWN: {
+
+				nui::FlexCreateInfo flex_info;
+				flex_info.id = "flex_id";
+				flex_info.size[0] = 100.f;
+				flex_info.size[1] = 100.f;
+				flex_info.orientation = nui::FlexOrientation::ROW;
+				flex_info.items_spacing = nui::FlexSpacing::CENTER;
+				flex_info.lines_spacing = nui::FlexSpacing::CENTER;
+
+				nui::Flex* flex = win->createFlex(flex_info);
+
+				nui::Dropdown::CreateInfo drop_info;
+				drop_info.id = "dropdown_id";
+				drop_info.options = {
+					"Option 1", 
+					"Option 2 Long",
+					"Option 3"
+				};
+
+				flex->createDropdown(drop_info);
+
+				// Size Variations
+				drop_info.id = "dropdown_1_id";
+				drop_info.size[0] = 35.f;
+				flex->createDropdown(drop_info);
 				break;
 			}
 
@@ -329,19 +377,19 @@ int main()
 				break;
 			}
 
-			case Tests::TREELIST: {
-				nui::FlexCreateInfo flex_info;
-				flex_info.size[0] = 100.f;
-				flex_info.size[1] = 100.f;
-				flex_info.items_spacing = nui::FlexSpacing::END;
-				auto flex = win->createFlex(flex_info);
+	//		case Tests::TREELIST: {
+	//			nui::FlexCreateInfo flex_info;
+	//			flex_info.size[0] = 100.f;
+	//			flex_info.size[1] = 100.f;
+	//			flex_info.items_spacing = nui::FlexSpacing::END;
+	//			auto flex = win->createFlex(flex_info);
 
-				nui::TreeListCreateInfo tree_info;
-				//tree_info.size[0] = 500;
-				tree_info.background_color = nui::Color(0.f, .05f, .05f);
-				flex->attachTreeList(tree_info, tree_list);
-				break;
-			}
+	//			nui::TreeListCreateInfo tree_info;
+	//			//tree_info.size[0] = 500;
+	//			tree_info.background_color = nui::Color(0.f, .05f, .05f);
+	//			flex->attachTreeList(tree_info, tree_list);
+	//			break;
+	//		}
 			}
 		});
 	}

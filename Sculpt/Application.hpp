@@ -6,6 +6,9 @@
 #include <list>
 #include <functional>
 
+// UI
+#include "Input.hpp"
+
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
 #include "FilePath.hpp"

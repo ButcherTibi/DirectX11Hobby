@@ -10,18 +10,25 @@ module;
 // DXGI
 #include <dxgi1_6.h>
 
-// Error
+// Mine
 #include "ErrorStack.hpp"
+#include "Input.hpp"
+#include "GPU_ShaderTypes.hpp"
+#include "Properties.hpp"
+#include "TimeStuff.hpp"
+
 
 // Undefines
 #undef RELATIVE
 #undef ABSOLUTE
 
-
-module NuiLibrary;
+module UserInterface;
 
 
 using namespace nui;
+
+
+// std::list<Window*> _created_windows;
 
 
 FORCEINLINE uint16_t getLowOrder(uint32_t param)
@@ -252,6 +259,11 @@ void Window::createText(Text::CreateInfo& info)
 	root->createText(info);
 }
 
+Rect* Window::createRectangle(RectCreateInfo& info)
+{
+	return root->createRect(info);
+}
+
 void Window::createButton(Button::CreateInfo& info)
 {
 	root->createButton(info);
@@ -262,14 +274,14 @@ void Window::createSlider(Slider::CreateInfo& info)
 	root->createSlider(info);
 }
 
+void Window::createDropdown(Dropdown::CreateInfo& info)
+{
+	root->createDropdown(info);
+}
+
 Flex* Window::createFlex(FlexCreateInfo& info)
 {
 	return root->createFlex(info);
-}
-
-Rect* Window::createRectangle(RectCreateInfo& info)
-{
-	return root->createRect(info);
 }
 
 Menu* Window::createMenu(MenuCreateInfo& info)
@@ -277,27 +289,27 @@ Menu* Window::createMenu(MenuCreateInfo& info)
 	return root->createMenu(info);
 }
 
-TreeList* Window::createTreeList(TreeListCreateInfo& new_info)
-{
-	StoredElement2& new_elem = retained_elements.emplace_back();
-
-	auto& new_tree = new_elem.specific_elem.emplace<TreeList>();
-	new_tree._window = this;
-	new_tree._parent = nullptr;
-	new_tree._self = &new_elem;
-
-	new_elem.base_elem = &new_tree;
-
-	new_tree._calcNowState(&new_tree.base_elem_state, new_info);
-	new_tree.info = new_info;
-
-	// Init
-	TreeListItem& root_item = new_tree.items.emplace_back();
-	root_item.parent = 0xFFFF'FFFF;
-
-	return &new_tree;
-}
-
+//TreeList* Window::createTreeList(TreeListCreateInfo& new_info)
+//{
+//	StoredElement2& new_elem = retained_elements.emplace_back();
+//
+//	auto& new_tree = new_elem.specific_elem.emplace<TreeList>();
+//	new_tree._window = this;
+//	new_tree._parent = nullptr;
+//	new_tree._self = &new_elem;
+//
+//	new_elem.base_elem = &new_tree;
+//
+//	new_tree._calcNowState(&new_tree.base_elem_state, new_info);
+//	new_tree.info = new_info;
+//
+//	// Init
+//	TreeListItem& root_item = new_tree.items.emplace_back();
+//	root_item.parent = 0xFFFF'FFFF;
+//
+//	return &new_tree;
+//}
+//
 void Window::update(WindowCallback callback)
 {
 	// Calculate Delta Factor
@@ -406,6 +418,13 @@ void Window::update(WindowCallback callback)
 
 			if (iter->used == false) {
 				button_prevs.erase(iter);
+			}
+		}
+
+		for (auto iter = slider_prevs.begin(); iter != slider_prevs.end(); iter++) {
+
+			if (iter->used == false) {
+				slider_prevs.erase(iter);
 			}
 		}
 
@@ -645,29 +664,29 @@ void Window::update(WindowCallback callback)
 	}
 }
 
-void Window::setEndEvent(WindowCallback callback, void* user_data)
-{
-	this->finalEvent = callback;
-	this->final_event_user_data = user_data;
-}
-
-void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
-{
-	root->_events.setKeyDownEvent(callback, key, user_data);
-}
-
-void Window::endMouseDeltaEffect()
-{
-	switch (delta_effect) {
-	case DeltaEffectType::HIDDEN: {
-		setLocalMousePosition(begin_mouse_x, begin_mouse_y);
-		setMouseVisibility(true);
-	}
-	}
-
-	delta_owner_elem = nullptr;
-	ClipCursor(nullptr);
-}
+//void Window::setEndEvent(WindowCallback callback, void* user_data)
+//{
+//	this->finalEvent = callback;
+//	this->final_event_user_data = user_data;
+//}
+//
+//void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
+//{
+//	root->_events.setKeyDownEvent(callback, key, user_data);
+//}
+//
+//void Window::endMouseDeltaEffect()
+//{
+//	switch (delta_effect) {
+//	case DeltaEffectType::HIDDEN: {
+//		setLocalMousePosition(begin_mouse_x, begin_mouse_y);
+//		setMouseVisibility(true);
+//	}
+//	}
+//
+//	delta_owner_elem = nullptr;
+//	ClipCursor(nullptr);
+//}
 
 RECT Window::getClientRectangle()
 {

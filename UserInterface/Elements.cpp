@@ -15,14 +15,16 @@ module;
 #include "glm\common.hpp"
 #include "glm\vec2.hpp"
 
-// Error
+// Mine
 #include "ErrorStack.hpp"
+#include "MathStuff.hpp"
+#include "Input.hpp"
 
 // Undefines
 #undef RELATIVE
 #undef ABSOLUTE
 
-module NuiLibrary;
+module UserInterface;
 
 
 using namespace nui;
@@ -64,418 +66,177 @@ void Element::_draw()
 	// no rendering commands present
 };
 
-//void Element::_shadowEmitEvents()
-//{
-//	
-//}
+////void Element::_shadowEmitEvents()
+////{
+////	
+////}
+////
+////void Element::_shadowTopDownPass()
+////{
+////	assert_cond(_shadow_root != nullptr);
+////
+////	std::vector<Element*> now_elems = {
+////		_shadow_root
+////	};
+////	std::vector<Element*> next_elems;
+////
+////	_shadow_leafs.clear();
+////
+////	while (now_elems.size()) {
+////
+////		for (Element* now_elem : now_elems) {
+////
+////			// needed later for bottom up pass
+////			if (now_elem->_children.size() == 0) {
+////				_shadow_leafs.insert(now_elem);
+////			}
+////
+////			auto calc_size_for_axis = [now_elem](uint32_t axis) {
+////
+////				auto& size = now_elem->size[axis];
+////				auto& _size = now_elem->_size[axis];
+////
+////				switch (size.type) {
+////				case ElementSizeType::RELATIVE: {
+////					auto& _parent_size = now_elem->_parent->_size[axis];
+////					_size = std::lroundf(_parent_size * size.relative_size);
+////					break;
+////				}
+////
+////				case ElementSizeType::ABSOLUTE: {
+////					_size = size.absolute_size;
+////					break;
+////				}
+////
+////				case ElementSizeType::FIT: {
+////					// size cannot be calculated at this pass
+////					_size = 0;
+////					break;
+////				}
+////				}
+////			};
+////			calc_size_for_axis(0);
+////			calc_size_for_axis(1);
+////
+////			for (Element* child : now_elem->_children) {
+////				next_elems.push_back(child);
+////			}
+////		}
+////
+////		now_elems.swap(next_elems);
+////		next_elems.clear();
+////	}
+////}
+////
+////void Element::_shadowBottomUpPass()
+////{
+////	auto& now_elems = _shadow_leafs;
+////	std::unordered_set<Element*> next_elems;
+////
+////	while (now_elems.size()) {
+////
+////		for (Element* now_elem : now_elems) {
+////
+////			now_elem->_calcSizeAndRelativeChildPositions();
+////
+////			if (now_elem->_parent != nullptr) {
+////				next_elems.insert(now_elem->_parent);
+////			}
+////		}
+////
+////		now_elems.swap(next_elems);
+////		next_elems.clear();
+////	}
+////}
+////
+////void Element::_shadowCalcDrawPosition()
+////{
+////	_shadow_draw_stacks.clear();
+////
+////	std::vector<PassedElement> now_elems;
+////
+////	PassedElement& passed_child = now_elems.emplace_back();
+////	passed_child.ancestor_pos = { 0, 0 };
+////	passed_child.ancestor_z_index = 0;
+////	passed_child.elem = _shadow_root;
+////
+////	std::vector<PassedElement> next_elems;
+////
+////	while (now_elems.size()) {
+////
+////		for (PassedElement& now_elem : now_elems) {
+////
+////			// convert position to screen space
+////			Element* elem = now_elem.elem;
+////			elem->_position[0] += now_elem.ancestor_pos[0];
+////			elem->_position[1] += now_elem.ancestor_pos[1];
+////
+////			// convert z index to draw call order
+////			switch (elem->z_index.type) {
+////			case Z_IndexType::INHERIT: {
+////				elem->_z_index = now_elem.ancestor_z_index;
+////				break;
+////			}
+////			case Z_IndexType::RELATIVE: {
+////				elem->_z_index = now_elem.ancestor_z_index + elem->z_index.value;
+////				break;
+////			}
+////			case Z_IndexType::ABSOLUTE: {
+////				elem->_z_index = elem->z_index.value;
+////				break;
+////			}
+////			}
+////
+////			_shadow_draw_stacks[elem->_z_index].push_back(elem);
+////
+////			for (Element* child : elem->_children) {
+////
+////				PassedElement& next_elem = next_elems.emplace_back();
+////				next_elem.ancestor_pos = elem->_position;
+////				next_elem.ancestor_z_index = elem->_z_index;
+////				next_elem.elem = child;
+////			}
+////		}
+////
+////		now_elems.swap(next_elems);
+////		next_elems.clear();
+////	}
+////}
+////
+////void Element::_shadowDraw()
+////{
+////	for (auto& stack : _shadow_draw_stacks) {
+////		for (Element* elem : stack.second) {
+////
+////			elem->_draw();
+////		}
+////	}
+////}
 //
-//void Element::_shadowTopDownPass()
-//{
-//	assert_cond(_shadow_root != nullptr);
-//
-//	std::vector<Element*> now_elems = {
-//		_shadow_root
-//	};
-//	std::vector<Element*> next_elems;
-//
-//	_shadow_leafs.clear();
-//
-//	while (now_elems.size()) {
-//
-//		for (Element* now_elem : now_elems) {
-//
-//			// needed later for bottom up pass
-//			if (now_elem->_children.size() == 0) {
-//				_shadow_leafs.insert(now_elem);
-//			}
-//
-//			auto calc_size_for_axis = [now_elem](uint32_t axis) {
-//
-//				auto& size = now_elem->size[axis];
-//				auto& _size = now_elem->_size[axis];
-//
-//				switch (size.type) {
-//				case ElementSizeType::RELATIVE: {
-//					auto& _parent_size = now_elem->_parent->_size[axis];
-//					_size = std::lroundf(_parent_size * size.relative_size);
-//					break;
-//				}
-//
-//				case ElementSizeType::ABSOLUTE: {
-//					_size = size.absolute_size;
-//					break;
-//				}
-//
-//				case ElementSizeType::FIT: {
-//					// size cannot be calculated at this pass
-//					_size = 0;
-//					break;
-//				}
-//				}
-//			};
-//			calc_size_for_axis(0);
-//			calc_size_for_axis(1);
-//
-//			for (Element* child : now_elem->_children) {
-//				next_elems.push_back(child);
-//			}
-//		}
-//
-//		now_elems.swap(next_elems);
-//		next_elems.clear();
-//	}
-//}
-//
-//void Element::_shadowBottomUpPass()
-//{
-//	auto& now_elems = _shadow_leafs;
-//	std::unordered_set<Element*> next_elems;
-//
-//	while (now_elems.size()) {
-//
-//		for (Element* now_elem : now_elems) {
-//
-//			now_elem->_calcSizeAndRelativeChildPositions();
-//
-//			if (now_elem->_parent != nullptr) {
-//				next_elems.insert(now_elem->_parent);
-//			}
-//		}
-//
-//		now_elems.swap(next_elems);
-//		next_elems.clear();
-//	}
-//}
-//
-//void Element::_shadowCalcDrawPosition()
-//{
-//	_shadow_draw_stacks.clear();
-//
-//	std::vector<PassedElement> now_elems;
-//
-//	PassedElement& passed_child = now_elems.emplace_back();
-//	passed_child.ancestor_pos = { 0, 0 };
-//	passed_child.ancestor_z_index = 0;
-//	passed_child.elem = _shadow_root;
-//
-//	std::vector<PassedElement> next_elems;
-//
-//	while (now_elems.size()) {
-//
-//		for (PassedElement& now_elem : now_elems) {
-//
-//			// convert position to screen space
-//			Element* elem = now_elem.elem;
-//			elem->_position[0] += now_elem.ancestor_pos[0];
-//			elem->_position[1] += now_elem.ancestor_pos[1];
-//
-//			// convert z index to draw call order
-//			switch (elem->z_index.type) {
-//			case Z_IndexType::INHERIT: {
-//				elem->_z_index = now_elem.ancestor_z_index;
-//				break;
-//			}
-//			case Z_IndexType::RELATIVE: {
-//				elem->_z_index = now_elem.ancestor_z_index + elem->z_index.value;
-//				break;
-//			}
-//			case Z_IndexType::ABSOLUTE: {
-//				elem->_z_index = elem->z_index.value;
-//				break;
-//			}
-//			}
-//
-//			_shadow_draw_stacks[elem->_z_index].push_back(elem);
-//
-//			for (Element* child : elem->_children) {
-//
-//				PassedElement& next_elem = next_elems.emplace_back();
-//				next_elem.ancestor_pos = elem->_position;
-//				next_elem.ancestor_z_index = elem->_z_index;
-//				next_elem.elem = child;
-//			}
-//		}
-//
-//		now_elems.swap(next_elems);
-//		next_elems.clear();
-//	}
-//}
-//
-//void Element::_shadowDraw()
-//{
-//	for (auto& stack : _shadow_draw_stacks) {
-//		for (Element* elem : stack.second) {
-//
-//			elem->_draw();
-//		}
-//	}
-//}
-
-//void Element::emitEvents()
-//{
-//
-//}
-//
-//void Element::topDownPass()
-//{
-//
-//}
-//
-//void Element::bottomUpPass()
-//{
-//
-//}
-//
-//void Element::calcDrawPosition()
-//{
-//
-//}
-//
-//void Element::draw()
-//{
-//
-//}
-
-void Container::createText(Text::CreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Text& new_text = new_entry.specific_elem.emplace<Text>();
-	new_text._window = _window;
-	new_text._parent = _self->base_elem;
-	new_entry.base_elem = &new_text;
-	new_text._self = &new_entry;
-
-	Text::RetainedState* prev = nullptr;
-	{
-		for (Text::RetainedState& state : _window->text_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->text_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-
-		prev->info = info;
-	}
-
-	new_text._calcNowState(prev, info);
-	new_text.state = prev;
-
-	_children.push_back(&new_text);
-}
-
-Flex* Container::createFlex(FlexCreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Flex& new_flex = new_entry.specific_elem.emplace<Flex>();
-	new_flex._window = _window;
-	new_flex._parent = _self->base_elem;
-	new_entry.base_elem = &new_flex;
-	new_flex._self = &new_entry;
-
-	FlexRetainedState* prev = nullptr;
-	{
-		for (FlexRetainedState& state : _window->flex_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->flex_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-	}
-
-	new_flex._calcNowState(prev, info);
-
-	new_flex.orientation = info.orientation;
-	new_flex.items_spacing = info.items_spacing;
-	new_flex.lines_spacing = info.lines_spacing;
-
-	_children.push_back(&new_flex);
-
-	return &new_flex;
-}
-
-Rect* Container::createRect(RectCreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Rect& new_rect = new_entry.specific_elem.emplace<Rect>();
-	new_rect._window = _window;
-	new_rect._parent = _self->base_elem;
-	new_entry.base_elem = &new_rect;
-	new_rect._self = &new_entry;
-
-	RectRetainedState* prev = nullptr;
-	{
-		for (RectRetainedState& state : _window->rect_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->rect_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-	}
-
-	new_rect._calcNowState(prev, info);
-
-	new_rect.color = prev->color.calc(info.color);
-
-	_children.push_back(&new_rect);
-
-	return &new_rect;
-}
-
-void Container::createButton(Button::CreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Button& new_btn = new_entry.specific_elem.emplace<Button>();
-	new_btn._window = _window;
-	new_btn._parent = _self->base_elem;
-	new_entry.base_elem = &new_btn;
-	new_btn._self = &new_entry;
-
-	Button::RetainedState* prev = nullptr;
-	{
-		for (Button::RetainedState& state : _window->button_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->button_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-
-		prev->info = info;
-	}
-
-	new_btn._calcNowState(prev, info);
-	new_btn.state = prev;
-
-	_children.push_back(&new_btn);
-}
-
-void Container::createSlider(Slider::CreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Slider& new_slider = new_entry.specific_elem.emplace<Slider>();
-	new_slider._window = _window;
-	new_slider._parent = _self->base_elem;
-	new_entry.base_elem = &new_slider;
-	new_slider._self = &new_entry;
-
-	Slider::RetainedState* prev = nullptr;
-	{
-		for (Slider::RetainedState& state : _window->slide_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->slide_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-
-		prev->info = info;
-	}
-
-	new_slider._calcNowState(prev, info);
-	new_slider.state = prev;
-
-	_children.push_back(&new_slider);
-}
-
-Menu* Container::createMenu(MenuCreateInfo& info)
-{
-	StoredElement2& new_entry = _window->elements.emplace_back();
-
-	Menu& new_menu = new_entry.specific_elem.emplace<Menu>();
-	new_menu._window = _window;
-	new_menu._parent = _self->base_elem;
-	new_menu._self = &new_entry;
-
-	new_entry.base_elem = &new_menu;
-	_children.push_back(&new_menu);
-
-	MenuRetainedState* prev = nullptr;
-	{
-		for (MenuRetainedState& state : _window->menu_prevs) {
-			if (state.id == info.id) {
-				prev = &state;
-				break;
-			}
-		}
-
-		if (prev == nullptr) {
-			prev = &_window->menu_prevs.emplace_back();
-		}
-
-		prev->id = info.id;
-		prev->used = true;
-
-		prev->submenus.clear();
-		prev->sections.clear();
-		prev->items.clear();
-
-		SubMenu& root_menu = prev->submenus.emplace_back();
-		root_menu.child_sections.push_back(0);
-
-		prev->sections.resize(1);
-	}
-
-	new_menu._calcNowState(prev, info);
-
-	{
-		SubMenu& root_submenu = prev->submenus[0];
-		root_submenu.info.background_color = info.titles_background_color;
-		root_submenu.info.border_thickness = info.titles_border_thickness;
-		root_submenu.info.border_color = info.titles_border_color;
-	}
-
-	// Init
-	new_menu.state = prev;
-
-	return &new_menu;
-}
-
-void Container::attachTreeList(TreeListCreateInfo& info, TreeList* tree_list)
-{
-	tree_list->_parent = _self->base_elem;
-	_children.push_back(tree_list->_self->base_elem);
-
-	tree_list->_calcNowState(&tree_list->base_elem_state, info);
-	tree_list->info = info;
-}
+////void Element::emitEvents()
+////{
+////
+////}
+////
+////void Element::topDownPass()
+////{
+////
+////}
+////
+////void Element::bottomUpPass()
+////{
+////
+////}
+////
+////void Element::calcDrawPosition()
+////{
+////
+////}
+////
+////void Element::draw()
+////{
+////
+////}
 
 void Root::_emitEvents(bool&)
 {
@@ -522,31 +283,6 @@ void Root::_draw()
 	instance->im_ctx3->ClearRenderTargetView(_window->present_rtv.Get(), clear_color.data());
 }
 
-//void Root::emitEvents()
-//{
-//
-//}
-//
-//void Root::topDownPass()
-//{
-//	// @HERE
-//}
-//
-//void Root::bottomUpPass()
-//{
-//
-//}
-//
-//void Root::calcDrawPosition()
-//{
-//
-//}
-//
-//void Root::draw()
-//{
-//
-//}
-
 void Text::_calcSizeAndRelativeChildPositions()
 {
 	TextProps new_inst;
@@ -579,11 +315,12 @@ void Text::_draw()
 void Rect::_draw()
 {
 	Instance* inst = _window->instance;
+	auto s = state;
 
 	RectInstance rect_inst;
 	rect_inst.pos = _position;
 	rect_inst.size = _size;
-	rect_inst.color = color;
+	rect_inst.color = s->color.calc(s->info.color);
 
 	std::vector<RectInstance*> instances = { &rect_inst };
 
@@ -909,113 +646,307 @@ void Slider::_draw()
 	inst->drawCircle(_window, &s->circle_instance);
 }
 
-//
-//void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)
-//{
-//	auto& color_anim = _background_color;
-//	color_anim.start = background_color.rgba;
-//	color_anim.end = end_color.rgba;
-//	color_anim.start_time = nui::frame_start_time;
-//	color_anim.end_time = color_anim.start_time + std::chrono::milliseconds(duration);
-//	color_anim.blend_func = TransitionBlendFunction::LINEAR;
-//}
-//
-//void BackgroundElement::_init()
-//{
-//	Element::_initDefaultProperties();
-//
-//	coloring = BackgroundColoring::NONE;
-//	background_color.setRGBA_UNORM();
-//
-//	_onRenderingSurface = nullptr;
-//
-//	_rect_render.init(_window);
-//	_events._init(_window);
-//}
-//
-//void BackgroundElement::_generateGPU_Data()
-//{
-//	switch (coloring) {
-//	case BackgroundColoring::FLAT_FILL: {
-//
-//		SteadyTime& now = nui::frame_start_time;
-//		background_color.rgba = _background_color.calculate(now);
-//
-//		_rect_render.reset();
-//
-//		RectInstance props;
-//		props.screen_pos[0] = _position[0];
-//		props.screen_pos[1] = _position[1];
-//		props.size[0] = _size[0];
-//		props.size[1] = _size[1];
-//		props.color.rgba = background_color.rgba;
-//		_rect_render.addInstance(props);
-//
-//		_rect_render.generateGPU_Data();
-//		break;
-//	}
-//	}
-//}
-//
-//void BackgroundElement::_draw()
-//{
-//	switch (coloring) {
-//	case BackgroundColoring::FLAT_FILL: {		
-//		_rect_render.draw();
-//		break;
-//	}
-//
-//	case BackgroundColoring::RENDERING_SURFACE: {
-//
-//		assert_cond(_onRenderingSurface != nullptr,
-//			"RenderingSurface callback not set for BackgroundColoring::RENDERING_SURFACE");
-//
-//		Instance* instance = _window->instance;
-//		ID3D11DeviceContext3* im_ctx3 = instance->im_ctx3.Get();
-//
-//		//auto clear_bindings = [&]() {
-//
-//		//	// Input Assembly
-//		//	{
-//		//		std::array<ID3D11Buffer*, 2> buffs = {
-//		//			nullptr, nullptr
-//		//		};
-//		//		std::array<uint32_t, 2> strides = {
-//		//			0, 0
-//		//		};
-//		//		std::array<uint32_t, 2> offsets = {
-//		//			0, 0
-//		//		};
-//		//		im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
-//		//	}
-//		//};
-//
-//		im_ctx3->ClearState();
-//
-//		SurfaceEvent surface_event;
-//		surface_event.dev5 = instance->dev5.Get();
-//		surface_event.im_ctx3 = im_ctx3;
-//
-//		surface_event.render_target_width = _window->surface_width;
-//		surface_event.render_target_height = _window->surface_height;
-//		surface_event.compose_rtv = _window->present_rtv.Get();
-//
-//		surface_event.viewport_pos = { _position[0], _position[1] };
-//		surface_event.viewport_size = { _size[0], _size[1] };
-//
-//		this->_onRenderingSurface(_window, &(*_self_element), surface_event, _surface_event_user_data);
-//
-//		im_ctx3->ClearState();
-//		break;
-//	}
-//	}
-//}
-//
-//void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data)
-//{
-//	this->_onRenderingSurface = callback;
-//	this->_surface_event_user_data = user_data;
-//}
+void Dropdown::_emitEvents(bool&)
+{
+	Input& input = _window->input;
+	auto s = state;
+
+	switch (s->input_state) {
+	case _InputState::CLOSED: {
+
+		if (s->boxes[0].isInside(input.mouse_x, input.mouse_y)) {
+
+			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
+			
+				s->is_open = true;
+				s->input_state = _InputState::RELEASE_MOUSE;
+			}
+		}
+		break;
+	}
+
+	case _InputState::RELEASE_MOUSE: {
+
+		break;
+	}
+
+	case _InputState::READY: {
+
+		break;
+	}
+	}
+
+	//if (s->is_open) {
+
+	////	uint32_t option_index = 0;
+	////	for (Box2D& option_box : s->options) {
+
+	////		if (option_box.isInside(input.mouse_x, input.mouse_y)) {
+
+	////			// click
+	////			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
+
+	////				if (s->info.chosen_callback != nullptr) {
+	////					s->info.chosen_callback(_window, option_index, s->info.chosen_user_data);
+	////				}
+	////				s->is_open = false;
+	////			}
+	////			// hover
+	////			else {
+
+	////			}
+	////			break;
+	////		}
+
+	////		option_index++;
+	////	}
+	//}
+}
+
+void Dropdown::_calcSizeAndRelativeChildPositions()
+{
+	auto s = state;
+	Instance* inst = _window->instance;
+
+	assert_cond(size[1].type == ElementSizeType::FIT, "not supported");
+
+	int32_t pen_y = 0;
+
+	uint32_t max_text_width = 0;
+
+	TextProps text_props;
+	text_props.font_family = s->info.font_family;;
+	text_props.font_style = s->info.font_style;
+	text_props.font_size = s->info.font_size;
+	text_props.line_height = s->info.line_height;
+
+	s->text_instances.clear();
+	s->background_instances.clear();
+	s->boxes.clear();
+
+	s->text_instances.resize(s->info.options.size());
+	s->background_instances.resize(s->info.options.size());
+	s->boxes.resize(s->info.options.size());
+
+	for (uint32_t i = 0; i < s->info.options.size(); i++) {
+
+		TextInstance& text_instance = s->text_instances[i];
+		RectInstance& background_instance = s->background_instances[i];
+
+		// Position text
+		uint32_t text_width;
+		uint32_t text_height;
+		{
+			text_props.text = s->info.options[i];
+
+			inst->findAndPositionGlyphs(text_props,
+				s->info.side_padding, pen_y + s->info.vertical_padding,
+				text_width, text_height,
+				text_instance.chars);
+		}
+
+		// Background
+		{
+			background_instance.pos = {
+				0, pen_y
+			};
+			background_instance.size[1] = text_height + s->info.vertical_padding * 2;
+		}
+
+		// Special Styling
+		if (i == s->hover_index) {
+			text_instance.color = s->hover_text_color.calc(s->info.hover.text_color);
+		}
+		else {
+			text_instance.color = s->text_color.calc(s->info.text_color);
+			background_instance.color = s->background_color.calc(s->info.background_color);
+		}
+
+		// Position box
+		{
+			Box2D& box = s->boxes[i];
+			box.pos = { 0, pen_y };
+			box.size[1] = text_height + s->info.vertical_padding * 2;
+		}
+
+		if (text_width > max_text_width) {
+			max_text_width = text_width;
+		}
+
+		pen_y += text_height + s->info.vertical_padding * 2;
+	}
+
+	if (size[0].type == ElementSizeType::FIT) {
+
+		for (uint32_t i = 0; i < s->boxes.size(); i++) {
+
+			Box2D& box = s->boxes[i];
+			box.size[0] = max_text_width + s->info.side_padding * 2;
+
+			RectInstance& background_instance = s->background_instances[i];
+			background_instance.size[0] = max_text_width + s->info.side_padding * 2;
+		}
+
+		_size[0] = s->boxes[0].size[0];
+		_size[1] = s->boxes[0].size[1];
+	}
+	else {
+		for (uint32_t i = 0; i < s->boxes.size(); i++) {
+
+			Box2D& box = s->boxes[i];
+			box.size[0] = _size[0];
+
+			RectInstance& background_instance = s->background_instances[i];
+			background_instance.size[0] = _size[0];
+		}
+	}
+}
+
+void Dropdown::_draw()
+{
+	Instance* inst = _window->instance;
+	auto s = state;
+
+	// Background
+	{
+		for (RectInstance& background_instance : s->background_instances) {
+			background_instance.pos[0] += _position[0];
+			background_instance.pos[1] += _position[1];
+		}
+
+		inst->drawRects(_window, s->background_instances);
+	}
+
+	// Text
+	{
+		for (TextInstance& text_instance : s->text_instances) {
+
+			for (auto& pos_char : text_instance.chars) {
+				pos_char.pos[0] += _position[0];
+				pos_char.pos[1] += _position[1];
+			}
+		}
+
+		ClipZone clip_zone;
+		clip_zone.pos = { 0, 0 };
+		clip_zone.size = { (uint32_t)_window->viewport.Width, (uint32_t)_window->viewport.Height };
+
+		inst->drawTexts(_window, clip_zone, s->text_instances);
+	}
+
+	// Boxes
+	for (Box2D& box : s->boxes) {
+		box.pos[0] += _position[0];
+		box.pos[1] += _position[1];
+	}
+}
+
+////void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)
+////{
+////	auto& color_anim = _background_color;
+////	color_anim.start = background_color.rgba;
+////	color_anim.end = end_color.rgba;
+////	color_anim.start_time = nui::frame_start_time;
+////	color_anim.end_time = color_anim.start_time + std::chrono::milliseconds(duration);
+////	color_anim.blend_func = TransitionBlendFunction::LINEAR;
+////}
+////
+////void BackgroundElement::_init()
+////{
+////	Element::_initDefaultProperties();
+////
+////	coloring = BackgroundColoring::NONE;
+////	background_color.setRGBA_UNORM();
+////
+////	_onRenderingSurface = nullptr;
+////
+////	_rect_render.init(_window);
+////	_events._init(_window);
+////}
+////
+////void BackgroundElement::_generateGPU_Data()
+////{
+////	switch (coloring) {
+////	case BackgroundColoring::FLAT_FILL: {
+////
+////		SteadyTime& now = nui::frame_start_time;
+////		background_color.rgba = _background_color.calculate(now);
+////
+////		_rect_render.reset();
+////
+////		RectInstance props;
+////		props.screen_pos[0] = _position[0];
+////		props.screen_pos[1] = _position[1];
+////		props.size[0] = _size[0];
+////		props.size[1] = _size[1];
+////		props.color.rgba = background_color.rgba;
+////		_rect_render.addInstance(props);
+////
+////		_rect_render.generateGPU_Data();
+////		break;
+////	}
+////	}
+////}
+////
+////void BackgroundElement::_draw()
+////{
+////	switch (coloring) {
+////	case BackgroundColoring::FLAT_FILL: {		
+////		_rect_render.draw();
+////		break;
+////	}
+////
+////	case BackgroundColoring::RENDERING_SURFACE: {
+////
+////		assert_cond(_onRenderingSurface != nullptr,
+////			"RenderingSurface callback not set for BackgroundColoring::RENDERING_SURFACE");
+////
+////		Instance* instance = _window->instance;
+////		ID3D11DeviceContext3* im_ctx3 = instance->im_ctx3.Get();
+////
+////		//auto clear_bindings = [&]() {
+////
+////		//	// Input Assembly
+////		//	{
+////		//		std::array<ID3D11Buffer*, 2> buffs = {
+////		//			nullptr, nullptr
+////		//		};
+////		//		std::array<uint32_t, 2> strides = {
+////		//			0, 0
+////		//		};
+////		//		std::array<uint32_t, 2> offsets = {
+////		//			0, 0
+////		//		};
+////		//		im_ctx3->IASetVertexBuffers(0, buffs.size(), buffs.data(), strides.data(), offsets.data());
+////		//	}
+////		//};
+////
+////		im_ctx3->ClearState();
+////
+////		SurfaceEvent surface_event;
+////		surface_event.dev5 = instance->dev5.Get();
+////		surface_event.im_ctx3 = im_ctx3;
+////
+////		surface_event.render_target_width = _window->surface_width;
+////		surface_event.render_target_height = _window->surface_height;
+////		surface_event.compose_rtv = _window->present_rtv.Get();
+////
+////		surface_event.viewport_pos = { _position[0], _position[1] };
+////		surface_event.viewport_size = { _size[0], _size[1] };
+////
+////		this->_onRenderingSurface(_window, &(*_self_element), surface_event, _surface_event_user_data);
+////
+////		im_ctx3->ClearState();
+////		break;
+////	}
+////	}
+////}
+////
+////void BackgroundElement::setRenderingSurfaceEvent(RenderingSurfaceCallback callback, void* user_data)
+////{
+////	this->_onRenderingSurface = callback;
+////	this->_surface_event_user_data = user_data;
+////}
 
 void Flex::_emitEvents(bool& allow_inside_events)
 {
@@ -1868,212 +1799,212 @@ void Menu::_draw()
 	}
 }
 
-TreeListCreateInfo::TreeListCreateInfo()
-{
-	ElementCreateInfo::ElementCreateInfo();
-	this->size[0] = 200;
-	this->size[1] = 100.f;
-
-	// Item
-	this->item.padding = {};
-	this->item.text_hover_color = Color::black();
-	this->item.background_hover_color = Color::white();
-	this->item.arrow.left_padding = 0;
-	this->item.arrow.right_padding = 0;
-	this->item.arrow.width = 14;
-	this->item.arrow.height = 14;
-	this->item.arrow.color = Color::white();
-	this->item.arrow.hover_color = Color::black();
-
-	// Layout
-	this->indentation = 14;
-}
-
-TreeListItemHandle::TreeListItemHandle(uint32_t new_item_idx)
-{
-	this->item_idx = new_item_idx;
-}
-
-TreeListItemHandle TreeList::createItem(TreeListItemCreateInfo& new_info)
-{
-	TreeListItemHandle new_handle;
-	new_handle.item_idx = 0;
-	return createItem(new_handle, new_info);
-}
-
-TreeListItemHandle TreeList::createItem(TreeListItemHandle handle, TreeListItemCreateInfo& new_info)
-{
-	uint32_t self_idx = items.size();
-
-	TreeListItem& parent = items[handle.item_idx];
-	parent.children.push_back(self_idx);
-
-	TreeListItem& new_item = items.emplace_back();
-	new_item.treelist = this;
-	new_item.parent = handle.item_idx;
-	new_item.self_idx = self_idx;
-	new_item.expanded = false;
-	new_item.info = new_info;
-
-	TreeListItemHandle new_handle;
-	new_handle.item_idx = self_idx;
-	return new_handle;
-}
-
-void TreeList::_calcSizeAndRelativeChildPositions()
-{
-	assert_cond(size[0].type != ElementSizeType::FIT &&
-		size[1].type != ElementSizeType::FIT,
-		"TreeList does not support fit size");
-
-	Instance* inst = _window->instance;
-
-	// Mark items as un-traversed
-	{
-		for (TreeListItem& item : items) {
-			item._traversed = false;
-		}
-	}
-
-	// Down first pass
-	{
-		_text_instances.clear();
-
-		uint32_t next_item = 0;
-
-		required_size = { 0, 0 };
-
-		int32_t indent_level = 0;
-		int32_t pen_y = 0;
-
-		// render all items on return
-		// if all child items have been traversed
-
-		while (next_item != 0xFFFF'FFFF) {
-
-			TreeListItem& item = items[next_item];
-
-			bool all_children_traversed = true;
-			for (uint32_t child_item_idx : item.children) {
-
-				TreeListItem& child_item = items[child_item_idx];
-
-				if (child_item._traversed == false) {
-
-					child_item._traversed = true;
-					all_children_traversed = false;
-
-					int32_t pen_x = info.indentation * indent_level;
-					uint32_t text_width;
-					uint32_t text_height;
-
-					// Text
-					{
-						inst->findAndPositionGlyphs(child_item.info.text,
-							pen_x + info.item.padding.left,
-							pen_y + info.item.padding.top,
-							text_width, text_height,
-							child_item._text.chars);
-
-						child_item._text.color = child_item.info.text.color;
-
-						_text_instances.push_back(&child_item._text);
-					}
-
-					child_item._label_size = {
-						info.item.padding.left + text_width + info.item.padding.right,
-						info.item.padding.top + text_height + info.item.padding.bot,
-					};
-
-					// TreeList Witdh
-					{
-						uint32_t new_width = pen_x + child_item._label_size[0];
-
-						if (new_width > required_size[0]) {
-							required_size[0] = new_width;
-						}
-					}
-
-					// schedule down
-					indent_level++;
-					next_item = child_item_idx;
-
-					pen_y += child_item._label_size[1];
-					break;
-				}
-			}
-
-			if (all_children_traversed) {
-
-				// schedule up
-				indent_level--;
-				next_item = item.parent;
-			}
-		}
-
-		required_size[1] = pen_y;
-	}
-}
-
-void TreeList::_draw()
-{
-	Instance* inst = _window->instance;
-
-	// render root background
-	// render item background
-
-	/*std::array<int32_t, 2> scroll_offset = { 0, 0 };
-	{
-		TreeListItem& root = items[0];
-
-		uint32_t available_height = _size[1];
-		uint32_t available_width = _size[0];
-
-		if (root._background.size[1] > available_height) {
-			available_width -= info.scroll_bar_thickness;
-		}
-
-		if (root._background.size[0] > available_width) {
-			available_height -= info.scroll_bar_thickness;
-		}
-
-		if (root._background.size[1] > available_height) {
-
-			uint32_t remainder = root._background.size[1] - available_height;
-			scroll_offset[1] = (int32_t)(scroll_factor[1] * (float)remainder);
-		}
-
-		if (root._background.size[0] > available_width) {
-
-			uint32_t remainder = root._background.size[0] - available_width;
-			scroll_offset[0] = (int32_t)(scroll_factor[0] * (float)remainder);
-		}
-	}*/
-
-	// Draw Treelist Background
-	{
-		RectInstance rect_inst;
-		rect_inst.pos = _position;
-		rect_inst.size = _size;
-		rect_inst.color = info.background_color;
-
-		inst->drawRect(_window, &rect_inst);
-	}
-
-	// Draw Hover Item Background
-	{
-		
-	}
-
-	// Render Text
-	{
-		for (TextInstance* text_inst : _text_instances) {
-			for (PositionedCharacter& chara : text_inst->chars) {
-				chara.pos[0] += _position[0];
-				chara.pos[1] += _position[1];
-			}
-		}
-
-		inst->drawTexts(_window, _text_instances);
-	}
-}
+//TreeListCreateInfo::TreeListCreateInfo()
+//{
+//	ElementCreateInfo::ElementCreateInfo();
+//	this->size[0] = 200;
+//	this->size[1] = 100.f;
+//
+//	// Item
+//	this->item.padding = {};
+//	this->item.text_hover_color = Color::black();
+//	this->item.background_hover_color = Color::white();
+//	this->item.arrow.left_padding = 0;
+//	this->item.arrow.right_padding = 0;
+//	this->item.arrow.width = 14;
+//	this->item.arrow.height = 14;
+//	this->item.arrow.color = Color::white();
+//	this->item.arrow.hover_color = Color::black();
+//
+//	// Layout
+//	this->indentation = 14;
+//}
+//
+//TreeListItemHandle::TreeListItemHandle(uint32_t new_item_idx)
+//{
+//	this->item_idx = new_item_idx;
+//}
+//
+//TreeListItemHandle TreeList::createItem(TreeListItemCreateInfo& new_info)
+//{
+//	TreeListItemHandle new_handle;
+//	new_handle.item_idx = 0;
+//	return createItem(new_handle, new_info);
+//}
+//
+//TreeListItemHandle TreeList::createItem(TreeListItemHandle handle, TreeListItemCreateInfo& new_info)
+//{
+//	uint32_t self_idx = items.size();
+//
+//	TreeListItem& parent = items[handle.item_idx];
+//	parent.children.push_back(self_idx);
+//
+//	TreeListItem& new_item = items.emplace_back();
+//	new_item.treelist = this;
+//	new_item.parent = handle.item_idx;
+//	new_item.self_idx = self_idx;
+//	new_item.expanded = false;
+//	new_item.info = new_info;
+//
+//	TreeListItemHandle new_handle;
+//	new_handle.item_idx = self_idx;
+//	return new_handle;
+//}
+//
+//void TreeList::_calcSizeAndRelativeChildPositions()
+//{
+//	assert_cond(size[0].type != ElementSizeType::FIT &&
+//		size[1].type != ElementSizeType::FIT,
+//		"TreeList does not support fit size");
+//
+//	Instance* inst = _window->instance;
+//
+//	// Mark items as un-traversed
+//	{
+//		for (TreeListItem& item : items) {
+//			item._traversed = false;
+//		}
+//	}
+//
+//	// Down first pass
+//	{
+//		_text_instances.clear();
+//
+//		uint32_t next_item = 0;
+//
+//		required_size = { 0, 0 };
+//
+//		int32_t indent_level = 0;
+//		int32_t pen_y = 0;
+//
+//		// render all items on return
+//		// if all child items have been traversed
+//
+//		while (next_item != 0xFFFF'FFFF) {
+//
+//			TreeListItem& item = items[next_item];
+//
+//			bool all_children_traversed = true;
+//			for (uint32_t child_item_idx : item.children) {
+//
+//				TreeListItem& child_item = items[child_item_idx];
+//
+//				if (child_item._traversed == false) {
+//
+//					child_item._traversed = true;
+//					all_children_traversed = false;
+//
+//					int32_t pen_x = info.indentation * indent_level;
+//					uint32_t text_width;
+//					uint32_t text_height;
+//
+//					// Text
+//					{
+//						inst->findAndPositionGlyphs(child_item.info.text,
+//							pen_x + info.item.padding.left,
+//							pen_y + info.item.padding.top,
+//							text_width, text_height,
+//							child_item._text.chars);
+//
+//						child_item._text.color = child_item.info.text.color;
+//
+//						_text_instances.push_back(&child_item._text);
+//					}
+//
+//					child_item._label_size = {
+//						info.item.padding.left + text_width + info.item.padding.right,
+//						info.item.padding.top + text_height + info.item.padding.bot,
+//					};
+//
+//					// TreeList Witdh
+//					{
+//						uint32_t new_width = pen_x + child_item._label_size[0];
+//
+//						if (new_width > required_size[0]) {
+//							required_size[0] = new_width;
+//						}
+//					}
+//
+//					// schedule down
+//					indent_level++;
+//					next_item = child_item_idx;
+//
+//					pen_y += child_item._label_size[1];
+//					break;
+//				}
+//			}
+//
+//			if (all_children_traversed) {
+//
+//				// schedule up
+//				indent_level--;
+//				next_item = item.parent;
+//			}
+//		}
+//
+//		required_size[1] = pen_y;
+//	}
+//}
+//
+//void TreeList::_draw()
+//{
+//	Instance* inst = _window->instance;
+//
+//	// render root background
+//	// render item background
+//
+//	/*std::array<int32_t, 2> scroll_offset = { 0, 0 };
+//	{
+//		TreeListItem& root = items[0];
+//
+//		uint32_t available_height = _size[1];
+//		uint32_t available_width = _size[0];
+//
+//		if (root._background.size[1] > available_height) {
+//			available_width -= info.scroll_bar_thickness;
+//		}
+//
+//		if (root._background.size[0] > available_width) {
+//			available_height -= info.scroll_bar_thickness;
+//		}
+//
+//		if (root._background.size[1] > available_height) {
+//
+//			uint32_t remainder = root._background.size[1] - available_height;
+//			scroll_offset[1] = (int32_t)(scroll_factor[1] * (float)remainder);
+//		}
+//
+//		if (root._background.size[0] > available_width) {
+//
+//			uint32_t remainder = root._background.size[0] - available_width;
+//			scroll_offset[0] = (int32_t)(scroll_factor[0] * (float)remainder);
+//		}
+//	}*/
+//
+//	// Draw Treelist Background
+//	{
+//		RectInstance rect_inst;
+//		rect_inst.pos = _position;
+//		rect_inst.size = _size;
+//		rect_inst.color = info.background_color;
+//
+//		inst->drawRect(_window, &rect_inst);
+//	}
+//
+//	// Draw Hover Item Background
+//	{
+//		
+//	}
+//
+//	// Render Text
+//	{
+//		for (TextInstance* text_inst : _text_instances) {
+//			for (PositionedCharacter& chara : text_inst->chars) {
+//				chara.pos[0] += _position[0];
+//				chara.pos[1] += _position[1];
+//			}
+//		}
+//
+//		inst->drawTexts(_window, _text_instances);
+//	}
+//}

@@ -20,14 +20,13 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <CharacterSet>NotSet</CharacterSet>
+    <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
   </PropertyGroup>
@@ -45,40 +44,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\FreeType\include;$(ProjectDir)ThirdParty\glm;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4239;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <FunctionLevelLinking>false</FunctionLevelLinking>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <CompileAsManaged>false</CompileAsManaged>
-      <CompileAsWinRT>false</CompileAsWinRT>
-      <SDLCheck>false</SDLCheck>
-      <StringPooling>false</StringPooling>
-      <MinimalRebuild>false</MinimalRebuild>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
-      <EnableParallelCodeGeneration>false</EnableParallelCodeGeneration>
-      <FloatingPointExceptions>true</FloatingPointExceptions>
-      <CreateHotpatchableImage>false</CreateHotpatchableImage>
-      <GuardEHContMetadata>false</GuardEHContMetadata>
-      <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
-      <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <OpenMPSupport>false</OpenMPSupport>
       <EnableModules>true</EnableModules>
-      <UseUnicodeForAssemblerListing>true</UseUnicodeForAssemblerListing>
-      <ExternalTemplatesDiagnostics>false</ExternalTemplatesDiagnostics>
-      <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -88,14 +68,22 @@
     <Lib>
       <AdditionalLibraryDirectories>$(ProjectDir)ThirdParty\FreeType\libs</AdditionalLibraryDirectories>
       <AdditionalDependencies>freetype.lib</AdditionalDependencies>
-      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
-      <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
     <ProjectReference />
     <FxCompile>
       <ShaderModel>5.0</ShaderModel>
       <ObjectFileOutput>$(ProjectDir)CompiledShaders\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
+    <ProjectReference />
+    <PostBuildEvent>
+      <Command>robocopy "$(ProjectDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" *.ifc /xo
+robocopy "$(SolutionDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" $(TargetName)$(TargetExt) /xo
+
+if %ERRORLEVEL% == 1 (
+  set %ERRORLEVEL% = 0
+)
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -140,12 +128,14 @@
     <ClInclude Include="DX11Wrapper.hpp" />
     <ClInclude Include="ErrorStack.hpp" />
     <ClInclude Include="FilePath.hpp" />
-    <ClInclude Include="NuiLibrary.hpp" />
+    <ClInclude Include="TimeStuff.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CharacterAtlas.ixx">
+    <ClCompile Include="CharacterAtlas.cpp" />
+    <ClInclude Include="CharacterAtlas.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
+    </ClInclude>
+    <ClCompile Include="Container.cpp" />
     <ClCompile Include="DX11Wrapper.cpp" />
     <ClCompile Include="Elements.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -155,25 +145,24 @@
     </ClCompile>
     <ClCompile Include="ErrorStack.cpp" />
     <ClCompile Include="FilePath.cpp" />
-    <ClCompile Include="GPU_ShaderTypes.ixx">
+    <ClCompile Include="GPU_ShaderTypes.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Input.ixx">
+    <ClCompile Include="Input.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Instance.cpp" />
-    <ClCompile Include="MathStuff.ixx">
+    <ClCompile Include="MathStuff.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Misc.ixx" />
-    <ClCompile Include="NuiLibrary.ixx">
+    <ClCompile Include="UserInterface.ixx">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Properties.ixx">
+    <ClCompile Include="Properties.cpp" />
+    <ClInclude Include="Properties.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="RenderInstanceTypes.ixx" />
-    <ClCompile Include="TextureAtlas.ixx">
+    </ClInclude>
+    <ClCompile Include="TextureAtlas.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Window.cpp" />

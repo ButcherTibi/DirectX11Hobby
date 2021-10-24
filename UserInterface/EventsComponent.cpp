@@ -6,8 +6,11 @@ module;
 // Standard
 #include <chrono>
 
-module NuiLibrary;
+// Mine
+#include "Input.hpp"
+#include "Properties.hpp"
 
+module UserInterface;
 
 using namespace nui;
 
