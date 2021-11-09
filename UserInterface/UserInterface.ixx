@@ -45,7 +45,6 @@ export module UserInterface;
 
 /*
 TODO:
-- dropdown
 - text input
 - check box
 - context menu
@@ -102,6 +101,7 @@ namespace nui {
 	export class Button;
 	export class Slider;
 	export class Dropdown;
+	export class DirectX11_Viewport;
 	export class Stack;
 	export class Flex;
 
@@ -112,7 +112,8 @@ namespace nui {
 	export class TreeList;
 
 	typedef std::variant<
-		Root, Text, Stack, Flex, Menu, Rect, TreeList, Button, Slider, Dropdown
+		Root, Text, Stack, Flex, Menu, Rect, TreeList, Button, Slider, Dropdown,
+		DirectX11_Viewport
 	> StoredElement;
 	export struct StoredElement2;
 
@@ -631,26 +632,26 @@ namespace nui {
 			uint32_t side_padding = 5;
 			uint32_t arrow_text_padding = 5;
 
-			struct Hover {
-				AnimatedProperty<Color> text_color = Color::white();
-				AnimatedProperty<Color> background_color = Color::black();
+			struct Selected {
+				AnimatedProperty<Color> text_color = Color::black();
+				AnimatedProperty<Color> background_color = Color::white();
+				AnimatedProperty<Color> arrow_color = Color::white();
+			};
+			Selected selected;
 
+			struct Hover {
+				AnimatedProperty<Color> text_color = Color::black();
+				AnimatedProperty<Color> background_color = Color::white();
 				AnimatedProperty<Color> arrow_color = Color::white();
 			};
 			Hover hover;
 		};
 
-		enum _InputState {
-			CLOSED,
-			RELEASE_MOUSE,
-			READY
-		};
-
 		struct RetainedState : public ElementRetainedState {
 			CreateInfo info;
 
-			bool is_open;
-			_InputState input_state;
+			bool is_open = false;
+			uint32_t selected_index = 0;
 			uint32_t hover_index = 0xFFFF'FFFF;
 			ArrowInstance arrow_instance;
 
@@ -671,6 +672,41 @@ namespace nui {
 
 		void _calcSizeAndRelativeChildPositions() override;
 
+		void _draw() override;
+	};
+
+
+	// DirectX11_Viewport ////////////////////////////////////////////////////////////////////////
+
+	export struct DirectX11_DrawEvent {
+		// Resource
+		ID3D11Device5* dev5;
+		ID3D11DeviceContext3* im_ctx3;
+
+		std::array<uint32_t, 2> render_target_size;
+		ID3D11RenderTargetView* render_target;
+
+		// Drawcall
+		std::array<int32_t, 2> viewport_pos;
+		std::array<uint32_t, 2> viewport_size;
+	};
+
+	typedef void(*DirectX11_DrawCallback)(Window* window, StoredElement2* source, DirectX11_DrawEvent& event, void* user_data);
+
+	class DirectX11_Viewport : public Element {
+	public:
+		struct CreateInfo : public ElementCreateInfo {
+			DirectX11_DrawCallback callback = nullptr;
+			void* user_data;
+		};
+
+		struct RetainedState : public ElementRetainedState {
+			CreateInfo info;
+		};
+
+		RetainedState* state;
+
+	public:
 		void _draw() override;
 	};
 
@@ -751,6 +787,8 @@ namespace nui {
 		void createSlider(Slider::CreateInfo& info);
 		void createDropdown(Dropdown::CreateInfo& info);
 
+		void createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info);
+
 		Flex* createFlex(FlexCreateInfo& info);
 
 		Menu* createMenu(MenuCreateInfo& info);
@@ -792,31 +830,7 @@ namespace nui {
 	};
 
 
-	//// DirectX11_Viewport ////////////////////////////////////////////////////////////////////////
-
-	///*class DirectX11_Viewport {
-	//public:
-
-	//};*/
-
-
 	//// Background Element ///////////////////////////////////////////////////////////////////////
-
-	//struct SurfaceEvent {
-	//	// Resource
-	//	ID3D11Device5* dev5;
-	//	ID3D11DeviceContext3* im_ctx3;
-
-	//	uint32_t render_target_width;
-	//	uint32_t render_target_height;
-	//	ID3D11RenderTargetView* compose_rtv;
-
-	//	// Drawcall
-	//	//glm::uvec2 viewport_pos;
-	//	//glm::uvec2 viewport_size;
-	//};
-
-	////typedef void(*RenderingSurfaceCallback)(Window* window, StoredElement* source, SurfaceEvent& event, void* user_data);
 
 	////struct BackgroundElement : public Element {
 	////	BackgroundColoring coloring;
@@ -1155,6 +1169,7 @@ namespace nui {
 		std::list<Button::RetainedState> button_prevs;
 		std::list<Slider::RetainedState> slider_prevs;
 		std::list<Dropdown::RetainedState> dropdown_prevs;
+		std::list<DirectX11_Viewport::RetainedState> dx11_viewport_prevs;
 		std::list<FlexRetainedState> flex_prevs;
 		std::list<MenuRetainedState> menu_prevs;
 

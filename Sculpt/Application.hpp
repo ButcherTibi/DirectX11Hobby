@@ -4,14 +4,13 @@
 #include <unordered_set>
 #include <set>
 #include <list>
-#include <functional>
-
-// UI
-#include "Input.hpp"
 
 #include "SculptMesh.hpp"
 #include "Renderer.hpp"
 #include "FilePath.hpp"
+
+// UserInterface
+// #include "Input.hpp"  // struct redefiniton without redefinition
 
 
 /* TODO:
@@ -32,10 +31,6 @@
 
 
 // Forward
-namespace nui {
-	class Window;
-}
-
 struct MeshLayer;
 struct MeshDrawcall;
 struct MeshInstanceSet;
@@ -210,47 +205,6 @@ struct MeshLayer {
 };
 
 
-namespace SelectionMode {
-	enum {
-		INSTANCE = 1 << 0,
-		POLY     = 1 << 1,
-		EDGE     = 1 << 2,
-		VERTEX   = 1 << 3
-	};
-}
-
-namespace InteractionModes {
-	enum {
-		BLANK_WINDOW,
-		UI_TESTS,
-		DEFAULT,
-
-		INSTANCE_SELECTION,
-		INSTANCE_MOVE,
-		INSTANCE_ROTATION,
-		INSTANCE_SCALE,
-
-		MESH,
-		VERTEX_SELECT,
-		EDGE_SELECT,
-		POLY_SELECT,
-
-		SCULPT,
-		STANDARD_BRUSH,
-
-		ENUM_SIZE
-	};
-}
-
-struct InteractionMode {
-	uint32_t parent;
-	std::vector<uint32_t> children;
-
-	std::function<void()> enter;
-	std::function<void()> exit;
-};
-
-
 // Mesh Creation Parameters
 
 struct CreateTriangleInfo {
@@ -308,13 +262,6 @@ struct RaytraceInstancesResult {
 	uint32_t poly;
 	glm::vec3 local_isect;  // local position of intersection same for instances of the same mesh
 	glm::vec3 global_isect;  // local position of intersection
-};
-
-
-struct UserInterface {
-	nui::Flex* viewport;
-
-	nui::TreeList* layers;
 };
 
 
@@ -394,11 +341,6 @@ class Application {
 public:
 	nui::Instance ui_instance;
 	nui::Window* main_window;
-	UserInterface ui;
-
-	// Interaction
-	uint32_t now_interaction;
-	std::array<InteractionMode, InteractionModes::ENUM_SIZE> interactions;
 
 	// Meshes
 	std::list<Mesh> meshes;
@@ -473,13 +415,6 @@ public:
 
 	// reset the scene
 	void reset();
-
-
-	// Interaction
-	
-	void navigateUp();
-
-	void navigateToChild(uint32_t interaction_mode);
 
 
 	// Instances
@@ -605,7 +540,7 @@ public:
 	// Debug
 
 	// trigger Visual Studio breakpoint when key is down
-	void triggerBreakpointOnKey(uint32_t key_down = nui::VirtualKeys::F8);
+	void triggerBreakpointOnKey(uint32_t key_down = VK_F8);
 };
 
 extern Application application;

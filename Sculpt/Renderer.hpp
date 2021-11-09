@@ -1,6 +1,8 @@
 #pragma once
 
-#include "NuiLibrary.hpp"
+#include "DX11Wrapper.hpp"
+
+import UserInterface;
 
 #include "SculptMesh.hpp"
 
@@ -115,9 +117,9 @@ public:
 	};
 	std::vector<CachedPixelWorldPosition> _cached_pixel_world_pos;
 
-	void draw(nui::SurfaceEvent& event);
+	void draw(nui::DirectX11_DrawEvent& event);
 };
 
 extern MeshRenderer renderer;
 
-void geometryDraw(nui::Window* window, nui::StoredElement* source, nui::SurfaceEvent& event, void* user_data);
+void geometryDraw(nui::Window* window, nui::StoredElement2* source, nui::DirectX11_DrawEvent& event, void* user_data);

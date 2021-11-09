@@ -238,11 +238,6 @@ int main()
 				};
 
 				flex->createDropdown(drop_info);
-
-				// Size Variations
-				drop_info.id = "dropdown_1_id";
-				drop_info.size[0] = 35.f;
-				flex->createDropdown(drop_info);
 				break;
 			}
 

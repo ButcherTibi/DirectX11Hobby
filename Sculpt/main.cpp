@@ -1,6 +1,6 @@
 
 #include "RenderDocIntegration.hpp"
-#include "NuiLibrary.hpp"
+import UserInterface;
 #include "Application.hpp"
 
 
@@ -26,34 +26,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// Init User Interface Library
 	{
 		nui::Instance& instance = application.ui_instance;
-		{
-			instance.create();
-		}
+		instance.create();
 
 		// Create Window
 		nui::Window* window;
 		{
-			nui::WindowCreateInfo info;
+			nui::Window::CreateInfo info;
 			info.width = 1027;
 			info.height = 720;
 
 			application.main_window = instance.createWindow(info);
 			window = application.main_window;
 		}
-
-		// Create Layers TreeList
-		{
-			nui::TreeListCreateInfo info;
-			application.ui.layers = window->createTreeList(info);
-		}
 	}
 
-	nui::WindowMessages& win_messages = application.main_window->win_messages;
-	while (!win_messages.should_close) {
+	while (application.main_window->win_messages.should_close == false) {
 
-		application.main_window->update([](nui::Window*, void*) {
+		application.main_window->update([](nui::Window* win, void*) {
 
+			nui::Flex* flex;
+			{
+				nui::FlexCreateInfo info;
+				info.id = "flex_id";
+				info.size[0] = 100.f;
+				info.size[1] = 100.f;
+
+				flex = win->createFlex(info);
+			}
 			
+			{
+				nui::DirectX11_Viewport::CreateInfo info;
+				info.id = "viewport_id";
+				info.size[0] = 100.f;
+				info.size[1] = 100.f;
+				info.callback = geometryDraw;
+
+				flex->createDirectX11_Viewport(info);
+			}
 		});
 	}
 

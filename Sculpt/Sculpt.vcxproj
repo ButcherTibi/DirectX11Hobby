@@ -46,23 +46,21 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <DisableSpecificWarnings>4201;4239;4267;4701;4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PrecompiledHeaderFile>SculptPCH.hpp</PrecompiledHeaderFile>
       <ForcedIncludeFiles>SculptPCH.hpp;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalModuleDependencies>
-      </AdditionalModuleDependencies>
+      <AdditionalModuleDependencies>$(SolutionDir)Output\UserInterface\x64\Debug\UserInterface.ixx.ifc;%(AdditionalModuleDependencies)</AdditionalModuleDependencies>
       <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
-      <CompileAsManaged>false</CompileAsManaged>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>kernel32.lib;user32.lib;UserInterface.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)Output\UserInterface\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>XCOPY </Command>

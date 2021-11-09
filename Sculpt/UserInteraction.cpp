@@ -3,12 +3,12 @@
 #include "Application.hpp"
 
 
-void createTestScene_EmptyScene(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_EmptyScene(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 }
 
-void createTestScene_SingleTriangle(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_SingleTriangle(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -23,7 +23,7 @@ void createTestScene_SingleTriangle(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_Triangle(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_Triangle(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -64,7 +64,7 @@ void createTestScene_Triangle(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_SingleQuad(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_SingleQuad(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -79,7 +79,7 @@ void createTestScene_SingleQuad(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_Quad(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_Quad(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -132,7 +132,7 @@ void createTestScene_Quad(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_WavyGrid(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_WavyGrid(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -147,7 +147,7 @@ void createTestScene_WavyGrid(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_Cube(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_Cube(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -179,7 +179,7 @@ void createTestScene_Cube(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_Cylinder(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_Cylinder(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -196,7 +196,7 @@ void createTestScene_Cylinder(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_UV_Sphere(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_UV_Sphere(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -213,7 +213,7 @@ void createTestScene_UV_Sphere(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_ImportGLTF(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_ImportGLTF(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -239,7 +239,7 @@ void createTestScene_ImportGLTF(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_DeletePoly(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_DeletePoly(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -262,7 +262,7 @@ void createTestScene_DeletePoly(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_joinMeshes(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_joinMeshes(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -308,7 +308,7 @@ void createTestScene_joinMeshes(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -339,7 +339,7 @@ void createTestScene_joinMeshes_Complex(nui::Window*, nui::StoredElement*, void*
 }
 
 
-void createTestScene_CopyInstance(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_CopyInstance(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -358,7 +358,7 @@ void createTestScene_CopyInstance(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createTestScene_DeleteInstance(nui::Window*, nui::StoredElement*, void*)
+void createTestScene_DeleteInstance(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -382,7 +382,7 @@ void createTestScene_DeleteInstance(nui::Window*, nui::StoredElement*, void*)
 }
 
 
-void createPerformanceTestScene_AABBs(nui::Window*, nui::StoredElement*, void*)
+void createPerformanceTestScene_AABBs(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -417,7 +417,7 @@ void createPerformanceTestScene_AABBs(nui::Window*, nui::StoredElement*, void*)
 	application.setCameraFocus(focus);
 }
 
-void createPerformanceTestScene_ManySpheres(nui::Window*, nui::StoredElement*, void*)
+void createPerformanceTestScene_ManySpheres(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -453,7 +453,7 @@ void createPerformanceTestScene_ManySpheres(nui::Window*, nui::StoredElement*, v
 	application.setCameraFocus(focus);
 }
 
-void createPerformanceTestScene_DenseSphere(nui::Window*, nui::StoredElement*, void*)
+void createPerformanceTestScene_DenseSphere(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -470,7 +470,7 @@ void createPerformanceTestScene_DenseSphere(nui::Window*, nui::StoredElement*, v
 	application.setCameraFocus(focus);
 }
 
-void createInputTestScene_TabletMapping(nui::Window*, nui::StoredElement*, void*)
+void createInputTestScene_TabletMapping(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.resetToHardcodedStartup();
 
@@ -498,186 +498,15 @@ void createInputTestScene_TabletMapping(nui::Window*, nui::StoredElement*, void*
 	printf("right = %d \n", (uint32_t)(right));
 }
 
-void createUI_Test_Flex_Simple(nui::Window*, nui::StoredElement*, void*)
-{
-	/*application.main_window->deleteAllElements();
-
-	nui::Window* window = application.main_window;
-
-	nui::Flex* flex = window->createFlex();
-	flex->size[0] = 100.f;
-	flex->size[1] = 100.f;
-	flex->orientation = nui::Flex::Orientation::ROW;
-
-	nui::Rect* box_0 = window->createRectangle(flex);
-	box_0->size[0] = 150;
-	box_0->size[1] = 150;
-	box_0->color = nui::Color::red();
-
-	nui::Rect* box_1 = window->createRectangle(flex);
-	box_1->size[0] = 150;
-	box_1->size[1] = 150;
-	box_1->color = nui::Color::green();
-
-	nui::Rect* box_2 = window->createRectangle(flex);
-	box_2->size[0] = 150;
-	box_2->size[1] = 150;
-	box_2->color = nui::Color::blue();
-
-	nui::Rect* box_3 = window->createRectangle(flex);
-	box_3->size[0] = 150;
-	box_3->size[1] = 150;
-	box_3->color = nui::Color::white();*/
-}
-
-void createUI_Test_Flex_Complex(nui::Window*, nui::StoredElement*, void*)
-{
-	//application.main_window->deleteAllElements();
-
-	//nui::Window* window = application.main_window;
-
-	//nui::Flex* main = window->createFlex();
-	//main->size[0] = 100.f;
-	//main->size[1] = 100.f;
-	//main->orientation = nui::Flex::Orientation::ROW;
-	//{
-	//	nui::Rect* rect_0 = window->createRectangle(main);
-	//	rect_0->size[0] = 50.f;
-	//	rect_0->size[1] = 50.f;
-	//	//rect_0->color = nui::Color(0.1, 0.1, 0.1, 1);
-	//	rect_0->color.setAnimation(nui::Color(1, 1, 1, 1), std::chrono::milliseconds(2'000));
-	//	{
-	//		nui::Flex* flex = window->createFlex(rect_0);
-	//		flex->size[0] = 100.f;
-	//		flex->size[1] = 100.f;
-	//		flex->orientation = nui::Flex::Orientation::ROW;
-
-	//		nui::Rect* box_0 = window->createRectangle(flex);
-	//		box_0->size[0] = 50;
-	//		box_0->size[1] = 50;
-	//		box_0->color = nui::Color::red();
-
-	//		nui::Rect* box_1 = window->createRectangle(flex);
-	//		box_1->size[0] = 50;
-	//		box_1->size[1] = 50;
-	//		box_1->color = nui::Color::green();
-
-	//		nui::Rect* box_2 = window->createRectangle(flex);
-	//		box_2->size[0] = 50;
-	//		box_2->size[1] = 50;
-	//		box_2->color = nui::Color::blue();
-
-	//		nui::Rect* box_3 = window->createRectangle(flex);
-	//		box_3->size[0] = 50;
-	//		box_3->size[1] = 50;
-	//		box_3->color = nui::Color::white();
-	//	}
-
-	//	{
-	//		nui::Flex* flex = window->createFlex(main);
-	//		flex->size[0] = 49.f;
-	//		flex->size[1] = 50.f;
-	//		flex->orientation = nui::Flex::Orientation::ROW;
-	//		flex->items_spacing = nui::Flex::Spacing::END;
-
-	//		nui::Rect* box_0 = window->createRectangle(flex);
-	//		box_0->size[0] = 50;
-	//		box_0->size[1] = 50;
-	//		box_0->color = nui::Color::red();
-
-	//		nui::Rect* box_1 = window->createRectangle(flex);
-	//		box_1->size[0] = 50;
-	//		box_1->size[1] = 50;
-	//		box_1->color = nui::Color::green();
-
-	//		nui::Rect* box_2 = window->createRectangle(flex);
-	//		box_2->size[0] = 50;
-	//		box_2->size[1] = 50;
-	//		box_2->color = nui::Color::blue();
-
-	//		nui::Rect* box_3 = window->createRectangle(flex);
-	//		box_3->size[0] = 50;
-	//		box_3->size[1] = 50;
-	//		box_3->color = nui::Color::white();
-	//	}
-
-	//	{
-	//		nui::Flex* flex = window->createFlex(main);
-	//		flex->size[0] = 50.f;
-	//		flex->size[1] = 50.f;
-	//		flex->orientation = nui::Flex::Orientation::ROW;
-	//		flex->items_spacing = nui::Flex::Spacing::CENTER;
-
-	//		nui::Rect* box_0 = window->createRectangle(flex);
-	//		box_0->size[0] = 50;
-	//		box_0->size[1] = 50;
-	//		box_0->color = nui::Color::red();
-
-	//		nui::Rect* box_1 = window->createRectangle(flex);
-	//		box_1->size[0] = 50;
-	//		box_1->size[1] = 50;
-	//		box_1->color = nui::Color::green();
-
-	//		nui::Rect* box_2 = window->createRectangle(flex);
-	//		box_2->size[0] = 50;
-	//		box_2->size[1] = 50;
-	//		box_2->color = nui::Color::blue();
-
-	//		nui::Rect* box_3 = window->createRectangle(flex);
-	//		box_3->size[0] = 50;
-	//		box_3->size[1] = 50;
-	//		box_3->color = nui::Color::white();
-	//	}
-
-	//	nui::Rect* rect_1 = window->createRectangle(main);
-	//	rect_1->size[0] = 49.f;
-	//	rect_1->size[1] = 50.f;
-	//	rect_1->color = nui::Color(0.1, 0.1, 0.1, 1);
-	//	{
-	//		nui::Flex* flex = window->createFlex(rect_1);
-	//		flex->size[0] = 100.f;
-	//		flex->size[1] = 100.f;
-	//		flex->orientation = nui::Flex::Orientation::ROW;
-	//		flex->items_spacing = nui::Flex::Spacing::SPACE_BETWEEN;
-
-	//		nui::Rect* box_0 = window->createRectangle(flex);
-	//		box_0->size[0] = 50;
-	//		box_0->size[1] = 50;
-	//		box_0->color = nui::Color::red();
-
-	//		nui::Rect* box_1 = window->createRectangle(flex);
-	//		box_1->size[0] = 50;
-	//		box_1->size[1] = 50;
-	//		box_1->color = nui::Color::green();
-
-	//		nui::Rect* box_2 = window->createRectangle(flex);
-	//		box_2->size[0] = 50;
-	//		box_2->size[1] = 50;
-	//		box_2->color = nui::Color::blue();
-
-	//		nui::Rect* box_3 = window->createRectangle(flex);
-	//		box_3->size[0] = 50;
-	//		box_3->size[1] = 50;
-	//		box_3->color = nui::Color::white();
-	//	}
-	//}
-}
-
 
 // From here on are real usages  /////////////////////////////////////////////////////////////////////////////
 
-void exit_application(nui::Window*, nui::StoredElement*, void*)
+void exit_application(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.main_window->win_messages.should_close = true;
 }
 
-void enterSculptMode(nui::Window*, nui::StoredElement*, void*)
-{
-	application.navigateToChild(InteractionModes::SCULPT);
-	application.navigateToChild(InteractionModes::STANDARD_BRUSH);
-}
-
-void beginStandardBrushStroke(nui::Window*, nui::StoredElement*, void*)
+void beginStandardBrushStroke(nui::Window*, nui::StoredElement2*, void*)
 {
 	Application& app = application;
 	SculptContext& sculpt = app.sculpt;
@@ -705,7 +534,7 @@ void beginStandardBrushStroke(nui::Window*, nui::StoredElement*, void*)
 	standard.applied_steps.clear();
 }
 
-void applyStandardBrush(nui::Window*, nui::StoredElement*, void*)
+void applyStandardBrush(nui::Window*, nui::StoredElement2*, void*)
 {
 	Application& app = application;
 	SculptContext& sculpt = app.sculpt;
@@ -769,7 +598,7 @@ void applyStandardBrush(nui::Window*, nui::StoredElement*, void*)
 	}
 }
 
-void endStandardBrushStroke(nui::Window*, nui::StoredElement*, void*)
+void endStandardBrushStroke(nui::Window*, nui::StoredElement2*, void*)
 {
 	Application& app = application;
 	SculptContext& sculpt = app.sculpt;
@@ -781,7 +610,7 @@ void endStandardBrushStroke(nui::Window*, nui::StoredElement*, void*)
 	sculpt.stroke_started = false;
 }
 
-void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void*)
+void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement2*, void*)
 {
 	nui::Input& input = window->input;
 	glm::vec3 pixel_world_pos;
@@ -793,11 +622,11 @@ void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement* source, void*
 		application.setCameraFocus(pixel_world_pos);
 	}
 
-	nui::Flex* grid = std::get_if<nui::Flex>(source);
-	grid->beginMouseFixedDeltaEffect();
+	//nui::Flex* grid = std::get_if<nui::Flex>(source);
+	//grid->beginMouseFixedDeltaEffect();
 }
 
-void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement*, void*)
+void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
 {
 	int32_t delta_x = window->input.mouse_delta_x;
 	int32_t delta_y = window->input.mouse_delta_y;
@@ -806,19 +635,19 @@ void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement*, void*)
 	application.arcballOrbitCamera((float)delta_x * scaling, (float)delta_y * scaling);
 }
 
-void onCameraOrbitKeyUp(nui::Window* window, nui::StoredElement*, void*)
+void onCameraOrbitKeyUp(nui::Window*, nui::StoredElement2*, void*)
 {
 	// nui::Flex* grid = std::get_if<nui::Flex>(source);
-	window->endMouseDeltaEffect();
+	//window->endMouseDeltaEffect();
 }
 
-void onCameraPanKeyDown(nui::Window*, nui::StoredElement* source, void*)
+void onCameraPanKeyDown(nui::Window*, nui::StoredElement2*, void*)
 {
-	auto grid = std::get_if<nui::Flex>(source);
-	grid->beginMouseLoopDeltaEffect();
+	//auto grid = std::get_if<nui::Flex>(source);
+	//grid->beginMouseLoopDeltaEffect();
 }
 
-void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement*, void*)
+void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
 {
 	int32_t delta_x = window->input.mouse_delta_x;
 	int32_t delta_y = window->input.mouse_delta_y;
@@ -827,12 +656,12 @@ void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement*, void*)
 	application.panCamera((float)-delta_x * scaling, (float)-delta_y * scaling);
 }
 
-void onCameraPanKeyUp(nui::Window* window, nui::StoredElement*, void*)
+void onCameraPanKeyUp(nui::Window* window, nui::StoredElement2*, void*)
 {
-	window->endMouseDeltaEffect();
+	//window->endMouseDeltaEffect();
 }
 
-void onCameraDollyScroll(nui::Window* window, nui::StoredElement*, void*)
+void onCameraDollyScroll(nui::Window* window, nui::StoredElement2*, void*)
 {
 	nui::Input& input = window->input;
 	glm::vec3 pixel_world_pos;
@@ -845,52 +674,52 @@ void onCameraDollyScroll(nui::Window* window, nui::StoredElement*, void*)
 	application.dollyCamera(window->input.mouse_wheel_delta * application.camera_dolly_sensitivity);
 }
 
-void setBackCullingTrue(nui::Window*, nui::StoredElement*, void*)
+void setBackCullingTrue(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.getRootDrawcall().is_back_culled = true;
 }
 
-void setBackCullingFalse(nui::Window*, nui::StoredElement*, void*)
+void setBackCullingFalse(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.getRootDrawcall().is_back_culled = false;
 }
 
-void setShadingNormalVertex(nui::Window*, nui::StoredElement*, void*)
+void setShadingNormalVertex(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setShadingNormal(GPU_ShadingNormal::VERTEX);
 }
 
-void setShadingNormalPoly(nui::Window*, nui::StoredElement*, void*)
+void setShadingNormalPoly(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setShadingNormal(GPU_ShadingNormal::POLY);
 }
 
-void setShadingNormalTesselation(nui::Window*, nui::StoredElement*, void*)
+void setShadingNormalTesselation(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setShadingNormal(GPU_ShadingNormal::TESSELATION);
 }
 
-void setDisplayModeSolid(nui::Window*, nui::StoredElement*, void*)
+void setDisplayModeSolid(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.getRootDrawcall().display_mode = DisplayMode::SOLID;
 }
 
-void setDisplayModeWireframeOverlay(nui::Window*, nui::StoredElement*, void*)
+void setDisplayModeWireframeOverlay(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.getRootDrawcall().display_mode = DisplayMode::WIREFRAME_OVERLAY;
 }
 
-void setDisplayModeWireframe(nui::Window*, nui::StoredElement*, void*)
+void setDisplayModeWireframe(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.getRootDrawcall().display_mode = DisplayMode::WIREFRANE;
 }
 
-void changeShadingNormal(nui::Window*, nui::StoredElement*, void*)
+void changeShadingNormal(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.shading_normal = (application.shading_normal + 1) % 3;
 }
 
-void renderAABBs_Normal(nui::Window*, nui::StoredElement*, void*)
+void renderAABBs_Normal(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setAABB_RenderModeForDrawcall(
 		&application.getRootDrawcall(),
@@ -898,7 +727,7 @@ void renderAABBs_Normal(nui::Window*, nui::StoredElement*, void*)
 	);
 }
 
-void renderAABBs_LeafOnly(nui::Window*, nui::StoredElement*, void*)
+void renderAABBs_LeafOnly(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setAABB_RenderModeForDrawcall(
 		&application.getRootDrawcall(),
@@ -906,7 +735,7 @@ void renderAABBs_LeafOnly(nui::Window*, nui::StoredElement*, void*)
 	);
 }
 
-void hideAABBs(nui::Window*, nui::StoredElement*, void*)
+void hideAABBs(nui::Window*, nui::StoredElement2*, void*)
 {
 	application.setAABB_RenderModeForDrawcall(
 		&application.getRootDrawcall(),
@@ -1283,12 +1112,9 @@ void Application::createUI()
 
 void Application::init()
 {
-	reset();
+	// reset();
 
 	//createTestScene_UV_Sphere(nullptr, nullptr, nullptr);
 	createTestScene_SingleTriangle(nullptr, nullptr, nullptr);
 	//createPerformanceTestScene_DenseSphere(nullptr, nullptr, nullptr);
-
-	navigateToChild(InteractionModes::SCULPT);
-	navigateToChild(InteractionModes::STANDARD_BRUSH);
 }

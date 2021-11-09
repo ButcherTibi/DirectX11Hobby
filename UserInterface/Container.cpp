@@ -118,6 +118,12 @@ void Container::createDropdown(Dropdown::CreateInfo& info)
 		(info, _window->dropdown_prevs);
 }
 
+void Container::createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info)
+{
+	createElement<DirectX11_Viewport, DirectX11_Viewport::CreateInfo, DirectX11_Viewport::RetainedState>
+		(info, _window->dx11_viewport_prevs);
+}
+
 Menu* Container::createMenu(MenuCreateInfo& info)
 {
 	StoredElement2& new_entry = _window->elements.emplace_back();

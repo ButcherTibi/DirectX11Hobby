@@ -435,10 +435,10 @@ void MeshRenderer::getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_worl
 	new_cache.world_pos = r_world_pos;
 }
 
-void MeshRenderer::draw(nui::SurfaceEvent& event)
+void MeshRenderer::draw(nui::DirectX11_DrawEvent& event)
 {
-	this->viewport_width = (float)event.viewport_size.x;
-	this->viewport_height = (float)event.viewport_size.y;
+	this->viewport_width = (float)event.viewport_size[0];
+	this->viewport_height = (float)event.viewport_size[1];
 
 	if (dev5 == nullptr) {
 
@@ -451,8 +451,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Scene Depth Resource
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = event.render_target_width;
-			desc.Height = event.render_target_height;
+			desc.Width = event.render_target_size[0];
+			desc.Height = event.render_target_size[1];
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -476,8 +476,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Mesh Depth Mash Resource
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = event.render_target_width;
-			desc.Height = event.render_target_height;
+			desc.Width = event.render_target_size[0];
+			desc.Height = event.render_target_size[1];
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -509,8 +509,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		// Wireframe Depth Texture
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = event.render_target_width;
-			desc.Height = event.render_target_height;
+			desc.Width = event.render_target_size[0];
+			desc.Height = event.render_target_size[1];
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -534,8 +534,8 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 		// World Position Textures
 		{
 			D3D11_TEXTURE2D_DESC desc = {};
-			desc.Width = event.render_target_width;
-			desc.Height = event.render_target_height;
+			desc.Width = event.render_target_size[0];
+			desc.Height = event.render_target_size[1];
 			desc.MipLevels = 1;
 			desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
@@ -797,18 +797,18 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 	loadVertices();
 	loadUniform();
 
-	if (render_target_width != event.render_target_width ||
-		render_target_height != event.render_target_height)
+	if (render_target_width != event.render_target_size[0] ||
+		render_target_height != event.render_target_size[1])
 	{
-		scene_dtex.resize(event.render_target_width, event.render_target_height);
-		mesh_mask_dtex.resize(event.render_target_width, event.render_target_height);
-		wireframe_dtex.resize(event.render_target_width, event.render_target_height);
-		world_pos_tex.resize(event.render_target_width, event.render_target_height);
+		scene_dtex.resize(event.render_target_size[0], event.render_target_size[1]);
+		mesh_mask_dtex.resize(event.render_target_size[0], event.render_target_size[1]);
+		wireframe_dtex.resize(event.render_target_size[0], event.render_target_size[1]);
+		world_pos_tex.resize(event.render_target_size[0], event.render_target_size[1]);
 
 		loadUniform();
 
-		this->render_target_width = event.render_target_width;
-		this->render_target_height = event.render_target_height;
+		this->render_target_width = event.render_target_size[0];
+		this->render_target_height = event.render_target_size[1];
 	}
 
 	// Rendering Commands ///////////////////////////////////////////////////////////////////////////////////
@@ -841,20 +841,20 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 	// Rasterizer Viewport
 	{
 		D3D11_VIEWPORT viewport;
-		viewport.TopLeftX = (float)event.viewport_pos.x;
-		viewport.TopLeftY = (float)event.viewport_pos.y;
-		viewport.Width = (float)event.viewport_size.x;
-		viewport.Height = (float)event.viewport_size.y;
+		viewport.TopLeftX = (float)event.viewport_pos[0];
+		viewport.TopLeftY = (float)event.viewport_pos[1];
+		viewport.Width = (float)event.viewport_size[0];
+		viewport.Height = (float)event.viewport_size[1];
 		viewport.MinDepth = 0;
 		viewport.MaxDepth = 1;
 
 		im_ctx3->RSSetViewports(1, &viewport);
 
 		D3D11_RECT sccissor;
-		sccissor.left = event.viewport_pos.x;
-		sccissor.top = event.viewport_pos.y;
-		sccissor.right = event.viewport_pos.x + event.viewport_size.x;
-		sccissor.bottom = event.viewport_pos.y + event.viewport_size.y;
+		sccissor.left = event.viewport_pos[0];
+		sccissor.top = event.viewport_pos[1];
+		sccissor.right = event.viewport_pos[0] + event.viewport_size[0];
+		sccissor.bottom = event.viewport_pos[1] + event.viewport_size[1];
 
 		im_ctx3->RSSetScissorRects(1, &sccissor);
 	}
@@ -934,7 +934,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetDepthStencilState(depth_stencil.Get(), 1);
 
 					std::array<ID3D11RenderTargetView*, 2> rtvs = {
-						event.compose_rtv, world_pos_tex.getRTV()
+						event.render_target, world_pos_tex.getRTV()
 					};
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
@@ -998,7 +998,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetDepthStencilState(depth_stencil.Get(), 1);
 
 					std::array<ID3D11RenderTargetView*, 2> rtvs = {
-						event.compose_rtv, nullptr
+						event.render_target, nullptr
 					};
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
@@ -1083,7 +1083,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetDepthStencilState(depth_stencil.Get(), 1);
 
 					std::array<ID3D11RenderTargetView*, 2> rtvs = {
-						event.compose_rtv, nullptr
+						event.render_target, nullptr
 					};
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), scene_dtex.getDSV());
 				}
@@ -1174,7 +1174,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 					im_ctx3->OMSetBlendState(blend_target_0_bs.Get(), blend_factor, 0xFFFF'FFFF);
 
 					std::array<ID3D11RenderTargetView*, 2> rtvs = {
-						event.compose_rtv, nullptr
+						event.render_target, nullptr
 					};
 					im_ctx3->OMSetRenderTargets(rtvs.size(), rtvs.data(), wireframe_dtex.getDSV());
 				}
@@ -1191,7 +1191,7 @@ void MeshRenderer::draw(nui::SurfaceEvent& event)
 	_cached_pixel_world_pos.clear();
 }
 
-void geometryDraw(nui::Window*, nui::StoredElement*, nui::SurfaceEvent& event, void*)
+void geometryDraw(nui::Window*, nui::StoredElement2*, nui::DirectX11_DrawEvent& event, void*)
 {
 	renderer.draw(event);
 }

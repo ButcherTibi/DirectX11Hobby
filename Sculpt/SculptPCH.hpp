@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <variant>
+#include <map>  // xtree module error fix
 
 #include <chrono>
 #include <algorithm>

@@ -71,37 +71,8 @@ MeshInstance* MeshInstanceRef::get()
 //	
 //}
 
-void Application::navigateUp()
-{
-	auto& now = interactions[now_interaction];
-	now.exit();
-
-	now_interaction = now.parent;
-}
-
-void Application::navigateToChild(uint32_t interaction_mode)
-{
-	auto& now = interactions[now_interaction];
-
-	for (uint32_t child : now.children) {
-
-		if (child == interaction_mode) {
-
-			interactions[child].enter();
-			now_interaction = child;
-			return;
-		}
-	}
-
-	throw std::exception("interaction mode not found in children");
-}
-
 void Application::reset()
 {
-	while (now_interaction != InteractionModes::DEFAULT) {
-		navigateUp();
-	}
-
 	// Meshes
 	meshes.clear();
 

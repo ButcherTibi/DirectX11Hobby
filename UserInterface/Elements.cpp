@@ -651,56 +651,52 @@ void Dropdown::_emitEvents(bool&)
 	Input& input = _window->input;
 	auto s = state;
 
-	switch (s->input_state) {
-	case _InputState::CLOSED: {
+	// closed
+	if (s->is_open == false) {
 
 		if (s->boxes[0].isInside(input.mouse_x, input.mouse_y)) {
 
-			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
-			
+			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].up_transition) {
 				s->is_open = true;
-				s->input_state = _InputState::RELEASE_MOUSE;
 			}
 		}
-		break;
 	}
+	// open
+	else {
+		if (s->boxes[0].isInside(input.mouse_x, input.mouse_y)) {
 
-	case _InputState::RELEASE_MOUSE: {
+			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].up_transition) {
+				s->is_open = false;			
+			}
+			s->hover_index = 0xFFFF'FFFF;
+		}
+		else {
+			s->hover_index = 0xFFFF'FFFF;
 
-		break;
+			for (uint32_t i = 1; i < s->boxes.size(); i++) {
+
+				Box2D& box = s->boxes[i];
+
+				if (box.isInside(input.mouse_x, input.mouse_y)) {
+
+					if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].up_transition) {
+						s->is_open = false;
+						s->selected_index = i - 1;
+					}
+
+					s->hover_index = i - 1;
+					break;
+				}
+			}
+
+			// if mouse is outside
+			if (s->hover_index == 0xFFFF'FFFF) {
+				if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].up_transition) {
+					s->is_open = false;
+				}
+			}
+		}
 	}
-
-	case _InputState::READY: {
-
-		break;
-	}
-	}
-
-	//if (s->is_open) {
-
-	////	uint32_t option_index = 0;
-	////	for (Box2D& option_box : s->options) {
-
-	////		if (option_box.isInside(input.mouse_x, input.mouse_y)) {
-
-	////			// click
-	////			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
-
-	////				if (s->info.chosen_callback != nullptr) {
-	////					s->info.chosen_callback(_window, option_index, s->info.chosen_user_data);
-	////				}
-	////				s->is_open = false;
-	////			}
-	////			// hover
-	////			else {
-
-	////			}
-	////			break;
-	////		}
-
-	////		option_index++;
-	////	}
-	//}
 }
 
 void Dropdown::_calcSizeAndRelativeChildPositions()
@@ -724,20 +720,18 @@ void Dropdown::_calcSizeAndRelativeChildPositions()
 	s->background_instances.clear();
 	s->boxes.clear();
 
-	s->text_instances.resize(s->info.options.size());
-	s->background_instances.resize(s->info.options.size());
-	s->boxes.resize(s->info.options.size());
+	uint32_t res_index = 0;
 
-	for (uint32_t i = 0; i < s->info.options.size(); i++) {
+	auto calc_option = [&](uint32_t option_index) {
 
-		TextInstance& text_instance = s->text_instances[i];
-		RectInstance& background_instance = s->background_instances[i];
+		TextInstance& text_instance = s->text_instances[res_index];
+		RectInstance& background_instance = s->background_instances[res_index];
 
 		// Position text
 		uint32_t text_width;
 		uint32_t text_height;
 		{
-			text_props.text = s->info.options[i];
+			text_props.text = s->info.options[option_index];
 
 			inst->findAndPositionGlyphs(text_props,
 				s->info.side_padding, pen_y + s->info.vertical_padding,
@@ -753,18 +747,28 @@ void Dropdown::_calcSizeAndRelativeChildPositions()
 			background_instance.size[1] = text_height + s->info.vertical_padding * 2;
 		}
 
-		// Special Styling
-		if (i == s->hover_index) {
-			text_instance.color = s->hover_text_color.calc(s->info.hover.text_color);
+		// Selected Style
+		if (res_index == 0) {
+			auto& selected = s->info.selected;
+			text_instance.color = s->text_color.calc(selected.text_color);
+			background_instance.color = s->background_color.calc(selected.background_color);
 		}
+		// Hover or Default Style
 		else {
-			text_instance.color = s->text_color.calc(s->info.text_color);
-			background_instance.color = s->background_color.calc(s->info.background_color);
+			if (option_index == s->hover_index) {
+				auto& hover = s->info.hover;
+				text_instance.color = s->text_color.calc(hover.text_color);
+				background_instance.color = s->background_color.calc(hover.background_color);
+			}
+			else {
+				text_instance.color = s->text_color.calc(s->info.text_color);
+				background_instance.color = s->background_color.calc(s->info.background_color);
+			}
 		}
 
 		// Position box
 		{
-			Box2D& box = s->boxes[i];
+			Box2D& box = s->boxes[res_index];
 			box.pos = { 0, pen_y };
 			box.size[1] = text_height + s->info.vertical_padding * 2;
 		}
@@ -774,6 +778,30 @@ void Dropdown::_calcSizeAndRelativeChildPositions()
 		}
 
 		pen_y += text_height + s->info.vertical_padding * 2;
+
+		res_index++;
+	};
+
+	// close
+	if (s->is_open == false) {
+		s->text_instances.resize(1);
+		s->background_instances.resize(1);
+		s->boxes.resize(1);
+
+		calc_option(s->selected_index);
+	}
+	// open
+	else {
+		uint32_t rows = s->info.options.size() + 1;
+		s->text_instances.resize(rows);
+		s->background_instances.resize(rows);
+		s->boxes.resize(rows);
+
+		calc_option(s->selected_index);
+
+		for (uint32_t option_idx = 0; option_idx < s->info.options.size(); option_idx++) {
+			calc_option(option_idx);
+		}
 	}
 
 	if (size[0].type == ElementSizeType::FIT) {
@@ -839,6 +867,24 @@ void Dropdown::_draw()
 		box.pos[0] += _position[0];
 		box.pos[1] += _position[1];
 	}
+}
+
+void DirectX11_Viewport::_draw()
+{
+	assert_cond(state->info.callback != nullptr);
+
+	Instance* inst = _window->instance;
+
+	DirectX11_DrawEvent draw_event;
+	draw_event.dev5 = inst->dev5.Get();
+	draw_event.im_ctx3 = inst->im_ctx3.Get();
+	draw_event.render_target_size = { _window->surface_width, _window->surface_height };
+	draw_event.render_target = _window->present_rtv.Get();
+	draw_event.viewport_pos = _position;
+	draw_event.viewport_size = _size;
+
+	auto& info = state->info;
+	info.callback(_window, _self, draw_event, info.user_data);
 }
 
 ////void BackgroundElement::setColorTransition(Color& end_color, uint32_t duration)

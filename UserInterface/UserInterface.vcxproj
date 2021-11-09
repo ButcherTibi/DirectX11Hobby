@@ -76,8 +76,8 @@
     </FxCompile>
     <ProjectReference />
     <PostBuildEvent>
-      <Command>robocopy "$(ProjectDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" *.ifc /xo
-robocopy "$(SolutionDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" $(TargetName)$(TargetExt) /xo
+      <Command>robocopy "$(ProjectDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" *.ifc /xo /np /NJH
+robocopy "$(SolutionDir)$(Platform)\$(Configuration)" "$(SolutionDir)Output\$(ProjectName)\$(Platform)\$(Configuration)" $(TargetName)$(TargetExt) /xo /np /NJH
 
 if %ERRORLEVEL% == 1 (
   set %ERRORLEVEL% = 0

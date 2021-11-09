@@ -400,6 +400,7 @@ void Window::update(WindowCallback callback)
 
 	// Delete Unused retained states
 	{
+		// @TODO: refactor these in template like createElement
 		for (auto iter = text_prevs.begin(); iter != text_prevs.end(); iter++) {
 
 			if (iter->used == false) {
@@ -425,6 +426,18 @@ void Window::update(WindowCallback callback)
 
 			if (iter->used == false) {
 				slider_prevs.erase(iter);
+			}
+		}
+
+		for (auto iter = dropdown_prevs.begin(); iter != dropdown_prevs.end(); iter++) {
+			if (iter->used == false) {
+				dropdown_prevs.erase(iter);
+			}
+		}
+
+		for (auto iter = dx11_viewport_prevs.begin(); iter != dx11_viewport_prevs.end(); iter++) {
+			if (iter->used == false) {
+				dx11_viewport_prevs.erase(iter);
 			}
 		}
 
