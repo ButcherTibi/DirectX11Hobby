@@ -112,15 +112,21 @@ void Container::createSlider(Slider::CreateInfo& info)
 		(info, _window->slider_prevs);
 }
 
+void Container::createSlider2(Slider2::CreateInfo& info)
+{
+	createElement<Slider2, Slider2::CreateInfo, Slider2::RetainedState>
+		(info, _window->slider2_prevs);
+}
+
 void Container::createDropdown(Dropdown::CreateInfo& info)
 {
 	createElement<Dropdown, Dropdown::CreateInfo, Dropdown::RetainedState>
 		(info, _window->dropdown_prevs);
 }
 
-void Container::createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info)
+DirectX11_Viewport* Container::createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info)
 {
-	createElement<DirectX11_Viewport, DirectX11_Viewport::CreateInfo, DirectX11_Viewport::RetainedState>
+	return createElement<DirectX11_Viewport, DirectX11_Viewport::CreateInfo, DirectX11_Viewport::RetainedState>
 		(info, _window->dx11_viewport_prevs);
 }
 
@@ -152,24 +158,13 @@ Menu* Container::createMenu(MenuCreateInfo& info)
 		prev->id = info.id;
 		prev->used = true;
 
-		prev->submenus.clear();
-		prev->sections.clear();
 		prev->items.clear();
 
-		SubMenu& root_menu = prev->submenus.emplace_back();
-		root_menu.child_sections.push_back(0);
-
-		prev->sections.resize(1);
+		MenuItem& root = prev->items.emplace_back();
+		root.info.menu_background_color = info.menu_background_color;
 	}
 
 	new_menu._calcNowState(prev, info);
-
-	{
-		SubMenu& root_submenu = prev->submenus[0];
-		root_submenu.info.background_color = info.titles_background_color;
-		root_submenu.info.border_thickness = info.titles_border_thickness;
-		root_submenu.info.border_color = info.titles_border_color;
-	}
 
 	// Init
 	new_menu.state = prev;

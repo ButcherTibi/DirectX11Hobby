@@ -1,4 +1,4 @@
-module;
+﻿module;
 
 // Windows
 #undef RELATIVE
@@ -11,6 +11,7 @@ module;
 #include "DX11Wrapper.hpp"
 #include "GPU_ShaderTypes.hpp"
 #include "Properties.hpp"
+#include "utf_string.hpp"
 
 module UserInterface;
 
@@ -19,8 +20,8 @@ using namespace nui;
 
 void Instance::create()
 {
-	hinstance = GetModuleHandleA(NULL);
-	arrow_hcursor = LoadCursorA(NULL, reinterpret_cast<LPCSTR>(IDC_ARROW));
+	hinstance = GetModuleHandle(NULL);
+	arrow_hcursor = LoadCursor(NULL, IDC_ARROW);
 
 	// Raw Device Input for Mouse
 	{
@@ -321,15 +322,16 @@ void Instance::create()
 	}
 }
 
-void Instance::findAndPositionGlyphs(TextProps& props,
-	int32_t start_pos_x, int32_t start_pos_y,
+void Instance::findAndPositionGlyphs(
+	std::string& text,
+	GlyphProperties& props,
 	uint32_t& r_width, uint32_t& r_height,
 	std::vector<PositionedCharacter>& r_chars)
 {
-	r_chars.resize(props.text.size());
+	r_chars.resize(text.size());
 
 	FontSize* font_size;
-	text_renderer.char_atlas.ensureFontWithSize(props.font_family, props.font_style, props.font_size, font_size);
+	text_renderer.char_atlas.ensureFontWithSize(*props.font_family, *props.font_style, props.font_size, font_size);
 
 	r_width = 0;
 
@@ -342,11 +344,11 @@ void Instance::findAndPositionGlyphs(TextProps& props,
 		line_height = props.line_height;
 	}
 
-	glm::ivec2 pen = { start_pos_x, start_pos_y };
+	glm::ivec2 pen = { props.offset_x, props.offset_y };
 	pen.y += line_height;
 
-	uint32_t i = 0;;
-	for (uint32_t unicode : props.text) {
+	uint32_t i = 0;
+	for (uint32_t unicode : text) {
 
 		switch (unicode) {
 			// New Line
@@ -364,7 +366,7 @@ void Instance::findAndPositionGlyphs(TextProps& props,
 			// Move the writing pen to the next character
 			pen.x += chara->advance_X;
 
-			uint32_t new_width = pen.x - start_pos_x;
+			uint32_t new_width = pen.x - props.offset_x;
 
 			if (new_width > r_width) {
 				r_width = new_width;
@@ -375,15 +377,128 @@ void Instance::findAndPositionGlyphs(TextProps& props,
 		i++;
 	}
 
-	r_height = (pen.y + font_size->descender) - start_pos_y;
+	r_height = (pen.y + font_size->descender) - props.offset_y;
+}
+
+
+void Instance::findAndPositionGlyphs(
+	utf8string& text,
+	GlyphProperties& props,
+	uint32_t& r_width, uint32_t& r_height,
+	std::vector<PositionedCharacter>& r_chars)
+{
+	if (text.length() == 0) {
+		return;
+	}
+
+	r_chars.resize(text.length());
+
+	FontSize* font_size;
+	text_renderer.char_atlas.ensureFontWithSize(*props.font_family, *props.font_style, props.font_size, font_size);
+
+	r_width = 0;
+
+	// if line height is unspecified use default from font file
+	uint32_t line_height;
+	if (props.line_height == 0xFFFF'FFFF) {
+		line_height = font_size->ascender;
+	}
+	else {
+		line_height = props.line_height;
+	}
+
+	glm::ivec2 pen = { props.offset_x, props.offset_y };
+	pen.y += line_height;
+
+	uint32_t char_index = 0;
+
+	for (utf8string_iter iter = text.begin(); !iter.isAtNull(); iter.next()) {
+
+		uint32_t code_point = iter.getCodePoint();
+
+		switch (code_point) {
+			// New Line
+		case 0x000A: {
+			pen.x = 0;  // Carriage Return
+			pen.y += line_height;  // Line Feed
+			break;
+		}
+
+		default: {
+			Character* chara = font_size->findCharacter(code_point);
+			r_chars[char_index].pos = { pen.x, pen.y };
+			r_chars[char_index].chara = chara;
+
+			// Move the writing pen to the next character
+			pen.x += chara->advance_X;
+
+			uint32_t new_width = pen.x - props.offset_x;
+
+			if (new_width > r_width) {
+				r_width = new_width;
+			}
+		}
+		}
+
+		char_index++;
+	}
+
+	r_height = (pen.y + font_size->descender) - props.offset_y;
+}
+
+void Instance::findAndPositionGlyphs(TextProps& props,
+	int32_t start_pos_x, int32_t start_pos_y,
+	uint32_t& r_width, uint32_t& r_height,
+	std::vector<PositionedCharacter>& r_chars)
+{
+	GlyphProperties glyph_props;
+	glyph_props.font_family = &props.font_family;
+	glyph_props.font_style = &props.font_style;
+	glyph_props.font_size = props.font_size;
+	glyph_props.line_height = props.line_height;
+	glyph_props.offset_x = start_pos_x;
+	glyph_props.offset_y = start_pos_y;
+
+	findAndPositionGlyphs(props.text, glyph_props,
+		r_width, r_height,
+		r_chars);
+}
+
+void Instance::findAndPositionGlyphs(
+	int32_t number,
+	GlyphProperties& props,
+	uint32_t& r_width, uint32_t& r_height,
+	std::vector<PositionedCharacter>& r_chars)
+{
+	_cache_string = std::to_string(number);
+
+	findAndPositionGlyphs(_cache_string, props,
+		r_width, r_height,
+		r_chars);
+}
+
+void Instance::findAndPositionGlyphs(
+	float number, uint32_t decimal_count,
+	GlyphProperties& props,
+	uint32_t& r_width, uint32_t& r_height,
+	std::vector<PositionedCharacter>& r_chars)
+{
+	_cache_string = std::to_string(number);
+	size_t dot_location = _cache_string.find(".");
+
+	if (dot_location != std::string::npos &&
+		_cache_string.length() - 1 - dot_location > decimal_count)
+	{
+		_cache_string.resize(dot_location + decimal_count + 1);
+	}
+
+	findAndPositionGlyphs(_cache_string, props,
+		r_width, r_height,
+		r_chars);
 }
 
 void Instance::drawTexts(Window* window, ClipZone& clip_zone, std::vector<TextInstance*>& instances)
 {
-	if (instances.size() == 0) {
-		return;
-	}
-
 	// Generate GPU Data
 	{
 		// Counting
@@ -399,6 +514,11 @@ void Instance::drawTexts(Window* window, ClipZone& clip_zone, std::vector<TextIn
 						index_count += 6;
 					}
 				}
+			}
+
+			if (vertex_count == 0) {
+				// nothing to render
+				return;
 			}
 
 			text_renderer.verts.resize(vertex_count);
@@ -1375,23 +1495,25 @@ Window* Instance::createWindow(Window::CreateInfo& info)
 
 	// Create Window
 	{
-		const char CLASS_NAME[] = "Sample Window Class";
+		const wchar_t class_name[] = L"Sample Window Class";
 		w.window_class = {};
 		w.window_class.lpfnWndProc = (WNDPROC)windowProc;
 		w.window_class.cbClsExtra = 0;
 		w.window_class.cbWndExtra = 0;
 		w.window_class.hInstance = hinstance;
 		w.window_class.hCursor = arrow_hcursor;
-		w.window_class.lpszClassName = CLASS_NAME;
+		w.window_class.lpszClassName = class_name;
 
-		if (!RegisterClassA(&w.window_class)) {
+		if (!RegisterClass(&w.window_class)) {
 			throw std::exception("failed to register window class");
 		}
 
-		w.hwnd = CreateWindowExA(
+		const wchar_t window_name[] = L"Window";
+
+		w.hwnd = CreateWindowEx(
 			0,                  // Optional window styles
-			CLASS_NAME,                     // Window class
-			"Window",                       // Window text
+			class_name,                     // Window class
+			window_name,                    // Window text
 			WS_OVERLAPPEDWINDOW | WS_VISIBLE,            // Window style
 			CW_USEDEFAULT, CW_USEDEFAULT, info.width, info.height, // Position and Size
 			NULL,       // Parent window
@@ -1464,11 +1586,6 @@ Window* Instance::createWindow(Window::CreateInfo& info)
 
 		// Put root in drawstack or else window does not handle input
 		w.draw_stacks[0].push_back(w.root);
-	}
-
-	// Delta Trap
-	{
-		w.delta_owner_elem = nullptr;
 	}
 
 	// Events

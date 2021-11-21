@@ -6,6 +6,9 @@ import UserInterface;
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+	// Configure Console
+	SetConsoleOutputCP(CP_UTF8);
+
 	// Memory Debugging
 #if 0
 	{
@@ -40,31 +43,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 	}
 
-	while (application.main_window->win_messages.should_close == false) {
-
-		application.main_window->update([](nui::Window* win, void*) {
-
-			nui::Flex* flex;
-			{
-				nui::FlexCreateInfo info;
-				info.id = "flex_id";
-				info.size[0] = 100.f;
-				info.size[1] = 100.f;
-
-				flex = win->createFlex(info);
-			}
-			
-			{
-				nui::DirectX11_Viewport::CreateInfo info;
-				info.id = "viewport_id";
-				info.size[0] = 100.f;
-				info.size[1] = 100.f;
-				info.callback = geometryDraw;
-
-				flex->createDirectX11_Viewport(info);
-			}
-		});
-	}
+	application.mainLoop();
 
 	return 0;
 }

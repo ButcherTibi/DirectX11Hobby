@@ -7,6 +7,7 @@
 // Standard
 #include <chrono>
 #include <array>
+#include <vector>
 
 
 namespace nui {
@@ -131,6 +132,12 @@ namespace nui {
 	};
 
 
+	struct CharacterKeyState {
+		uint32_t code_point;
+		bool down_transition;
+	};
+
+
 	struct MousePosition {
 		uint16_t x;
 		uint16_t y;
@@ -148,6 +155,9 @@ namespace nui {
 	public:
 		// this list also contains non-existent, reserved, unused virtual key codes
 		std::array<KeyState, 0xFF> key_list;
+
+		// unicode characters pressed
+		std::vector<CharacterKeyState> unicode_list;
 
 		// Local Mouse Position
 		uint16_t mouse_x;

@@ -47,6 +47,9 @@ namespace nui {
 	};
 
 
+	// TODO: make this lazy loading
+	// where you just ask it for a character code, font, size
+	// and it will load, rasterize and pack it
 	class CharacterAtlas {
 	public:
 		TextureAtlas atlas;

@@ -79,7 +79,7 @@ namespace nui {
 		uint32_t pen_x = 0;
 		uint32_t pen_y = 0;
 		uint32_t next_pen_y = 0;
-		std::list<AtlasRegion> zones;
+		std::list<AtlasRegion> zones;  // TODO: this should be a vector
 
 	private:
 		bool addRegion(AtlasRegion& bitmap_zone,

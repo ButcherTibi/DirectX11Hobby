@@ -60,10 +60,6 @@ ErrStack CharacterAtlas::addSizeToFont(Font* font, uint32_t size, FontSize*& r_f
 	ErrStack err_stack;
 	FT_Error err;
 
-	uint32_t first_unicode = '!';
-	uint32_t last_unicode = '~';
-	uint32_t unicode_count = last_unicode - first_unicode + 1;
-
 	FT_Face face = (FT_Face)font->face_ft;
 
 	err = FT_Set_Pixel_Sizes(face, 0, size);
@@ -78,22 +74,32 @@ ErrStack CharacterAtlas::addSizeToFont(Font* font, uint32_t size, FontSize*& r_f
 	font_size.ascender = metrics.ascender / 64;
 	font_size.descender = (-metrics.descender) / 64;
 	font_size.line_spacing = metrics.height / 64;
-	font_size.chars.resize(unicode_count + 1);
+
+	uint32_t character_count = 0;
+	uint32_t glyph_index;
+	{
+		uint32_t charcode = FT_Get_First_Char(face, &glyph_index);
+		while (glyph_index != 0) {
+			charcode = FT_Get_Next_Char( face, charcode, &glyph_index);
+			character_count++;
+		}
+	}
+	font_size.chars.resize(character_count + 1);
 
 	uint32_t i = 0;
-	for (uint32_t unicode = first_unicode; unicode <= last_unicode; unicode++) {
+	uint32_t charcode = FT_Get_First_Char(face, &glyph_index);
 
-		uint32_t glyph_idx = FT_Get_Char_Index(face, unicode);
+	while (glyph_index != 0) {
 
-		err = FT_Load_Glyph(face, glyph_idx, FT_LOAD_RENDER);
+		err = FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER);
 		if (err) {
 			return ErrStack(code_location, "failed to load and render glyph");
 		}
 
 		auto& glyph = face->glyph;
 
-		Character& chara = font_size.chars[i++];
-		chara.unicode = unicode;
+		Character& chara = font_size.chars[i];
+		chara.unicode = charcode;
 		chara.bitmap_left = glyph->bitmap_left;
 		chara.bitmap_top = glyph->bitmap_top;
 		chara.hori_bearing_X = glyph->metrics.horiBearingX / 64;
@@ -107,6 +113,9 @@ ErrStack CharacterAtlas::addSizeToFont(Font* font, uint32_t size, FontSize*& r_f
 		if (!atlas.addBitmap(_bitmap, glyph->bitmap.width, glyph->bitmap.rows, chara.zone)) {
 			return ErrStack(code_location, "failed to find space to store character in atlas");
 		}
+
+		charcode = FT_Get_Next_Char(face, charcode, &glyph_index);
+		i++;
 	}
 
 	// White Space

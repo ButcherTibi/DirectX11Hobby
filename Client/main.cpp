@@ -1,8 +1,8 @@
+﻿
+#include "Windows.h"
 
 // Standard
 #include <cstdio>
-
-// Standard
 #include <chrono>
 
 // Library
@@ -18,6 +18,7 @@ enum class Tests {
 
 	BUTTON,
 	SLIDER,
+	SLIDER2,
 	DROPDOWN,
 
 	FLEX,
@@ -27,7 +28,7 @@ enum class Tests {
 };
 
 // modify below to test a different feature
-Tests current_test = Tests::DROPDOWN;
+Tests current_test = Tests::SLIDER2;
 
 
 void buttonClicked(nui::Window*, nui::StoredElement2*, void*)
@@ -49,6 +50,9 @@ nui::TreeList* tree_list;
 
 int main()
 {
+	// Configure Console
+	SetConsoleOutputCP(CP_UTF8);
+
 	nui::Instance instance;
 	instance.create();
 
@@ -217,6 +221,27 @@ int main()
 				break;
 			}
 
+			case Tests::SLIDER2: {
+				nui::FlexCreateInfo flex_info;
+				flex_info.id = "flex_id";
+				flex_info.size[0] = 100.f;
+				flex_info.size[1] = 100.f;
+				flex_info.orientation = nui::FlexOrientation::COLUMN;
+				flex_info.items_spacing = nui::FlexSpacing::CENTER;
+				flex_info.lines_spacing = nui::FlexSpacing::CENTER;
+
+				nui::Flex* flex = win->createFlex(flex_info);
+				
+				nui::Slider2::CreateInfo slider_info;
+				slider_info.id = "slider_id";
+				slider_info.size[0] = 50.f;
+				slider_info.size[1] = 25;
+				slider_info.label.text = u8"șțăî";
+
+				flex->createSlider2(slider_info);
+				break;
+			}
+
 			case Tests::DROPDOWN: {
 
 				nui::FlexCreateInfo flex_info;
@@ -293,9 +318,7 @@ int main()
 				{
 					nui::MenuCreateInfo menu_info;
 					menu_info.id = "menu_id";
-					menu_info.titles_background_color = nui::Color(0.f, 0.2f, 0.2f);
-					menu_info.titles_border_thickness = border_thickness;
-					menu_info.titles_border_color = nui::Color::white();
+					menu_info.menu_background_color = nui::Color(0.f, 0.2f, 0.2f);
 
 					menu = win->createMenu(menu_info);
 				}
@@ -307,6 +330,9 @@ int main()
 				title_info.left_padding = horizontal_padding;
 				title_info.right_padding = horizontal_padding;
 				title_info.background_hover_color = nui::Color(0.f, 0.4f, 0.4f);
+				title_info.menu_background_color = nui::Color(0.f, 0.2f, 0.2f);
+				title_info.menu_border_color = nui::Color::white();
+				title_info.menu_border_thickness = border_thickness;
 
 				nui::MenuItemCreateInfo item_info;
 				item_info.left_text.font_size = font_size;
@@ -319,53 +345,39 @@ int main()
 				item_info.arrow_height = 6;
 				item_info.arrow_color = nui::Color(0.f, 0.6f, 0.6f);
 				item_info.arrow_highlight_color = nui::Color::white();
+				item_info.menu_background_color = nui::Color(0.f, 0.2f, 0.2f);
+				item_info.menu_border_color = nui::Color::white();
+				item_info.menu_border_thickness = border_thickness;
 
-				nui::MenuSectionCreateInfo section_info;
-
-				nui::SubMenuCreateInfo submenu_info;
-				submenu_info.background_color = nui::Color(0.f, 0.2f, 0.2f);
-				submenu_info.border_thickness = border_thickness;
-				submenu_info.border_color = nui::Color::white();
-
-				for (uint32_t title_idx = 0; title_idx < 5; title_idx++) {
+				for (uint32_t title_idx = 0; title_idx < 6; title_idx++) {
 
 					title_info.left_text.text = "Title Menu " + std::to_string(title_idx);
 
-					uint32_t title_1 = menu->createTitle(title_info);
-					uint32_t title_submenu_1 = menu->createSubMenu(title_1, submenu_info);
-					{
-						uint32_t section_1 = menu->createSection(title_submenu_1, section_info);
-						{
-							for (uint32_t i = 1; i < 5; i++) {
+					uint32_t title = menu->createItem(0, title_info);
+					
+					for (uint32_t i = 1; i < 5; i++) {
 
-								item_info.left_text.text = "Item " + std::to_string(i);
-								menu->createItem(section_1, item_info);
-							}
-						}
+						item_info.left_text.text = "Item " + std::to_string(i);
+						item_info.callback = [](nui::Window*, nui::StoredElement2*, void*) {
+							printf("called \n");
+						};
 
-						uint32_t section_2 = menu->createSection(title_submenu_1, section_info);
-						{
-							for (uint32_t i = 5; i < 11; i++) {
+						menu->createItem(title, item_info);
+					}
 
-								item_info.left_text.text = "Item " + std::to_string(i);
+					for (uint32_t i = 5; i < 11; i++) {
 
-								uint32_t item = menu->createItem(section_2, item_info);
-								uint32_t submenu = menu->createSubMenu(item, submenu_info);
-								{
-									uint32_t section = menu->createSection(submenu, section_info);
-									{
-										for (uint32_t j = 1; j < 6; j++) {
+						item_info.left_text.text = "Item " + std::to_string(i);
+						uint32_t item = menu->createItem(title, item_info);
+						
+						for (uint32_t j = 1; j < 6; j++) {
 
-											item_info.left_text.text = "Item " + std::to_string(i) + " " + std::to_string(j);
-											item_info.callback = [](nui::Window*, nui::StoredElement2*, void*) {
-												printf("called \n");
-											};
+							item_info.left_text.text = "Item " + std::to_string(i) + " " + std::to_string(j);
+							item_info.callback = [](nui::Window*, nui::StoredElement2*, void*) {
+								printf("called \n");
+							};
 
-											menu->createItem(section, item_info);
-										}
-									}
-								}
-							}
+							menu->createItem(item, item_info);
 						}
 					}
 				}

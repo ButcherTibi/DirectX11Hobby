@@ -1,4 +1,4 @@
-module;
+﻿module;
 
 // Windows
 #include "DietWindows.hpp"
@@ -115,6 +115,13 @@ LRESULT CALLBACK nui::windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 				return 0;
 			}
 
+			case WM_CHAR: {
+				CharacterKeyState& key = w->input.unicode_list.emplace_back();
+				key.code_point = (uint32_t)wParam;
+				key.down_transition = (lParam & (1 << 30)) != (1 << 30);
+				return 0;
+			}
+
 			case WM_LBUTTONDOWN: {
 				w->input.setKeyDownState(VirtualKeys::LEFT_MOUSE_BUTTON, 0);
 				return 0;
@@ -178,7 +185,7 @@ LRESULT CALLBACK nui::windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			}
 		}
 	}
-	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 
@@ -323,6 +330,8 @@ void Window::update(WindowCallback callback)
 
 	// Reset Input
 	{
+		input.unicode_list.clear();
+
 		input.mouse_pos_history.clear();
 
 		input.mouse_delta_x = 0;
@@ -339,9 +348,9 @@ void Window::update(WindowCallback callback)
 
 	// Read Input
 	MSG msg{};
-	while (PeekMessageA(&msg, hwnd, 0, 0, PM_REMOVE)) {
+	while (PeekMessage(&msg, hwnd, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&msg);
-		DispatchMessageA(&msg);
+		DispatchMessage(&msg);
 	}
 
 	// Calculate time for keys
@@ -359,16 +368,73 @@ void Window::update(WindowCallback callback)
 
 	// Emit events for previous frame input
 	{
+		bool is_exclusive;
 		bool emit_inside_events = true;
 
-		for (auto i = draw_stacks.rbegin(); i != draw_stacks.rend(); ++i) {
+		// emit inside event for exclusive element only
+		// used allow input to element even if the mouse is not over the element
+		// better usability/accessibility
+		if (exclusive_event_element_id != "") {
 
-			std::list<Element*>& elems = i->second;
+			// printf("exclusive = %s \n", exclusive_event_element_id.c_str());
 
-			for (auto j = elems.rbegin(); j != elems.rend(); ++j) {
+			is_exclusive = true;
 
-				Element* elem = *j;
-				elem->_emitEvents(emit_inside_events);
+			auto emit_exclusive = [&]() {
+
+				for (auto i = draw_stacks.rbegin(); i != draw_stacks.rend(); ++i) {
+
+					std::list<Element*>& elems = i->second;
+
+					for (auto j = elems.rbegin(); j != elems.rend(); ++j) {
+
+						Element* elem = *j;
+
+						if (elem->id == exclusive_event_element_id) {
+
+							elem->_emitInsideEvents(emit_inside_events, is_exclusive);
+
+							if (is_exclusive == false) {
+								exclusive_event_element_id = "";
+							}
+
+							return true;
+						}
+					}
+				}
+
+				// not found
+				return false;
+			};
+
+			if (emit_exclusive() == false) {
+				exclusive_event_element_id = "";
+			}
+		}
+		else {
+			is_exclusive = false;
+
+			for (auto i = draw_stacks.rbegin(); i != draw_stacks.rend(); ++i) {
+
+				std::list<Element*>& elems = i->second;
+
+				for (auto j = elems.rbegin(); j != elems.rend(); ++j) {
+
+					Element* elem = *j;
+
+					if (elem->_isInside() && emit_inside_events) {
+						elem->_emitInsideEvents(emit_inside_events, is_exclusive);
+					}
+					else {
+						elem->_emitOutsideEvents();
+					}
+
+					if (is_exclusive) {
+						exclusive_event_element_id = elem->id;
+						emit_inside_events = false;  // only emit outside events for the rest
+						is_exclusive = false;  // only the first exclusive element is allowed
+					}
+				}
 			}
 		}
 
@@ -426,6 +492,13 @@ void Window::update(WindowCallback callback)
 
 			if (iter->used == false) {
 				slider_prevs.erase(iter);
+			}
+		}
+
+		for (auto iter = slider2_prevs.begin(); iter != slider2_prevs.end(); iter++) {
+
+			if (iter->used == false) {
+				slider2_prevs.erase(iter);
 			}
 		}
 
@@ -615,14 +688,20 @@ void Window::update(WindowCallback callback)
 		}
 	}
 
+	// Draw the frame
+	_render();
+
 	// Mouse Delta Trap
-	if (delta_owner_elem != nullptr) {
+	// Not sure where to place it
+	if (mouse_delta_effect.trap.size[0] != 0) {
+
+		Box2D& trap = mouse_delta_effect.trap;
 
 		// Trap the Mouse position
-		int32_t local_top = delta_owner_elem->_position[1];
-		int32_t local_bot = local_top + delta_owner_elem->_size[1];
-		int32_t local_left = delta_owner_elem->_position[0];
-		int32_t local_right = local_left + delta_owner_elem->_size[0];
+		int32_t local_top = trap.pos[1];
+		int32_t local_bot = local_top + trap.size[1];
+		int32_t local_left = trap.pos[0];
+		int32_t local_right = local_left + trap.size[0];
 
 		RECT client_rect = getClientRectangle();
 		RECT new_trap;
@@ -633,8 +712,9 @@ void Window::update(WindowCallback callback)
 
 		ClipCursor(&new_trap);
 
-		switch (delta_effect) {
-		case DeltaEffectType::LOOP: {
+		switch (mouse_delta_effect.type) {
+		case MouseDeltaEffect::Type::LOOP: {
+
 			POINT mouse_screen_pos;
 			GetCursorPos(&mouse_screen_pos);
 
@@ -653,15 +733,12 @@ void Window::update(WindowCallback callback)
 			break;
 		}
 
-		case DeltaEffectType::HIDDEN: {
+		case MouseDeltaEffect::Type::HIDDEN: {
 			setMouseVisibility(false);
 			break;
 		}
 		}
 	}
-
-	// Draw the frame
-	_render();
 
 	// Frame Rate Limit
 	{
@@ -682,24 +759,25 @@ void Window::update(WindowCallback callback)
 //	this->finalEvent = callback;
 //	this->final_event_user_data = user_data;
 //}
-//
+
 //void Window::setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data)
 //{
 //	root->_events.setKeyDownEvent(callback, key, user_data);
 //}
-//
-//void Window::endMouseDeltaEffect()
-//{
-//	switch (delta_effect) {
-//	case DeltaEffectType::HIDDEN: {
-//		setLocalMousePosition(begin_mouse_x, begin_mouse_y);
-//		setMouseVisibility(true);
-//	}
-//	}
-//
-//	delta_owner_elem = nullptr;
-//	ClipCursor(nullptr);
-//}
+
+void Window::endMouseDeltaEffect()
+{
+	switch (mouse_delta_effect.type) {
+	case MouseDeltaEffect::Type::HIDDEN: {
+
+		setLocalMousePosition(mouse_delta_effect.begin_mouse_x, mouse_delta_effect.begin_mouse_y);
+		setMouseVisibility(true);
+	}
+	}
+
+	ClipCursor(nullptr);
+	mouse_delta_effect.trap.size[0] = 0;
+}
 
 RECT Window::getClientRectangle()
 {

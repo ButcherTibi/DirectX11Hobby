@@ -32,6 +32,7 @@ module;
 #include "Input.hpp"
 #include "GPU_ShaderTypes.hpp"
 #include "Properties.hpp"
+#include "utf_string.hpp"
 
 
 // Undefine
@@ -45,8 +46,9 @@ export module UserInterface;
 
 /*
 TODO:
-- text input
+- mode selector
 - check box
+- text input
 - context menu
 - tree list
 - popup
@@ -100,6 +102,7 @@ namespace nui {
 	export class Rect;
 	export class Button;
 	export class Slider;
+	export class Slider2;
 	export class Dropdown;
 	export class DirectX11_Viewport;
 	export class Stack;
@@ -112,8 +115,9 @@ namespace nui {
 	export class TreeList;
 
 	typedef std::variant<
-		Root, Text, Stack, Flex, Menu, Rect, TreeList, Button, Slider, Dropdown,
-		DirectX11_Viewport
+		Root, Text, Rect, Button, Slider, Slider2, Dropdown,
+		DirectX11_Viewport, Stack, Flex,
+		Menu, TreeList
 	> StoredElement;
 	export struct StoredElement2;
 
@@ -166,6 +170,14 @@ namespace nui {
 	struct TextInstance {
 		std::vector<PositionedCharacter> chars;
 		Color color;
+
+		void offsetPosition(std::array<int32_t, 2> offset)
+		{
+			for (PositionedCharacter& character : chars) {
+				character.pos[0] += offset[0];
+				character.pos[1] += offset[1];
+			}
+		}
 	};
 
 	struct CircleInstance {
@@ -208,7 +220,7 @@ namespace nui {
 	};
 
 	// Complex event handling component
-	class EventsComponent {
+	export class EventsComponent {
 	public:
 		// Internal
 		Window* _window;
@@ -276,17 +288,61 @@ namespace nui {
 
 		// Special Effects
 
-		// Loops the mouse around the element
-		void beginMouseLoopDeltaEffect(Element* elem);
+		// Loops the mouse around the box
+		void beginMouseLoopDeltaEffect(Box2D& trap);
 
 		// hides the mouse and on end restore mouse position to original position
-		void beginMouseFixedDeltaEffect(Element* elem);
+		void beginMouseFixedDeltaEffect(Box2D& trap);
 
 
 		// Other
 
 		// get how long is the mouse inside component in milliseconds
 		float getInsideDuration();
+	};
+
+	// Text Input Component ///////////////////////////////////////////////////
+
+	class TextInputComponent {
+	public:
+		Window* _window = nullptr;
+
+		utf8string display_text;
+
+		// Cursor
+		utf8string_iter cursor_pos;
+
+		// Selection
+		int32_t mouse_x_start;
+		int32_t mouse_x_end;
+		utf8string_iter selection_start;
+		uint32_t selection_length;
+
+		// Box2D box;
+		TextInstance instance;
+		// RectInstance highlight;
+		// RectInstance cursor;
+
+	public:
+		void init(Window* _window);
+
+		// Text
+		void set(int32_t value);
+		void set(float value, uint32_t decimal_count);
+		void set(utf8string& new_text);
+
+		// Selection
+		void resetSelection();
+		void setCursorAtEnd();
+
+		void respondToInput();
+		
+		void calcSize(GlyphProperties& glyph_props, Color& text_color,
+			uint32_t& r_width, uint32_t& r_height);
+
+		void offsetPosition(std::array<int32_t, 2> offset);
+
+		void draw();
 	};
 
 
@@ -319,6 +375,8 @@ namespace nui {
 	public:
 		Window* _window;  // pointer to parent window some little things
 
+		std::string id;  // id that links the retained state across frames
+		
 		Element* _parent;
 		StoredElement2* _self;
 		std::vector<Element*> _children;
@@ -356,8 +414,19 @@ namespace nui {
 
 		// Virtuals in order of usage
 
-		// element may implement this to process events
-		virtual void _emitEvents(bool& r_allow_inside_events);
+		virtual bool _isInside();
+
+		/**
+		* element may implement this to process events
+		* @param r_allow_inside_events = short-circuit the event handling chain to only 
+		* 	emit outside events.
+		* @param r_exclusive = makes the element that set it the only event to have
+		* 	inside events emited.
+		* 	To stop exclusive behaviour set it to FALSE or have the element id that set it
+		* 	no longer exist.
+		*/
+		virtual void _emitInsideEvents(bool& r_allow_inside_events, bool& r_exclusive);
+		virtual void _emitOutsideEvents();
 
 		// element may implement this if _size requires computation
 		// Example:
@@ -471,7 +540,9 @@ namespace nui {
 		RetainedState* state;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
+		void _emitInsideEvents(bool&,bool&) override;
+		void _emitOutsideEvents() override;
 
 		void _calcSizeAndRelativeChildPositions() override;
 
@@ -589,7 +660,113 @@ namespace nui {
 		RetainedState* state;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
+		void _emitInsideEvents(bool&, bool&) override;
+		void _emitOutsideEvents() override;
+
+		void _calcSizeAndRelativeChildPositions() override;
+
+		void _draw() override;
+	};
+
+	// Slider 2 ///////////////////////////////////////////////////////////////////////
+
+	typedef void (*Slider2Callback)(Window* window, float value, void* user_data);
+
+	class Slider2 : public Element {
+	public:
+		struct CreateInfo : public ElementCreateInfo {
+			
+			// Background
+			AnimatedProperty<Color> background_color = Color::red();
+			AnimatedProperty<Color> fill_color = Color::blue();
+
+			struct Label {
+				utf8string text;
+
+				// Style
+				std::string font_family = "Roboto";
+				std::string font_style = "Regular";
+				uint32_t font_size = 14;
+				uint32_t line_height = 0xFFFF'FFFF;
+				AnimatedProperty<Color> color = Color::white();
+
+				// Layout
+				uint32_t padding_left = 5;
+			};
+			Label label;
+
+			struct Value {
+				std::string font_family = "Roboto";
+				std::string font_style = "Regular";
+				uint32_t font_size = 14;
+				uint32_t line_height = 0xFFFF'FFFF;
+				AnimatedProperty<Color> color = Color::white();
+
+				// Layout
+				uint32_t padding_right = 5;
+
+				// Data
+				float soft_min = 0.f;
+				float soft_max = 1.f;
+				float hard_min = std::numeric_limits<float>::min();;
+				float hard_max = std::numeric_limits<float>::max();;
+				float initial = 0.5f;
+				uint32_t decimal_places = 2;
+
+				// Input
+				uint32_t movement_threshold = 10;
+			};
+			Value value;
+
+			Slider2Callback callback = nullptr;
+			void* user_data;
+
+			struct Hover {
+				AnimatedProperty<Color> background_color = Color::red();
+				AnimatedProperty<Color> fill_color = Color::blue();
+
+				AnimatedProperty<Color> label_color = Color::white();
+				AnimatedProperty<Color> value_color = Color::white();
+			};
+			Hover hover;
+		};
+
+		enum class _EditMode {
+			SLIDER,
+			VALUE_EDIT
+		};
+
+		struct RetainedState : public ElementRetainedState {
+			CreateInfo info;
+			
+			float value;
+
+			_EditMode mode = _EditMode::SLIDER;
+			int32_t mouse_start_x, mouse_start_y;
+			bool moved_more = false;
+			float initial_fill_ratio;
+			float fill_ratio = -1.f;
+
+			Box2D box;
+
+			RectInstance background_instance;
+			RectInstance fill_instance;
+			TextInstance label_instance;
+			TextInstance value_instance;
+			TextInputComponent text_input;
+
+			InternalAnimatedProperty<Color> background_color;
+			InternalAnimatedProperty<Color> fill_color;
+			InternalAnimatedProperty<Color> label_color;
+			InternalAnimatedProperty<Color> value_color;
+		};
+		RetainedState* state;
+
+	public:
+		bool _isInside() override;
+		void _emitInsideEvents(bool&, bool&) override;
+		void _emitOutsideEvents() override;
 
 		void _calcSizeAndRelativeChildPositions() override;
 
@@ -668,7 +845,7 @@ namespace nui {
 		RetainedState* state;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
 
 		void _calcSizeAndRelativeChildPositions() override;
 
@@ -702,11 +879,16 @@ namespace nui {
 
 		struct RetainedState : public ElementRetainedState {
 			CreateInfo info;
+
+			Box2D box;
+			EventsComponent events;
 		};
 
 		RetainedState* state;
 
 	public:
+		void _emitEvents(bool& r_allow_inside_events, bool& is_exclusive);
+
 		void _draw() override;
 	};
 
@@ -732,10 +914,7 @@ namespace nui {
 	};
 
 	export struct MenuCreateInfo : public ElementCreateInfo {
-		Color titles_background_color;
-
-		uint32_t titles_border_thickness;
-		Color titles_border_color;
+		Color menu_background_color;
 	};
 
 	export struct TreeListCreateInfo : public ElementCreateInfo {
@@ -785,9 +964,10 @@ namespace nui {
 
 		void createButton(Button::CreateInfo& info);
 		void createSlider(Slider::CreateInfo& info);
+		void createSlider2(Slider2::CreateInfo& info);
 		void createDropdown(Dropdown::CreateInfo& info);
 
-		void createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info);
+		DirectX11_Viewport* createDirectX11_Viewport(DirectX11_Viewport::CreateInfo& info);
 
 		Flex* createFlex(FlexCreateInfo& info);
 
@@ -804,7 +984,8 @@ namespace nui {
 	public:
 		EventsComponent _events;
 
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
+		void _emitInsideEvents(bool&, bool&) override;
 
 		void _calcSizeAndRelativeChildPositions() override;
 
@@ -886,10 +1067,13 @@ namespace nui {
 		FlexSpacing items_spacing;
 		FlexSpacing lines_spacing;
 
+		// TODO: delete this
 		EventsComponent _events;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
+		void _emitInsideEvents(bool&, bool&) override;
+		void _emitOutsideEvents() override;
 
 		void _calcSizeAndRelativeChildPositions() override;
 
@@ -900,31 +1084,12 @@ namespace nui {
 
 		void setMouseMoveEvent(EventCallback callback, void* user_data = nullptr);
 		void setMouseScrollEvent(EventCallback callback, void* user_data = nullptr);
-
-		void beginMouseLoopDeltaEffect();
-		void beginMouseFixedDeltaEffect();
 	};
 
 
-	//// Menu //////////////////////////////////////////////////////////////
+	// Menu //////////////////////////////////////////////////////////////
 
-	export struct SubMenuCreateInfo {
-		Color background_color;
-
-		uint32_t border_thickness = 0;
-		Color border_color;
-
-		// std::array<uint32_t, 2> shadow_offset;
-		// uint32_t shadow_spread;
-		// Color shadow_color;
-	};
-
-	export struct MenuSectionCreateInfo {
-		//Color background_color;
-
-		//Color separator_color;
-		//uint32_t separator_thickness;
-	};
+	// @TODO: simplify, drop the section feature have only create item exist
 
 	export struct MenuItemCreateInfo {
 		// icon
@@ -948,39 +1113,24 @@ namespace nui {
 
 		// Events
 		EventCallback callback = nullptr;
-	};
 
+		// SubMenu
+		Color menu_background_color;
 
-	struct SubMenu {
-		std::vector<uint32_t> child_sections;
-
-		SubMenuCreateInfo info;
-
-		Box2D box;
-
-		// Render
-		RectInstance _background;
-	};
-
-	struct MenuSection {
-		std::vector<uint32_t> child_items;
-
-		MenuSectionCreateInfo info;
-
-		Box2D _section_box;
-
-		// Render
-		RectInstance _background;
+		Color menu_border_color;
+		uint32_t menu_border_thickness = 0;
 	};
 
 	struct MenuItem {
-		uint32_t sub_menu;
+		uint32_t parent;
+		std::vector<uint32_t> child_items;
 
 		MenuItemCreateInfo info;
-
-		Box2D box;
+		Box2D item_box;
+		Box2D menu_box;
 
 		// Render
+		RectInstance _background;
 		TextInstance _text;
 		ArrowInstance _arrow;
 	};
@@ -992,13 +1142,9 @@ namespace nui {
 
 	struct MenuRetainedState : public ElementRetainedState {
 		// Graph from last frame
-		std::vector<SubMenu> prev_submenus;
-		std::vector<MenuSection> prev_sections;
 		std::vector<MenuItem> prev_items;
 
 		// Current frame graph
-		std::vector<SubMenu> submenus;
-		std::vector<MenuSection> sections;
 		std::vector<MenuItem> items;
 
 		std::vector<MenuVisibleMenus> visible_menus;
@@ -1013,15 +1159,11 @@ namespace nui {
 		MenuRetainedState* state;
 
 	public:
-		void _emitEvents(bool& allow_inside_events) override;
+		bool _isInside() override;
+
 		void _calcSizeAndRelativeChildPositions() override;
 		void _draw() override;
 
-
-		uint32_t createTitle(MenuItemCreateInfo& info);
-
-		uint32_t createSubMenu(uint32_t parent_item, SubMenuCreateInfo& info);
-		uint32_t createSection(uint32_t parent_submenu, MenuSectionCreateInfo& info);
 		uint32_t createItem(uint32_t parent_section, MenuItemCreateInfo& info);
 	};
 
@@ -1142,7 +1284,7 @@ namespace nui {
 
 		Instance* instance;  // parent instance to which this window belongs
 
-		WNDCLASSA window_class;  // Win32 Window class used on creation
+		WNDCLASSW window_class;  // Win32 Window class used on creation
 		HWND hwnd;  // handle to the window
 
 		// Timing
@@ -1168,6 +1310,7 @@ namespace nui {
 		std::list<Rect::RetainedState> rect_prevs;
 		std::list<Button::RetainedState> button_prevs;
 		std::list<Slider::RetainedState> slider_prevs;
+		std::list<Slider2::RetainedState> slider2_prevs;
 		std::list<Dropdown::RetainedState> dropdown_prevs;
 		std::list<DirectX11_Viewport::RetainedState> dx11_viewport_prevs;
 		std::list<FlexRetainedState> flex_prevs;
@@ -1180,20 +1323,24 @@ namespace nui {
 		// also used for occlusion in emiting events
 		std::map<uint32_t, std::list<Element*>> draw_stacks;
 
-		// Mouse Delta Handling
-		enum class DeltaEffectType {
-			LOOP,
-			HIDDEN
+		struct MouseDeltaEffect {
+			enum class Type {
+				LOOP,
+				HIDDEN
+			};
+			Type type;
+
+			Box2D trap;  // mouse trap where mouse will be contained
+
+			// initial mouse coordinates at the start of the delta effect (only for HIDDEN)
+			uint32_t begin_mouse_x;
+			uint32_t begin_mouse_y;
 		};
-		DeltaEffectType delta_effect;  // type of delta effect to apply, only one delta effect can be present
-
-		Element* delta_owner_elem;  // who owns the delta efect
-
-		// initial mouse coordinates at the start of the delta effect (only for HIDDEN)
-		uint32_t begin_mouse_x;
-		uint32_t begin_mouse_y;
+		MouseDeltaEffect mouse_delta_effect;
 
 		// Events
+		std::string exclusive_event_element_id;
+
 		void* final_event_user_data;
 		WindowCallback finalEvent;
 
@@ -1251,7 +1398,7 @@ namespace nui {
 	//	void setEndEvent(WindowCallback callback, void* user_data = nullptr);
 
 	//	void setKeyDownEvent(EventCallback callback, uint32_t key, void* user_data = nullptr);
-	//	void endMouseDeltaEffect();
+		void endMouseDeltaEffect();
 
 		// Window
 	
@@ -1347,6 +1494,8 @@ namespace nui {
 		std::list<Window> windows;
 
 	public:
+		std::string _cache_string;  // used by the gliph position methods
+
 		bool _bruteForceCreateSwapchain(Window& window, ComPtr<IDXGISwapChain1>& swapchain1);
 
 		void _loadCharacterAtlasToTexture();
@@ -1357,9 +1506,32 @@ namespace nui {
 		// What is the size of each character
 		// Where it should be placed
 		// How large the container should be to contain the text
-		// NOTE: the color property is ignored
+		void findAndPositionGlyphs(
+			std::string& text,
+			GlyphProperties& props,
+			uint32_t& r_width, uint32_t& r_height,
+			std::vector<PositionedCharacter>& r_chars);
+
+		void findAndPositionGlyphs(
+			utf8string& text,
+			GlyphProperties& props,
+			uint32_t& r_width, uint32_t& r_height,
+			std::vector<PositionedCharacter>& r_chars);
+		
 		void findAndPositionGlyphs(TextProps& props,
 			int32_t start_pos_x, int32_t start_pos_y,
+			uint32_t& r_width, uint32_t& r_height,
+			std::vector<PositionedCharacter>& r_chars);
+
+		void findAndPositionGlyphs(
+			int32_t number,
+			GlyphProperties& props,
+			uint32_t& r_width, uint32_t& r_height,
+			std::vector<PositionedCharacter>& r_chars);
+
+		void findAndPositionGlyphs(
+			float number, uint32_t decimal_count,
+			GlyphProperties& props,
 			uint32_t& r_width, uint32_t& r_height,
 			std::vector<PositionedCharacter>& r_chars);
 

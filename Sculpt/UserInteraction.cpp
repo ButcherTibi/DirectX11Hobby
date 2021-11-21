@@ -1,4 +1,6 @@
 
+#include "Input.hpp"
+
 // Header
 #include "Application.hpp"
 
@@ -610,7 +612,7 @@ void endStandardBrushStroke(nui::Window*, nui::StoredElement2*, void*)
 	sculpt.stroke_started = false;
 }
 
-void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement2*, void*)
+void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement2* source, void*)
 {
 	nui::Input& input = window->input;
 	glm::vec3 pixel_world_pos;
@@ -622,8 +624,8 @@ void onCameraOrbitKeyDown(nui::Window* window, nui::StoredElement2*, void*)
 		application.setCameraFocus(pixel_world_pos);
 	}
 
-	//nui::Flex* grid = std::get_if<nui::Flex>(source);
-	//grid->beginMouseFixedDeltaEffect();
+	auto viewport = source->get<nui::DirectX11_Viewport>();
+	viewport->state->events.beginMouseFixedDeltaEffect(viewport->state->box);
 }
 
 void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
@@ -635,16 +637,15 @@ void onCameraOrbitKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
 	application.arcballOrbitCamera((float)delta_x * scaling, (float)delta_y * scaling);
 }
 
-void onCameraOrbitKeyUp(nui::Window*, nui::StoredElement2*, void*)
+void onCameraOrbitKeyUp(nui::Window* window, nui::StoredElement2*, void*)
 {
-	// nui::Flex* grid = std::get_if<nui::Flex>(source);
-	//window->endMouseDeltaEffect();
+	window->endMouseDeltaEffect();
 }
 
-void onCameraPanKeyDown(nui::Window*, nui::StoredElement2*, void*)
+void onCameraPanKeyDown(nui::Window*, nui::StoredElement2* source, void*)
 {
-	//auto grid = std::get_if<nui::Flex>(source);
-	//grid->beginMouseLoopDeltaEffect();
+	auto viewport = source->get<nui::DirectX11_Viewport>();
+	viewport->state->events.beginMouseLoopDeltaEffect(viewport->state->box);
 }
 
 void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
@@ -658,7 +659,7 @@ void onCameraPanKeyHeld(nui::Window* window, nui::StoredElement2*, void*)
 
 void onCameraPanKeyUp(nui::Window* window, nui::StoredElement2*, void*)
 {
-	//window->endMouseDeltaEffect();
+	window->endMouseDeltaEffect();
 }
 
 void onCameraDollyScroll(nui::Window* window, nui::StoredElement2*, void*)
@@ -1117,4 +1118,53 @@ void Application::init()
 	//createTestScene_UV_Sphere(nullptr, nullptr, nullptr);
 	createTestScene_SingleTriangle(nullptr, nullptr, nullptr);
 	//createPerformanceTestScene_DenseSphere(nullptr, nullptr, nullptr);
+}
+
+void Application::mainLoop()
+{
+	while (main_window->win_messages.should_close == false) {
+
+		main_window->update([](nui::Window* win, void*) {
+
+			nui::Flex* flex;
+			{
+				nui::FlexCreateInfo info;
+				info.id = "flex_id";
+				info.size[0] = 100.f;
+				info.size[1] = 100.f;
+				info.orientation = nui::FlexOrientation::COLUMN;
+
+				flex = win->createFlex(info);
+			}
+
+			{
+				nui::MenuCreateInfo info;
+				
+			}
+
+			{
+				nui::DirectX11_Viewport::CreateInfo info;
+				info.id = "viewport_id";
+				info.size[0] = 100.f;
+				info.size[1] = 100.f;
+				info.callback = geometryDraw;
+
+				nui::DirectX11_Viewport* viewport = flex->createDirectX11_Viewport(info);
+				nui::EventsComponent& events = viewport->state->events;
+
+				// Mouse Camera Rotation
+				events.setKeyDownEvent(onCameraOrbitKeyDown, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+				events.setKeyHeldDownEvent(onCameraOrbitKeyHeld, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+				events.setKeyUpEvent(onCameraOrbitKeyUp, nui::VirtualKeys::RIGHT_MOUSE_BUTTON);
+
+				// Camera Pan
+				events.setKeyDownEvent(onCameraPanKeyDown, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+				events.setKeyHeldDownEvent(onCameraPanKeyHeld, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+				events.setKeyUpEvent(onCameraPanKeyUp, nui::VirtualKeys::MIDDLE_MOUSE_BUTTON);
+
+				// Camera Zoom
+				events.setMouseScrollEvent(onCameraDollyScroll);
+			}
+		});
+	}
 }

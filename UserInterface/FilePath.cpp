@@ -209,9 +209,13 @@ ErrStack Path::readOnce(std::vector<T>& content)
 {
 	// create file handle
 	std::string filename_vec = toWindowsPath();
-	LPCSTR filename_win = filename_vec.data();
 
-	HANDLE file_handle = CreateFileA(filename_win,
+	std::wstring filename_win;
+	filename_win.resize(filename_vec.size());
+
+	mbstowcs((wchar_t*)filename_win.c_str(), filename_vec.c_str(), filename_vec.length());
+
+	HANDLE file_handle = CreateFile(filename_win.c_str(),
 		GENERIC_READ, // desired acces
 		0,  // share mode
 		NULL,  // security atributes
@@ -260,23 +264,23 @@ void File::create(Path& path)
 
 ErrStack File::openForParsing()
 {
-	if (_file_handle.isValid()) {
-		CloseHandle(_file_handle.handle);
-		_file_handle.handle = INVALID_HANDLE_VALUE;
-	}
+	//if (_file_handle.isValid()) {
+	//	CloseHandle(_file_handle.handle);
+	//	_file_handle.handle = INVALID_HANDLE_VALUE;
+	//}
 
-	_file_handle = CreateFileA(file_path.data(),
-		GENERIC_READ, // desired acces
-		FILE_SHARE_READ | FILE_SHARE_WRITE,  // share mode
-		NULL,  // security atributes
-		OPEN_EXISTING,  // disposition
-		FILE_FLAG_SEQUENTIAL_SCAN, // flags and atributes
-		NULL);
+	//_file_handle = CreateFile(file_path.data(),
+	//	GENERIC_READ, // desired acces
+	//	FILE_SHARE_READ | FILE_SHARE_WRITE,  // share mode
+	//	NULL,  // security atributes
+	//	OPEN_EXISTING,  // disposition
+	//	FILE_FLAG_SEQUENTIAL_SCAN, // flags and atributes
+	//	NULL);
 
-	if (_file_handle.isValid() == false) {
-		return ErrStack(code_location,
-			"failed to open file handle for path = " + file_path + " " + getLastError());
-	}
+	//if (_file_handle.isValid() == false) {
+	//	return ErrStack(code_location,
+	//		"failed to open file handle for path = " + file_path + " " + getLastError());
+	//}
 
 	return ErrStack();
 }
@@ -299,8 +303,13 @@ ErrStack File::size(size_t& r_byte_count)
 	// create a temporary file handle
 	if (_file_handle.isValid() == false) {
 
+		std::wstring file_path_wstr;
+		file_path_wstr.resize(file_path.size());
+
+		mbstowcs((wchar_t*)file_path_wstr.c_str(), file_path.c_str(), file_path.length());
+
 		// create file handle
-		Handle file_handle = CreateFileA(file_path.data(),
+		Handle file_handle = CreateFile(file_path_wstr.c_str(),
 			GENERIC_READ, // desired acces
 			0,  // share mode
 			NULL,  // security atributes

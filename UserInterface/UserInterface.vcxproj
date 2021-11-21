@@ -22,6 +22,7 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v142</PlatformToolset>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -129,6 +130,8 @@ if %ERRORLEVEL% == 1 (
     <ClInclude Include="ErrorStack.hpp" />
     <ClInclude Include="FilePath.hpp" />
     <ClInclude Include="TimeStuff.hpp" />
+    <ClInclude Include="utf8.h" />
+    <ClInclude Include="utf_string.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CharacterAtlas.cpp" />
@@ -148,13 +151,13 @@ if %ERRORLEVEL% == 1 (
     <ClCompile Include="GPU_ShaderTypes.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Input.hpp">
+    <ClInclude Include="Input.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
+    </ClInclude>
     <ClCompile Include="Instance.cpp" />
-    <ClCompile Include="MathStuff.hpp">
+    <ClInclude Include="MathStuff.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
+    </ClInclude>
     <ClCompile Include="UserInterface.ixx">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -165,6 +168,7 @@ if %ERRORLEVEL% == 1 (
     <ClCompile Include="TextureAtlas.hpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="utf8string.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
   <ItemGroup>

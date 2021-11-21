@@ -40,6 +40,15 @@
     <Filter Include="Shaders\Circle">
       <UniqueIdentifier>{338d5f24-def0-46fa-8b24-90903b4c8736}</UniqueIdentifier>
     </Filter>
+    <Filter Include="UTF-8 Strings">
+      <UniqueIdentifier>{cab7ac04-6891-4d54-9634-9ab2bb4c1469}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty">
+      <UniqueIdentifier>{ed53c45e-dbd6-4103-aa0c-3796316eff8d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\utf8">
+      <UniqueIdentifier>{10dd3c66-4ace-427f-af77-81a9defb9a30}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ErrorStack.hpp">
@@ -59,6 +68,14 @@
     <ClInclude Include="CharacterAtlas.hpp">
       <Filter>CharacterAtlas</Filter>
     </ClInclude>
+    <ClInclude Include="utf_string.hpp">
+      <Filter>UTF-8 Strings</Filter>
+    </ClInclude>
+    <ClInclude Include="utf8.h">
+      <Filter>ThirdParty\utf8</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.hpp" />
+    <ClInclude Include="MathStuff.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ErrorStack.cpp">
@@ -94,11 +111,12 @@
     <ClCompile Include="CharacterAtlas.cpp">
       <Filter>CharacterAtlas</Filter>
     </ClCompile>
-    <ClCompile Include="Input.hpp" />
-    <ClCompile Include="MathStuff.hpp" />
     <ClCompile Include="UserInterface.ixx" />
     <ClCompile Include="Container.cpp">
       <Filter>Implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="utf8string.cpp">
+      <Filter>UTF-8 Strings</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

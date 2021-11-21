@@ -352,6 +352,7 @@ public:
 	std::list<MeshLayer> layers;
 
 
+
 	// Selection
 
 	// current selection of instances
@@ -412,6 +413,9 @@ public:
 
 	// fully init the application (called when first rendering with the initialization of the renderer)
 	void init();
+
+	// main loop of the application for setting the UserInterface
+	void mainLoop();
 
 	// reset the scene
 	void reset();

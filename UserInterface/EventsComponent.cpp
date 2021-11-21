@@ -9,6 +9,7 @@ module;
 // Mine
 #include "Input.hpp"
 #include "Properties.hpp"
+#include "utf_string.hpp"
 
 module UserInterface;
 
@@ -266,12 +267,14 @@ void EventsComponent::setKeyUpEvent(EventCallback callback, uint32_t key, void* 
 	}
 }
 
-void EventsComponent::beginMouseLoopDeltaEffect(Element* elem)
+void EventsComponent::beginMouseLoopDeltaEffect(Box2D& trap)
 {
-	if (_window->delta_owner_elem != nullptr) {
+	Window::MouseDeltaEffect& delta = _window->mouse_delta_effect;
 
-		switch (_window->delta_effect) {
-		case Window::DeltaEffectType::HIDDEN: {
+	if (delta.trap.size[0] != 0) {
+
+		switch (delta.type) {
+		case Window::MouseDeltaEffect::Type::HIDDEN: {
 			_window->setMouseVisibility(true);
 		}
 		}
@@ -279,16 +282,18 @@ void EventsComponent::beginMouseLoopDeltaEffect(Element* elem)
 		ClipCursor(nullptr);
 	}
 
-	_window->delta_effect = Window::DeltaEffectType::LOOP;
-	_window->delta_owner_elem = elem;
+	delta.type = Window::MouseDeltaEffect::Type::LOOP;
+	delta.trap = trap;
 }
 
-void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
+void EventsComponent::beginMouseFixedDeltaEffect(Box2D& trap)
 {
-	if (_window->delta_owner_elem != nullptr) {
+	Window::MouseDeltaEffect& delta = _window->mouse_delta_effect;
 
-		switch (_window->delta_effect) {
-		case Window::DeltaEffectType::HIDDEN: {
+	if (delta.trap.size[0] != 0) {
+
+		switch (delta.type) {
+		case Window::MouseDeltaEffect::Type::HIDDEN: {
 			_window->setMouseVisibility(true);
 		}
 		}
@@ -296,12 +301,12 @@ void EventsComponent::beginMouseFixedDeltaEffect(Element* elem)
 		ClipCursor(nullptr);
 	}
 
-	_window->delta_effect = Window::DeltaEffectType::HIDDEN;
-	_window->delta_owner_elem = elem;
+	delta.type = Window::MouseDeltaEffect::Type::HIDDEN;
+	delta.trap = trap;
 
 	nui::Input& input = _window->input;
-	_window->begin_mouse_x = input.mouse_x;
-	_window->begin_mouse_y = input.mouse_y;
+	delta.begin_mouse_x = input.mouse_x;
+	delta.begin_mouse_y = input.mouse_y;
 }
 
 float EventsComponent::getInsideDuration()
@@ -448,4 +453,170 @@ void EventsComponent::_emitOutsideEvents(StoredElement2* self)
 	}
 
 	// do nothing if already outside
+}
+
+void TextInputComponent::init(Window* _window)
+{
+	this->_window = _window;
+	
+	cursor_pos = display_text.end();
+	selection_start = display_text.end();
+	selection_length = 0;
+}
+
+void TextInputComponent::set(int32_t value)
+{
+	auto& number_str = _window->instance->_cache_string;
+	number_str = std::to_string(value);
+
+	display_text = number_str;
+}
+
+void TextInputComponent::set(float value, uint32_t decimal_count)
+{
+	auto& number_str = _window->instance->_cache_string;
+	number_str = std::to_string(value);
+	size_t dot_location = number_str.find(".");
+
+	if (dot_location != std::string::npos &&
+		number_str.length() - 1 - dot_location > decimal_count)
+	{
+		number_str.resize(dot_location + decimal_count + 1);
+	}
+
+	display_text = number_str;
+}
+
+void TextInputComponent::set(utf8string& new_text)
+{
+	display_text = new_text;
+}
+
+void TextInputComponent::resetSelection()
+{
+	selection_length = 0;
+}
+
+void TextInputComponent::setCursorAtEnd()
+{
+	cursor_pos = display_text.end();
+}
+
+void TextInputComponent::respondToInput()
+{
+	Input& input = _window->input;
+
+	// Selection
+	{
+		// Start
+		if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+			mouse_x_start = input.mouse_x;
+			mouse_x_end = mouse_x_start;
+			resetSelection();
+		}
+		// End
+		else if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
+			mouse_x_end = input.mouse_x;
+		}
+
+		int32_t start_x = mouse_x_start;
+		int32_t end_x = mouse_x_end;
+
+		if (mouse_x_start > mouse_x_end) {
+			start_x = mouse_x_end;
+			end_x = mouse_x_start;
+		}
+
+		utf8string_iter iter = display_text.begin();
+		selection_start = display_text.end();
+		selection_length = 0;
+
+		for (uint32_t i = 0; i < instance.chars.size(); i++) {
+
+			PositionedCharacter& character = instance.chars[i];
+			int32_t character_middle = character.pos[0] + (character.chara->advance_X / 2);
+
+			if (start_x < character_middle && character_middle < end_x) {
+
+				if (selection_start.isAtNull()) {
+					selection_start = iter;
+					selection_length = 1;
+				}
+				else {
+					selection_length += 1;
+				}
+			}
+
+			iter.next();
+		}
+
+		//printf("select start = %d length = %d \n", select_start.byte_index, select_length);
+
+		if (selection_length) {
+			printf("selection %s \n", display_text.extract(selection_start, selection_length).c_str());
+		}
+	}
+
+	// Add
+	{
+		if (input.unicode_list.size() > 0) {
+
+			utf8string new_content;
+
+			for (CharacterKeyState& key : input.unicode_list) {
+				if (key.down_transition) {
+					new_content.push(key.code_point);
+				}
+			}
+
+			printf("input = %s \n", new_content.c_str());
+
+			if (selection_length > 0) {
+
+				display_text.replaceSelection(selection_start, selection_length, new_content);
+			}
+			else {
+
+			}
+		}
+	}
+
+	// Delete
+	/*if (input.key_list[VirtualKeys::BACKSPACE].down_transition) {
+		
+		if (select_end - select_start > 0) {
+			display_text.erase(select_start, select_end - select_start);
+		}
+		else if (cursor_pos > 0) {
+			display_text.erase(cursor_pos, 1);
+		}
+	}*/
+}
+
+void TextInputComponent::calcSize(GlyphProperties& glyph_props, Color& text_color,
+	uint32_t& r_width, uint32_t& r_height)
+{
+	Instance* inst = _window->instance;
+
+	inst->findAndPositionGlyphs(display_text, glyph_props,
+		r_width, r_height, instance.chars);
+
+	instance.color = text_color;
+}
+
+void TextInputComponent::offsetPosition(std::array<int32_t, 2> offset)
+{
+	instance.offsetPosition(offset);
+}
+
+void TextInputComponent::draw()
+{
+	Instance* inst = _window->instance;
+
+	std::vector<TextInstance*> instances = {
+		&instance
+	};
+
+	inst->drawTexts(_window, instances);
 }

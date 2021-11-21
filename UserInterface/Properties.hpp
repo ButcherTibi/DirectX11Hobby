@@ -364,6 +364,16 @@ namespace nui {
 		Color color = Color::white();
 	};
 
+	struct GlyphProperties {
+		std::string* font_family;
+		std::string* font_style;
+		uint32_t font_size;
+		uint32_t line_height;
+
+		int32_t offset_x = 0;
+		int32_t offset_y = 0;
+	};
+
 
 	// Animated Properties ///////////////////////////////////////////////////////////////
 
@@ -527,6 +537,41 @@ namespace nui {
 		uint32_t height()
 		{
 			return top + bot;
+		}
+	};
+
+
+	// Numeric Value /////////////////////////////////////////////////////////////////
+
+	enum class NumericValueDataType {
+		INT32,
+		FLOAT
+	};
+
+	template<typename T>
+	struct NumericValueCreateInfo {
+		T soft_min;
+		T soft_max;
+		T hard_min;
+		T hard_max;
+		T initial;
+
+		NumericValueCreateInfo()
+		{
+			if constexpr (std::is_same<T, int32_t>()) {
+				soft_min = 0;
+				soft_max = 100;
+				hard_min = std::numeric_limits<int32_t>::min();
+				hard_max = std::numeric_limits<int32_t>::max();;
+				initial = 50;
+			}
+			else if constexpr (std::is_same<T, float>()) {
+				soft_min = 0.f;
+				soft_max = 1.f;
+				hard_min = std::numeric_limits<float>::min();;
+				hard_max = std::numeric_limits<float>::max();;
+				initial = 0.5f;
+			}
 		}
 	};
 }
