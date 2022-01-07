@@ -116,6 +116,16 @@ LRESULT CALLBACK nui::windowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			}
 
 			case WM_CHAR: {
+				// These are NOT characters
+				switch ((uint32_t)wParam) {
+				case 27:  // Escape key
+				case 13:  // Carriage Return
+				case 8:  // Backspace key
+				{
+					return 0;
+				}
+				}
+
 				CharacterKeyState& key = w->input.unicode_list.emplace_back();
 				key.code_point = (uint32_t)wParam;
 				key.down_transition = (lParam & (1 << 30)) != (1 << 30);

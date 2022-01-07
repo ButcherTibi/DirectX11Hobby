@@ -714,7 +714,7 @@ void Slider2::_emitInsideEvents(bool&, bool& r_exclusive)
 
 				// set initial content of the input box
 				s->text_input.set(s->value, info.value.decimal_places);
-				s->text_input.resetSelection();
+				s->text_input.deselect();
 
 				s->mode = _EditMode::VALUE_EDIT;
 				r_exclusive = true;
@@ -873,14 +873,13 @@ void Slider2::_calcSizeAndRelativeChildPositions()
 		// Value
 		uint32_t value_width, value_height;
 		{
-			GlyphProperties glyph_props;
-			glyph_props.font_family = &info.value.font_family;
-			glyph_props.font_style = &info.value.font_style;
-			glyph_props.font_size = info.value.font_size;
-			glyph_props.line_height = info.value.line_height;
+			auto& input_info = s->text_input.info;
+			input_info.font_family = info.value.font_family;
+			input_info.font_style = info.value.font_style;
+			input_info.font_size = info.value.font_size;
+			input_info.line_height = info.value.line_height;
 
-			s->text_input.calcSize(glyph_props, s->value_instance.color,
-				value_width, value_height);
+			s->text_input.generateGPU_Data(value_width, value_height);
 
 			int32_t offset_x = (s->box.size[0] - value_width) / 2;
 			int32_t offset_y = (s->box.size[1] - value_height) / 2;

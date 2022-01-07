@@ -3,6 +3,7 @@
 // Windows
 #include "DietWindows.hpp"
 #include "Windows.h"
+#undef DELETE
 
 // Standard
 #include <chrono>
@@ -76,6 +77,7 @@ namespace nui {
 
 			// Text Editing
 			BACKSPACE = VK_BACK,
+			DELETE = VK_DELETE,
 			SPACE = VK_SEPARATOR,
 			ENTER = VK_RETURN,
 
@@ -198,6 +200,11 @@ namespace nui {
 			}
 
 			// key was already UP do nothing
+		}
+
+		bool isDownTransition(uint32_t key)
+		{
+			return key_list[key].down_transition;
 		}
 
 		void debugPrint()

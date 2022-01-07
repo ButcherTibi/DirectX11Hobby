@@ -1,6 +1,9 @@
-
+﻿
 // Header
 #include "utf_string.hpp"
+
+// Mine
+#include "ErrorStack.hpp"
 
 
 uint32_t getUTF8_SequenceLength(uint8_t byte)
@@ -77,13 +80,21 @@ void encodeUTF8_CodePoint(uint32_t code_point,
 	byte_3 = code_point & 0b111111 | 0b1000'0000;
 }
 
-void utf8string_iter::prev()
+uint32_t byteCount(utf8string_iter& begin, utf8string_iter& end)
+{
+	assert_cond(begin <= end, "begin cannot be further back than end");
+
+	return end.byte_index - begin.byte_index;
+}
+
+void utf8string_iter::prev(uint32_t count)
 {
 	auto& bytes = parent->bytes;
 
-	while (true) {
+	uint32_t i = 0;
+	while (i < count) {
 
-		if (byte_index == 0) {bool isBeforeBegin();
+		if (byte_index == 0) {
 			byte_index = -1;
 			return;
 		}
@@ -98,11 +109,19 @@ void utf8string_iter::prev()
 		{
 			return;
 		}
+
+		i++;
 	}
 }
 
 void utf8string_iter::next(uint32_t count)
 {
+	// before iter
+	if (byte_index == - 1) {
+		byte_index = 0;
+		return;
+	}
+
 	auto& bytes = parent->bytes;
 
 	uint8_t byte = bytes[byte_index];
@@ -110,7 +129,7 @@ void utf8string_iter::next(uint32_t count)
 	uint32_t i = 0;
 	while (i < count) {
 
-		// null termination
+		// don't pass after
 		if (byte == 0) {
 			return;
 		}
@@ -134,7 +153,47 @@ void utf8string_iter::next(uint32_t count)
 	}
 }
 
-uint32_t utf8string_iter::getCodePoint()
+int32_t utf8string_iter::characterIndex()
+{
+	auto& bytes = parent->bytes;
+
+	if (byte_index == -1) {
+		return -1;
+	}
+	else if (byte_index == bytes.size() - 1) {
+		return 0x7FFF'FFFF;
+	}
+
+	uint32_t character_index = 0;
+
+	int32_t byte_i = 0;
+	uint8_t byte = bytes[byte_i];
+
+	while (byte_i < byte_index) {
+
+		if ((byte & 0b1000'0000) == 0) {
+			byte_i += 1;
+		}
+		else if ((byte & 0b1100'0000) == 0b1100'0000) {
+			byte_i += 2;
+		}
+		else if ((byte & 0b1110'0000) == 0b1110'0000) {
+			byte_i += 3;
+		}
+		else if ((byte & 0b1111'0000) == 0b1111'0000) {
+			byte_i += 4;
+		}
+		else {
+			throw std::exception("invalid byte");
+		}
+
+		character_index++;
+	}
+
+	return character_index;
+}
+
+uint32_t utf8string_iter::codePoint()
 {
 	auto& bytes = parent->bytes;
 
@@ -258,6 +317,11 @@ bool operator>(utf8string_iter a, utf8string_iter b)
 	return a.byte_index > b.byte_index;
 }
 
+bool operator<=(utf8string_iter a, utf8string_iter b)
+{
+	return a.byte_index <= b.byte_index;
+}
+
 bool operator>=(utf8string_iter a, utf8string_iter b)
 {
 	return a.byte_index >= b.byte_index;
@@ -322,7 +386,12 @@ uint32_t utf8string::length()
 	return count;
 }
 
-utf8string_iter utf8string::beforeBegin()
+bool utf8string::isEmpty()
+{
+	return bytes.size() == 1;
+}
+
+utf8string_iter utf8string::before()
 {
 	utf8string_iter iter;
 	iter.parent = this;
@@ -340,7 +409,20 @@ utf8string_iter utf8string::begin()
 	return iter;
 }
 
-utf8string_iter utf8string::end()
+utf8string_iter utf8string::last()
+{
+	utf8string_iter iter;
+	iter.parent = this;
+	iter.byte_index = bytes.size() - 1;
+
+	if (bytes.size() > 1) {
+		iter.prev();
+	}
+
+	return iter;
+}
+
+utf8string_iter utf8string::after()
 {
 	utf8string_iter iter;
 	iter.parent = this;
@@ -380,6 +462,47 @@ void utf8string::push(uint32_t code_point)
 	bytes[bytes.size() - 1] = '\0';
 }
 
+void utf8string::insertAfter(utf8string_iter& location,
+	utf8string_iter& new_content_start, utf8string_iter& new_content_end)
+{
+	assert_cond(location < after(), "cannot insert a character past the after iterator i.e past NULL terminator");
+
+	// Optimization
+	if (new_content_start == new_content_end) {
+		return;
+	}
+
+	// move old content
+	//     |displaced_content_begin
+	// 0 1 2 3 4
+	//         |displaced_content_end
+	//
+	// 0 1 X X X X 2 3 4
+	//             |after_new_content
+	utf8string_iter displaced_content_begin = location;
+	displaced_content_begin.next();
+
+	utf8string_iter displaced_content_end = after();
+
+	utf8string_iter after_new_content = displaced_content_begin;
+	after_new_content.byte_index += byteCount(new_content_start, new_content_end);
+
+	overwrite(after_new_content, displaced_content_begin, displaced_content_end);
+
+	// add new content
+	overwrite(displaced_content_begin, new_content_start, new_content_end);
+
+	bytes[bytes.size() - 1] = '\0';
+}
+
+void utf8string::insertAfter(utf8string_iter& location, utf8string& new_content)
+{
+	utf8string_iter new_content_start = new_content.begin();
+	utf8string_iter new_content_end = new_content.after();
+
+	insertAfter(location, new_content_start, new_content_end);
+}
+
 void utf8string::overwrite(utf8string_iter& location,
 	utf8string_iter& new_content_start, utf8string_iter& new_content_end)
 {
@@ -411,7 +534,7 @@ void utf8string::overwrite(utf8string_iter& location,
 void utf8string::overwrite(utf8string_iter& location, utf8string& new_content)
 {
 	utf8string_iter new_content_start = new_content.begin();
-	utf8string_iter new_content_end = new_content.end();
+	utf8string_iter new_content_end = new_content.after();
 
 	overwrite(location, new_content_start, new_content_end);
 }
@@ -440,7 +563,7 @@ void utf8string::replaceSelection(utf8string_iter& select_start, uint32_t select
 	utf8string_iter select_end = select_start;
 	select_end.next(select_length);
 
-	utf8string_iter old_end = end();
+	utf8string_iter old_end = after();
 
 	uint32_t select_bytes_length = select_end.byte_index - select_start.byte_index;
 	uint32_t new_bytes_size = bytes.size() - select_bytes_length + new_content.bytes.size() - 1;
@@ -454,10 +577,46 @@ void utf8string::replaceSelection(utf8string_iter& select_start, uint32_t select
 	bytes[bytes.size() - 1] = '\0';
 }
 
-//void utf8string::erase(uint32_t start, uint32_t count)
-//{
-//	
-//}
+void utf8string::erase(utf8string_iter& select_start, utf8string_iter& select_end)
+{
+	assert_cond(before() < select_start && select_start <= after(),
+		"");
+	assert_cond(before() < select_end && select_end <= after(),
+		"");
+
+	uint32_t selection_bytes_count = byteCount(select_start, select_end);
+	assert_cond(select_start.byte_index + selection_bytes_count < bytes.size(),
+		"cannot erase more characters than existing");
+
+	if (select_start == select_end) {
+		return;
+	}
+	// displace existing content to the left to fill the created gap
+	else if (select_end < after()) {
+
+		//         |select end
+		// 0 1 2 3 4 5 6
+		//     |select start
+		// 
+		//     new content start
+		// 0 1 4 5 6
+		//             new content end
+		utf8string_iter displaced_content_end = after();
+
+		overwrite(select_start, select_end, displaced_content_end);
+	}
+
+	bytes.resize(bytes.size() - selection_bytes_count);
+	bytes[bytes.size() - 1] = '\0';
+}
+
+void utf8string::erase(utf8string_iter& select_start, uint32_t selection_length)
+{
+	utf8string_iter select_end = select_start;
+	select_end.next(selection_length);
+
+	erase(select_start, select_end);
+}
 
 utf8string utf8string::extract(utf8string_iter& begin, utf8string_iter& end)
 {
@@ -544,4 +703,57 @@ bool operator==(utf8string& str, const char8_t* str_literal)
 bool operator!=(utf8string& str, const char8_t* str_literal)
 {
 	return !(str == str_literal);
+}
+
+namespace _utf8string_tests {
+
+	void testInsertAfter()
+	{
+		// Before
+		{
+			utf8string str = u8"ăîșț";
+			utf8string_iter str_iter = str.before();
+			utf8string new_content = u8"Ă";
+
+			utf8string new_str = str;
+			new_str.insertAfter(str_iter, new_content);
+
+			if (new_str != u8"Ăăîșț") {
+				throw std::exception();
+			}
+		}
+
+		// Begin
+		{
+			utf8string str = u8"ăîșț";
+			utf8string_iter str_iter = str.begin();
+			utf8string new_content = u8"Ă";
+
+			utf8string new_str = str;
+			new_str.insertAfter(str_iter, new_content);
+
+			if (new_str != u8"ăĂîșț") {
+				throw std::exception();
+			}
+		}
+
+		// Last
+		{
+			utf8string str = u8"ăîșț";
+			utf8string_iter str_iter = str.last();
+			utf8string new_content = u8"Ă";
+
+			utf8string new_str = str;
+			new_str.insertAfter(str_iter, new_content);
+
+			if (new_str != u8"ăîșțĂ") {
+				throw std::exception();
+			}
+		}
+	}
+
+	void testEverything()
+	{
+		testInsertAfter();
+	}
 }

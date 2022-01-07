@@ -137,6 +137,12 @@ namespace nui {
 		std::array<uint32_t, 2> size;
 
 		Color color;
+
+		void offsetPosition(std::array<int32_t, 2> offset)
+		{
+			this->pos[0] += offset[0];
+			this->pos[1] += offset[1];
+		}
 	};
 
 	struct ArrowInstance {
@@ -178,6 +184,18 @@ namespace nui {
 				character.pos[1] += offset[1];
 			}
 		}
+	};
+
+	struct PositionedCharacters {
+		// Size of the container required to fit all characters
+		uint32_t width;
+		uint32_t height;
+
+		// Font with size metrics
+		FontSize* font_size;
+
+		// Positioned Characters
+		std::vector<PositionedCharacter>* chars;
 	};
 
 	struct CircleInstance {
@@ -301,15 +319,35 @@ namespace nui {
 		float getInsideDuration();
 	};
 
+
 	// Text Input Component ///////////////////////////////////////////////////
 
 	class TextInputComponent {
 	public:
+		struct CreateInfo {
+			// Text
+			std::string font_family = "Roboto";
+			std::string font_style = "Regular";
+			uint32_t font_size = 14;
+			uint32_t line_height = 0xFFFF'FFFF;
+			Color text_color = Color::white();
+
+			// Selection
+			Color selection_background_color = Color::blue();
+			Color selection_text_color = Color::white();
+
+			// Cursor
+			Color cursor_color = Color::blue();
+			uint32_t cursor_thickness = 2;
+		};
+		CreateInfo info;
+
 		Window* _window = nullptr;
 
 		utf8string display_text;
 
-		// Cursor
+		// Cursor is after specified character ex: bar| = the | is at 'r' at index 2
+		// cursor starts before() and goes to last()
 		utf8string_iter cursor_pos;
 
 		// Selection
@@ -319,9 +357,11 @@ namespace nui {
 		uint32_t selection_length;
 
 		// Box2D box;
-		TextInstance instance;
-		// RectInstance highlight;
-		// RectInstance cursor;
+		TextInstance text_instance;
+		// RectInstance select_instance;
+		RectInstance cursor_instance;
+	public:
+		void _reset();
 
 	public:
 		void init(Window* _window);
@@ -332,15 +372,20 @@ namespace nui {
 		void set(utf8string& new_text);
 
 		// Selection
-		void resetSelection();
+		void deselect();
+
+		// Cursor
 		void setCursorAtEnd();
+
+		// Position
+		void offsetPosition(std::array<int32_t, 2> offset);
+
+
+		/* The Stages of usage */
 
 		void respondToInput();
 		
-		void calcSize(GlyphProperties& glyph_props, Color& text_color,
-			uint32_t& r_width, uint32_t& r_height);
-
-		void offsetPosition(std::array<int32_t, 2> offset);
+		void generateGPU_Data(uint32_t& r_width, uint32_t& r_height);
 
 		void draw();
 	};
@@ -716,6 +761,8 @@ namespace nui {
 
 				// Input
 				uint32_t movement_threshold = 10;
+				//Color input_selection_color = Color::blue();
+				//uint32_t input_cursor_thickness = 2;
 			};
 			Value value;
 
@@ -1506,6 +1553,8 @@ namespace nui {
 		// What is the size of each character
 		// Where it should be placed
 		// How large the container should be to contain the text
+
+		// deprecated
 		void findAndPositionGlyphs(
 			std::string& text,
 			GlyphProperties& props,
@@ -1517,7 +1566,13 @@ namespace nui {
 			GlyphProperties& props,
 			uint32_t& r_width, uint32_t& r_height,
 			std::vector<PositionedCharacter>& r_chars);
+
+		void findAndPositionGlyphs(
+			utf8string& text,
+			GlyphProperties& props,
+			PositionedCharacters& result);
 		
+		// deprecated
 		void findAndPositionGlyphs(TextProps& props,
 			int32_t start_pos_x, int32_t start_pos_y,
 			uint32_t& r_width, uint32_t& r_height,

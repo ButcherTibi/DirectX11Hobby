@@ -12,6 +12,7 @@
 #include "GPU_ShaderTypes.hpp"
 #include "Properties.hpp"
 #include "utf_string.hpp"
+#include "CharacterAtlas.hpp"
 
 module UserInterface;
 
@@ -20,6 +21,8 @@ using namespace nui;
 
 void Instance::create()
 {
+	// _utf8string_tests::testEverything();
+
 	hinstance = GetModuleHandle(NULL);
 	arrow_hcursor = LoadCursor(NULL, IDC_ARROW);
 
@@ -381,6 +384,75 @@ void Instance::findAndPositionGlyphs(
 }
 
 
+void Instance::findAndPositionGlyphs(utf8string& text, GlyphProperties& props,
+	PositionedCharacters& r)
+{
+	FontSize* font_size;
+	text_renderer.char_atlas.ensureFontWithSize(*props.font_family, *props.font_style, props.font_size, font_size);
+	r.font_size = font_size;
+
+	// Optimization
+	if (text.length() == 0) {
+		r.width = 0;
+		r.height = font_size->line_spacing;
+		r.font_size = font_size;
+		r.chars->clear();
+		return;
+	}
+
+	r.chars->resize(text.length());
+
+	// if line height is unspecified use default from font file
+	uint32_t line_height;
+	if (props.line_height == 0xFFFF'FFFF) {
+		line_height = font_size->ascender;
+	}
+	else {
+		line_height = props.line_height;
+	}
+
+	r.width = 0;
+
+	glm::ivec2 pen = { props.offset_x, props.offset_y };
+	pen.y += line_height;
+
+	uint32_t char_index = 0;
+
+	for (utf8string_iter iter = text.begin(); !iter.isAtNull(); iter.next()) {
+
+		uint32_t code_point = iter.codePoint();
+
+		switch (code_point) {
+		// New Line
+		case 0x000A: {
+			pen.x = 0;  // Carriage Return
+			pen.y += line_height;  // Line Feed
+			break;
+		}
+
+		default: {
+			Character* chara = font_size->findCharacter(code_point);
+			(*r.chars)[char_index].pos = { pen.x, pen.y };
+			(*r.chars)[char_index].chara = chara;
+
+			// Move the writing pen to the next character
+			pen.x += chara->advance_X;
+
+			uint32_t new_width = pen.x - props.offset_x;
+
+			if (new_width > r.width) {
+				r.width = new_width;
+			}
+		}
+		}
+
+		char_index++;
+	}
+
+	r.height = (pen.y + font_size->descender) - props.offset_y;
+}
+
+
 void Instance::findAndPositionGlyphs(
 	utf8string& text,
 	GlyphProperties& props,
@@ -414,7 +486,7 @@ void Instance::findAndPositionGlyphs(
 
 	for (utf8string_iter iter = text.begin(); !iter.isAtNull(); iter.next()) {
 
-		uint32_t code_point = iter.getCodePoint();
+		uint32_t code_point = iter.codePoint();
 
 		switch (code_point) {
 			// New Line

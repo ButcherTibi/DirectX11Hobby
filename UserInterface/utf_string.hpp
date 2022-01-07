@@ -7,6 +7,14 @@
 
 // Forward
 class utf8string;
+class utf8string_iter;
+
+
+// NOTE:
+// Upon analizing the memory cost of rendering a single character on the GPU
+// The idea of using UTF-8 to save memory of rendered characters is absolutely
+// hilarious and absurd (pretty easy to make a utf-8 string type)
+// it takes around 120 bytes of memory of CPU and GPU to render a single character
 
 
 /* Low level Utilities */
@@ -34,30 +42,36 @@ void encodeUTF8_CodePoint(uint32_t code_point,
 void encodeUTF8_CodePoint(uint32_t code_point,
 	uint8_t& byte_0, uint8_t& byte_1, uint8_t& byte_2, uint8_t& byte_3);
 
+// get the number of bytes between iterators
+uint32_t byteCount(utf8string_iter& begin, utf8string_iter& end);
 
-// Upon analizing the memory cost of rendering a single character on the GPU
-// The idea of using UTF-8 to save memory of rendered characters is absolutely
-// hilarious and absurd (pretty easy to make a utf-8 string type)
-// it takes around 120 bytes of memory of CPU and GPU to render a single character
+
 class utf8string_iter {
 public:
 	utf8string* parent = nullptr;
 	int32_t byte_index;
 
 public:
-	// void invalidate();
-	// bool isValid();
-
-	void prev();
+	// Iteration
+	void prev(uint32_t count = 1);
 	void next(uint32_t count = 1);
 
-	uint32_t getCodePoint();
+	// calculate at which caracter does this point to
+	int32_t characterIndex();
+
+	// retrieve/decode unicode code point
+	uint32_t codePoint();
+
+	// get character as utf8string
 	utf8string get();
+
+	// get pointer to bytes in utf8string parent
 	uint8_t* data();
 
 	bool isBeforeBegin();
 	bool isAtNull();
 
+	// swap the contents of this iterator with other
 	void swap(utf8string_iter& other);
 };
 
@@ -65,6 +79,7 @@ bool operator==(utf8string_iter a, utf8string_iter b);
 bool operator!=(utf8string_iter a, utf8string_iter b);
 bool operator<(utf8string_iter a, utf8string_iter b);
 bool operator>(utf8string_iter a, utf8string_iter b);
+bool operator<=(utf8string_iter a, utf8string_iter b);
 bool operator>=(utf8string_iter a, utf8string_iter b);
 
 bool operator==(utf8string_iter a, const char8_t* utf8_string_literal);
@@ -79,27 +94,40 @@ public:
 	utf8string(const char8_t* utf8_string_literal);
 	utf8string(std::string& string);
 
-	// return the number of code points (excludes \0)
+	/* Queries */
+
+	// return the number of code points (excludes \\0)
 	uint32_t length();
+
+	// faster than calling length and checking for 0
+	bool isEmpty();
 
 
 	/* Iterators */
 
-	// return iterator with byte index of -1
-	utf8string_iter beforeBegin();
+	// return iterator with byte index of -1 before begin iter
+	utf8string_iter before();
 
 	// return iterator with byte index of 0
 	utf8string_iter begin();
+
+	// return iterator to last character
+	utf8string_iter last();
 	
-	// return iterator with byte index of the last character which is \0
-	utf8string_iter end();
+	// return iterator with byte index of the last character which is \\0
+	utf8string_iter after();
 
 
 	/* Insert */
 
 	void push(uint32_t code_point);
 
-	// writes characters from new_content to location
+	void insertAfter(utf8string_iter& location, utf8string& new_content);
+
+	void insertAfter(utf8string_iter& location,
+		utf8string_iter& new_content_start, utf8string_iter& new_content_end);
+
+	// overwrites characters from new_content to location
 	void overwrite(utf8string_iter& location, utf8string& new_content);
 
 	void overwrite(utf8string_iter& location,
@@ -116,7 +144,14 @@ public:
 
 
 	/* Delete */
-	// void erase(uint32_t start, uint32_t count);
+
+	// delete a number of characters from the end
+	// void pop();
+	
+	// erase starting at location
+	void erase(utf8string_iter& selection_start, uint32_t selection_length);
+
+	void erase(utf8string_iter& selection_start, utf8string_iter& selection_end);
 
 
 	/* Output */
@@ -130,13 +165,15 @@ public:
 
 	// returns a C style null terminated string
 	const char* c_str();
-
-	// std::wstring w_str();
 };
 
 bool operator==(utf8string& a, const char8_t* utf8_string_literal);
 bool operator!=(utf8string& a, const char8_t* utf8_string_literal);
 
 
-// UTF-32 String Helpers
+namespace _utf8string_tests {
 
+	void testInsertAfter();
+
+	void testEverything();
+}

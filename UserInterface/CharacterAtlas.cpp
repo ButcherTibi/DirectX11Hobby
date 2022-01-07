@@ -1,4 +1,4 @@
-
+﻿
 // Header
 #include "CharacterAtlas.hpp"
 
@@ -14,6 +14,13 @@ Character* FontSize::findCharacter(uint32_t unicode)
 {
 	for (Character& chara : chars) {
 		if (chara.unicode == unicode) {
+			return &chara;
+		}
+	}
+
+	// Unknown character ����������
+	for (Character& chara : chars) {
+		if (chara.unicode == 0xFFFD) {
 			return &chara;
 		}
 	}

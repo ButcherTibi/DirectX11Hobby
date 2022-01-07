@@ -7,6 +7,7 @@ module;
 #include <chrono>
 
 // Mine
+#include "ErrorStack.hpp"
 #include "Input.hpp"
 #include "Properties.hpp"
 #include "utf_string.hpp"
@@ -459,8 +460,16 @@ void TextInputComponent::init(Window* _window)
 {
 	this->_window = _window;
 	
-	cursor_pos = display_text.end();
-	selection_start = display_text.end();
+	cursor_pos = display_text.after();
+	selection_start = display_text.after();
+	selection_length = 0;
+}
+
+void TextInputComponent::_reset()
+{
+	cursor_pos = display_text.last();
+
+	selection_start = display_text.begin();
 	selection_length = 0;
 }
 
@@ -470,6 +479,8 @@ void TextInputComponent::set(int32_t value)
 	number_str = std::to_string(value);
 
 	display_text = number_str;
+
+	_reset();
 }
 
 void TextInputComponent::set(float value, uint32_t decimal_count)
@@ -485,81 +496,35 @@ void TextInputComponent::set(float value, uint32_t decimal_count)
 	}
 
 	display_text = number_str;
+
+	_reset();
 }
 
 void TextInputComponent::set(utf8string& new_text)
 {
 	display_text = new_text;
+
+	_reset();
 }
 
-void TextInputComponent::resetSelection()
+void TextInputComponent::deselect()
 {
+	selection_start = display_text.begin();
 	selection_length = 0;
 }
 
 void TextInputComponent::setCursorAtEnd()
 {
-	cursor_pos = display_text.end();
+	cursor_pos = display_text.last();
 }
 
 void TextInputComponent::respondToInput()
 {
 	Input& input = _window->input;
 
-	// Selection
-	{
-		// Start
-		if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+	if (display_text.isEmpty()) {
 
-			mouse_x_start = input.mouse_x;
-			mouse_x_end = mouse_x_start;
-			resetSelection();
-		}
-		// End
-		else if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
-			mouse_x_end = input.mouse_x;
-		}
-
-		int32_t start_x = mouse_x_start;
-		int32_t end_x = mouse_x_end;
-
-		if (mouse_x_start > mouse_x_end) {
-			start_x = mouse_x_end;
-			end_x = mouse_x_start;
-		}
-
-		utf8string_iter iter = display_text.begin();
-		selection_start = display_text.end();
-		selection_length = 0;
-
-		for (uint32_t i = 0; i < instance.chars.size(); i++) {
-
-			PositionedCharacter& character = instance.chars[i];
-			int32_t character_middle = character.pos[0] + (character.chara->advance_X / 2);
-
-			if (start_x < character_middle && character_middle < end_x) {
-
-				if (selection_start.isAtNull()) {
-					selection_start = iter;
-					selection_length = 1;
-				}
-				else {
-					selection_length += 1;
-				}
-			}
-
-			iter.next();
-		}
-
-		//printf("select start = %d length = %d \n", select_start.byte_index, select_length);
-
-		if (selection_length) {
-			printf("selection %s \n", display_text.extract(selection_start, selection_length).c_str());
-		}
-	}
-
-	// Add
-	{
+		// Add Only
 		if (input.unicode_list.size() > 0) {
 
 			utf8string new_content;
@@ -570,53 +535,261 @@ void TextInputComponent::respondToInput()
 				}
 			}
 
-			printf("input = %s \n", new_content.c_str());
+			display_text.insertAfter(cursor_pos, new_content);
+			cursor_pos.next(new_content.length());
 
+			deselect();
+		}
+	}
+	else {
+
+		// Selection And Cursor
+		{
+			// Start
+			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].down_transition) {
+
+				mouse_x_start = input.mouse_x;
+				mouse_x_end = mouse_x_start;
+			}
+
+			// End
+			if (input.key_list[VirtualKeys::LEFT_MOUSE_BUTTON].is_down) {
+
+				mouse_x_end = input.mouse_x;
+
+				// Selection
+				{
+					int32_t start_x = mouse_x_start;
+					int32_t end_x = mouse_x_end;
+
+					if (mouse_x_start > mouse_x_end) {
+						start_x = mouse_x_end;
+						end_x = mouse_x_start;
+					}
+
+					utf8string_iter iter = display_text.begin();
+					selection_start = display_text.after();
+					selection_length = 0;
+
+					for (uint32_t i = 0; i < text_instance.chars.size(); i++) {
+
+						PositionedCharacter& character = text_instance.chars[i];
+						int32_t character_middle = character.pos[0] + (character.chara->advance_X / 2);
+
+						if (start_x < character_middle && character_middle < end_x) {
+
+							if (selection_start.isAtNull()) {
+								selection_start = iter;
+								selection_length = 1;
+							}
+							else {
+								selection_length += 1;
+							}
+						}
+
+						iter.next();
+					}
+				}
+
+				// Cursor
+				{
+					PositionedCharacter& first_char = text_instance.chars[0];
+					PositionedCharacter& last_char = text_instance.chars.back();
+
+					if (input.mouse_x < first_char.pos[0]) {
+						cursor_pos = display_text.before();
+					}
+					else if (input.mouse_x > last_char.pos[0] + last_char.chara->advance_X) {
+						cursor_pos = display_text.last();
+					}
+					else {
+						utf8string_iter iter = display_text.begin();
+
+						for (uint32_t i = 0; i < text_instance.chars.size(); i++) {
+
+							PositionedCharacter& character = text_instance.chars[i];
+							int32_t char_start = character.pos[0];
+							int32_t char_mid = character.pos[0] + (character.chara->advance_X / 2);
+							int32_t char_end = character.pos[0] + character.chara->advance_X;
+
+							// if the mouse is to the left of the character
+							if (char_start < input.mouse_x && input.mouse_x < char_mid) {
+
+								iter.prev();
+								cursor_pos = iter;
+								break;
+							}
+							else if (char_mid < input.mouse_x && input.mouse_x < char_end) {
+								cursor_pos = iter;
+								break;
+							}
+
+							iter.next();
+						}
+					}
+				}
+			}
+		}
+
+		// Move Cursor
+		{
+
+		}
+
+		// Add/Replace
+		if (input.unicode_list.size() > 0) {
+
+			utf8string new_content;
+
+			for (CharacterKeyState& key : input.unicode_list) {
+				if (key.down_transition) {
+					new_content.push(key.code_point);
+				}
+			}
+
+			// Replace Selection
 			if (selection_length > 0) {
 
 				display_text.replaceSelection(selection_start, selection_length, new_content);
+				cursor_pos = selection_start;
+				cursor_pos.next(new_content.length() - 1);
+				deselect();
 			}
+			// Add at cursor
 			else {
+				display_text.insertAfter(cursor_pos, new_content);
+				cursor_pos.next(new_content.length());
+			}
+		}
+		// Delete
+		else {
 
+			// Delete Selection
+			if (selection_length > 0) {
+
+				if (input.isDownTransition(VirtualKeys::BACKSPACE) ||
+					input.isDownTransition(VirtualKeys::DELETE))
+				{
+					display_text.erase(selection_start, selection_length);
+
+					cursor_pos = selection_start;
+					cursor_pos.prev();
+					deselect();
+				}
+			}
+			// Delete at cursor
+			else {
+				if (input.isDownTransition(VirtualKeys::BACKSPACE)) {
+
+					if (cursor_pos > display_text.before()) {
+						display_text.erase(cursor_pos, 1);
+						cursor_pos.prev();
+					}
+				}
+				else if (input.isDownTransition(VirtualKeys::DELETE)) {
+
+					if (cursor_pos < display_text.last()) {
+
+						utf8string_iter target = cursor_pos;
+						target.next();
+						display_text.erase(target, 1);
+					}
+				}
 			}
 		}
 	}
-
-	// Delete
-	/*if (input.key_list[VirtualKeys::BACKSPACE].down_transition) {
-		
-		if (select_end - select_start > 0) {
-			display_text.erase(select_start, select_end - select_start);
-		}
-		else if (cursor_pos > 0) {
-			display_text.erase(cursor_pos, 1);
-		}
-	}*/
 }
 
-void TextInputComponent::calcSize(GlyphProperties& glyph_props, Color& text_color,
-	uint32_t& r_width, uint32_t& r_height)
+void TextInputComponent::generateGPU_Data(uint32_t& r_width, uint32_t& r_height)
 {
 	Instance* inst = _window->instance;
 
-	inst->findAndPositionGlyphs(display_text, glyph_props,
-		r_width, r_height, instance.chars);
+	// Text
+	PositionedCharacters chars_pos;
+	chars_pos.chars = &text_instance.chars;
+	{
+		GlyphProperties props;
+		props.font_family = &info.font_family;
+		props.font_style = &info.font_style;
+		props.font_size = info.font_size;
+		props.line_height = info.line_height;
 
-	instance.color = text_color;
+		inst->findAndPositionGlyphs(display_text, props, chars_pos);
+
+		text_instance.color = info.text_color;
+	}
+	
+	// Selection
+	if (selection_length > 0) {
+		
+		int32_t character_index = selection_start.characterIndex();
+		PositionedCharacter& start = text_instance.chars[character_index];
+		PositionedCharacter& end = text_instance.chars[character_index + selection_length];
+	}
+
+	// Cursor
+	{
+		if (display_text.isEmpty()) {
+			cursor_instance.pos[0] = 0;
+		}
+		else {
+			int32_t character_index = cursor_pos.characterIndex();
+
+			if (character_index == -1) {
+				PositionedCharacter& character = text_instance.chars[0];
+				cursor_instance.pos[0] = character.pos[0];
+			}
+			else {
+				PositionedCharacter& character = text_instance.chars[character_index];
+				cursor_instance.pos[0] = character.pos[0] + character.chara->advance_X;
+			}
+		}
+
+		cursor_instance.pos[1] = 0;
+
+		cursor_instance.size[0] = info.cursor_thickness;
+		cursor_instance.size[1] = chars_pos.font_size->line_spacing;
+
+		cursor_instance.color = info.cursor_color;
+	}
+
+	r_width = chars_pos.width;
+	r_height = chars_pos.height;
 }
 
 void TextInputComponent::offsetPosition(std::array<int32_t, 2> offset)
 {
-	instance.offsetPosition(offset);
+	text_instance.offsetPosition(offset);
+	cursor_instance.offsetPosition(offset);
 }
 
 void TextInputComponent::draw()
 {
 	Instance* inst = _window->instance;
 
-	std::vector<TextInstance*> instances = {
-		&instance
-	};
+	if (display_text.isEmpty()) {
 
-	inst->drawTexts(_window, instances);
+		// Only draw the cursor
+		inst->drawRect(_window, &cursor_instance);
+	}
+	else {
+		// Selection
+		{
+
+		}
+
+		// Text
+		{
+			std::vector<TextInstance*> instances = {
+				&text_instance
+			};
+
+			inst->drawTexts(_window, instances);
+		}
+
+		// Cursor
+		{
+			inst->drawRect(_window, &cursor_instance);
+		}
+	}
 }
