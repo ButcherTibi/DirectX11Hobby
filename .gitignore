@@ -1,12 +1,19 @@
-# Solution
-.vs
-
-# Sculpt
-Sculpt/x64
-
-# Library
+# Folders
+.vs/
 UserInterface/x64
 Sculpt/x64
 
-# Program Debug Database
+# Build Intermediary
+*.recipe
+*.CppClean.log
+*.tlog
+
+# Intermediary
+*.obj
 *.pdb
+*.idb
+*.ilk
+
+# Output
+*.out
+*.cso
