@@ -46,8 +46,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(WindowsSdkDir)Include\$(TargetPlatformVersion)\um\;$(ProjectDir)ThirdParty\glm;$(ProjectDir)ThirdParty\RenderDoc;$(SolutionDir)UserInterface\</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <DisableSpecificWarnings>4201;4239;4267;4701;4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
@@ -55,13 +54,13 @@
       <ForcedIncludeFiles>SculptPCH.hpp;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalModuleDependencies>$(SolutionDir)Output\UserInterface\x64\Debug\UserInterface.ixx.ifc;%(AdditionalModuleDependencies)</AdditionalModuleDependencies>
-      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>kernel32.lib;user32.lib;UserInterface.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)Output\UserInterface\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;UserInterface.lib;dxgi.lib;dxguid.lib;D3d11.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)Output\UserInterface\x64\Debug;$(WindowsSdkDir)Lib\$(TargetPlatformVersion)\um\$(Platform)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>XCOPY </Command>
@@ -111,108 +110,114 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AABBs.cpp" />
-    <ClCompile Include="Brushes.cpp" />
-    <ClCompile Include="IntersectionQueries.cpp" />
-    <ClCompile Include="Application.cpp" />
+    <ClCompile Include="SculptMesh\AABBs.cpp" />
+    <ClCompile Include="App\AppLoop.cpp" />
+    <ClCompile Include="SculptMesh\Brushes.cpp" />
+    <ClCompile Include="Camera\Camera.cpp" />
+    <ClCompile Include="SculptMesh\IntersectionQueries.cpp" />
+    <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="Base64.cpp" />
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="GLTF_File.cpp" />
     <ClCompile Include="GPU_ShaderTypesMesh.cpp" />
     <ClCompile Include="JSON_File.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshDebug.cpp" />
-    <ClCompile Include="MeshUpdates.cpp" />
+    <ClCompile Include="SculptMesh\MeshDebug.cpp" />
+    <ClCompile Include="SculptMesh\MeshUpdates.cpp" />
     <ClCompile Include="RenderDocIntegration.cpp" />
-    <ClCompile Include="Renderer.cpp" />
-    <ClCompile Include="MeshCreation.cpp" />
+    <ClCompile Include="Renderer\Renderer.cpp" />
+    <ClCompile Include="SculptMesh\MeshCreation.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="SculptPCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="Primitives.cpp" />
-    <ClCompile Include="UserInteraction.cpp" />
+    <ClCompile Include="SculptMesh\Primitives.cpp" />
+    <ClCompile Include="App\UserInteraction.cpp" />
+    <ClCompile Include="Window\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Application.hpp" />
+    <ClInclude Include="App\Application.hpp" />
+    <ClInclude Include="Camera\Camera.hpp" />
+    <ClInclude Include="CommonTypes.hpp" />
     <ClInclude Include="Geometry.hpp" />
     <ClInclude Include="GLTF_File.hpp" />
     <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
+    <ClInclude Include="Input.hpp" />
     <ClInclude Include="JSON_File.hpp" />
-    <ClInclude Include="SparseVector.hpp" />
     <ClInclude Include="RenderDocIntegration.hpp" />
-    <ClInclude Include="Renderer.hpp" />
-    <ClInclude Include="SculptMesh.hpp" />
+    <ClInclude Include="Renderer\Renderer.hpp" />
+    <ClInclude Include="SculptMesh\SculptMesh.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="SculptPCH.hpp" />
+    <ClInclude Include="Window\Window.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="AABB_PS.hlsl">
+    <FxCompile Include="Shaders\AABB_PS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="BrushCirclePS.hlsl">
+    <FxCompile Include="Shaders\BrushCirclePS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="DebugPS.hlsl">
+    <FxCompile Include="Shaders\DebugPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="DistributeAABB_VertsCS.hlsl">
+    <FxCompile Include="Shaders\DistributeAABB_VertsCS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="MeshDepthOnlyPS.hlsl">
+    <FxCompile Include="Shaders\MeshDepthOnlyPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="MeshGS.hlsl">
+    <FxCompile Include="Shaders\MeshGS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="MeshPS.hlsl">
+    <FxCompile Include="Shaders\MeshPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="MeshVS.hlsl">
+    <FxCompile Include="Shaders\MeshVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="SeeThruWirePS.hlsl">
+    <FxCompile Include="Shaders\SeeThruWirePS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="UpdateTesselationTriangles.hlsl">
+    <FxCompile Include="Shaders\UpdateTesselationTriangles.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="UpdateVertexNormalsCS.hlsl">
+    <FxCompile Include="Shaders\UpdateVertexNormalsCS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="UpdateVertexPositionsCS.hlsl">
+    <FxCompile Include="Shaders\UpdateVertexPositionsCS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="WirePS.hlsl">
+    <FxCompile Include="Shaders\WirePS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MeshPixelIn.hlsli" />
+    <None Include="Shaders\MeshPixelIn.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CommentGraphics.txt" />

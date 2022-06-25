@@ -73,7 +73,7 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Renderer.cpp">
+    <ClCompile Include="Renderer\Renderer.cpp">
       <Filter>Source Files\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="JSON_File.cpp">
@@ -88,16 +88,16 @@
     <ClCompile Include="Geometry.cpp">
       <Filter>Source Files\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="Primitives.cpp">
+    <ClCompile Include="SculptMesh\Primitives.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
     <ClCompile Include="GPU_ShaderTypesMesh.cpp">
       <Filter>Source Files\Shaders</Filter>
     </ClCompile>
-    <ClCompile Include="MeshCreation.cpp">
+    <ClCompile Include="SculptMesh\MeshCreation.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="IntersectionQueries.cpp">
+    <ClCompile Include="SculptMesh\IntersectionQueries.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
     <ClCompile Include="SculptPCH.cpp">
@@ -106,33 +106,42 @@
     <ClCompile Include="RenderDocIntegration.cpp">
       <Filter>Source Files\Tooling</Filter>
     </ClCompile>
-    <ClCompile Include="AABBs.cpp">
+    <ClCompile Include="SculptMesh\AABBs.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="MeshUpdates.cpp">
+    <ClCompile Include="SculptMesh\MeshUpdates.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="MeshDebug.cpp">
+    <ClCompile Include="SculptMesh\MeshDebug.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
-    <ClCompile Include="Application.cpp">
+    <ClCompile Include="App\Application.cpp">
       <Filter>Source Files\Application</Filter>
     </ClCompile>
-    <ClCompile Include="UserInteraction.cpp">
+    <ClCompile Include="App\UserInteraction.cpp">
       <Filter>Source Files\Application</Filter>
     </ClCompile>
-    <ClCompile Include="Brushes.cpp">
+    <ClCompile Include="SculptMesh\Brushes.cpp">
       <Filter>Source Files\SculptMesh</Filter>
+    </ClCompile>
+    <ClCompile Include="App\AppLoop.cpp">
+      <Filter>Source Files\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="Window\Window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera\Camera.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
       <Filter>Source Files\ThirdParty\stb_image</Filter>
     </ClInclude>
-    <ClInclude Include="Renderer.hpp">
+    <ClInclude Include="Renderer\Renderer.hpp">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="SculptMesh.hpp">
+    <ClInclude Include="SculptMesh\SculptMesh.hpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClInclude>
     <ClInclude Include="JSON_File.hpp">
@@ -153,56 +162,57 @@
     <ClInclude Include="RenderDocIntegration.hpp">
       <Filter>Source Files\Tooling</Filter>
     </ClInclude>
-    <ClInclude Include="SparseVector.hpp">
-      <Filter>Source Files\CustomContainers</Filter>
-    </ClInclude>
-    <ClInclude Include="Application.hpp">
+    <ClInclude Include="App\Application.hpp">
       <Filter>Source Files\Application</Filter>
     </ClInclude>
+    <ClInclude Include="Window\Window.hpp" />
+    <ClInclude Include="Camera\Camera.hpp" />
+    <ClInclude Include="CommonTypes.hpp" />
+    <ClInclude Include="Input.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="MeshVS.hlsl">
+    <FxCompile Include="Shaders\MeshVS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
-    <FxCompile Include="MeshPS.hlsl">
+    <FxCompile Include="Shaders\MeshPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
-    <FxCompile Include="WirePS.hlsl">
+    <FxCompile Include="Shaders\WirePS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
-    <FxCompile Include="MeshGS.hlsl">
+    <FxCompile Include="Shaders\MeshGS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
-    <FxCompile Include="SeeThruWirePS.hlsl">
+    <FxCompile Include="Shaders\SeeThruWirePS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
-    <FxCompile Include="MeshDepthOnlyPS.hlsl">
+    <FxCompile Include="Shaders\MeshDepthOnlyPS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
-    <FxCompile Include="DebugPS.hlsl">
+    <FxCompile Include="Shaders\DebugPS.hlsl">
       <Filter>Source Files\Shaders\Debug</Filter>
     </FxCompile>
-    <FxCompile Include="AABB_PS.hlsl">
+    <FxCompile Include="Shaders\AABB_PS.hlsl">
       <Filter>Source Files\Shaders\AABBs</Filter>
     </FxCompile>
-    <FxCompile Include="DistributeAABB_VertsCS.hlsl">
+    <FxCompile Include="Shaders\DistributeAABB_VertsCS.hlsl">
       <Filter>Source Files\Shaders\Compute</Filter>
     </FxCompile>
-    <FxCompile Include="UpdateVertexPositionsCS.hlsl">
+    <FxCompile Include="Shaders\UpdateVertexPositionsCS.hlsl">
       <Filter>Source Files\Shaders\Compute</Filter>
     </FxCompile>
-    <FxCompile Include="UpdateTesselationTriangles.hlsl">
+    <FxCompile Include="Shaders\UpdateTesselationTriangles.hlsl">
       <Filter>Source Files\Shaders\Compute</Filter>
     </FxCompile>
-    <FxCompile Include="UpdateVertexNormalsCS.hlsl">
+    <FxCompile Include="Shaders\UpdateVertexNormalsCS.hlsl">
       <Filter>Source Files\Shaders\Compute</Filter>
     </FxCompile>
-    <FxCompile Include="BrushCirclePS.hlsl">
+    <FxCompile Include="Shaders\BrushCirclePS.hlsl">
       <Filter>Source Files\Shaders\UI</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MeshPixelIn.hlsli">
+    <None Include="Shaders\MeshPixelIn.hlsli">
       <Filter>Source Files\Shaders\Headers</Filter>
     </None>
   </ItemGroup>

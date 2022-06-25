@@ -1,7 +1,4 @@
-
-#include "RenderDocIntegration.hpp"
-import UserInterface;
-#include "Application.hpp"
+#include <App/Application.hpp>
 
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -21,29 +18,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 #endif
 
-	// GPU Debugging using Render Doc
-#if _DEBUG
-	render_doc.init();
-#endif
-
-	// Init User Interface Library
-	{
-		nui::Instance& instance = application.ui_instance;
-		instance.create();
-
-		// Create Window
-		nui::Window* window;
-		{
-			nui::Window::CreateInfo info;
-			info.width = 1027;
-			info.height = 720;
-
-			application.main_window = instance.createWindow(info);
-			window = application.main_window;
-		}
-	}
-
-	application.mainLoop();
+	app.init(true);
 
 	return 0;
 }
