@@ -2,9 +2,6 @@
 
 #include <Renderer/Renderer.hpp>
 
-// Debug
-#include "RenderDocIntegration.hpp"
-
 
 using namespace scme;
 

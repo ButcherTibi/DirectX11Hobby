@@ -130,7 +130,6 @@ if %ERRORLEVEL% == 1 (
     <ClInclude Include="ErrorStack.hpp" />
     <ClInclude Include="FilePath.hpp" />
     <ClInclude Include="TimeStuff.hpp" />
-    <ClInclude Include="utf8.h" />
     <ClInclude Include="utf_string.hpp" />
   </ItemGroup>
   <ItemGroup>

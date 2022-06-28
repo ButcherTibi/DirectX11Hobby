@@ -492,7 +492,7 @@ void dx11::Texture::readPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g)
 	g = rg[1];
 }
 
-void dx11::Texture::readPixel(uint32_t x, uint32_t y, std::array<uint32_t, 4>& rgba)
+void dx11::Texture::readPixel(uint32_t x, uint32_t y, std::array<float, 4>& rgba)
 {
 	if (mapped.pData == nullptr) {
 		throwDX11(ctx3->Map(tex.Get(), 0, D3D11_MAP_READ, 0, &mapped));

@@ -10,7 +10,7 @@
 #include "glm\vec3.hpp"
 
 // DirectX 11
-#include "DX11Wrapper.hpp"
+#include <DirectX 11/DX11Wrapper.hpp>
 
 #include "ErrorStack.hpp"
 #include "Geometry.hpp"
@@ -97,35 +97,60 @@ struct BrushStep {
 
 namespace scme {
 
+	typedef uint32_t VertexIndex;
+	typedef uint32_t EdgeIndex;
+	typedef uint32_t PolyIndex;
+	typedef uint32_t InstanceIndex;
+
+
 	enum class ModifiedVertexState {
 		UPDATE,
 		DELETED
 	};
 
 	struct ModifiedVertex {
-		uint32_t idx;  // vertex that is changed and must be updated on the GPU
+		/// <summary>
+		/// Vertex that is changed and must be updated on the GPU
+		/// </summary>
+		uint32_t idx;
+
 		ModifiedVertexState state;
 	};
 
-
-	// edge == 0xFFFF'FFFF, vertex is a point, not connected to anything
-	// aabb == 0xFFFF'FFFF, vertex does not belong to any AABB
 	struct Vertex {
 	public:
+		/// <summary>
+		/// Position in mesh local space
+		/// </summary>
 		glm::vec3 pos;
+
+		/// <summary>
+		/// Vertex normal computed from connected polys
+		/// </summary>
 		glm::vec3 normal;
 
-		uint32_t edge;  // any edge attached to vertex
+		/// <summary>
+		/// Any edge connected to the vertex
+		/// </summary>
+		/// <remarks>
+		/// If 0xFFFF'FFFF then no edge is connected and is point
+		/// </remarks>
+		uint32_t edge;
 
+		// aabb == 0xFFFF'FFFF, vertex does not belong to any AABB
 		uint32_t aabb;  // to leaf AABB does this vertex belong
 		uint32_t idx_in_aabb;  // where to find vertex in parent AABB (makes AABB transfers faster)
 
 	public:
-		Vertex() {};
+		Vertex() {};  // suppress initialization
 
 		void init();
 
-		bool isPoint();  // is the vertex atached to anything
+		/// <summary>
+		/// Checks if the vertex is connected to anything
+		/// </summary>
+		/// <returns>True if the vertex is NOT connected</returns>
+		bool isPoint();
 	};
 
 
@@ -227,6 +252,25 @@ namespace scme {
 	};
 
 
+	//struct Instance {
+	//	MeshTransform transform;
+	//	PhysicalBasedMaterial pbr_material;
+	//	MeshWireframeColors wireframe_colors;
+	//};
+
+	//enum class ModifiedInstanceType {
+	//	UPDATE,
+	//	DELETED
+	//};
+
+	//// What instance was modified and what was modified
+	//struct ModifiedInstance {
+	//	uint32_t idx;
+
+	//	ModifiedInstanceType state;
+	//};
+
+
 	// History:
 	// Version 1 & 2: Naive implementation with vectors allocated per element
 	// Version 3: Edge list inspired allocation-less primitives with AABBs (top down only search)
@@ -243,26 +287,49 @@ namespace scme {
 		std::vector<GPU_MeshVertex> aabb_verts;
 		dx11::ArrayBuffer<GPU_MeshVertex> gpu_aabb_verts;
 
-		// New AABBs
-		//uint32_t root_aabb_size;  // the size of the root AABB that contains all other AABBs
-		//uint32_t aabbs_levels;  // the depth of the AABB graph
-
-		// Vertex
 		SparseVector<Vertex> verts;
-		std::vector<ModifiedVertex> modified_verts;
-		dx11::ArrayBuffer<GPU_MeshVertex> gpu_verts;
-
-		// Edge
 		SparseVector<Edge> edges;
-
-		// Poly
 		SparseVector<Poly> polys;
+
+		// Modification
+		std::vector<ModifiedVertex> modified_verts;
 		std::vector<ModifiedPoly> modified_polys;
+
+		// GPU Data
+		dx11::ArrayBuffer<GPU_MeshVertex> gpu_verts;
 		dx11::ArrayBuffer<uint32_t> gpu_indexes;
 		dx11::ArrayBuffer<GPU_MeshTriangle> gpu_triangles;
 
+		// Instances
+		/*SparseVector<Instance> instances;
+		std::vector<ModifiedInstance> modified_instances;
+		dx11::ArrayBuffer<GPU_MeshInstance> gpu_instances;*/
+
 		// Settings
 		uint32_t max_vertices_in_AABB;
+
+	private:
+		/* Internal Edge Operations ************************************/
+
+		/// <summary>
+		/// Always create edge between vertices
+		/// </summary>
+		uint32_t createEdge(VertexIndex v0, VertexIndex v1);
+
+		void initEdge(uint32_t blank_edge, uint32_t v0, uint32_t v1);
+
+
+		/* Internal Poly Operations *********************************** */
+
+		void initTris(uint32_t blank_tris, uint32_t v0, uint32_t v1, uint32_t v2);
+
+		void initQuad(uint32_t blank_quad, uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
+
+		/// <summary>
+		/// Think capping a cylinder
+		/// </summary>
+		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
+
 
 	public:
 		// mark vertex as deleted in both CPU and GPU memory
@@ -273,8 +340,6 @@ namespace scme {
 
 		// mark poly as deleted in both CPU and GPU memory
 		void _deletePolyMemory(uint32_t poly);
-
-		void printEdgeListOfVertex(uint32_t vertex_idx);
 
 	public:
 		void init();
@@ -292,9 +357,6 @@ namespace scme {
 
 		// Internal Data Structures for primitives //////////////////
 
-		// return 0xFFFF'FFFF if not found
-		uint32_t findEdgeBetween(uint32_t vertex_0, uint32_t vertex_1);
-
 		// appends to the edge list around the vertex
 		void registerEdgeToVertexList(uint32_t new_edge, uint32_t vertex);
 
@@ -307,25 +369,33 @@ namespace scme {
 		void unregisterPolyFromEdge(uint32_t delete_poly, uint32_t edge);
 
 
-		// Vertex ///////////////////////////////////////////////////
+		/* Vertex Operations **********************************************************/
 
-		// calculates vertex normal based on the average normals of the connected polygons
-		// only called when updating vertex gpu data
+		/// <summary>
+		/// Calculate vertex normal from polygon normals
+		/// </summary>
 		void calcVertexNormal(uint32_t vertex);
 
-		//
+		// addVertex
+
+		// moveVertex
+
 		void deleteVertex(uint32_t vertex);
 
+		void printEdgeListOfVertex(uint32_t vertex_idx);
 
-		// Edge ////////////////////////////////////////////////////
 
-		// create a edge between vertices
-		uint32_t createEdge(uint32_t v0, uint32_t v1);
+		/* Edge Operations **********************************************************/
 
-		void setEdge(uint32_t blank_edge, uint32_t v0, uint32_t v1);
-
-		// creates or returns existing edge between vertex 0 and vertex 1
+		/// <summary>
+		/// Creates or returns existing edge between vertices
+		/// </summary>
 		uint32_t addEdge(uint32_t v0, uint32_t v1);
+
+		/// <summary>
+		/// Return 0xFFFF'FFFF if not found
+		/// </summary>
+		uint32_t findEdgeBetween(uint32_t vertex_0, uint32_t vertex_1);
 
 
 		// Poly ////////////////////////////////////////////////////
@@ -334,24 +404,15 @@ namespace scme {
 		// only called when updating poly gpu data
 		glm::vec3 calcWindingNormal(Vertex* v0, Vertex* v1, Vertex* v2);
 
-		void calcPolyNormal(Poly* poly);	
+		void calcPolyNormal(Poly* poly);
 
 		// creates a new triangle from existing vertices, creates new edges between the vertices 
 		// if they are not already present
 		uint32_t addTris(uint32_t v0, uint32_t v1, uint32_t v2);
 
-		// like addTris but doesn't create a new polygon
-		void setTris(uint32_t blank_tris, uint32_t v0, uint32_t v1, uint32_t v2);
-
 		// creates a new quad from existing vertices, creates new edges between the vertices
 		// if they are not already present
 		uint32_t addQuad(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
-
-		// like addQuad but doesn't create a new polygon
-		void setQuad(uint32_t blank_quad, uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3);
-
-		// think capping a cylinder
-		void stichVerticesToVertexLooped(std::vector<uint32_t>& vertices, uint32_t vertex);
 
 		void deletePoly(uint32_t poly);
 
@@ -429,28 +490,25 @@ namespace scme {
 
 		// upload vertex additions and removals to GPU
 		void uploadVertexAddsRemoves();
-		bool dirty_vertex_list;
 
 		// upload vertex positions changes to GPU
 		void uploadVertexPositions();
-		bool dirty_vertex_pos;
 
 		// upload vertex normals changes to GPU
 		void uploadVertexNormals();
-		bool dirty_vertex_normals;
 
 		// upload poly additions and removals to GPU
 		void uploadIndexBufferChanges();
-		bool dirty_index_buff;
 
-		// uploads which tesselation triangles have changed
-		// computes on the GPU normals for polygons
-		// downloads the results and applies them
-		// 
-		// the based_on parameter is used to determine on what basis should the tesselation be updated
+		/// <summary>
+		/// uploads which tesselation triangles have changed
+		/// computes on the GPU normals for polygons
+		/// downloads the results and applies them
+		///
+		/// the based_on parameter is used to determine on what basis should the tesselation be updated
+		/// </summary>
 		void uploadTesselationTriangles(
 			TesselationModificationBasis based_on = TesselationModificationBasis::MODIFIED_POLYS);
-		bool dirty_tess_tris;
 
 
 		// Debug /////////////////////////////////////////////////////////////

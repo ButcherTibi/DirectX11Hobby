@@ -7,8 +7,7 @@
 #include <thread>
 
 #include <SculptMesh/SculptMesh.hpp>
-#include <Renderer/Renderer.hpp>
-#include "FilePath.hpp"
+#include <ButchersToolbox/Filesys/Filesys.hpp>
 #include "Camera/Camera.hpp"
 
 #include "./CommonTypes.hpp"
@@ -475,7 +474,7 @@ public:
 	MeshInstanceRef createUV_Sphere(CreateUV_SphereInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);
 	
 	// import a GLTF from path
-	ErrStack importMeshesFromGLTF_File(io::Path& path, GLTF_ImporterSettings& settings,
+	ErrStack importMeshesFromGLTF_File(filesys::Path<char>& path, GLTF_ImporterSettings& settings,
 		std::vector<MeshInstanceRef>* r_instances = nullptr);
 
 	//MeshInstance* createLine(CreateLineInfo& info, MeshLayer* dest_layer = nullptr, MeshDrawcall* dest_drawcall = nullptr);

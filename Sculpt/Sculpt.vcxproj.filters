@@ -103,9 +103,6 @@
     <ClCompile Include="SculptPCH.cpp">
       <Filter>Source Files\Precompiled Headers</Filter>
     </ClCompile>
-    <ClCompile Include="RenderDocIntegration.cpp">
-      <Filter>Source Files\Tooling</Filter>
-    </ClCompile>
     <ClCompile Include="SculptMesh\AABBs.cpp">
       <Filter>Source Files\SculptMesh</Filter>
     </ClCompile>
@@ -131,6 +128,42 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Camera\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ButchersToolbox\Filesys\Filesys.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ButchersToolbox\Console\Console.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ButchersToolbox\Windows\WindowsSpecific.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectX 11\DX11Wrapper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer\GenerateGPU_Data.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\Operations\InstanceOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\Operations\VertexOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\InternalOperations\InternalVertexOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\Operations\EdgeOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\InternalOperations\InternalEdgeOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\InternalOperations\InternalPolyOperations.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SculptMesh\Operations\PolyOperations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -159,9 +192,6 @@
     <ClInclude Include="SculptPCH.hpp">
       <Filter>Source Files\Precompiled Headers</Filter>
     </ClInclude>
-    <ClInclude Include="RenderDocIntegration.hpp">
-      <Filter>Source Files\Tooling</Filter>
-    </ClInclude>
     <ClInclude Include="App\Application.hpp">
       <Filter>Source Files\Application</Filter>
     </ClInclude>
@@ -169,12 +199,17 @@
     <ClInclude Include="Camera\Camera.hpp" />
     <ClInclude Include="CommonTypes.hpp" />
     <ClInclude Include="Input.hpp" />
+    <ClInclude Include="SparseVector.hpp" />
+    <ClInclude Include="ButchersToolbox\Filesys\Filesys.hpp" />
+    <ClInclude Include="ButchersToolbox\Console\Console.hpp" />
+    <ClInclude Include="ButchersToolbox\Windows\WindowsSpecific.hpp" />
+    <ClInclude Include="DirectX 11\DX11Wrapper.hpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\MeshVS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\MeshPS.hlsl">
+    <FxCompile Include="Shaders\ColoredPS\MeshPS.hlsl">
       <Filter>Source Files\Shaders\Mesh</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\WirePS.hlsl">
@@ -186,7 +221,7 @@
     <FxCompile Include="Shaders\SeeThruWirePS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
-    <FxCompile Include="Shaders\MeshDepthOnlyPS.hlsl">
+    <FxCompile Include="Shaders\ColoredPS\MeshDepthOnlyPS.hlsl">
       <Filter>Source Files\Shaders\Wireframe</Filter>
     </FxCompile>
     <FxCompile Include="Shaders\DebugPS.hlsl">

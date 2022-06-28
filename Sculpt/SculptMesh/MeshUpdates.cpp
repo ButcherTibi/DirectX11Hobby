@@ -6,12 +6,8 @@
 // Mine
 #include <Renderer/Renderer.hpp>
 
-// Debug
-#include "RenderDocIntegration.hpp"
-
 
 using namespace scme;
-namespace conc = concurrency;
 using namespace std::chrono_literals;
 
 
@@ -28,126 +24,108 @@ void SculptMesh::markAllVerticesForNormalUpdate()
 
 		i++;
 	}
-
-	this->dirty_vertex_normals = true;
 }
 
 void SculptMesh::uploadVertexAddsRemoves()
 {
-	if (verts.size()) {
+	gpu_verts.resize(verts.capacity() + 1);
 
-		// add vertices
-		gpu_verts.resize(verts.capacity() + 1);
+	for (scme::ModifiedVertex& modified_v : modified_verts) {
 
-		for (scme::ModifiedVertex& modified_v : modified_verts) {
+		// remove vertices
+		if (modified_v.state == ModifiedVertexState::DELETED) {
 
-			// remove vertices
-			if (modified_v.state == ModifiedVertexState::DELETED) {
+			GPU_MeshVertex gpu_v;
+			gpu_v.normal.x = 999'999.f;
 
-				GPU_MeshVertex gpu_v;
-				gpu_v.normal.x = 999'999.f;
-
-				gpu_verts.upload(modified_v.idx + 1, gpu_v);
-				break;
-			}
+			gpu_verts.upload(modified_v.idx + 1, gpu_v);
 		}
 	}
-
-	this->dirty_vertex_list = false;
 }
 
 void SculptMesh::uploadVertexPositions()
 {
-	assert_cond(dirty_vertex_list == false);
+	auto& r = renderer;
 
-	if (modified_verts.size() > 0) {
-
-		auto& r = renderer;
-
-		// Counting
-		{
-			uint32_t group_count = 1;
-			uint32_t thread_count = 0;
-
-			for (scme::ModifiedVertex& modified_v : modified_verts) {
-
-				if (modified_v.state == ModifiedVertexState::UPDATE &&
-					verts.isDeleted(modified_v.idx) == false)
-				{
-					thread_count++;
-
-					if (thread_count == 64) {
-						group_count++;
-						thread_count = 0;
-					}
-				}
-			}
-
-			r.vert_pos_updates.resize(group_count);
-		}
-
-		uint32_t group_idx = 0;
-		uint32_t thread_idx = 0;
+	// Counting
+	{
+		uint32_t group_count = 1;
+		uint32_t thread_count = 0;
 
 		for (scme::ModifiedVertex& modified_v : modified_verts) {
 
 			if (modified_v.state == ModifiedVertexState::UPDATE &&
 				verts.isDeleted(modified_v.idx) == false)
 			{
-				auto& update = r.vert_pos_updates[group_idx];
-				update.vertex_id[thread_idx] = modified_v.idx + 1;
-				update.new_pos[thread_idx] = dxConvert(verts[modified_v.idx].pos);
+				thread_count++;
 
-				thread_idx++;
-
-				if (thread_idx == 64) {
-					group_idx++;
-					thread_idx = 0;
+				if (thread_count == 64) {
+					group_count++;
+					thread_count = 0;
 				}
 			}
 		}
 
-		// Round Down Threads
-		uint32_t last_thread = thread_idx;
-		for (thread_idx = last_thread; thread_idx < 64; thread_idx++) {
-			r.vert_pos_updates[group_idx].vertex_id[thread_idx] = 0;
-		}
-
-		// Load
-		r.gpu_vert_pos_updates.upload(r.vert_pos_updates);
-
-		// Command List
-		auto& im_ctx = r.im_ctx;
-		im_ctx->ClearState();
-
-		// Shader Resources
-		{
-			std::array<ID3D11ShaderResourceView*, 1> srvs = {
-				r.gpu_vert_pos_updates.getSRV()
-			};
-			im_ctx->CSSetShaderResources(0, srvs.size(), srvs.data());
-		}
-
-		// UAVs
-		{
-			std::array<ID3D11UnorderedAccessView*, 1> uavs = {
-				gpu_verts.getUAV()
-			};
-			im_ctx->CSSetUnorderedAccessViews(0, uavs.size(), uavs.data(), nullptr);
-		}
-
-		im_ctx->CSSetShader(r.update_vertex_positions_cs.Get(), nullptr, 0);
-
-		im_ctx->Dispatch(r.vert_pos_updates.size(), 1, 1);
+		r.vert_pos_updates.resize(group_count);
 	}
 
-	this->dirty_vertex_pos = false;
+	uint32_t group_idx = 0;
+	uint32_t thread_idx = 0;
+
+	for (scme::ModifiedVertex& modified_v : modified_verts) {
+
+		if (modified_v.state == ModifiedVertexState::UPDATE &&
+			verts.isDeleted(modified_v.idx) == false)
+		{
+			auto& update = r.vert_pos_updates[group_idx];
+			update.vertex_id[thread_idx] = modified_v.idx + 1;
+			update.new_pos[thread_idx] = dxConvert(verts[modified_v.idx].pos);
+
+			thread_idx++;
+
+			if (thread_idx == 64) {
+				group_idx++;
+				thread_idx = 0;
+			}
+		}
+	}
+
+	// Round Down Threads
+	uint32_t last_thread = thread_idx;
+	for (thread_idx = last_thread; thread_idx < 64; thread_idx++) {
+		r.vert_pos_updates[group_idx].vertex_id[thread_idx] = 0;
+	}
+
+	// Load
+	r.gpu_vert_pos_updates.upload(r.vert_pos_updates);
+
+	// Command List
+	auto& im_ctx = r.im_ctx;
+	im_ctx->ClearState();
+
+	// Shader Resources
+	{
+		std::array<ID3D11ShaderResourceView*, 1> srvs = {
+			r.gpu_vert_pos_updates.getSRV()
+		};
+		im_ctx->CSSetShaderResources(0, srvs.size(), srvs.data());
+	}
+
+	// UAVs
+	{
+		std::array<ID3D11UnorderedAccessView*, 1> uavs = {
+			gpu_verts.getUAV()
+		};
+		im_ctx->CSSetUnorderedAccessViews(0, uavs.size(), uavs.data(), nullptr);
+	}
+
+	im_ctx->CSSetShader(r.update_vertex_positions_cs.Get(), nullptr, 0);
+
+	im_ctx->Dispatch(r.vert_pos_updates.size(), 1, 1);
 }
 
 void SculptMesh::uploadVertexNormals()
 {
-	assert_cond(dirty_tess_tris == false);
-
 	if (modified_verts.size() > 0) {
 
 		auto& r = renderer;
@@ -232,14 +210,10 @@ void SculptMesh::uploadVertexNormals()
 
 		ctx->Dispatch(r.vert_normal_updates.size(), 1, 1);
 	}
-
-	this->dirty_vertex_normals = false;
 }
 
 void SculptMesh::uploadIndexBufferChanges()
 {
-	assert_cond(dirty_vertex_list == false);
-
 	if (modified_polys.size() > 0) {
 
 		// regardless if a poly is tris or quad, always load 6 indexes
@@ -321,14 +295,10 @@ void SculptMesh::uploadIndexBufferChanges()
 			}
 		}
 	}
-
-	dirty_index_buff = false;
 }
 
 void SculptMesh::uploadTesselationTriangles(TesselationModificationBasis based_on)
 {
-	assert_cond(dirty_vertex_pos == false);
-
 	if (modified_verts.size() > 0) {
 
 		auto& r = renderer;
@@ -510,6 +480,4 @@ void SculptMesh::uploadTesselationTriangles(TesselationModificationBasis based_o
 			}
 		}
 	}
-
-	dirty_tess_tris = false;
 }

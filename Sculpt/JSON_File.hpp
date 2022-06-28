@@ -4,7 +4,6 @@
 #include <variant>
 #include <forward_list>
 
-#include "FilePath.hpp"
 #include "ErrorStack.hpp"
 
 

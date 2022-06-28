@@ -9,7 +9,8 @@
 #include <glm\mat4x4.hpp>
 
 #include "JSON_File.hpp"
-#include "FilePath.hpp"
+//#include "FilePath.hpp"
+#include <ButchersToolbox/Filesys/Filesys.hpp>
 
 
 namespace base64 {
@@ -178,6 +179,6 @@ namespace gltf {
 		ErrStack _loadVec3FromBuffer(uint64_t acc_idx,
 			std::vector<base64::BitVector>& bin_buffs, std::vector<glm::vec3>& r_vecs);
 
-		ErrStack importGLTF(io::Path& path_to_gltf_file);
+		ErrStack importGLTF(filesys::Path<char>& path_to_gltf_file);
 	};
 }

@@ -1,6 +1,7 @@
 #include "./Application.hpp"
 
 // Mine
+#include <Renderer/Renderer.hpp>
 #include "Geometry.hpp"
 #include "GLTF_File.hpp"
 
@@ -158,19 +159,6 @@ void Application::reset()
 	lights[7].intensity = 0.f;
 
 	ambient_intensity = 0.03f;
-
-	//// Camera
-	//camera_focus = { 0, 0, 0 };
-	//camera_field_of_view = 15.f;
-	//camera_z_near = 0.1f;
-	//camera_z_far = 100'000.f;
-	//camera_pos = { 0, 0, 0 };
-	//camera_quat_inv = { 1, 0, 0, 0 };
-	//camera_forward = { 0, 0, -1 };
-
-	//camera_orbit_sensitivity = 0.1f;
-	//camera_pan_sensitivity = 0.001f;
-	//camera_dolly_sensitivity = 0.001f;
 }
 
 MeshInstanceRef Application::copyInstance(MeshInstanceRef& source_ref)
@@ -519,7 +507,7 @@ MeshInstanceRef Application::createUV_Sphere(CreateUV_SphereInfo& info,
 	return new_ref;
 }
 
-ErrStack Application::importMeshesFromGLTF_File(io::Path& path, GLTF_ImporterSettings& settings,
+ErrStack Application::importMeshesFromGLTF_File(filesys::Path<char>& path, GLTF_ImporterSettings& settings,
 	std::vector<MeshInstanceRef>* r_instances)
 {
 	ErrStack err_stack;

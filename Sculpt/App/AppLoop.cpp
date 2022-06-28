@@ -1,5 +1,7 @@
 #include "./Application.hpp"
 
+#include <Renderer/Renderer.hpp>
+
 
 void createTestScene_SingleTriangle()
 {
@@ -20,15 +22,19 @@ void createTestScene_ImportGLTF()
 {
 	app.resetToHardcodedStartup();
 
-	io::Path file_path;
+	auto file_path = filesys::Path<char>::executablePath();
+	file_path.pop(3);
+	file_path.append("Sculpt/Meshes/Journey/scene.gltf");
+
+	/*io::Path file_path;
 	ErrStack err_stack = file_path.recreateFromRelativePath("Sculpt/Meshes/Journey/scene.gltf");
 	if (err_stack.isBad()) {
 		err_stack.debugPrint();
 		return;
-	}
+	}*/
 
 	GLTF_ImporterSettings settings;
-	err_stack = app.importMeshesFromGLTF_File(file_path, settings);
+	ErrStack err_stack = app.importMeshesFromGLTF_File(file_path, settings);
 	if (err_stack.isBad()) {
 		err_stack.debugPrint();
 		return;
@@ -121,7 +127,7 @@ void Application::main(bool enable_render_doc)
 
 	// Debug
 	{
-		debug.capture_frame = true;
+		debug.capture_frame = false;
 	}
 
 	renderer.init(enable_render_doc);
@@ -206,15 +212,11 @@ void Application::CPU_update()
 	// Camera Rotate
 	if (input.key_list[VirtualKeys::RIGHT_MOUSE_BUTTON].down_transition) {
 
-		//glm::vec3 pixel_world_pos;
-		//renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
-		//
-		////printf("%.2f %.2f %.2f \n", pixel_world_pos.x, pixel_world_pos.y, pixel_world_pos.z);
-		//
-		//if (pixel_world_pos.x != FLT_MAX) {
-		//	app.camera.setCameraFocalPoint(pixel_world_pos);
-		//}
-
+		glm::vec3 pixel_world_pos;
+		if (renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos)) {
+			app.camera.setCameraFocalPoint(pixel_world_pos);
+		}
+		
 		window.setMouseVisibility(false);
 		window.trapMousePosition(input.mouse_x, input.mouse_y);
 	}
@@ -228,6 +230,12 @@ void Application::CPU_update()
 
 	// Camera Panning
 	if (input.key_list[VirtualKeys::MIDDLE_MOUSE_BUTTON].down_transition) {
+
+		glm::vec3 pixel_world_pos;
+		if (renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos)) {
+			app.camera.setCameraFocalPoint(pixel_world_pos);
+		}
+
 		window.setMouseVisibility(false);
 		window.trapMousePosition(input.mouse_x, input.mouse_y);
 	}
@@ -240,14 +248,13 @@ void Application::CPU_update()
 	}
 
 	// Camera Dolly
-	{
-		/*glm::vec3 pixel_world_pos;
-		renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos);
+	if (input.mouse_wheel_delta != 0) {
 
-		if (pixel_world_pos.x != FLT_MAX) {
+		glm::vec3 pixel_world_pos;
+		if (renderer.getPixelWorldPosition(input.mouse_x, input.mouse_y, pixel_world_pos)) {
 			app.camera.setCameraFocalPoint(pixel_world_pos);
 		}
 
-		camera.dollyCamera(input.mouse_wheel_delta * app.camera.dolly_sensitivity);*/
+		camera.dollyCamera(input.mouse_wheel_delta * app.camera.dolly_sensitivity);
 	}
 }

@@ -71,9 +71,6 @@
     <ClInclude Include="utf_string.hpp">
       <Filter>UTF-8 Strings</Filter>
     </ClInclude>
-    <ClInclude Include="utf8.h">
-      <Filter>ThirdParty\utf8</Filter>
-    </ClInclude>
     <ClInclude Include="Input.hpp" />
     <ClInclude Include="MathStuff.hpp" />
   </ItemGroup>

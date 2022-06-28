@@ -523,7 +523,7 @@ namespace dx11 {
 		void load(void* data, uint32_t width, uint32_t height);
 
 		void readPixel(uint32_t x, uint32_t y, uint32_t& r, uint32_t& g);
-		void readPixel(uint32_t x, uint32_t y, std::array<uint32_t, 4>& rgba);
+		void readPixel(uint32_t x, uint32_t y, std::array<float, 4>& rgba);
 
 		void ensureUnmapped();
 

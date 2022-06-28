@@ -330,7 +330,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 			uint32_t v2_idx = (row + 1) * cols + col + 1;
 			uint32_t v3_idx = (row + 1) * cols + col;
 
-			setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
+			initQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 			
 			quad_idx++;
 		}
@@ -340,7 +340,7 @@ void SculptMesh::createAsCylinder(float height, float diameter, uint32_t rows, u
 		uint32_t v2_idx = (row + 1) * cols;
 		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
-		setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
+		initQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 		quad_idx++;
 	}
@@ -466,7 +466,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
 			uint32_t v2_idx = (row + 1) * cols + col + 1;
 			uint32_t v3_idx = (row + 1) * cols + col;
 
-			setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
+			initQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 			quad_idx++;
 		}
@@ -476,7 +476,7 @@ void SculptMesh::createAsUV_Sphere(float diameter, uint32_t rows, uint32_t cols,
 		uint32_t v2_idx = (row + 1) * cols;
 		uint32_t v3_idx = (row + 1) * cols + cols - 1;
 
-		setQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
+		initQuad(quad_idx, v0_idx, v1_idx, v2_idx, v3_idx);
 
 		quad_idx++;
 	}
@@ -532,10 +532,10 @@ void SculptMesh::createFromLists(std::vector<uint32_t>& indexes, std::vector<glm
 		glm::vec3 winding_normal = calcWindingNormal(v0, v1, v2);
 
 		if (glm::dot(normal, winding_normal) > 0) {
-			setTris(tris_idx, v0_idx, v1_idx, v2_idx);
+			initTris(tris_idx, v0_idx, v1_idx, v2_idx);
 		}
 		else {
-			setTris(tris_idx, v2_idx, v1_idx, v0_idx);
+			initTris(tris_idx, v2_idx, v1_idx, v0_idx);
 		}
 
 		tris_idx++;

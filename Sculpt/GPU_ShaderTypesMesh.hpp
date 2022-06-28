@@ -72,57 +72,6 @@ struct GPU_MeshInstance {
 	DirectX::XMFLOAT4 wireframe_tess_back_color;
 	float wireframe_tess_split_count;
 	float wireframe_tess_gap;
-
-	// No longer used but just in case a I change my mind
-	//static auto getInputLayout(uint32_t input_slot = 1)
-	//{
-	//	std::array<D3D11_INPUT_ELEMENT_DESC, 12> elems;
-	//	elems[0].SemanticName = "INSTANCE_POSITION";
-	//	elems[0].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	elems[1].SemanticName = "INSTANCE_ROTATION";
-	//	elems[1].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-
-	//	elems[2].SemanticName = "ALBEDO_COLOR";
-	//	elems[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	elems[3].SemanticName = "ROUGHNESS";
-	//	elems[3].Format = DXGI_FORMAT_R32_FLOAT;
-
-	//	elems[4].SemanticName = "METALLIC";
-	//	elems[4].Format = DXGI_FORMAT_R32_FLOAT;
-
-	//	elems[5].SemanticName = "SPECULAR";
-	//	elems[5].Format = DXGI_FORMAT_R32_FLOAT;
-
-	//	elems[6].SemanticName = "WIREFRAME_FRONT_COLOR";
-	//	elems[6].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	elems[7].SemanticName = "WIREFRAME_BACK_COLOR";
-	//	elems[7].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-
-	//	elems[8].SemanticName = "WIREFRAME_TESS_FRONT_COLOR";
-	//	elems[8].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-
-	//	elems[9].SemanticName = "WIREFRAME_TESS_BACK_COLOR";
-	//	elems[9].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-
-	//	elems[10].SemanticName = "WIREFRAME_TESS_SPLIT_COUNT";
-	//	elems[10].Format = DXGI_FORMAT_R32_FLOAT;
-
-	//	elems[11].SemanticName = "WIREFRAME_TESS_GAP";
-	//	elems[11].Format = DXGI_FORMAT_R32_FLOAT;
-
-	//	for (D3D11_INPUT_ELEMENT_DESC& elem : elems) {
-	//		elem.SemanticIndex = 0;
-	//		elem.InputSlot = input_slot;
-	//		elem.AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
-	//		elem.InputSlotClass = D3D11_INPUT_PER_INSTANCE_DATA;
-	//		elem.InstanceDataStepRate = 1;
-	//	}
-
-	//	return elems;
-	//}
 };
 
 struct GPU_BrushCircleInstance {

@@ -1,11 +1,13 @@
 #include "./Renderer.hpp"
 
+// RenderDoc
+#include <renderdoc_app.h>
+
 // GLM
 #include <glm/gtc/matrix_transform.hpp>
 
 // Mine
 #include <App/Application.hpp>
-#include "RenderDocIntegration.hpp"
 
 
 MeshRenderer renderer;
@@ -18,375 +20,36 @@ void checkDX11(HRESULT result)
 	}
 }
 
-
-// vertex buffer has one extra vertex, which will be the deleted vertex
-// cpu vertex index == gpu vertex index + 1
-void MeshRenderer::loadVertices()
-{
-	for (Mesh& mesh : app.meshes) {
-
-		scme::SculptMesh& sculpt_mesh = mesh.mesh;
-
-		if (sculpt_mesh.verts.size() == 0) {
-			continue;
-		}
-
-		auto load_aabbs = [&]() {
-
-			mesh.prev_aabb_mode = mesh.aabb_render_mode;
-
-			uint32_t aabb_count = 0;
-			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
-
-				switch (mesh.aabb_render_mode) {
-				case AABB_RenderMode::LEAF_ONLY: {
-					if (aabb.isLeaf() && aabb.hasVertices()) {
-						aabb_count++;
-					}
-					break;
-				}
-				case AABB_RenderMode::NORMAL: {
-					if (aabb.isLeaf()) {
-						aabb_count++;
-					}
-					break;
-				}
-				}
-			}
-
-			auto& aabb_verts = sculpt_mesh.aabb_verts;
-			aabb_verts.resize(aabb_count * 36 + 3);
-
-			// AABB rendering uses the Vertex shader in which the 0 index is discarded
-			// with non-indexing drawing
-			{
-				auto& second = aabb_verts[1];
-				second.pos = { 0, 0, 0 };
-
-				auto& third = aabb_verts[2];
-				third.pos = { 0, 0, 0 };
-			}
-
-			uint32_t vertex_idx = 3;
-			for (scme::VertexBoundingBox& aabb : sculpt_mesh.aabbs) {
-
-				switch (mesh.aabb_render_mode) {
-				case AABB_RenderMode::LEAF_ONLY: {
-					if (aabb.isLeaf() == false || aabb.hasVertices() == false) {
-						continue;
-					}
-					break;
-				}
-				case AABB_RenderMode::NORMAL: {
-					if (aabb.isLeaf() == false) {
-						continue;
-					}
-					break;
-				}
-				}
-
-				glm::vec3& min = aabb.aabb.min;
-				glm::vec3& max = aabb.aabb.max;
-
-				// Forward (Classic winding)
-				DirectX::XMFLOAT3 gpu_aabbs_positions[8];
-				gpu_aabbs_positions[0] = dxConvert(min.x, max.y, max.z);  // top left
-				gpu_aabbs_positions[1] = dxConvert(max.x, max.y, max.z);  // top right
-				gpu_aabbs_positions[2] = dxConvert(max.x, min.y, max.z);  // bot right
-				gpu_aabbs_positions[3] = dxConvert(min.x, min.y, max.z);  // bot left
-
-				// Backward
-				gpu_aabbs_positions[4] = dxConvert(min.x, max.y, min.z);  // top left
-				gpu_aabbs_positions[5] = dxConvert(max.x, max.y, min.z);  // top right
-				gpu_aabbs_positions[6] = dxConvert(max.x, min.y, min.z);  // bot right
-				gpu_aabbs_positions[7] = dxConvert(min.x, min.y, min.z);  // bot left
-
-				// Front Face
-				aabb_verts[vertex_idx + 0].pos = gpu_aabbs_positions[0];
-				aabb_verts[vertex_idx + 1].pos = gpu_aabbs_positions[1];
-				aabb_verts[vertex_idx + 2].pos = gpu_aabbs_positions[3];
-
-				aabb_verts[vertex_idx + 3].pos = gpu_aabbs_positions[1];
-				aabb_verts[vertex_idx + 4].pos = gpu_aabbs_positions[2];
-				aabb_verts[vertex_idx + 5].pos = gpu_aabbs_positions[3];
-
-				// Right Face
-				aabb_verts[vertex_idx + 6].pos = gpu_aabbs_positions[1];
-				aabb_verts[vertex_idx + 7].pos = gpu_aabbs_positions[5];
-				aabb_verts[vertex_idx + 8].pos = gpu_aabbs_positions[2];
-
-				aabb_verts[vertex_idx + 9].pos = gpu_aabbs_positions[5];
-				aabb_verts[vertex_idx + 10].pos = gpu_aabbs_positions[6];
-				aabb_verts[vertex_idx + 11].pos = gpu_aabbs_positions[2];
-
-				// Back Face
-				aabb_verts[vertex_idx + 12].pos = gpu_aabbs_positions[5];
-				aabb_verts[vertex_idx + 13].pos = gpu_aabbs_positions[4];
-				aabb_verts[vertex_idx + 14].pos = gpu_aabbs_positions[6];
-
-				aabb_verts[vertex_idx + 15].pos = gpu_aabbs_positions[4];
-				aabb_verts[vertex_idx + 16].pos = gpu_aabbs_positions[7];
-				aabb_verts[vertex_idx + 17].pos = gpu_aabbs_positions[6];
-
-				// Left Face
-				aabb_verts[vertex_idx + 18].pos = gpu_aabbs_positions[4];
-				aabb_verts[vertex_idx + 19].pos = gpu_aabbs_positions[0];
-				aabb_verts[vertex_idx + 20].pos = gpu_aabbs_positions[7];
-
-				aabb_verts[vertex_idx + 21].pos = gpu_aabbs_positions[0];
-				aabb_verts[vertex_idx + 22].pos = gpu_aabbs_positions[3];
-				aabb_verts[vertex_idx + 23].pos = gpu_aabbs_positions[7];
-
-				// Top Face	
-				aabb_verts[vertex_idx + 24].pos = gpu_aabbs_positions[4];
-				aabb_verts[vertex_idx + 25].pos = gpu_aabbs_positions[5];
-				aabb_verts[vertex_idx + 26].pos = gpu_aabbs_positions[0];
-
-				aabb_verts[vertex_idx + 27].pos = gpu_aabbs_positions[5];
-				aabb_verts[vertex_idx + 28].pos = gpu_aabbs_positions[1];
-				aabb_verts[vertex_idx + 29].pos = gpu_aabbs_positions[0];
-
-				// Back Face
-				aabb_verts[vertex_idx + 30].pos = gpu_aabbs_positions[6];
-				aabb_verts[vertex_idx + 31].pos = gpu_aabbs_positions[7];
-				aabb_verts[vertex_idx + 32].pos = gpu_aabbs_positions[2];
-
-				aabb_verts[vertex_idx + 33].pos = gpu_aabbs_positions[7];
-				aabb_verts[vertex_idx + 34].pos = gpu_aabbs_positions[3];
-				aabb_verts[vertex_idx + 35].pos = gpu_aabbs_positions[2];
-
-				// Front Face
-				aabb_verts[vertex_idx + 1].normal.x = 1;
-				aabb_verts[vertex_idx + 2].normal.x = 1;
-
-				aabb_verts[vertex_idx + 3].normal.x = 1;
-				aabb_verts[vertex_idx + 5].normal.x = 1;
-
-				// Right Face
-				aabb_verts[vertex_idx + 7].normal.x = 1;
-				aabb_verts[vertex_idx + 8].normal.x = 1;
-
-				aabb_verts[vertex_idx + 9].normal.x = 1;
-				aabb_verts[vertex_idx + 11].normal.x = 1;
-
-				// Back Face
-				aabb_verts[vertex_idx + 13].normal.x = 1;
-				aabb_verts[vertex_idx + 14].normal.x = 1;
-
-				aabb_verts[vertex_idx + 15].normal.x = 1;
-				aabb_verts[vertex_idx + 17].normal.x = 1;
-
-				// Left Face
-				aabb_verts[vertex_idx + 19].normal.x = 1;
-				aabb_verts[vertex_idx + 20].normal.x = 1;
-
-				aabb_verts[vertex_idx + 21].normal.x = 1;
-				aabb_verts[vertex_idx + 23].normal.x = 1;
-
-				// Top Face
-				aabb_verts[vertex_idx + 25].normal.x = 1;
-				aabb_verts[vertex_idx + 26].normal.x = 1;
-
-				aabb_verts[vertex_idx + 27].normal.x = 1;
-				aabb_verts[vertex_idx + 29].normal.x = 1;
-
-				// Bot Face
-				aabb_verts[vertex_idx + 31].normal.x = 1;
-				aabb_verts[vertex_idx + 32].normal.x = 1;
-
-				aabb_verts[vertex_idx + 27].normal.x = 1;
-				aabb_verts[vertex_idx + 35].normal.x = 1;
-
-				// normal.xy is unused
-
-				vertex_idx += 36;
-			}
-
-			sculpt_mesh.gpu_aabb_verts.upload(aabb_verts);
-		};
-
-		// Update AABBs (does not depend GPU data being updated)
-		if (mesh.aabb_render_mode != AABB_RenderMode::NO_RENDER)
-		{
-			// redo render mode changed
-			if (mesh.aabb_render_mode != mesh.prev_aabb_mode) {
-
-				mesh.prev_aabb_mode = mesh.aabb_render_mode;
-				load_aabbs();
-			}
-			// positions updated
-			else if (sculpt_mesh.modified_verts.size()) {
-				load_aabbs();
-			}
-			// no data so load
-			else if (sculpt_mesh.gpu_aabb_verts.count() == 0) {
-				load_aabbs();
-			}
-		}
-		// Free GPU Memory
-		else if (mesh.aabb_render_mode == AABB_RenderMode::NO_RENDER && sculpt_mesh.gpu_aabb_verts.count() != 0) {
-			sculpt_mesh.gpu_aabb_verts.deallocate();
-
-			mesh.prev_aabb_mode = mesh.aabb_render_mode;
-		}
-
-		// Update Mesh Data
-		{
-			if (sculpt_mesh.dirty_vertex_list) {
-				sculpt_mesh.uploadVertexAddsRemoves();
-			}
-
-			if (sculpt_mesh.dirty_vertex_pos) {
-				sculpt_mesh.uploadVertexPositions();
-			}
-
-			if (sculpt_mesh.dirty_index_buff) {
-				sculpt_mesh.uploadIndexBufferChanges();
-			}
-
-			if (sculpt_mesh.dirty_tess_tris) {
-				sculpt_mesh.uploadTesselationTriangles(scme::TesselationModificationBasis::MODIFIED_POLYS);
-			}
-
-			if (app.shading_normal == GPU_ShadingNormal::VERTEX &&
-				sculpt_mesh.dirty_vertex_normals)
-			{
-				sculpt_mesh.uploadVertexNormals();
-			}
-
-			if (sculpt_mesh.modified_verts.size() > 0) {
-
-				for (scme::ModifiedVertex& modified_v : sculpt_mesh.modified_verts) {
-
-					switch (modified_v.state) {
-					case scme::ModifiedVertexState::UPDATE: {
-
-						// it is posible to have the vertex as both deleted and updated multiple times
-						// when running multiple sculpt mesh operations
-						if (sculpt_mesh.verts.isDeleted(modified_v.idx) == false) {
-
-							sculpt_mesh.moveVertexInAABBs(modified_v.idx);
-						}
-						break;
-					}
-					}
-				}
-			}
-
-			sculpt_mesh.modified_verts.clear();
-			sculpt_mesh.modified_polys.clear();
-		}
-
-		// Instances
-		{
-		for (MeshInstanceSet& set : mesh.sets) {
-
-			if (set.modified_instances.size()) {
-
-				auto& gpu_instances = set.gpu_instances;
-
-				if (gpu_instances.buff == nullptr) {
-					gpu_instances.dev = dev.Get();
-					gpu_instances.ctx3 = im_ctx.Get();
-					gpu_instances.init_desc = {};
-					gpu_instances.init_desc.Usage = D3D11_USAGE_DEFAULT;
-					gpu_instances.init_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-					gpu_instances.init_desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-					gpu_instances.init_desc.StructureByteStride = sizeof(GPU_MeshInstance);
-				}
-
-				gpu_instances.resize(set.instances.capacity());
-
-				for (ModifiedMeshInstance& modified_instance : set.modified_instances) {
-
-					GPU_MeshInstance gpu_inst;
-
-					switch (modified_instance.type) {
-					case ModifiedInstanceType::UPDATE: {
-
-						if (set.instances.isDeleted(modified_instance.idx) == false) {
-
-							MeshInstance& instance = set.instances[modified_instance.idx];
-							gpu_inst.pos = dxConvert(instance.transform.pos);
-							gpu_inst.rot = dxConvert(instance.transform.rot);
-
-							PhysicalBasedMaterial& pbr_mat = instance.pbr_material;
-							gpu_inst.albedo_color = dxConvert(pbr_mat.albedo_color);
-							gpu_inst.roughness = glm::clamp(pbr_mat.roughness, 0.05f, 1.f);
-							gpu_inst.metallic = pbr_mat.metallic;
-							gpu_inst.specular = pbr_mat.specular;
-
-							MeshWireframeColors wire_colors = instance.wireframe_colors;
-							gpu_inst.wireframe_front_color = dxConvert(wire_colors.front_color);
-							gpu_inst.wireframe_back_color = dxConvert(wire_colors.back_color);
-							gpu_inst.wireframe_tess_front_color = dxConvert(wire_colors.tesselation_front_color);
-							gpu_inst.wireframe_tess_back_color = dxConvert(wire_colors.tesselation_back_color);
-							gpu_inst.wireframe_tess_split_count = wire_colors.tesselation_split_count;
-							gpu_inst.wireframe_tess_gap = wire_colors.tesselation_gap;
-
-							gpu_instances.upload(modified_instance.idx, gpu_inst);
-						}
-						break;
-					}
-
-					case ModifiedInstanceType::DELETED: {
-						gpu_inst.rot.w = 2.f;
-						gpu_instances.upload(modified_instance.idx, gpu_inst);
-						break;
-					}
-					}
-				}
-
-				set.modified_instances.clear();
-
-				// Shader Resource View
-				set.gpu_instances_srv = nullptr;
-
-				D3D11_SHADER_RESOURCE_VIEW_DESC desc;
-				desc.Format = DXGI_FORMAT_UNKNOWN;
-				desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-				desc.Buffer.ElementOffset = 0;
-				desc.Buffer.ElementWidth = sizeof(GPU_MeshInstance);
-				desc.Buffer.NumElements = set.gpu_instances.capacity();
-
-				throwDX11(dev->CreateShaderResourceView(
-					set.gpu_instances.get(), &desc, set.gpu_instances_srv.GetAddressOf()));
-			}
-		}
-		}
-	}
-}
-
 void MeshRenderer::init(bool enable_render_doc)
 {
 	// RenderDoc
-	auto init_render_doc = [&]() {
-
-		HMODULE module = GetModuleHandleA("renderdoc.dll");
-		if (module == nullptr) {
-			printf("renderdoc.dll could not be located");
-			return;
-		}
-
-		pRENDERDOC_GetAPI getApi = (pRENDERDOC_GetAPI)GetProcAddress(module, "RENDERDOC_GetAPI");
-		if (getApi == nullptr) {
-			printf("Could not find GetAPI procedure in the RenderDoc DLL \n");
-			return;
-		}
-
-		if (!getApi(eRENDERDOC_API_Version_1_4_1, (void**)&render_doc)) {
-			printf("Could not get RenderDoc API \n");
-			return;
-		}
-
-		int32_t major;
-		int32_t minor;
-		int32_t patch;
-		render_doc->GetAPIVersion(&major, &minor, &patch);
-		printf("RenderDoc Integration Active API Version %d.%d.%d \n", major, minor, patch);
-	};
-
 	if (enable_render_doc) {
+
+		auto init_render_doc = [&]() {
+
+			HMODULE renderdoc_dll = GetModuleHandleA("renderdoc.dll");
+			if (renderdoc_dll == nullptr) {
+				printf("renderdoc.dll could not be located \n");
+				return;
+			}
+
+			pRENDERDOC_GetAPI getApi = (pRENDERDOC_GetAPI)GetProcAddress(renderdoc_dll, "RENDERDOC_GetAPI");
+			if (getApi == nullptr) {
+				printf("Could not find GetAPI procedure in the RenderDoc DLL \n");
+				return;
+			}
+
+			if (!getApi(eRENDERDOC_API_Version_1_4_1, (void**)&render_doc)) {
+				printf("Could not get RenderDoc API \n");
+				return;
+			}
+
+			int32_t major;
+			int32_t minor;
+			int32_t patch;
+			render_doc->GetAPIVersion(&major, &minor, &patch);
+			printf("RenderDoc Integration Active API Version %d.%d.%d \n", major, minor, patch);
+		};
 		init_render_doc();
 	}
 
@@ -580,6 +243,7 @@ void MeshRenderer::init(bool enable_render_doc)
 		desc.MiscFlags = 0;
 
 		world_pos_cputex.create(dev.Get(), im_ctx.Get(), desc);
+		world_pos_cputex.resize(1, 1);
 	}
 
 	// Staging Buffer
@@ -599,22 +263,22 @@ void MeshRenderer::init(bool enable_render_doc)
 		frame_ubuff.create(dev.Get(), im_ctx.Get(), desc);
 	}
 
-	// PBR Mesh Vertex Shader
+	// Set Shaders folder
 	{
-		dx11::createVertexShaderFromPath("Sculpt/CompiledShaders/MeshVS.cso", dev.Get(),
-			mesh_vs.GetAddressOf(), &shader_cso);
+		auto project_folder = filesys::Path<char>::executablePath();
+		project_folder.pop(3);
+		project_folder.append("Sculpt");
+
+		auto compiled_shaders_folder = project_folder;
+		compiled_shaders_folder.append("CompiledShaders");
+
+		dx11::Shader<ID3D11VertexShader>::compiled_shaders_folder = compiled_shaders_folder;
+		dx11::Shader<ID3D11PixelShader>::compiled_shaders_folder = compiled_shaders_folder;
+		dx11::Shader<ID3D11GeometryShader>::compiled_shaders_folder = compiled_shaders_folder;
 	}
 
-	// Mesh Geometry Shader
-	{
-		ErrStack err_stack = io::readLocalFile("Sculpt/CompiledShaders/MeshGS.cso", shader_cso);
-		if (err_stack.isBad()) {
-			throw std::exception("geometry shader code not found");
-		}
-
-		throwDX11(dev->CreateGeometryShader(shader_cso.data(), shader_cso.size(),
-			nullptr, mesh_gs.GetAddressOf()));
-	}
+	mesh_vs.create(dev.Get(), "", "MeshVS.cso");
+	mesh_gs.create(dev.Get(), "", "MeshGS.cso");
 
 	// Mesh Rasterization States
 	{
@@ -653,27 +317,20 @@ void MeshRenderer::init(bool enable_render_doc)
 	// Pixel Shaders
 	{
 		// PBR Pixel Shader
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/MeshPS.cso", dev.Get(),
-			mesh_ps.GetAddressOf(), &shader_cso);
-
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/MeshDepthOnlyPS.cso", dev.Get(),
-			mesh_depth_only_ps.GetAddressOf(), &shader_cso);
+		mesh_ps.create(dev.Get(), "", "MeshPS.cso");
+		mesh_depth_only_ps.create(dev.Get(), "", "MeshDepthOnlyPS.cso");
 
 		// Wireframe Pixel Shader
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/WirePS.cso", dev.Get(),
-			wire_ps.GetAddressOf(), &shader_cso);
+		wire_ps.create(dev.Get(), "", "WirePS.cso");
 
 		// See Thru Wireframe Pixel Shader
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/SeeThruWirePS.cso", dev.Get(),
-			see_thru_wire_ps.GetAddressOf(), &shader_cso);
+		see_thru_wire_ps.create(dev.Get(), "", "SeeThruWirePS.cso");
 
 		// AABB
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/AABB_PS.cso", dev.Get(),
-			aabb_ps.GetAddressOf(), &shader_cso);
+		aabb_ps.create(dev.Get(), "", "AABB_PS.cso");
 
 		// Debug
-		dx11::createPixelShaderFromPath("Sculpt/CompiledShaders/DebugPS.cso", dev.Get(),
-			debug_ps.GetAddressOf(), &shader_cso);
+		debug_ps.create(dev.Get(), "", "DebugPS.cso");
 	}
 
 	// Blend
@@ -691,9 +348,7 @@ void MeshRenderer::init(bool enable_render_doc)
 		desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 		desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
-		desc.RenderTarget[1].BlendEnable = false;
 		desc.RenderTarget[1].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-
 		desc.RenderTarget[2].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 		desc.RenderTarget[3].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 		desc.RenderTarget[4].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
@@ -723,44 +378,11 @@ void MeshRenderer::init(bool enable_render_doc)
 			"failed to create mesh depth stencil state");
 	}
 
-	// Compute Shaders
-	{
-		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/DistributeAABB_VertsCS.cso", dev.Get(),
-			distribute_AABB_verts_cs.GetAddressOf(), &shader_cso);
-
-		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexPositionsCS.cso", dev.Get(),
-			update_vertex_positions_cs.GetAddressOf(), &shader_cso);
-
-		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexNormalsCS.cso", dev.Get(),
-			update_vertex_normals_cs.GetAddressOf(), &shader_cso);
-
-		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateTesselationTriangles.cso", dev.Get(),
-			update_tesselation_triangles.GetAddressOf(), &shader_cso);
-	}
-
 	// Mesh Compute Data Constant Buffer
 	{
 		mesh_aabb_graph.create(dev.Get(), im_ctx.Get(), D3D11_USAGE_DYNAMIC, D3D10_CPU_ACCESS_WRITE);
 		mesh_aabb_graph.addUint();
 		mesh_aabb_graph.addUint();
-	}
-
-	// Vertex AABB placements
-	{
-		D3D11_BUFFER_DESC desc = {};
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-
-		gpu_unplaced_verts.create(dev.Get(), im_ctx.Get(), desc);
-
-		//
-		desc = {};
-		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
-		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-
-		gpu_placed_verts.create(dev.Get(), im_ctx.Get(), desc);
 	}
 
 	// Vertex Position Update Buffer
@@ -771,6 +393,9 @@ void MeshRenderer::init(bool enable_render_doc)
 		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 
 		gpu_vert_pos_updates.create(dev.Get(), im_ctx.Get(), desc);
+
+		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexPositionsCS.cso", dev.Get(),
+			update_vertex_positions_cs.GetAddressOf(), &shader_cso);
 	}
 
 	// Vertex Normal Update Buffer
@@ -781,6 +406,9 @@ void MeshRenderer::init(bool enable_render_doc)
 		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 
 		gpu_vert_normal_updates.create(dev.Get(), im_ctx.Get(), desc);
+
+		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateVertexNormalsCS.cso", dev.Get(),
+			update_vertex_normals_cs.GetAddressOf(), &shader_cso);
 	}
 
 	// Poly Normal Update Buffers
@@ -798,7 +426,32 @@ void MeshRenderer::init(bool enable_render_doc)
 		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 
 		gpu_r_poly_normal_updates.create(dev.Get(), im_ctx.Get(), desc);
+
+		dx11::createComputeShaderFromPath("Sculpt/CompiledShaders/UpdateTesselationTriangles.cso", dev.Get(),
+			update_tesselation_triangles.GetAddressOf(), &shader_cso);
 	}
+}
+
+void MeshRenderer::beginGPU_Capture()
+{
+	if (render_doc == nullptr) {
+		return;
+	}
+
+	render_doc->StartFrameCapture(nullptr, nullptr);
+
+	printf("RenderDoc frame capture started \n");
+}
+
+void MeshRenderer::endGPU_Capture()
+{
+	if (render_doc == nullptr) {
+		return;
+	}
+
+	render_doc->EndFrameCapture(nullptr, nullptr);
+
+	printf("RenderDoc frame capture ended \n");
 }
 
 void MeshRenderer::loadUniform()
@@ -849,10 +502,10 @@ void MeshRenderer::setWireframeDepthBias(int32_t depth_bias)
 	wire_none_bias_rs.setDepthBias(depth_bias);
 }
 
-void MeshRenderer::getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_world_pos)
+bool MeshRenderer::getPixelWorldPosition(uint32_t x, uint32_t y, glm::vec3& r_world_pos)
 {
-	if (world_pos_cputex.tex == nullptr) {
-		return;
+	if (world_pos_tex.tex == nullptr) {
+		return false;
 	}
 
 	D3D11_BOX box = {};
@@ -869,17 +522,29 @@ void MeshRenderer::getPixelWorldPosition(int32_t x, int32_t y, glm::vec3& r_worl
 		&box
 	);
 
-	std::array<uint32_t, 4> rgba;
+	std::array<float, 4> rgba;
 	world_pos_cputex.readPixel(0, 0, rgba);
-	
-	// copy only RGB and ignore A
-	std::memcpy(&r_world_pos, rgba.data(), sizeof(uint32_t) * 3);
+
+	if (rgba[0] != FLT_MAX) {
+
+		r_world_pos.x = rgba[0];
+		r_world_pos.y = rgba[1];
+		r_world_pos.z = rgba[2];
+
+		/*printf("world position = %.2f %.2f %.2f \n",
+			r_world_pos.x, r_world_pos.y, r_world_pos.z
+		);*/
+
+		return true;
+	}
+	return false;
 }
 
 void MeshRenderer::render()
 {
-	loadVertices();
-	loadUniform();
+	if (app.debug.capture_frame) {
+		beginGPU_Capture();
+	}
 
 	if (render_target_width != app.viewport.width ||
 		render_target_height != app.viewport.height)
@@ -894,8 +559,14 @@ void MeshRenderer::render()
 			checkDX11(swapchain1->GetBuffer(
 				0, IID_PPV_ARGS(swapchain_texs[0].GetAddressOf()))
 			);
+
+			D3D11_RENDER_TARGET_VIEW_DESC rtv_desc = {};
+			rtv_desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+			rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+			rtv_desc.Texture2D.MipSlice = 0;
+
 			checkDX11(dev->CreateRenderTargetView(
-				swapchain_texs[0].Get(), NULL, swapchain_rtvs[0].GetAddressOf())
+				swapchain_texs[0].Get(), &rtv_desc, swapchain_rtvs[0].GetAddressOf())
 			);
 		}
 
@@ -904,7 +575,7 @@ void MeshRenderer::render()
 		wireframe_dtex.resize(app.viewport.width, app.viewport.height);
 		world_pos_tex.resize(app.viewport.width, app.viewport.height);
 
-		loadUniform();
+		// loadUniform();
 
 		this->render_target_width = app.viewport.width;
 		this->render_target_height = app.viewport.height;
@@ -913,6 +584,9 @@ void MeshRenderer::render()
 	// Choose swapchain backbuffer
 	swapchain_backbuffer_index = (swapchain_backbuffer_index + 1) % 1;
 	present_rtv = swapchain_rtvs[swapchain_backbuffer_index].Get();
+
+	loadVertices();
+	loadUniform();
 
 	// Rendering Commands ///////////////////////////////////////////////////////////////////////////////////
 	im_ctx->ClearState();
@@ -1291,6 +965,8 @@ void MeshRenderer::render()
 
 	swapchain1->Present(0, 0);
 
-	// Clear previous cached pixel world position
-	_cached_pixel_world_pos.clear();
+	if (app.debug.capture_frame) {
+		endGPU_Capture();
+		app.debug.capture_frame = false;
+	}
 }

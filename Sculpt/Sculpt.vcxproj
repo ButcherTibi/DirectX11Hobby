@@ -110,10 +110,20 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ButchersToolbox\Console\Console.cpp" />
+    <ClCompile Include="ButchersToolbox\Filesys\Filesys.cpp" />
+    <ClCompile Include="ButchersToolbox\Windows\WindowsSpecific.cpp" />
+    <ClCompile Include="DirectX 11\DX11Wrapper.cpp" />
+    <ClCompile Include="Renderer\GenerateGPU_Data.cpp" />
     <ClCompile Include="SculptMesh\AABBs.cpp" />
     <ClCompile Include="App\AppLoop.cpp" />
     <ClCompile Include="SculptMesh\Brushes.cpp" />
     <ClCompile Include="Camera\Camera.cpp" />
+    <ClCompile Include="SculptMesh\InternalOperations\InternalPolyOperations.cpp" />
+    <ClCompile Include="SculptMesh\Operations\EdgeOperations.cpp" />
+    <ClCompile Include="SculptMesh\Operations\InstanceOperations.cpp" />
+    <ClCompile Include="SculptMesh\InternalOperations\InternalEdgeOperations.cpp" />
+    <ClCompile Include="SculptMesh\InternalOperations\InternalVertexOperations.cpp" />
     <ClCompile Include="SculptMesh\IntersectionQueries.cpp" />
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="Base64.cpp" />
@@ -124,9 +134,10 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="SculptMesh\MeshDebug.cpp" />
     <ClCompile Include="SculptMesh\MeshUpdates.cpp" />
-    <ClCompile Include="RenderDocIntegration.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="SculptMesh\MeshCreation.cpp" />
+    <ClCompile Include="SculptMesh\Operations\PolyOperations.cpp" />
+    <ClCompile Include="SculptMesh\Operations\VertexOperations.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="SculptPCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -138,16 +149,20 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App\Application.hpp" />
+    <ClInclude Include="ButchersToolbox\Console\Console.hpp" />
+    <ClInclude Include="ButchersToolbox\Filesys\Filesys.hpp" />
+    <ClInclude Include="ButchersToolbox\Windows\WindowsSpecific.hpp" />
     <ClInclude Include="Camera\Camera.hpp" />
     <ClInclude Include="CommonTypes.hpp" />
+    <ClInclude Include="DirectX 11\DX11Wrapper.hpp" />
     <ClInclude Include="Geometry.hpp" />
     <ClInclude Include="GLTF_File.hpp" />
     <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
     <ClInclude Include="Input.hpp" />
     <ClInclude Include="JSON_File.hpp" />
-    <ClInclude Include="RenderDocIntegration.hpp" />
     <ClInclude Include="Renderer\Renderer.hpp" />
     <ClInclude Include="SculptMesh\SculptMesh.hpp" />
+    <ClInclude Include="SparseVector.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="SculptPCH.hpp" />
     <ClInclude Include="Window\Window.hpp" />
@@ -171,7 +186,7 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="Shaders\MeshDepthOnlyPS.hlsl">
+    <FxCompile Include="Shaders\ColoredPS\MeshDepthOnlyPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
@@ -181,7 +196,7 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Geometry</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
     </FxCompile>
-    <FxCompile Include="Shaders\MeshPS.hlsl">
+    <FxCompile Include="Shaders\ColoredPS\MeshPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>

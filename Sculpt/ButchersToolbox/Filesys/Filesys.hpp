@@ -134,7 +134,14 @@ namespace filesys {
 		string exe_path;
 		exe_path.resize(max_path_length);
 
-		uint32_t used_size = GetModuleFileName(NULL, exe_path.data(), (uint32_t)exe_path.size());
+		uint32_t used_size;
+
+		if constexpr (std::is_same<T, wchar_t>()) {
+			used_size = GetModuleFileNameW(NULL, exe_path.data(), (uint32_t)exe_path.size());
+		}
+		else if constexpr (std::is_same<T, char>() || std::is_same<T, char8_t>()) {
+			used_size = GetModuleFileNameA(NULL, exe_path.data(), (uint32_t)exe_path.size());
+		}
 
 		exe_path.resize(used_size);
 		exe_path.shrink_to_fit();

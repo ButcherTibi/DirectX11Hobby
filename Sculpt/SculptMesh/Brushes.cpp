@@ -9,12 +9,8 @@
 // Mine
 #include <App/Application.hpp>
 
-// Debug
-#include "RenderDocIntegration.hpp"
-
 
 using namespace scme;
-namespace conc = concurrency;
 using namespace std::chrono_literals;
 
 
