@@ -166,6 +166,9 @@
     <ClCompile Include="SculptMesh\Operations\PolyOperations.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ErrorStack.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
@@ -204,6 +207,7 @@
     <ClInclude Include="ButchersToolbox\Console\Console.hpp" />
     <ClInclude Include="ButchersToolbox\Windows\WindowsSpecific.hpp" />
     <ClInclude Include="DirectX 11\DX11Wrapper.hpp" />
+    <ClInclude Include="ErrorStack.hpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\MeshVS.hlsl">
