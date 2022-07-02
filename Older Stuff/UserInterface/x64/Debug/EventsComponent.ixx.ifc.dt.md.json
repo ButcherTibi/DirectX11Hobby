@@ -1,0 +1,9 @@
+{
+    "Version": "1.1",
+    "Data": {
+        "Source": "e:\\my_work\\directx 11\\sculpt\\userinterface\\eventscomponent.ixx",
+        "ProvidedModule": "EventsComponent",
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

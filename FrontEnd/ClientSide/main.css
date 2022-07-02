@@ -1,0 +1,39 @@
+
+html {
+	--theme_font: sans-serif;
+
+	--theme_backgrd_hue: 208deg;
+	--theme_backgrd_sat: 100%;
+	--theme_backgrd_lum: 84%;
+	--theme_backgrd_color: hsl(
+		var(--theme_backgrd_hue)
+		var(--theme_backgrd_sat)
+		var(--theme_backgrd_lum)
+	);
+
+	--theme_backgrd_hover_color: hsl(
+		var(--theme_backgrd_hue)
+		var(--theme_backgrd_sat)
+		96%
+	);
+}
+
+/* Style Reset *********************************************/
+
+body, menu, label, p {
+	padding: 0px;
+	margin: 0px;
+}
+
+
+/***********************************************************/
+
+body {
+	display: flex;
+	flex-direction: column;
+}
+
+.bar {
+	background-color: var(--theme_backgrd_color);
+}
+

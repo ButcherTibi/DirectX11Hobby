@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.detectIndentation": false,
+		"[html]": {
+            "editor.insertSpaces": false,
+			"editor.tabSize": 2
+		},
+		"[css]": {
+            "editor.insertSpaces": false,
+			"editor.tabSize": 2
+		},
+		"[typescript]": {
+            "editor.insertSpaces": false,
+			"editor.tabSize": 4
+		}
+	}
+}

@@ -1,0 +1,22 @@
+{
+    "Version": "1.1",
+    "Data": {
+        "Source": "e:\\my_work\\directx 11\\sculpt\\userinterface\\eventscomponent.ixx",
+        "ProvidedModule": "",
+        "Includes": [
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\cinttypes",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\yvals_core.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\vcruntime.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\sal.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\concurrencysal.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\vadefs.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\xkeycheck.h",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\cstdint",
+            "d:\\programs\\vs 19\\vc\\tools\\msvc\\14.29.30133\\include\\stdint.h",
+            "c:\\program files (x86)\\windows kits\\10\\include\\10.0.19041.0\\ucrt\\inttypes.h",
+            "c:\\program files (x86)\\windows kits\\10\\include\\10.0.19041.0\\ucrt\\corecrt.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

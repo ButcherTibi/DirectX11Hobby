@@ -1,0 +1,75 @@
+#pragma once
+
+#include "FilePath.hpp"
+#include "TextureAtlas.hpp"
+
+
+namespace nui {
+
+	struct Character {
+		uint32_t unicode;
+
+		int32_t bitmap_left;
+		int32_t bitmap_top;  // the height of the character above the baseline
+
+		int32_t hori_bearing_X;
+		int32_t hori_bearing_Y;
+
+		int32_t advance_X;
+		int32_t advance_Y;
+
+		AtlasRegion* zone;
+	};
+
+
+	 struct FontSize {
+		uint32_t size;
+
+		uint32_t ascender;
+		uint32_t descender;
+		uint32_t line_spacing;
+
+		std::vector<Character> chars;
+
+		Character* findCharacter(uint32_t unicode);
+	};
+
+
+	struct Font {
+		std::vector<uint8_t> ttf_file;
+		void* face_ft;
+
+		// Properties
+		std::string family_name;
+		std::string style_name;
+
+		std::vector<FontSize> sizes;
+	};
+
+
+	// TODO: make this lazy loading
+	// where you just ask it for a character code, font, size
+	// and it will load, rasterize and pack it
+	class CharacterAtlas {
+	public:
+		TextureAtlas atlas;
+
+		void* free_type_ft = nullptr;
+
+		std::vector<Font> fonts;
+
+		// Memory cache
+		std::vector<uint8_t> _bitmap;
+
+	public:
+		ErrStack addFont(std::string path, Font*& r_font);
+
+		// TODO: specify which characters
+		ErrStack addSizeToFont(Font* font, uint32_t size, FontSize*& r_font_size);
+
+		// Finds the font and adds the size if it does not exist, else return existing size.
+		// Font must exist.
+		bool ensureFontWithSize(std::string font_family, std::string font_style, uint32_t size,
+			FontSize*& r_font_size);
+	};
+}

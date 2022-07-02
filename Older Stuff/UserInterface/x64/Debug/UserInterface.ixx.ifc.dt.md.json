@@ -1,0 +1,9 @@
+{
+    "Version": "1.1",
+    "Data": {
+        "Source": "f:\\my_work\\directx 11\\sculpt\\userinterface\\userinterface.ixx",
+        "ProvidedModule": "UserInterface",
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

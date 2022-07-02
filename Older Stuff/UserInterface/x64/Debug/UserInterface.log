@@ -1,0 +1,62 @@
+﻿  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\AllVS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CharPS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CharVS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CirclePS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\CopyParentsMaskPS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectFlatFillPS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectLinearGradient.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\RectPS.cso
+  compilation object save succeeded; see F:\my_work\DirectX 11\Sculpt\UserInterface\CompiledShaders\SimpleVS.cso
+  Scanning sources for module dependencies...
+  UserInterface.ixx
+  Compiling...
+  UserInterface.ixx
+  CharacterAtlas.cpp
+  Container.cpp
+  DX11Wrapper.cpp
+  Elements.cpp
+  EventsComponent.cpp
+  ErrorStack.cpp
+  FilePath.cpp
+  GPU_ShaderTypes.hpp
+  Instance.cpp
+  Properties.cpp
+  TextureAtlas.hpp
+  utf8string.cpp
+  Window.cpp
+  Generating Code...
+  UserInterface.vcxproj -> F:\my_work\DirectX 11\Sculpt\x64\Debug\UserInterface.lib
+  
+  	                   2	F:\my_work\DirectX 11\Sculpt\UserInterface\x64\Debug\
+  	    Newer     		  10.0 m	UserInterface.ixx.ifc
+  
+  ------------------------------------------------------------------------------
+  
+                 Total    Copied   Skipped  Mismatch    FAILED    Extras
+      Dirs :         1         0         1         0         0         0
+     Files :         2         1         1         0         0         0
+     Bytes :   10.07 m   10.07 m     3.9 k         0         0         0
+     Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+  
+  
+     Speed :           880365333 Bytes/sec.
+     Speed :           50374.908 MegaBytes/min.
+     Ended : miercuri, 29 iunie 2022 18:20:08
+  
+  
+  	                   1	F:\my_work\DirectX 11\Sculpt\x64\Debug\
+  	    Newer     		  17.0 m	UserInterface.lib
+  
+  ------------------------------------------------------------------------------
+  
+                 Total    Copied   Skipped  Mismatch    FAILED    Extras
+      Dirs :         1         0         1         0         0         0
+     Files :         1         1         0         0         0         0
+     Bytes :   17.04 m   17.04 m         0         0         0         0
+     Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+  
+  
+     Speed :           812456181 Bytes/sec.
+     Speed :           46489.115 MegaBytes/min.
+     Ended : miercuri, 29 iunie 2022 18:20:08
+  

@@ -115,6 +115,7 @@
     <ClCompile Include="ButchersToolbox\Windows\WindowsSpecific.cpp" />
     <ClCompile Include="DirectX 11\DX11Wrapper.cpp" />
     <ClCompile Include="ErrorStack.cpp" />
+    <ClCompile Include="FilePath.cpp" />
     <ClCompile Include="Renderer\GenerateGPU_Data.cpp" />
     <ClCompile Include="SculptMesh\AABBs.cpp" />
     <ClCompile Include="App\AppLoop.cpp" />
@@ -157,6 +158,7 @@
     <ClInclude Include="CommonTypes.hpp" />
     <ClInclude Include="DirectX 11\DX11Wrapper.hpp" />
     <ClInclude Include="ErrorStack.hpp" />
+    <ClInclude Include="FilePath.hpp" />
     <ClInclude Include="Geometry.hpp" />
     <ClInclude Include="GLTF_File.hpp" />
     <ClInclude Include="GPU_ShaderTypesMesh.hpp" />
@@ -238,11 +240,6 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="CommentGraphics.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\UserInterface\UserInterface.vcxproj">
-      <Project>{5692ff15-cf3c-4d63-a7df-6a9ffa183bf1}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

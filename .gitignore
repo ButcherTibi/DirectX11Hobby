@@ -1,8 +1,6 @@
 # Folders
 .vs/
-UserInterface/x64
 Sculpt/x64
-BackEnd/x64
 FrontEnd/bin
 FrontEnd/obj
 
