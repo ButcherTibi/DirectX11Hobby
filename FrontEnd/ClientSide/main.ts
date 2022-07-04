@@ -1,8 +1,10 @@
 import MainMenu, { MenuItem } from "./MainMenu/MainMenu.js"
+import Vector3Editor from "./Editors/Vector3Editor.js";
 
 
 class Globals {
     static main_menu: MainMenu;
+	static vector3_editor: Vector3Editor;
 }
 
 
@@ -110,6 +112,15 @@ function main() {
 		}
 	];
 	Globals.main_menu.render("main_menu_root", items);
+
+	Globals.vector3_editor = new Vector3Editor();
+	Globals.vector3_editor.create("vector3_editor");
+	Globals.vector3_editor.x = 123.67;
+	Globals.vector3_editor.y = 0.981;
+	Globals.vector3_editor.z = 10.45;
+	
+	Globals.vector3_editor = new Vector3Editor();
+	Globals.vector3_editor.create("vector3_editor");
 }
 
 main();

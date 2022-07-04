@@ -5,7 +5,7 @@
 
 	<link rel="stylesheet" href="./main.css">
 	
-	<!-- Main Menu -->
+	<link rel="stylesheet" href="./Editors/Vector3Editor.css">
 	<link rel="stylesheet" href="./MainMenu/MainMenu.css">
 
 	<script type="module" src="./main.js" defer></script>
@@ -15,14 +15,54 @@
 	
 	<section class="mid-section">
 		<aside class="left-aside">
-			Brush panel
+			<div id="vector3_editor"></div>
 		</aside>
-		<main>
+		<main class="viewport">
 			<h1>Viewport</h1>
 		</main>
 		<aside class="right-aside">
 			Layers
 		</aside>
 	</section>
+
+	<footer class="footer-bar">
+
+	</footer>
+
+	<!-- <div id="theme_color_test">
+		<div></div>
+		<div></div>
+		<div></div>
+		<div></div>
+	</div> -->
+
+	<template id="vec3_input">
+		<div class="vec3-input-inl">
+			<div class="axis x-axis">
+				<button class="sub">⯇</button>
+				<span class="field">
+					<label>X:</label>
+					<input type="number" step="0">
+				</span>
+				<button class="add">⯈</button>
+			</div>
+			<div class="axis y-axis">
+				<button class="sub">⯇</button>
+				<span class="field">
+					<label>Y:</label>
+					<input type="number" step="0">
+				</span>
+				<button class="add">⯈</button>
+			</div>
+			<div class="axis z-axis">
+				<button class="sub">⯇</button>
+				<span class="field">
+					<label>Z:</label>
+					<input type="number" step="0">
+				</span>
+				<button class="add">⯈</button>
+			</div>
+		</div>
+	</template>
 </body>
 </html>

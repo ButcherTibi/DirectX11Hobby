@@ -1,5 +1,6 @@
 # Folders
 .vs/
+node_modules/
 Sculpt/x64
 FrontEnd/bin
 FrontEnd/obj

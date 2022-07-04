@@ -1,0 +1,105 @@
+
+.vec3-input-inl {
+	display: flex;
+	flex-direction: row;
+
+	--border_radius: 15px;
+}
+
+.vec3-input-inl .axis:first-child,
+.vec3-input-inl .axis:first-child .sub {
+	border-radius: var(--border_radius) 0px 0px var(--border_radius);
+}
+
+.vec3-input-inl .axis:last-child,
+.vec3-input-inl .axis:last-child .add {
+	border-radius: 0px var(--border_radius) var(--border_radius) 0px;
+}
+
+.vec3-input-inl .axis {
+	height: 2rem;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+
+	flex-grow: 1;
+
+	background-color: var(--theme_backgrd_color);
+	transition: background .2s;
+}
+
+.vec3-input-inl .axis:hover,
+.vec3-input-inl .axis:focus-within {
+	background-color: var(--theme_backgrd_hover_color);
+}
+
+.vec3-input-inl .axis button {
+	height: 100%;
+	display: flex;
+	align-items: center;
+	color: transparent;
+	background-color: transparent;
+
+	transition: background .2s, color .2s;
+
+	cursor: pointer;
+}
+
+.vec3-input-inl .axis:hover button,
+.vec3-input-inl .axis:focus-within button {
+	color: black;
+	background-color: var(--theme_backgrd_hover_color);
+}
+
+.vec3-input-inl .axis button:hover,
+.vec3-input-inl .axis button:focus {
+	color: black;
+	background-color: var(--theme_backgrd_hard_hover_color);
+}
+
+.vec3-input-inl .field {
+	height: 100%;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+
+	transition: background .2s;
+}
+
+.vec3-input-inl .field:hover {
+	background-color: var(--theme_backgrd_hard_hover_color);
+}
+
+.vec3-input-inl .field:focus-within {
+	background-color: var(--theme_backgrd_edit_color);
+}
+
+.vec3-input-inl label {
+	margin-left: 7px;
+
+	font-family: var(--theme_font);
+	color: black;
+}
+
+.vec3-input-inl input {
+	outline: none;
+	border-width: 0px;
+	width: 0%;
+	height: 100%;
+	flex-grow: 1;
+
+	font-family: var(--theme_font);
+	font-size: 1rem;
+	color: black;
+	text-align: center;
+
+	background-color: transparent;
+}
+
+/* ascunde butoanele */
+.vec3-input-inl input::-webkit-outer-spin-button,
+.vec3-input-inl input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}

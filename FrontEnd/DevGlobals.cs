@@ -43,12 +43,13 @@ public static class DevGlobals
 		main_webview = new_webview;
 	}
 
-	//public static bool reloadWebView()
-	//{
-	//	return main_window.DispatcherQueue.TryEnqueue(() => {
-	//		main_webview.Reload();
-	//	});
-	//}
+	public static void reloadWebView()
+	{
+		main_window.Dispatcher.Invoke(() =>
+		{
+			main_webview.Reload();
+		});
+	}
 
 	//public static void configureTypeScriptOutDir()
 	//{
@@ -123,6 +124,8 @@ public static class DevGlobals
 	{
 		hot_reload_thread = new Thread(() =>
 		{
+			Thread.Sleep(5000);
+
 			while (true) {
 
 				bool were_files_copied = false;
@@ -172,10 +175,10 @@ public static class DevGlobals
 				addInputFiles(client_side_src);
 
 				if (were_files_copied) {
-					// reloadWebView();
+					reloadWebView();
 				}
 
-				Thread.Sleep(1000 * 2);
+				Thread.Sleep(1000);
 			}
 		});
 

@@ -20,7 +20,8 @@
 }
 
 .main-menu .menu-item > label {
-	display: block;padding: 3px 8px;
+	display: block;
+	padding: 3px 8px;
 	font-family: var(--theme_font);
 	font-size: var(--item_font_size);
 	font-weight: normal;
@@ -34,7 +35,8 @@
 	border-width: 2px;
 	border-radius: var(--menu_border_radius);
 
-	width: max-content;display: flex;
+	width: max-content;
+	display: flex;
 	flex-direction: column;
 
 	background-color: var(--theme_backgrd_color);

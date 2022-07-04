@@ -1,10 +1,10 @@
 
-html {
+:root {
 	--theme_font: sans-serif;
 
 	--theme_backgrd_hue: 208deg;
 	--theme_backgrd_sat: 100%;
-	--theme_backgrd_lum: 84%;
+	--theme_backgrd_lum: 86%;
 	--theme_backgrd_color: hsl(
 		var(--theme_backgrd_hue)
 		var(--theme_backgrd_sat)
@@ -14,17 +14,36 @@ html {
 	--theme_backgrd_hover_color: hsl(
 		var(--theme_backgrd_hue)
 		var(--theme_backgrd_sat)
-		96%
+		78%
+	);
+
+	--theme_backgrd_hard_hover_color: hsl(
+		var(--theme_backgrd_hue)
+		var(--theme_backgrd_sat)
+		71%
+	);
+
+	--theme_backgrd_edit_color: hsl(
+		var(--theme_backgrd_hue)
+		var(--theme_backgrd_sat)
+		94%
 	);
 }
 
 /* Style Reset *********************************************/
 
 body, menu, label, p {
-	padding: 0px;
+	padding: 0px; 
 	margin: 0px;
 }
 
+button {
+	border: none;
+}
+
+button:focus {
+	outline: none;
+}
 
 /***********************************************************/
 
@@ -37,3 +56,35 @@ body {
 	background-color: var(--theme_backgrd_color);
 }
 
+.mid-section {
+	width: 100%;
+
+	display: flex;
+	flex-direction: row;
+}
+
+.mid-section .left-aside {
+	flex-basis: 0;
+	flex-grow: 1;
+}
+
+.mid-section .left-aside #vector3_editor {
+	display: flex;
+	flex-direction: column;
+
+	padding: 5px;
+	gap: 5px;
+}
+
+.mid-section .viewport {
+	flex-basis: 0;
+	flex-grow: 1;
+}
+
+.mid-section .right-aside {
+	display: none;
+}
+
+.footer-bar {
+
+}
