@@ -45,6 +45,12 @@ button:focus {
 	outline: none;
 }
 
+ul {
+	margin: 0px;
+	padding-inline-start: 0px;
+	list-style-type: none;
+}
+
 /***********************************************************/
 
 body {
@@ -68,7 +74,7 @@ body {
 	flex-grow: 1;
 }
 
-.mid-section .left-aside #vector3_editor {
+.mid-section .left-aside #panel {
 	display: flex;
 	flex-direction: column;
 

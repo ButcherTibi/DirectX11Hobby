@@ -11,7 +11,7 @@
 }
 
 .main-menu .menu-item {
-	/* position: relative; */
+	position: relative;
 }
 
 .main-menu .menu-item:hover {
@@ -19,12 +19,27 @@
 	background-color: var(--theme_backgrd_hover_color);
 }
 
-.main-menu .menu-item > label {
-	display: block;
+.main-menu .menu-item > summary {
 	padding: 3px 8px;
+
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.main-menu .menu-item > summary label {
 	font-family: var(--theme_font);
 	font-size: var(--item_font_size);
 	font-weight: normal;
+}
+
+.main-menu .menu-item > summary i {
+	margin-left: 5px;
+
+	font-size: var(--item_font_size);
+	font-weight: normal;
+	font-style: normal;
 }
 
 .main-menu .menu-item > menu {
@@ -46,7 +61,7 @@
 	
 }
 
-.main-menu .title-item > label {
+.main-menu .title-item > summary {
 	padding: 8px 8px;
 }
 

@@ -1,9 +1,10 @@
 
 export default class Vector3InputInl {
-	instance: HTMLElement | null = null;
-	_x: number = 0;
-	_y: number = 0;
-	_z: number = 0;
+	private instance: HTMLElement | null = null;
+	private _x: number = 0;
+	private _y: number = 0;
+	private _z: number = 0;
+	onchange?: (x: number, y: number, z: number) => void;
 
 	get x() {
 		return this._x;
@@ -22,6 +23,10 @@ export default class Vector3InputInl {
 
 		let x_input: HTMLInputElement = this.instance!.querySelector(".x-axis input")!;
 		x_input.value = this._x.toFixed(2);
+
+		if (this.onchange !== undefined) {
+			this.onchange(this._x, this._y, this._z);
+		}
 	}
 
 	set y(value) {
@@ -29,6 +34,10 @@ export default class Vector3InputInl {
 
 		let input: HTMLInputElement = this.instance!.querySelector(".y-axis input")!;
 		input.value = this._y.toFixed(2);
+
+		if (this.onchange !== undefined) {
+			this.onchange(this._x, this._y, this._z);
+		}
 	}
 
 	set z(value) {
@@ -36,6 +45,10 @@ export default class Vector3InputInl {
 
 		let input: HTMLInputElement = this.instance!.querySelector(".z-axis input")!;
 		input.value = this._z.toFixed(2);
+
+		if (this.onchange !== undefined) {
+			this.onchange(this._x, this._y, this._z);
+		}
 	}
 
 	getValue(idx: number){
@@ -79,11 +92,10 @@ export default class Vector3InputInl {
 	{
 		let root = document.getElementById(root_id);
 		if (root === null) {
-			console.trace();
-			return;
+			throw `root_id ${root_id} not found`;
 		}
 
-		let vector3_template = document.getElementById("vec3_input") as HTMLTemplateElement;
+		let vector3_template = document.getElementById("vec3_input_inl") as HTMLTemplateElement;
 		let node = vector3_template.content.cloneNode(true);
 
 		root.append(node);
@@ -111,8 +123,23 @@ export default class Vector3InputInl {
 			};
 		});
 
-		let field_x = this.instance.querySelector(".x-axis .field") as HTMLSpanElement;
-		let input_x = field_x.querySelector("input");
+		let inputs: HTMLInputElement[] = [
+			this.instance.querySelector(".x-axis input") as HTMLInputElement,
+			this.instance.querySelector(".y-axis input") as HTMLInputElement,
+			this.instance.querySelector(".z-axis input") as HTMLInputElement
+		];
+		inputs.forEach((input, idx) => {
+			input.onchange = (e) => {
+				let input_elem = e.target as HTMLInputElement;
+				let new_value = parseFloat(input_elem.value);
 
+				if (isNaN(new_value) === false) {
+					this.setValue(idx, new_value);
+				}
+				else {
+					this.setValue(idx, this.getValue(idx));
+				}
+			};
+		});
 	}
 }

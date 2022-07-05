@@ -1,10 +1,12 @@
 import MainMenu, { MenuItem } from "./MainMenu/MainMenu.js"
-import Vector3Editor from "./Editors/Vector3Editor.js";
+import Vector3InputInl from "./Editors/Vector3InputInl.js";
+import Accordion, { AccordionItem } from "./Accordion/Accordion.js";
 
 
 class Globals {
     static main_menu: MainMenu;
-	static vector3_editor: Vector3Editor;
+	static vec3: Vector3InputInl;
+	static accordion: Accordion;
 }
 
 
@@ -113,14 +115,38 @@ function main() {
 	];
 	Globals.main_menu.render("main_menu_root", items);
 
-	Globals.vector3_editor = new Vector3Editor();
-	Globals.vector3_editor.create("vector3_editor");
-	Globals.vector3_editor.x = 123.67;
-	Globals.vector3_editor.y = 0.981;
-	Globals.vector3_editor.z = 10.45;
+	// Vector3 Input
+	Globals.vec3 = new Vector3InputInl();
+	Globals.vec3.create("panel");
+	Globals.vec3.x = 123.67;
+	Globals.vec3.y = 0.981;
+	Globals.vec3.z = 10.45;
+	Globals.vec3.onchange = (x, y, z) => {
+		console.log(`vector3 = {${x}, ${y}, ${z}}`);
+	};
 	
-	Globals.vector3_editor = new Vector3Editor();
-	Globals.vector3_editor.create("vector3_editor");
+	Globals.vec3 = new Vector3InputInl();
+	Globals.vec3.create("panel");
+
+	// Accordion
+	{
+		let p = document.createElement("p");
+		p.textContent = "Test content";
+
+		let p2 = document.createElement("p");
+		p2.textContent = "Another bit of content";
+
+		let frag = document.createDocumentFragment();
+		frag.append(p, p2);
+
+		let accordion_items: AccordionItem[] = [
+			{ name: "Item 1", content: frag },
+			{ name: "Item 2" },
+			{ name: "Item 3", content: frag }
+		];
+		Globals.accordion = new Accordion();
+		Globals.accordion.create("panel", accordion_items);
+	}
 }
 
 main();

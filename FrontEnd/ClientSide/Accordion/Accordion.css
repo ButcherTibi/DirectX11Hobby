@@ -1,0 +1,54 @@
+
+.accordion {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+
+	--border_radius: 5px;
+	--padding: 10px;
+}
+
+.accordion > li {
+	border-radius: var(--border_radius);
+
+
+	background-color: var(--theme_backgrd_color);
+}
+
+.accordion > li > summary {
+	border-radius: var(--border_radius);
+	padding: 0px var(--padding);
+	height: 2rem;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+
+	cursor: pointer;
+}
+
+.accordion > li > summary:hover {
+	background-color: var(--theme_backgrd_hover_color);
+}
+
+.accordion > li > summary i {
+	margin-right: 5px;
+	font-style: normal;
+}
+
+.accordion > li > summary label {
+	font-family: var(--theme_font);
+	cursor: pointer;
+}
+
+.accordion > li > .content-wrap {
+	box-sizing: border-box;
+	height: 0px;
+	overflow-y: hidden;
+
+	transition: height .2s;
+}
+
+.accordion > li > .content-wrap > .content {
+	padding: var(--padding);
+}

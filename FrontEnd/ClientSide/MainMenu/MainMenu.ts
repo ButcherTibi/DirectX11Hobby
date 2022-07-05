@@ -44,9 +44,7 @@ export default class MainMenu {
 		}
 	}
 	
-	showMenu(e: MouseEvent) {
-		let li_elem: HTMLElement = e.target as HTMLElement;
-
+	showMenu(li_elem: HTMLLIElement) {
 		let menu: HTMLMenuElement = li_elem.children[1] as HTMLMenuElement;
 		let parent_menu: HTMLMenuElement = li_elem.parentElement as HTMLMenuElement;
 		clearTimeout(this.close_timer_id);
@@ -86,24 +84,40 @@ export default class MainMenu {
 
 	private _render = (parent_elem: HTMLElement, item: MenuItem, level: number) => {
 		let li_elem = document.createElement("li");
-		li_elem.onmouseenter = (e) => this.showMenu(e);
-		li_elem.onmouseleave = (e) => this.scheduleHidingMenu(e);
+		// li_elem.onmouseenter = (e) => this.showMenu(e);
+		// li_elem.onmouseleave = (e) => this.scheduleHidingMenu(e);
 
-		if (level === 0) {
-			li_elem.classList.add("title-item");
-		}
-		else {
-			li_elem.classList.add("normal-item");
-		}
+		
 
 		li_elem.classList.add("menu-item");
 
 		let label = document.createElement("label");
 		label.textContent = item.name;
 
-		li_elem.appendChild(label);
+		let summary = document.createElement("summary");
+		
+		summary.appendChild(label);
+
+		li_elem.appendChild(summary);
+
+		if (level === 0) {
+			li_elem.classList.add("title-item");
+			summary.onclick = () => this.showMenu(li_elem);
+			li_elem.onmouseleave = (e) => this.scheduleHidingMenu(e);
+		}
+		else {
+			li_elem.classList.add("normal-item");
+			li_elem.onmouseenter = (e) => this.showMenu(e.target as HTMLLIElement);
+			li_elem.onmouseleave = (e) => this.scheduleHidingMenu(e);
+		}
 
 		if (item.children && item.children.length > 0) {
+
+			if (level !== 0) {
+				let arrow = document.createElement("i");
+				arrow.textContent = "⯈";
+				summary.appendChild(arrow);
+			}
 
 			let menu_elem = document.createElement("menu");
 			menu_elem.classList.add("hide");

@@ -6,11 +6,7 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
   </ItemGroup>
-  <ItemGroup>
-    <None Update="ClientSide\Editors\Vector3Editor.ts">
-      <SubType>Code</SubType>
-    </None>
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Page Update="MainWindow.xaml">
       <SubType>Designer</SubType>
